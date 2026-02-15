@@ -82,13 +82,13 @@ export default function Landing() {
               I'm a Volunteer
             </Link>
             <Link
-              to="/signup?role=ORGANIZATION"
+              to="/signup?role=ORG_ADMIN"
               className="px-6 py-3 border border-gray-300 rounded-md font-medium hover:bg-gray-50"
             >
               I'm an Organization
             </Link>
             <Link
-              to="/signup?role=SCHOOL"
+              to="/signup?role=SCHOOL_ADMIN"
               className="px-6 py-3 border border-gray-300 rounded-md font-medium hover:bg-gray-50"
             >
               I'm a School

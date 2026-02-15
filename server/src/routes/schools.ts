@@ -5,26 +5,19 @@ import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
-// GET /api/schools — list all schools
-router.get("/", async (_req: Request, res: Response) => {
+// GET /api/schools/:id — school details (staff only)
+router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const schools = await prisma.school.findMany({
-      include: { _count: { select: { students: true } } },
-      orderBy: { name: "asc" },
-    });
-    res.json(schools);
-  } catch (err) {
-    console.error("List schools error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
 
-// GET /api/schools/:id
-router.get("/:id", async (req: Request, res: Response) => {
-  try {
     const school = await prisma.school.findUnique({
       where: { id: req.params.id },
-      include: { _count: { select: { students: true, approvedOrgs: true, groups: true } } },
+      include: {
+        _count: { select: { staff: true, classrooms: true, approvedOrgs: true, groups: true } },
+      },
     });
     if (!school) return res.status(404).json({ error: "School not found" });
     res.json(school);
@@ -34,11 +27,11 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/schools/:id — update school settings
-router.put("/:id", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+// PUT /api/schools/:id — update school settings (SCHOOL_ADMIN only)
+router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -46,9 +39,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL"), async (req: Request, res
       where: { id: req.params.id },
       data: {
         name: req.body.name,
-        address: req.body.address,
-        phone: req.body.phone,
-        description: req.body.description,
+        domain: req.body.domain,
         requiredHours: req.body.requiredHours,
         verificationStandard: req.body.verificationStandard,
       },
@@ -60,18 +51,23 @@ router.put("/:id", authenticate, requireRole("SCHOOL"), async (req: Request, res
   }
 });
 
-// GET /api/schools/:id/students — list students
-router.get("/:id/students", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+// GET /api/schools/:id/students — list students (via classrooms)
+router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
     const students = await prisma.user.findMany({
-      where: { schoolId: req.params.id, role: "STUDENT" },
+      where: {
+        role: "STUDENT",
+        classroom: { schoolId: req.params.id },
+      },
       select: {
         id: true, name: true, email: true, grade: true, age: true, avatarUrl: true,
+        classroomId: true,
+        classroom: { select: { id: true, name: true } },
         serviceSessions: {
           where: { verificationStatus: "APPROVED" },
           select: { totalHours: true },
@@ -94,15 +90,21 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL"), async (req: Req
 });
 
 // GET /api/schools/:id/stats — school-wide stats
-router.get("/:id/stats", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
+    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
     const students = await prisma.user.findMany({
-      where: { schoolId: req.params.id, role: "STUDENT" },
+      where: {
+        role: "STUDENT",
+        classroom: { schoolId: req.params.id },
+      },
       include: {
         serviceSessions: {
           where: { verificationStatus: "APPROVED" },
@@ -137,11 +139,11 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL"), async (req: Reques
   }
 });
 
-// POST /api/schools/:id/organizations/:orgId/approve — approve an org
-router.post("/:id/organizations/:orgId/approve", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+// POST /api/schools/:id/organizations/:orgId/approve
+router.post("/:id/organizations/:orgId/approve", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -174,10 +176,10 @@ router.post("/:id/organizations/:orgId/approve", authenticate, requireRole("SCHO
 });
 
 // POST /api/schools/:id/organizations/:orgId/reject
-router.post("/:id/organizations/:orgId/reject", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.post("/:id/organizations/:orgId/reject", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -203,11 +205,11 @@ router.post("/:id/organizations/:orgId/reject", authenticate, requireRole("SCHOO
   }
 });
 
-// GET /api/schools/:id/organizations — list org approval statuses
-router.get("/:id/organizations", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+// GET /api/schools/:id/organizations
+router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -217,7 +219,6 @@ router.get("/:id/organizations", authenticate, requireRole("SCHOOL"), async (req
       orderBy: { createdAt: "desc" },
     });
 
-    // Also get orgs not yet reviewed
     const approvedOrgIds = approvals.map((a) => a.organizationId);
     const pendingOrgs = await prisma.organization.findMany({
       where: { id: { notIn: approvedOrgIds } },
@@ -233,10 +234,10 @@ router.get("/:id/organizations", authenticate, requireRole("SCHOOL"), async (req
 // ─── Student Groups ─────────────────────────────────────────────
 
 // GET /api/schools/:id/groups
-router.get("/:id/groups", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.get("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -253,10 +254,10 @@ router.get("/:id/groups", authenticate, requireRole("SCHOOL"), async (req: Reque
 });
 
 // POST /api/schools/:id/groups
-router.post("/:id/groups", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.post("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
-    if (!school || school.adminUserId !== req.user!.userId) {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -271,16 +272,12 @@ router.post("/:id/groups", authenticate, requireRole("SCHOOL"), async (req: Requ
 });
 
 // GET /api/schools/:id/groups/:groupId/students
-router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
     const members = await prisma.studentGroupMember.findMany({
       where: { groupId: req.params.groupId },
-      include: {
-        group: true,
-      },
     });
 
-    // Get full student info for each member
     const studentIds = members.map((m) => m.studentId);
     const students = await prisma.user.findMany({
       where: { id: { in: studentIds } },
@@ -316,7 +313,7 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL"),
 });
 
 // POST /api/schools/:id/groups/:groupId/students
-router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const { studentId } = req.body;
     const member = await prisma.studentGroupMember.create({

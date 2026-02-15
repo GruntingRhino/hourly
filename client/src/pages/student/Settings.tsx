@@ -4,23 +4,38 @@ import { api } from "../../lib/api";
 
 export default function StudentSettings() {
   const { user, logout, refreshUser } = useAuth();
-  const [tab, setTab] = useState<"profile" | "security" | "notifications">("profile");
+  const [tab, setTab] = useState<"profile" | "classroom" | "security">("profile");
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordIsError, setPasswordIsError] = useState(false);
+
+  // Classroom join
+  const [inviteCode, setInviteCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [classroomMessage, setClassroomMessage] = useState("");
+  const [classroomIsError, setClassroomIsError] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage("");
+    setIsError(false);
     try {
       await api.put("/auth/profile", { name, phone, bio });
       await refreshUser();
       setMessage("Profile updated!");
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(err.message || "Failed to update profile");
+      setIsError(true);
     } finally {
       setSaving(false);
     }
@@ -37,7 +52,70 @@ export default function StudentSettings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.message);
+      setMessage(err.message || "Failed to export");
+      setIsError(true);
+    }
+  };
+
+  const handleJoinClassroom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClassroomMessage("");
+    setClassroomIsError(false);
+    setJoining(true);
+    try {
+      await api.post("/classrooms/join", { inviteCode: inviteCode.trim() });
+      setClassroomMessage("Joined classroom successfully!");
+      setInviteCode("");
+      await refreshUser();
+    } catch (err: any) {
+      setClassroomMessage(err.message || "Failed to join classroom");
+      setClassroomIsError(true);
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleLeaveClassroom = async () => {
+    setClassroomMessage("");
+    setClassroomIsError(false);
+    try {
+      await api.post("/classrooms/leave");
+      setClassroomMessage("Left classroom successfully");
+      await refreshUser();
+    } catch (err: any) {
+      setClassroomMessage(err.message || "Failed to leave classroom");
+      setClassroomIsError(true);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage("");
+    setPasswordIsError(false);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("Passwords do not match");
+      setPasswordIsError(true);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordMessage("Password must be at least 8 characters");
+      setPasswordIsError(true);
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.put("/auth/password", { currentPassword, newPassword });
+      setPasswordMessage("Password changed successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPasswordMessage(err.message || "Failed to change password");
+      setPasswordIsError(true);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -46,7 +124,7 @@ export default function StudentSettings() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <div className="flex gap-2 mb-6">
-        {(["profile", "security", "notifications"] as const).map((t) => (
+        {(["profile", "classroom", "security"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -75,7 +153,11 @@ export default function StudentSettings() {
           </div>
 
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              isError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
               {message}
             </div>
           )}
@@ -134,21 +216,118 @@ export default function StudentSettings() {
         </div>
       )}
 
-      {tab === "security" && (
+      {tab === "classroom" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Security</h3>
-          <p className="text-sm text-gray-500">
-            Password changes and security settings will be available in a future update.
-          </p>
+          <h3 className="font-semibold mb-4">Classroom</h3>
+
+          {classroomMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              classroomIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {classroomMessage}
+            </div>
+          )}
+
+          {user?.classroomId ? (
+            <div>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <div className="font-medium text-blue-900">
+                  {user.classroom?.name || "Classroom"}
+                </div>
+                <div className="text-sm text-blue-700">
+                  {user.school?.name || "School"}
+                </div>
+              </div>
+              <button
+                onClick={handleLeaveClassroom}
+                className="text-red-600 text-sm hover:underline"
+              >
+                Leave Classroom
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-gray-500 mb-4">
+                Enter an invite code from your teacher to join a classroom.
+              </p>
+              <form onSubmit={handleJoinClassroom} className="flex gap-2">
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="Enter 8-character code"
+                  maxLength={8}
+                  required
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md font-mono tracking-wider text-center"
+                />
+                <button
+                  type="submit"
+                  disabled={joining || inviteCode.trim().length !== 8}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {joining ? "Joining..." : "Join"}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       )}
 
-      {tab === "notifications" && (
+      {tab === "security" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Notification Preferences</h3>
-          <p className="text-sm text-gray-500">
-            Notification preferences will be available in a future update.
-          </p>
+          <h3 className="font-semibold mb-4">Change Password</h3>
+          {passwordMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              passwordIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {passwordMessage}
+            </div>
+          )}
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            >
+              {changingPassword ? "Changing..." : "Change Password"}
+            </button>
+          </form>
         </div>
       )}
     </div>

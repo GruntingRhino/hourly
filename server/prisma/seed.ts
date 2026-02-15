@@ -1,30 +1,61 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
+
+function generateInviteCode(): string {
+  return crypto.randomBytes(4).toString("hex");
+}
 
 async function main() {
   console.log("Seeding database...");
 
-  // Create school
+  // Create school admin user first
   const schoolAdmin = await prisma.user.create({
     data: {
       email: "admin@lincoln.edu",
       passwordHash: await bcrypt.hash("password123", 12),
       name: "Principal Johnson",
-      role: "SCHOOL",
+      role: "SCHOOL_ADMIN",
       emailVerified: true,
     },
   });
 
+  // Create school
   const school = await prisma.school.create({
     data: {
       name: "Lincoln High School",
-      address: "100 Main Street",
-      phone: "(555) 123-4567",
-      description: "Lincoln High School community service program",
+      domain: "lincoln.edu",
+      verified: false,
+      createdById: schoolAdmin.id,
       requiredHours: 40,
-      adminUserId: schoolAdmin.id,
+    },
+  });
+
+  // Associate admin with school
+  await prisma.user.update({
+    where: { id: schoolAdmin.id },
+    data: { schoolId: school.id },
+  });
+
+  // Create default "General" classroom
+  const generalClassroom = await prisma.classroom.create({
+    data: {
+      name: "General",
+      schoolId: school.id,
+      teacherId: schoolAdmin.id,
+      inviteCode: generateInviteCode(),
+    },
+  });
+
+  // Create a second classroom
+  const classroom2 = await prisma.classroom.create({
+    data: {
+      name: "AP Community Service",
+      schoolId: school.id,
+      teacherId: schoolAdmin.id,
+      inviteCode: generateInviteCode(),
     },
   });
 
@@ -45,7 +76,7 @@ async function main() {
       email: "volunteer@greenearth.org",
       passwordHash: await bcrypt.hash("password123", 12),
       name: "Sarah Mitchell",
-      role: "ORGANIZATION",
+      role: "ORG_ADMIN",
       organizationId: org.id,
       emailVerified: true,
     },
@@ -67,7 +98,7 @@ async function main() {
       email: "staff@library.org",
       passwordHash: await bcrypt.hash("password123", 12),
       name: "Mike Chen",
-      role: "ORGANIZATION",
+      role: "ORG_ADMIN",
       organizationId: org2.id,
       emailVerified: true,
     },
@@ -81,7 +112,7 @@ async function main() {
     data: { schoolId: school.id, organizationId: org2.id, status: "APPROVED", approvedAt: new Date() },
   });
 
-  // Create students
+  // Create students — joined via classroom (implicitly associated with school)
   const student1 = await prisma.user.create({
     data: {
       email: "john@student.edu",
@@ -90,7 +121,8 @@ async function main() {
       role: "STUDENT",
       age: 16,
       grade: "11th",
-      schoolId: school.id,
+      classroomId: generalClassroom.id,
+      schoolId: school.id, // denormalized from classroom
       emailVerified: true,
     },
   });
@@ -103,6 +135,7 @@ async function main() {
       role: "STUDENT",
       age: 17,
       grade: "12th",
+      classroomId: classroom2.id,
       schoolId: school.id,
       emailVerified: true,
     },
@@ -116,6 +149,7 @@ async function main() {
       role: "STUDENT",
       age: 15,
       grade: "10th",
+      classroomId: generalClassroom.id,
       schoolId: school.id,
       emailVerified: true,
     },
@@ -286,6 +320,9 @@ async function main() {
   console.log("  Organization: volunteer@greenearth.org / password123");
   console.log("  Organization: staff@library.org / password123");
   console.log("  School Admin: admin@lincoln.edu / password123");
+  console.log(`\nClassroom invite codes:`);
+  console.log(`  General: ${generalClassroom.inviteCode}`);
+  console.log(`  AP Community Service: ${classroom2.inviteCode}`);
 }
 
 main()

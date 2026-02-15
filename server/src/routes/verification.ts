@@ -6,7 +6,7 @@ import { requireRole } from "../middleware/rbac";
 const router = Router();
 
 // POST /api/verification/:sessionId/approve — org approves hours
-router.post("/:sessionId/approve", authenticate, requireRole("ORGANIZATION", "SCHOOL"), async (req: Request, res: Response) => {
+router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },
@@ -15,7 +15,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORGANIZATION", "SC
     if (!session) return res.status(404).json({ error: "Session not found" });
 
     // Verify the actor has permission
-    if (req.user!.role === "ORGANIZATION") {
+    if (req.user!.role === "ORG_ADMIN") {
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (session.opportunity.organizationId !== user?.organizationId) {
         return res.status(403).json({ error: "Not your organization's session" });
@@ -67,7 +67,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORGANIZATION", "SC
 });
 
 // POST /api/verification/:sessionId/reject — org rejects hours
-router.post("/:sessionId/reject", authenticate, requireRole("ORGANIZATION", "SCHOOL"), async (req: Request, res: Response) => {
+router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },
@@ -75,7 +75,7 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORGANIZATION", "SCH
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
 
-    if (req.user!.role === "ORGANIZATION") {
+    if (req.user!.role === "ORG_ADMIN") {
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (session.opportunity.organizationId !== user?.organizationId) {
         return res.status(403).json({ error: "Not your organization's session" });
@@ -122,7 +122,7 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORGANIZATION", "SCH
 });
 
 // GET /api/verification/pending — get pending verifications for org
-router.get("/pending", authenticate, requireRole("ORGANIZATION"), async (req: Request, res: Response) => {
+router.get("/pending", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.organizationId) {

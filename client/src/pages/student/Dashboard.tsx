@@ -67,6 +67,24 @@ export default function StudentDashboard() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
+      {/* Join classroom prompt */}
+      {!user?.classroomId && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <div className="font-medium text-yellow-900">No classroom yet</div>
+            <div className="text-sm text-yellow-700">
+              Join a classroom with an invite code from your teacher to link to a school.
+            </div>
+          </div>
+          <Link
+            to="/settings"
+            className="px-4 py-2 bg-yellow-600 text-white rounded-md text-sm hover:bg-yellow-700"
+          >
+            Join Classroom
+          </Link>
+        </div>
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white border border-gray-200 rounded-lg p-5">

@@ -4,13 +4,14 @@ import { authenticate } from "../middleware/auth";
 
 const router = Router();
 
+const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
+
 // GET /api/reports/student — student's hour summary
 router.get("/student", authenticate, async (req: Request, res: Response) => {
   try {
     const userId = (req.query.studentId as string) || req.user!.userId;
 
-    // Only students can see their own, schools can see their students
-    if (userId !== req.user!.userId && req.user!.role !== "SCHOOL") {
+    if (userId !== req.user!.userId && !SCHOOL_ROLES.includes(req.user!.role)) {
       return res.status(403).json({ error: "Cannot view this report" });
     }
 
@@ -31,16 +32,21 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const totalApprovedHours = approved.reduce((sum, s) => sum + (s.totalHours || 0), 0);
     const totalPendingHours = pending.reduce((sum, s) => sum + (s.totalHours || 0), 0);
 
-    // Get student's school requirements
+    // Get student's school requirements via classroom
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { school: true },
+      include: {
+        classroom: { include: { school: true } },
+        school: true,
+      },
     });
+
+    const school = user?.classroom?.school || user?.school;
 
     res.json({
       totalApprovedHours: Math.round(totalApprovedHours * 100) / 100,
       totalPendingHours: Math.round(totalPendingHours * 100) / 100,
-      requiredHours: user?.school?.requiredHours || 40,
+      requiredHours: school?.requiredHours || 40,
       activitiesCompleted: approved.length,
       sessions,
       approved,
@@ -57,7 +63,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
 router.get("/organization", authenticate, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user?.organizationId && req.user!.role !== "SCHOOL") {
+    if (!user?.organizationId && !SCHOOL_ROLES.includes(req.user!.role)) {
       return res.status(400).json({ error: "Not associated with organization" });
     }
 
@@ -91,15 +97,21 @@ router.get("/organization", authenticate, async (req: Request, res: Response) =>
 // GET /api/reports/school — school compliance report
 router.get("/school", authenticate, async (req: Request, res: Response) => {
   try {
-    if (req.user!.role !== "SCHOOL") {
+    if (!SCHOOL_ROLES.includes(req.user!.role)) {
       return res.status(403).json({ error: "School role required" });
     }
 
-    const school = await prisma.school.findFirst({ where: { adminUserId: req.user!.userId } });
-    if (!school) return res.status(400).json({ error: "Not a school admin" });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
+    if (!school) return res.status(400).json({ error: "School not found" });
 
     const students = await prisma.user.findMany({
-      where: { schoolId: school.id, role: "STUDENT" },
+      where: {
+        role: "STUDENT",
+        classroom: { schoolId: school.id },
+      },
       include: {
         serviceSessions: {
           where: { verificationStatus: "APPROVED" },
@@ -138,7 +150,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
 // GET /api/reports/export/csv — CSV export
 router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
   try {
-    const { type } = req.query; // student, organization, school
+    const { type } = req.query;
 
     let rows: string[][] = [];
     let filename = "hourly-report.csv";

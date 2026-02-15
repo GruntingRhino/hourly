@@ -1,20 +1,23 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
 
 const router = Router();
 
+const VALID_ROLES = ["STUDENT", "ORG_ADMIN", "SCHOOL_ADMIN"] as const;
+
 const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1),
-  role: z.enum(["STUDENT", "ORGANIZATION", "SCHOOL"]),
+  role: z.enum(VALID_ROLES),
   age: z.number().optional(),
-  schoolId: z.string().optional(),
   organizationName: z.string().optional(),
   schoolName: z.string().optional(),
+  schoolDomain: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -37,8 +40,8 @@ router.post("/signup", async (req: Request, res: Response) => {
     let organizationId: string | undefined;
     let schoolId: string | undefined;
 
-    // If signing up as an organization, create the organization
-    if (data.role === "ORGANIZATION") {
+    // If signing up as an org admin, create the organization
+    if (data.role === "ORG_ADMIN") {
       const org = await prisma.organization.create({
         data: {
           name: data.organizationName || data.name,
@@ -48,40 +51,46 @@ router.post("/signup", async (req: Request, res: Response) => {
       organizationId = org.id;
     }
 
-    // If signing up as a school, create the school
-    if (data.role === "SCHOOL") {
-      const school = await prisma.school.create({
-        data: {
-          name: data.schoolName || data.name,
-          adminUserId: "temp", // will update after user creation
-        },
-      });
-      schoolId = school.id;
-    }
-
-    // If student with school affiliation
-    if (data.role === "STUDENT" && data.schoolId) {
-      schoolId = data.schoolId;
-    }
-
+    // Create the user first (school creation needs user id)
     const user = await prisma.user.create({
       data: {
         email: data.email,
         passwordHash,
         name: data.name,
         role: data.role,
-        age: data.age,
-        schoolId: data.role === "STUDENT" ? schoolId : undefined,
+        age: data.role === "STUDENT" ? data.age : undefined,
         organizationId,
-        emailVerified: true, // In production, would send verification email
+        emailVerified: true,
       },
     });
 
-    // Update school admin reference
-    if (data.role === "SCHOOL" && schoolId) {
-      await prisma.school.update({
-        where: { id: schoolId },
-        data: { adminUserId: user.id },
+    // If signing up as a school admin, create the school and link
+    if (data.role === "SCHOOL_ADMIN") {
+      const school = await prisma.school.create({
+        data: {
+          name: data.schoolName || data.name,
+          domain: data.schoolDomain || undefined,
+          verified: false,
+          createdById: user.id,
+        },
+      });
+      schoolId = school.id;
+
+      // Create a default "General" classroom
+      const inviteCode = crypto.randomBytes(4).toString("hex");
+      await prisma.classroom.create({
+        data: {
+          name: "General",
+          schoolId: school.id,
+          teacherId: user.id,
+          inviteCode,
+        },
+      });
+
+      // Associate the admin with their school
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { schoolId: school.id },
       });
     }
 
@@ -95,7 +104,7 @@ router.post("/signup", async (req: Request, res: Response) => {
         name: user.name,
         role: user.role,
         organizationId: user.organizationId,
-        schoolId: data.role === "SCHOOL" ? schoolId : user.schoolId,
+        schoolId,
       },
     });
   } catch (err) {
@@ -114,7 +123,11 @@ router.post("/login", async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      include: { organization: true, school: true },
+      include: {
+        organization: true,
+        school: true,
+        classroom: { include: { school: true } },
+      },
     });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
@@ -130,12 +143,8 @@ router.post("/login", async (req: Request, res: Response) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
-    // For school admins, find their school
-    let adminSchoolId: string | undefined;
-    if (user.role === "SCHOOL") {
-      const school = await prisma.school.findFirst({ where: { adminUserId: user.id } });
-      adminSchoolId = school?.id;
-    }
+    // Derive school info for students from classroom
+    const studentSchool = user.classroom?.school || null;
 
     res.json({
       token,
@@ -149,7 +158,10 @@ router.post("/login", async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl,
         organizationId: user.organizationId,
         organization: user.organization,
-        schoolId: user.role === "SCHOOL" ? adminSchoolId : user.schoolId,
+        schoolId: user.schoolId || studentSchool?.id,
+        school: user.school || studentSchool,
+        classroomId: user.classroomId,
+        classroom: user.classroom,
       },
     });
   } catch (err) {
@@ -166,15 +178,15 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      include: { organization: true, school: true },
+      include: {
+        organization: true,
+        school: true,
+        classroom: { include: { school: true } },
+      },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    let adminSchoolId: string | undefined;
-    if (user.role === "SCHOOL") {
-      const school = await prisma.school.findFirst({ where: { adminUserId: user.id } });
-      adminSchoolId = school?.id;
-    }
+    const studentSchool = user.classroom?.school || null;
 
     res.json({
       id: user.id,
@@ -189,11 +201,47 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       status: user.status,
       organizationId: user.organizationId,
       organization: user.organization,
-      schoolId: user.role === "SCHOOL" ? adminSchoolId : user.schoolId,
-      school: user.school,
+      schoolId: user.schoolId || studentSchool?.id,
+      school: user.school || studentSchool,
+      classroomId: user.classroomId,
+      classroom: user.classroom,
     });
   } catch (err) {
     console.error("Me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/auth/password
+router.put("/password", authenticate, async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Current password and new password are required" });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { passwordHash },
+    });
+
+    res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    console.error("Password change error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

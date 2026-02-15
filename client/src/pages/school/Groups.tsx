@@ -38,6 +38,7 @@ export default function SchoolGroups() {
   const [filter, setFilter] = useState(searchParams.get("filter") || "All");
   const [search, setSearch] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
+  const [schoolRequiredHours, setSchoolRequiredHours] = useState(40);
   const [loading, setLoading] = useState(true);
 
   const schoolId = user?.schoolId;
@@ -47,9 +48,11 @@ export default function SchoolGroups() {
     Promise.all([
       api.get<Group[]>(`/schools/${schoolId}/groups`),
       api.get<AllStudent[]>(`/schools/${schoolId}/students`),
-    ]).then(([gr, st]) => {
+      api.get<{ requiredHours: number }>(`/schools/${schoolId}`),
+    ]).then(([gr, st, schoolData]) => {
       setGroups(gr);
       setAllStudents(st);
+      setSchoolRequiredHours(schoolData.requiredHours);
       setLoading(false);
     });
   }, [schoolId]);
@@ -76,8 +79,8 @@ export default function SchoolGroups() {
 
   const filtered = (selectedGroup ? students : allStudents.map((s) => ({
     ...s,
-    requiredHours: 40,
-    status: (s.approvedHours >= 40 ? "COMPLETED" : s.approvedHours >= 20 ? "ON_TRACK" : "AT_RISK") as "COMPLETED" | "ON_TRACK" | "AT_RISK",
+    requiredHours: schoolRequiredHours,
+    status: (s.approvedHours >= schoolRequiredHours ? "COMPLETED" : s.approvedHours >= schoolRequiredHours * 0.5 ? "ON_TRACK" : "AT_RISK") as "COMPLETED" | "ON_TRACK" | "AT_RISK",
   }))).filter((s) => {
     if (filter !== "All" && s.status !== filter.replace(" ", "_").toUpperCase()) return false;
     if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;

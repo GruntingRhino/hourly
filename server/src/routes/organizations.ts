@@ -44,7 +44,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // PUT /api/organizations/:id — update org profile
-router.put("/:id", authenticate, requireRole("ORGANIZATION"), async (req: Request, res: Response) => {
+router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.organizationId !== req.params.id) {
@@ -69,7 +69,7 @@ router.put("/:id", authenticate, requireRole("ORGANIZATION"), async (req: Reques
 });
 
 // GET /api/organizations/:id/volunteers — volunteer history
-router.get("/:id/volunteers", authenticate, requireRole("ORGANIZATION"), async (req: Request, res: Response) => {
+router.get("/:id/volunteers", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.organizationId !== req.params.id) {

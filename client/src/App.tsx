@@ -21,6 +21,8 @@ import SchoolGroups from "./pages/school/Groups";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
 
+const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -58,7 +60,7 @@ function AppRoutes() {
         )}
 
         {/* Organization routes */}
-        {user.role === "ORGANIZATION" && (
+        {user.role === "ORG_ADMIN" && (
           <>
             <Route path="/dashboard" element={<OrgDashboard />} />
             <Route path="/opportunities" element={<OrgOpportunities />} />
@@ -68,8 +70,8 @@ function AppRoutes() {
           </>
         )}
 
-        {/* School routes */}
-        {user.role === "SCHOOL" && (
+        {/* School routes (SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN) */}
+        {SCHOOL_ROLES.includes(user.role) && (
           <>
             <Route path="/dashboard" element={<SchoolDashboard />} />
             <Route path="/groups" element={<SchoolGroups />} />

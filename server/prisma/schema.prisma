@@ -17,7 +17,7 @@ model User {
   phone         String?
   bio           String?
   avatarUrl     String?
-  role          String    // STUDENT, ORGANIZATION, SCHOOL
+  role          String    // DISTRICT_ADMIN, SCHOOL_ADMIN, TEACHER, STUDENT, ORG_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
   createdAt     DateTime  @default(now())
@@ -26,42 +26,64 @@ model User {
   // Student-specific
   age           Int?
   grade         String?
-  schoolId      String?
-  school        School?   @relation("StudentSchool", fields: [schoolId], references: [id])
+  classroomId   String?
+  classroom     Classroom? @relation("ClassroomStudents", fields: [classroomId], references: [id])
 
-  // Organization-specific
+  // Staff school association (SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN)
+  schoolId      String?
+  school        School?   @relation("SchoolStaff", fields: [schoolId], references: [id])
+
+  // Organization-specific (ORG_ADMIN)
   organizationId String?
   organization   Organization? @relation("OrgMembers", fields: [organizationId], references: [id])
 
   // Relations
-  signups           Signup[]
-  serviceSessions   ServiceSession[]
-  sentMessages      Message[]        @relation("SentMessages")
-  receivedMessages  Message[]        @relation("ReceivedMessages")
-  notifications     Notification[]
-  auditLogs         AuditLog[]       @relation("AuditActor")
-  savedOpportunities SavedOpportunity[]
+  signups              Signup[]
+  serviceSessions      ServiceSession[]
+  sentMessages         Message[]        @relation("SentMessages")
+  receivedMessages     Message[]        @relation("ReceivedMessages")
+  notifications        Notification[]
+  auditLogs            AuditLog[]       @relation("AuditActor")
+  savedOpportunities   SavedOpportunity[]
+  createdSchools       School[]         @relation("SchoolCreator")
+  taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
 }
 
 // ─── Schools ────────────────────────────────────────────────────
 
 model School {
-  id                 String   @id @default(cuid())
-  name               String
-  address            String?
-  phone              String?
-  description        String?
-  requiredHours      Float    @default(40)
-  verificationStandard String @default("ORGANIZATION") // ORGANIZATION, SCHOOL_REVIEW
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  domain           String?
+  verified         Boolean  @default(false)
+  createdById      String
+  createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
+  requiredHours    Float    @default(40)
+  verificationStandard String @default("OPEN")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  // The admin user who manages this school
-  adminUserId        String
+  staff            User[]               @relation("SchoolStaff")
+  classrooms       Classroom[]
+  approvedOrgs     SchoolOrganization[]
+  groups           StudentGroup[]
+}
 
-  students           User[]              @relation("StudentSchool")
-  approvedOrgs       SchoolOrganization[]
-  groups             StudentGroup[]
+// ─── Classrooms ─────────────────────────────────────────────────
+
+model Classroom {
+  id          String   @id @default(cuid())
+  name        String
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id])
+  teacherId   String
+  teacher     User     @relation("ClassroomTeacher", fields: [teacherId], references: [id])
+  inviteCode  String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  students    User[]   @relation("ClassroomStudents")
 }
 
 // ─── Organizations ──────────────────────────────────────────────
@@ -236,6 +258,7 @@ model Message {
   sender      User     @relation("SentMessages", fields: [senderId], references: [id])
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
+
 
 // ─── Notifications ──────────────────────────────────────────────
 

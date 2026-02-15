@@ -106,7 +106,7 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
     if (!signup) return res.status(404).json({ error: "Signup not found" });
 
     // Students can cancel their own, orgs can cancel any for their opportunities
-    if (signup.userId !== req.user!.userId && req.user!.role !== "ORGANIZATION") {
+    if (signup.userId !== req.user!.userId && req.user!.role !== "ORG_ADMIN") {
       return res.status(403).json({ error: "Cannot cancel this signup" });
     }
 

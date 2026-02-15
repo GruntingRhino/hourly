@@ -32,6 +32,7 @@ export default function StudentMessages() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function StudentMessages() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
+    setSendError("");
     try {
       await api.post("/messages", { receiverId: to, subject, body });
       setShowCompose(false);
@@ -66,7 +68,7 @@ export default function StudentMessages() {
       setBody("");
       loadMessages();
     } catch (err: any) {
-      alert(err.message);
+      setSendError(err.message || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -93,6 +95,11 @@ export default function StudentMessages() {
       {showCompose && (
         <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
           <h3 className="font-semibold mb-3">Compose Message</h3>
+          {sendError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+              {sendError}
+            </div>
+          )}
           <form onSubmit={handleSend} className="space-y-3">
             <input
               type="text"

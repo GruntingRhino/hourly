@@ -117,7 +117,7 @@ router.get("/my", authenticate, requireRole("STUDENT"), async (req: Request, res
 });
 
 // GET /api/sessions/organization — org sees their volunteers' sessions
-router.get("/organization", authenticate, requireRole("ORGANIZATION"), async (req: Request, res: Response) => {
+router.get("/organization", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.organizationId) {
@@ -144,13 +144,13 @@ router.get("/organization", authenticate, requireRole("ORGANIZATION"), async (re
 });
 
 // GET /api/sessions/school — school sees all student sessions
-router.get("/school", authenticate, requireRole("SCHOOL"), async (req: Request, res: Response) => {
+router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const school = await prisma.school.findFirst({ where: { adminUserId: req.user!.userId } });
-    if (!school) return res.status(400).json({ error: "Not a school admin" });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
     const { studentId, verificationStatus } = req.query;
-    const where: any = { user: { schoolId: school.id } };
+    const where: any = { user: { classroom: { schoolId: user.schoolId } } };
     if (studentId) where.userId = studentId;
     if (verificationStatus) where.verificationStatus = verificationStatus;
 

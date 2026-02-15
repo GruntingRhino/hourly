@@ -69,14 +69,16 @@ function getNavItems(role: string) {
         { path: "/messages", label: "Messages", icon: "\u2709" },
         { path: "/settings", label: "Settings", icon: "\u2630" },
       ];
-    case "ORGANIZATION":
+    case "ORG_ADMIN":
       return [
         { path: "/dashboard", label: "Dashboard", icon: "\u2302" },
         { path: "/opportunities", label: "Opportunities", icon: "\u2605" },
         { path: "/messages", label: "Messages", icon: "\u2709" },
         { path: "/settings", label: "Settings", icon: "\u2630" },
       ];
-    case "SCHOOL":
+    case "SCHOOL_ADMIN":
+    case "TEACHER":
+    case "DISTRICT_ADMIN":
       return [
         { path: "/dashboard", label: "Dashboard", icon: "\u2302" },
         { path: "/groups", label: "Groups", icon: "\u2605" },

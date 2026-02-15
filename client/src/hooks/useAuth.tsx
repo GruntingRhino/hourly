@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { api } from "../lib/api";
 
+type Role = "STUDENT" | "ORG_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "DISTRICT_ADMIN";
+
 interface User {
   id: string;
   email: string;
   name: string;
-  role: "STUDENT" | "ORGANIZATION" | "SCHOOL";
+  role: Role;
   phone?: string;
   bio?: string;
   avatarUrl?: string;
@@ -14,7 +16,9 @@ interface User {
   organizationId?: string;
   organization?: { id: string; name: string; description?: string };
   schoolId?: string;
-  school?: { id: string; name: string };
+  school?: { id: string; name: string; domain?: string | null; verified: boolean };
+  classroomId?: string;
+  classroom?: { id: string; name: string; school: { id: string; name: string } };
 }
 
 interface AuthContextType {
@@ -32,9 +36,9 @@ interface SignupData {
   name: string;
   role: string;
   age?: number;
-  schoolId?: string;
   organizationName?: string;
   schoolName?: string;
+  schoolDomain?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

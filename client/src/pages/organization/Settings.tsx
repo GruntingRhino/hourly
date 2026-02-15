@@ -24,6 +24,7 @@ export default function OrgSettings() {
   const [twitter, setTwitter] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     if (user?.organizationId) {
@@ -49,6 +50,7 @@ export default function OrgSettings() {
     if (!user?.organizationId) return;
     setSaving(true);
     setMessage("");
+    setIsError(false);
     try {
       await api.put(`/organizations/${user.organizationId}`, {
         name,
@@ -60,7 +62,8 @@ export default function OrgSettings() {
       setMessage("Profile updated!");
       await refreshUser();
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(err.message || "Failed to update profile");
+      setIsError(true);
     } finally {
       setSaving(false);
     }
@@ -97,7 +100,11 @@ export default function OrgSettings() {
           </div>
 
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              isError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
               {message}
             </div>
           )}

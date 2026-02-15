@@ -5,35 +5,50 @@ import { api } from "../../lib/api";
 interface SchoolData {
   id: string;
   name: string;
-  address: string | null;
-  phone: string | null;
-  description: string | null;
+  domain: string | null;
+  verified: boolean;
   requiredHours: number;
   verificationStandard: string;
 }
 
+interface ClassroomData {
+  id: string;
+  name: string;
+  inviteCode: string;
+  isActive: boolean;
+  teacher: { id: string; name: string };
+  _count: { students: number };
+}
+
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
-  const [tab, setTab] = useState<"profile" | "security" | "notifications">("profile");
+  const [tab, setTab] = useState<"profile" | "classrooms" | "security">("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
+  const [classrooms, setClassrooms] = useState<ClassroomData[]>([]);
+  const [schoolName, setSchoolName] = useState("");
+  const [domain, setDomain] = useState("");
   const [requiredHours, setRequiredHours] = useState("40");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [newClassroomName, setNewClassroomName] = useState("");
+  const [creatingClassroom, setCreatingClassroom] = useState(false);
 
   useEffect(() => {
     if (user?.schoolId) {
-      api.get<SchoolData>(`/schools/${user.schoolId}`).then((data) => {
-        setSchool(data);
-        setName(data.name);
-        setPhone(data.phone || "");
-        setDescription(data.description || "");
-        setAddress(data.address || "");
-        setRequiredHours(String(data.requiredHours));
-      });
+      Promise.all([
+        api.get<SchoolData>(`/schools/${user.schoolId}`),
+        api.get<ClassroomData[]>("/classrooms"),
+      ]).then(([schoolData, classroomData]) => {
+        setSchool(schoolData);
+        setSchoolName(schoolData.name || "");
+        setDomain(schoolData.domain || "");
+        setRequiredHours(String(schoolData.requiredHours));
+        setClassrooms(classroomData);
+      }).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
@@ -42,29 +57,47 @@ export default function SchoolSettings() {
     if (!user?.schoolId) return;
     setSaving(true);
     setMessage("");
+    setIsError(false);
     try {
       await api.put(`/schools/${user.schoolId}`, {
-        name,
-        phone,
-        description,
-        address,
+        name: schoolName,
+        domain: domain || null,
         requiredHours: parseFloat(requiredHours),
       });
       setMessage("Settings updated!");
       await refreshUser();
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(err.message || "Failed to update settings");
+      setIsError(true);
     } finally {
       setSaving(false);
     }
   };
+
+  const handleCreateClassroom = async () => {
+    if (!newClassroomName.trim()) return;
+    setCreatingClassroom(true);
+    try {
+      await api.post("/classrooms", { name: newClassroomName.trim() });
+      setNewClassroomName("");
+      const data = await api.get<ClassroomData[]>("/classrooms");
+      setClassrooms(data);
+    } catch (err: any) {
+      setMessage(err.message || "Failed to create classroom");
+      setIsError(true);
+    } finally {
+      setCreatingClassroom(false);
+    }
+  };
+
+  if (loading) return <div className="text-gray-500">Loading settings...</div>;
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <div className="flex gap-2 mb-6">
-        {(["profile", "security", "notifications"] as const).map((t) => (
+        {(["profile", "classrooms", "security"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -87,13 +120,24 @@ export default function SchoolSettings() {
               <div className="font-semibold text-lg">{user?.name}</div>
               <div className="text-sm text-gray-500">{user?.email}</div>
               {school && (
-                <div className="text-sm text-gray-400">{school.name}</div>
+                <div className="text-sm text-gray-400">
+                  {school.name}
+                  {!school.verified && (
+                    <span className="ml-2 text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
+                      Unverified
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              isError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
               {message}
             </div>
           )}
@@ -103,35 +147,20 @@ export default function SchoolSettings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">School Name</label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={schoolName}
+                onChange={(e) => setSchoolName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Domain <span className="text-gray-400">(optional)</span>
+              </label>
               <input
                 type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="e.g. lincoln.edu"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
@@ -152,7 +181,7 @@ export default function SchoolSettings() {
               disabled={saving}
               className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Edit Details"}
+              {saving ? "Saving..." : "Save Changes"}
             </button>
           </form>
 
@@ -164,20 +193,58 @@ export default function SchoolSettings() {
         </div>
       )}
 
+      {tab === "classrooms" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold mb-4">Classrooms</h3>
+
+          <div className="space-y-3 mb-6">
+            {classrooms.map((c) => (
+              <div key={c.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-sm text-gray-500">
+                      Teacher: {c.teacher.name} &middot; {c._count.students} students
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                      {c.inviteCode}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Invite Code</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {classrooms.length === 0 && (
+              <div className="text-gray-500 text-sm">No classrooms yet.</div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newClassroomName}
+              onChange={(e) => setNewClassroomName(e.target.value)}
+              placeholder="New classroom name"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <button
+              onClick={handleCreateClassroom}
+              disabled={creatingClassroom || !newClassroomName.trim()}
+              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            >
+              {creatingClassroom ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab === "security" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h3 className="font-semibold mb-4">Security</h3>
           <p className="text-sm text-gray-500">
             Security settings will be available in a future update.
-          </p>
-        </div>
-      )}
-
-      {tab === "notifications" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Notification Preferences</h3>
-          <p className="text-sm text-gray-500">
-            Notification preferences will be available in a future update.
           </p>
         </div>
       )}

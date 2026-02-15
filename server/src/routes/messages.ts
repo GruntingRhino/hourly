@@ -35,6 +35,11 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "receiverId and body are required" });
     }
 
+    const receiver = await prisma.user.findUnique({ where: { id: receiverId } });
+    if (!receiver) {
+      return res.status(404).json({ error: "Recipient not found. Please check the User ID." });
+    }
+
     const message = await prisma.message.create({
       data: {
         senderId: req.user!.userId,

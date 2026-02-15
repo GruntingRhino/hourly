@@ -1,12 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { api } from "../lib/api";
-
-interface School {
-  id: string;
-  name: string;
-}
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -20,14 +14,9 @@ export default function Signup() {
   const [age, setAge] = useState("");
   const [orgName, setOrgName] = useState("");
   const [schoolName, setSchoolName] = useState("");
-  const [schoolId, setSchoolId] = useState("");
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schoolDomain, setSchoolDomain] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    api.get<School[]>("/schools").then(setSchools).catch(() => {});
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,9 +29,9 @@ export default function Signup() {
         name,
         role,
         age: age ? parseInt(age) : undefined,
-        schoolId: schoolId || undefined,
         organizationName: orgName || undefined,
-        schoolName: schoolName || undefined,
+        schoolName: role === "SCHOOL_ADMIN" ? schoolName : undefined,
+        schoolDomain: role === "SCHOOL_ADMIN" ? schoolDomain || undefined : undefined,
       });
       navigate("/dashboard");
     } catch (err: any) {
@@ -69,18 +58,18 @@ export default function Signup() {
               <div className="text-sm text-gray-500">Find opportunities and track hours</div>
             </button>
             <button
-              onClick={() => setRole("ORGANIZATION")}
+              onClick={() => setRole("ORG_ADMIN")}
               className="w-full p-4 border-2 border-gray-200 rounded-lg text-left hover:border-blue-500 hover:bg-blue-50 transition-colors"
             >
               <div className="font-medium">I am looking for volunteers</div>
               <div className="text-sm text-gray-500">Post opportunities and manage attendance</div>
             </button>
             <button
-              onClick={() => setRole("SCHOOL")}
+              onClick={() => setRole("SCHOOL_ADMIN")}
               className="w-full p-4 border-2 border-gray-200 rounded-lg text-left hover:border-blue-500 hover:bg-blue-50 transition-colors"
             >
-              <div className="font-medium">I am a school</div>
-              <div className="text-sm text-gray-500">Manage students and audit service hours</div>
+              <div className="font-medium">I am a school administrator</div>
+              <div className="text-sm text-gray-500">Create a school, manage classrooms and audit hours</div>
             </button>
           </div>
           <p className="mt-6 text-center text-sm text-gray-500">
@@ -113,8 +102,8 @@ export default function Signup() {
 
           <div className="mb-4 p-2 bg-blue-50 rounded text-sm text-blue-700 text-center">
             {role === "STUDENT" && "Signing up as a Volunteer"}
-            {role === "ORGANIZATION" && "Signing up as an Organization"}
-            {role === "SCHOOL" && "Signing up as a School"}
+            {role === "ORG_ADMIN" && "Signing up as an Organization"}
+            {role === "SCHOOL_ADMIN" && "Creating a School"}
           </div>
 
           {error && (
@@ -146,35 +135,18 @@ export default function Signup() {
             </div>
 
             {role === "STUDENT" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">School</label>
-                  <select
-                    value={schoolId}
-                    onChange={(e) => setSchoolId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select a school (optional)</option>
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                <input
+                  type="number"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             )}
 
-            {role === "ORGANIZATION" && (
+            {role === "ORG_ADMIN" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Organization Name
@@ -189,19 +161,33 @@ export default function Signup() {
               </div>
             )}
 
-            {role === "SCHOOL" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  School Name
-                </label>
-                <input
-                  type="text"
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            {role === "SCHOOL_ADMIN" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    School Name
+                  </label>
+                  <input
+                    type="text"
+                    value={schoolName}
+                    onChange={(e) => setSchoolName(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    School Domain <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={schoolDomain}
+                    onChange={(e) => setSchoolDomain(e.target.value)}
+                    placeholder="e.g. lincoln.edu"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </>
             )}
 
             <div>
