@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import SignaturePad from "../../components/SignaturePad";
 
 interface Opportunity {
   id: string;
@@ -31,6 +32,9 @@ interface Session {
   checkInTime: string | null;
   checkOutTime: string | null;
   totalHours: number | null;
+  signatureType: string | null;
+  submittedAt: string | null;
+  rejectionReason: string | null;
 }
 
 export default function OpportunityDetail() {
@@ -42,6 +46,10 @@ export default function OpportunityDetail() {
   const [mySession, setMySession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showVerifyForm, setShowVerifyForm] = useState(false);
+  const [verifyMethod, setVerifyMethod] = useState<"DRAWN" | "FILE">("DRAWN");
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
 
   const loadData = async () => {
     try {
@@ -118,6 +126,52 @@ export default function OpportunityDetail() {
       setActionLoading(false);
     }
   };
+
+  const handleSubmitVerification = async () => {
+    if (!mySession) return;
+    setActionLoading(true);
+    try {
+      if (verifyMethod === "DRAWN") {
+        if (!signatureData) {
+          alert("Please draw your signature");
+          setActionLoading(false);
+          return;
+        }
+        await api.post(`/sessions/${mySession.id}/submit-verification`, {
+          signatureType: "DRAWN",
+          signatureData,
+        });
+      } else {
+        if (!signatureFile) {
+          alert("Please select a file");
+          setActionLoading(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append("signatureFile", signatureFile);
+        formData.append("signatureType", "FILE");
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/sessions/${mySession.id}/submit-verification`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to submit");
+        }
+      }
+      setShowVerifyForm(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Check if opportunity date has passed (can submit verification)
+  const canSubmitVerification = opp && mySession?.status === "COMMITTED" && new Date(opp.date) <= new Date();
 
   if (loading) return <div className="text-gray-500">Loading...</div>;
   if (!opp) return <div className="text-red-500">Opportunity not found</div>;
@@ -206,6 +260,90 @@ export default function OpportunityDetail() {
                 You're signed up for this opportunity
               </div>
 
+              {/* COMMITTED state — waiting for opportunity date to pass */}
+              {mySession?.status === "COMMITTED" && !canSubmitVerification && (
+                <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center">
+                  Committed &middot; {mySession.totalHours}h &middot; Verification unlocks after {new Date(opp!.date).toLocaleDateString()}
+                </div>
+              )}
+
+              {/* COMMITTED and date has passed — show Submit Verification */}
+              {canSubmitVerification && !showVerifyForm && (
+                <button
+                  onClick={() => setShowVerifyForm(true)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
+                >
+                  Submit Verification
+                </button>
+              )}
+
+              {/* Verification submission form */}
+              {canSubmitVerification && showVerifyForm && (
+                <div className="border border-gray-200 rounded-lg p-4 space-y-4">
+                  <h3 className="font-medium">Submit Verification</h3>
+                  <p className="text-sm text-gray-500">
+                    Provide a supervisor signature to verify your {mySession!.totalHours} hours.
+                  </p>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setVerifyMethod("DRAWN")}
+                      className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                        verifyMethod === "DRAWN" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-50 text-gray-600 border border-gray-200"
+                      }`}
+                    >
+                      Draw Signature
+                    </button>
+                    <button
+                      onClick={() => setVerifyMethod("FILE")}
+                      className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                        verifyMethod === "FILE" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-50 text-gray-600 border border-gray-200"
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                  </div>
+
+                  {verifyMethod === "DRAWN" ? (
+                    <SignaturePad onSignatureChange={setSignatureData} />
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg"
+                        onChange={(e) => setSignatureFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">PDF, PNG, or JPG up to 5MB</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitVerification}
+                      disabled={actionLoading}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? "Submitting..." : "Submit for Review"}
+                    </button>
+                    <button
+                      onClick={() => setShowVerifyForm(false)}
+                      className="py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PENDING_VERIFICATION state */}
+              {mySession?.status === "PENDING_VERIFICATION" && (
+                <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                  Verification submitted &middot; {mySession.totalHours}h &middot; Awaiting school review
+                </div>
+              )}
+
+              {/* Legacy check-in/out flow states */}
               {mySession?.status === "PENDING_CHECKIN" && (
                 <button
                   onClick={handleCheckIn}
@@ -244,12 +382,15 @@ export default function OpportunityDetail() {
               )}
 
               {mySession?.status === "REJECTED" && (
-                <div className="p-3 bg-red-50 rounded-md text-red-700 text-sm text-center">
-                  Hours rejected
+                <div className="p-3 bg-red-50 rounded-md text-red-700 text-sm">
+                  <div className="text-center font-medium">Hours rejected</div>
+                  {mySession.rejectionReason && (
+                    <div className="mt-1 text-center">Reason: {mySession.rejectionReason}</div>
+                  )}
                 </div>
               )}
 
-              {mySession?.status === "PENDING_CHECKIN" && (
+              {(mySession?.status === "COMMITTED" || mySession?.status === "PENDING_CHECKIN") && (
                 <button
                   onClick={handleCancelSignup}
                   disabled={actionLoading}

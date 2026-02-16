@@ -5,7 +5,7 @@ import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
-// POST /api/verification/:sessionId/approve — org approves hours
+// POST /api/verification/:sessionId/approve — approve hours
 router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
@@ -13,6 +13,11 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
       include: { opportunity: true },
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Prevent self-verification
+    if (session.userId === req.user!.userId) {
+      return res.status(403).json({ error: "Cannot verify your own session" });
+    }
 
     // Verify the actor has permission
     if (req.user!.role === "ORG_ADMIN") {
@@ -24,6 +29,11 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
 
     if (session.verificationStatus === "APPROVED") {
       return res.status(400).json({ error: "Already approved" });
+    }
+
+    // Must be in PENDING_VERIFICATION or CHECKED_OUT status
+    if (!["PENDING_VERIFICATION", "CHECKED_OUT"].includes(session.status)) {
+      return res.status(400).json({ error: "Session is not pending verification" });
     }
 
     const { approvedHours } = req.body;
@@ -66,7 +76,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
   }
 });
 
-// POST /api/verification/:sessionId/reject — org rejects hours
+// POST /api/verification/:sessionId/reject — reject hours
 router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
@@ -75,11 +85,20 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
 
+    // Prevent self-verification
+    if (session.userId === req.user!.userId) {
+      return res.status(403).json({ error: "Cannot verify your own session" });
+    }
+
     if (req.user!.role === "ORG_ADMIN") {
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (session.opportunity.organizationId !== user?.organizationId) {
         return res.status(403).json({ error: "Not your organization's session" });
       }
+    }
+
+    if (!["PENDING_VERIFICATION", "CHECKED_OUT"].includes(session.status)) {
+      return res.status(400).json({ error: "Session is not pending verification" });
     }
 
     const { reason } = req.body;
@@ -132,19 +151,52 @@ router.get("/pending", authenticate, requireRole("ORG_ADMIN"), async (req: Reque
     const sessions = await prisma.serviceSession.findMany({
       where: {
         verificationStatus: "PENDING",
-        status: "CHECKED_OUT",
+        status: { in: ["CHECKED_OUT", "PENDING_VERIFICATION"] },
         opportunity: { organizationId: user.organizationId },
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
         opportunity: { select: { id: true, title: true, date: true, startTime: true, endTime: true } },
       },
-      orderBy: { checkOutTime: "desc" },
+      orderBy: { submittedAt: "desc" },
     });
 
     res.json(sessions);
   } catch (err) {
     console.error("Pending verifications error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/verification/school-pending — get pending verifications for school staff
+router.get("/school-pending", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const sessions = await prisma.serviceSession.findMany({
+      where: {
+        status: "PENDING_VERIFICATION",
+        verificationStatus: "PENDING",
+        user: { classroom: { schoolId: user.schoolId } },
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        opportunity: {
+          select: {
+            id: true, title: true, date: true, startTime: true, endTime: true,
+            organization: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { submittedAt: "desc" },
+    });
+
+    res.json(sessions);
+  } catch (err) {
+    console.error("School pending verifications error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

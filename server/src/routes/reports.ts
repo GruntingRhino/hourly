@@ -26,11 +26,13 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     });
 
     const approved = sessions.filter((s) => s.verificationStatus === "APPROVED");
-    const pending = sessions.filter((s) => s.verificationStatus === "PENDING");
+    const pending = sessions.filter((s) => s.verificationStatus === "PENDING" && s.status !== "COMMITTED");
+    const committed = sessions.filter((s) => s.status === "COMMITTED" || s.status === "PENDING_VERIFICATION");
     const rejected = sessions.filter((s) => s.verificationStatus === "REJECTED");
 
     const totalApprovedHours = approved.reduce((sum, s) => sum + (s.totalHours || 0), 0);
     const totalPendingHours = pending.reduce((sum, s) => sum + (s.totalHours || 0), 0);
+    const totalCommittedHours = committed.reduce((sum, s) => sum + (s.totalHours || 0), 0);
 
     // Get student's school requirements via classroom
     const user = await prisma.user.findUnique({
@@ -46,11 +48,13 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     res.json({
       totalApprovedHours: Math.round(totalApprovedHours * 100) / 100,
       totalPendingHours: Math.round(totalPendingHours * 100) / 100,
+      totalCommittedHours: Math.round(totalCommittedHours * 100) / 100,
       requiredHours: school?.requiredHours || 40,
       activitiesCompleted: approved.length,
       sessions,
       approved,
       pending,
+      committed,
       rejected,
     });
   } catch (err) {

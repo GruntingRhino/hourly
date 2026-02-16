@@ -6,6 +6,7 @@ import { useAuth } from "../../hooks/useAuth";
 interface ReportData {
   totalApprovedHours: number;
   totalPendingHours: number;
+  totalCommittedHours: number;
   requiredHours: number;
   activitiesCompleted: number;
   sessions: Session[];

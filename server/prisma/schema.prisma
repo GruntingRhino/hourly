@@ -214,11 +214,19 @@ model ServiceSession {
   checkInTime     DateTime?
   checkOutTime    DateTime?
   totalHours      Float?
-  status          String      @default("PENDING_CHECKIN") // PENDING_CHECKIN, CHECKED_IN, CHECKED_OUT, VERIFIED, REJECTED
+  status          String      @default("COMMITTED") // COMMITTED, PENDING_VERIFICATION, VERIFIED, REJECTED, PENDING_CHECKIN, CHECKED_IN, CHECKED_OUT
   verificationStatus String   @default("PENDING") // PENDING, APPROVED, REJECTED
   verifiedBy      String?
   verifiedAt      DateTime?
   rejectionReason String?
+
+  // Verification submission fields
+  signatureType     String?   // "DRAWN" or "FILE"
+  signatureData     String?   // Base64 eSignature data (for DRAWN type)
+  signatureFileUrl  String?   // File path for uploaded signature (for FILE type)
+  signatureFileName String?   // Original filename
+  submittedAt       DateTime? // When verification was submitted
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

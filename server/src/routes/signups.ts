@@ -33,6 +33,21 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
           where: { id: existing.id },
           data: { status },
         });
+        // Reset service session to COMMITTED
+        await prisma.serviceSession.updateMany({
+          where: { userId: req.user!.userId, opportunityId },
+          data: {
+            status: "COMMITTED",
+            totalHours: opp.durationHours,
+            verificationStatus: "PENDING",
+            signatureType: null,
+            signatureData: null,
+            signatureFileUrl: null,
+            signatureFileName: null,
+            submittedAt: null,
+            rejectionReason: null,
+          },
+        });
         return res.json(updated);
       }
       return res.status(409).json({ error: "Already signed up" });
@@ -50,12 +65,13 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       },
     });
 
-    // Also create a pending service session
+    // Create a committed service session with pre-filled hours
     await prisma.serviceSession.create({
       data: {
         userId: req.user!.userId,
         opportunityId,
-        status: "PENDING_CHECKIN",
+        status: "COMMITTED",
+        totalHours: opp.durationHours,
       },
     });
 
