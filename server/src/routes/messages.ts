@@ -30,20 +30,22 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 // POST /api/messages — send a message
 router.post("/", authenticate, async (req: Request, res: Response) => {
   try {
-    const { receiverId, subject, body, priority } = req.body;
-    if (!receiverId || !body) {
-      return res.status(400).json({ error: "receiverId and body are required" });
+    const { receiverId, receiverEmail, subject, body, priority } = req.body;
+    if ((!receiverId && !receiverEmail) || !body) {
+      return res.status(400).json({ error: "Recipient and body are required" });
     }
 
-    const receiver = await prisma.user.findUnique({ where: { id: receiverId } });
+    const receiver = receiverEmail
+      ? await prisma.user.findUnique({ where: { email: receiverEmail } })
+      : await prisma.user.findUnique({ where: { id: receiverId } });
     if (!receiver) {
-      return res.status(404).json({ error: "Recipient not found. Please check the User ID." });
+      return res.status(404).json({ error: "Recipient not found. Please check the email address." });
     }
 
     const message = await prisma.message.create({
       data: {
         senderId: req.user!.userId,
-        receiverId,
+        receiverId: receiver.id,
         subject,
         body,
         priority: priority || false,
@@ -57,7 +59,7 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
     // Create notification for receiver
     await prisma.notification.create({
       data: {
-        userId: receiverId,
+        userId: receiver.id,
         type: "NEW_MESSAGE",
         title: "New Message",
         body: subject || "You have a new message",

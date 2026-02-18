@@ -24,6 +24,9 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* Main content */}
+      <main>
+
       {/* Hero */}
       <section className="py-20 text-center border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4">
@@ -71,7 +74,7 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="py-16">
+      <section className="py-16 border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-8">Get Started</h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -96,6 +99,22 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="py-8 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-gray-500">
+            © {new Date().getFullYear()} Hourly. All rights reserved.
+          </div>
+          <div className="flex gap-6 text-sm">
+            <a href="#" className="text-gray-500 hover:text-gray-800">Help & Support</a>
+            <a href="#" className="text-gray-500 hover:text-gray-800">Terms of Service</a>
+            <a href="#" className="text-gray-500 hover:text-gray-800">Privacy Policy</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

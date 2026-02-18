@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
+import { sendVerificationEmail, sendPasswordResetEmail, CLIENT_URL } from "../services/email";
 
 const router = Router();
 
@@ -113,13 +114,14 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
-    // In dev, include the verification link in the response
-    const verificationUrl = `${process.env.APP_URL || "http://localhost:5173"}/verify-email?token=${emailVerificationToken}`;
+    const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
+
+    // Send verification email (non-blocking)
+    sendVerificationEmail(user.email, verificationUrl).catch(() => {});
 
     res.status(201).json({
       token,
       requiresEmailVerification: true,
-      verificationUrl, // Dev only: include in response for testing
       user: {
         id: user.id,
         email: user.email,
@@ -361,11 +363,142 @@ router.post("/resend-verification", authenticate, async (req: Request, res: Resp
       data: { emailVerificationToken, emailVerificationExpires },
     });
 
-    const verificationUrl = `${process.env.APP_URL || "http://localhost:5173"}/verify-email?token=${emailVerificationToken}`;
+    const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
 
-    res.json({ message: "Verification email sent", verificationUrl });
+    sendVerificationEmail(user.email, verificationUrl).catch(() => {});
+
+    res.json({ message: "Verification email sent" });
   } catch (err) {
     console.error("Resend verification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  try {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Always respond with success to prevent user enumeration
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: resetToken, passwordResetExpires: resetExpires },
+      });
+
+      const resetLink = `${CLIENT_URL}/reset-password?token=${resetToken}`;
+      sendPasswordResetEmail(user.email, resetLink).catch(() => {});
+    }
+
+    res.json({ message: "If an account with that email exists, a password reset link has been sent." });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Valid email is required" });
+    }
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post("/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { token, password } = z.object({
+      token: z.string(),
+      password: z.string().min(8).max(128),
+    }).parse(req.body);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordResetToken: null, passwordResetExpires: null },
+    });
+
+    res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/auth/account — permanently delete the current user's account and all their data
+router.delete("/account", authenticate, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, schoolId: true },
+    });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    await prisma.$transaction(async (tx) => {
+      // Delete audit logs created by this user
+      await tx.auditLog.deleteMany({ where: { actorId: userId } });
+
+      // Delete audit logs that reference this user's sessions
+      const sessions = await tx.serviceSession.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      if (sessions.length > 0) {
+        await tx.auditLog.deleteMany({ where: { sessionId: { in: sessions.map((s) => s.id) } } });
+      }
+
+      // Delete personal data
+      await tx.notification.deleteMany({ where: { userId } });
+      await tx.message.deleteMany({ where: { OR: [{ senderId: userId }, { receiverId: userId }] } });
+      await tx.savedOpportunity.deleteMany({ where: { userId } });
+      await tx.studentGroupMember.deleteMany({ where: { studentId: userId } });
+      await tx.signup.deleteMany({ where: { userId } });
+      await tx.serviceSession.deleteMany({ where: { userId } });
+
+      // School admin: clean up school and classrooms (circular FK requires this)
+      if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
+        const schoolId = user.schoolId;
+
+        // Detach all students and staff from the school
+        await tx.user.updateMany({
+          where: { schoolId, id: { not: userId } },
+          data: { classroomId: null, schoolId: null },
+        });
+
+        // Delete classrooms, org links, groups
+        await tx.classroom.deleteMany({ where: { schoolId } });
+        await tx.schoolOrganization.deleteMany({ where: { schoolId } });
+        const groups = await tx.studentGroup.findMany({ where: { schoolId }, select: { id: true } });
+        if (groups.length > 0) {
+          await tx.studentGroupMember.deleteMany({ where: { groupId: { in: groups.map((g) => g.id) } } });
+          await tx.studentGroup.deleteMany({ where: { schoolId } });
+        }
+        await tx.school.delete({ where: { id: schoolId } });
+      }
+
+      // Delete the user
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    res.json({ message: "Account permanently deleted" });
+  } catch (err) {
+    console.error("Delete account error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

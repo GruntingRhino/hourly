@@ -1,9 +1,36 @@
 import { Router, Request, Response } from "express";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
 
 const router = Router();
+
+// GET /api/schools — public search (for orgs to find schools)
+router.get("/", authenticate, async (req: Request, res: Response) => {
+  try {
+    const search = req.query.search as string | undefined;
+    const schools = await prisma.school.findMany({
+      where: search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { domain: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
+      select: { id: true, name: true, domain: true, verified: true },
+      orderBy: { name: "asc" },
+      take: 20,
+    });
+    res.json(schools);
+  } catch (err) {
+    console.error("List schools error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // GET /api/schools/:id — school details (staff only)
 router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
@@ -35,14 +62,21 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       return res.status(403).json({ error: "Not your school" });
     }
 
+    const updateData: any = {
+      name: req.body.name,
+      domain: req.body.domain,
+      requiredHours: req.body.requiredHours,
+      verificationStandard: req.body.verificationStandard,
+    };
+    if (req.body.zipCodes !== undefined) {
+      updateData.zipCodes = Array.isArray(req.body.zipCodes)
+        ? JSON.stringify(req.body.zipCodes)
+        : req.body.zipCodes;
+    }
+
     const updated = await prisma.school.update({
       where: { id: req.params.id },
-      data: {
-        name: req.body.name,
-        domain: req.body.domain,
-        requiredHours: req.body.requiredHours,
-        verificationStandard: req.body.verificationStandard,
-      },
+      data: updateData,
     });
     res.json(updated);
   } catch (err) {
@@ -167,6 +201,16 @@ router.post("/:id/organizations/:orgId/approve", authenticate, requireRole("SCHO
       where: { id: req.params.orgId },
       data: { status: "APPROVED" },
     });
+
+    // Email the org that they've been approved
+    const school = await prisma.school.findUnique({ where: { id: req.params.id }, select: { name: true } });
+    const orgAdmins = await prisma.user.findMany({
+      where: { organizationId: req.params.orgId, role: "ORG_ADMIN" },
+      select: { email: true },
+    });
+    for (const admin of orgAdmins) {
+      sendOrgRequestApprovedEmail(admin.email, school?.name ?? "A school").catch(() => {});
+    }
 
     res.json(approval);
   } catch (err) {
@@ -322,6 +366,151 @@ router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_A
     res.status(201).json(member);
   } catch (err) {
     console.error("Add group student error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/:id/staff — create a teacher account (staff invite)
+router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const admin = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (admin?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const { name, email, classroomId } = z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      classroomId: z.string().optional(),
+    }).parse(req.body);
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: "Email already registered" });
+
+    const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const teacher = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        role: "TEACHER",
+        schoolId: req.params.id,
+        emailVerified: true,
+      },
+    });
+
+    // If classroomId provided, update that classroom's teacherId
+    if (classroomId) {
+      await prisma.classroom.update({
+        where: { id: classroomId },
+        data: { teacherId: teacher.id },
+      });
+    }
+
+    res.status(201).json({
+      id: teacher.id,
+      name: teacher.name,
+      email: teacher.email,
+      role: teacher.role,
+      tempPassword, // Dev only: return temp password for testing
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Create staff error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/:id/remove-hours — school admin removes verified hours for a student
+router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const { sessionId, reason } = z.object({
+      sessionId: z.string(),
+      reason: z.string().optional(),
+    }).parse(req.body);
+
+    const session = await prisma.serviceSession.findUnique({
+      where: { id: sessionId },
+      include: { opportunity: true, user: true },
+    });
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Teacher can only remove hours for students in their classroom
+    if (user.role === "TEACHER") {
+      const student = await prisma.user.findUnique({ where: { id: session.userId } });
+      const classroom = await prisma.classroom.findUnique({ where: { id: student?.classroomId || "" } });
+      if (classroom?.teacherId !== user.id) {
+        return res.status(403).json({ error: "Can only remove hours for students in your classroom" });
+      }
+    }
+
+    await prisma.serviceSession.update({
+      where: { id: sessionId },
+      data: {
+        verificationStatus: "REJECTED",
+        status: "REJECTED",
+        rejectionReason: reason || "Hours removed by school admin",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "OVERRIDE",
+        actorId: req.user!.userId,
+        sessionId,
+        details: JSON.stringify({ action: "REMOVE_HOURS", reason }),
+      },
+    });
+
+    // Notify student
+    await prisma.notification.create({
+      data: {
+        userId: session.userId,
+        type: "VERIFICATION_UPDATE",
+        title: "Hours Removed",
+        body: `${session.totalHours} hours for "${session.opportunity.title}" have been removed by your school admin.${reason ? ` Reason: ${reason}` : ""}`,
+      },
+    });
+
+    // Send email to student
+    sendHourRemovedEmail(session.user.email, session.totalHours ?? 0, session.opportunity.title).catch(() => {});
+
+    res.json({ message: "Hours removed successfully" });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed" });
+    }
+    console.error("Remove hours error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/:id/organizations/:orgId/block — block an org
+router.post("/:id/organizations/:orgId/block", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    await prisma.schoolOrganization.upsert({
+      where: { schoolId_organizationId: { schoolId: req.params.id, organizationId: req.params.orgId } },
+      update: { status: "BLOCKED" },
+      create: { schoolId: req.params.id, organizationId: req.params.orgId, status: "BLOCKED" },
+    });
+
+    res.json({ message: "Organization blocked" });
+  } catch (err) {
+    console.error("Block org error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

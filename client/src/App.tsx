@@ -6,6 +6,11 @@ import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import EmailVerificationRequired from "./pages/EmailVerificationRequired";
+import ClassroomJoin from "./pages/student/ClassroomJoin";
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentBrowse from "./pages/student/Browse";
 import OpportunityDetail from "./pages/student/OpportunityDetail";
@@ -20,6 +25,7 @@ import SchoolDashboard from "./pages/school/Dashboard";
 import SchoolGroups from "./pages/school/Groups";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
+import SchoolOnboarding from "./pages/school/Onboarding";
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
 
@@ -34,15 +40,52 @@ function AppRoutes() {
     );
   }
 
+  // Public routes (unauthenticated)
   if (!user) {
     return (
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     );
+  }
+
+  // Email not verified — block all access except verify/reset pages
+  if (!user.emailVerified) {
+    return (
+      <Routes>
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="*" element={<EmailVerificationRequired />} />
+      </Routes>
+    );
+  }
+
+  // Student holding state — must join a classroom first
+  if (user.role === "STUDENT" && !user.classroomId) {
+    return (
+      <Routes>
+        <Route path="*" element={<ClassroomJoin />} />
+      </Routes>
+    );
+  }
+
+  // School admin onboarding — set graduation hours goal first
+  if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
+    const onboardingDone = localStorage.getItem(`school_onboarding_${user.schoolId}`);
+    if (!onboardingDone) {
+      return (
+        <Routes>
+          <Route path="*" element={<SchoolOnboarding />} />
+        </Routes>
+      );
+    }
   }
 
   return (
@@ -65,6 +108,7 @@ function AppRoutes() {
             <Route path="/dashboard" element={<OrgDashboard />} />
             <Route path="/opportunities" element={<OrgOpportunities />} />
             <Route path="/opportunities/new" element={<CreateOpportunity />} />
+            <Route path="/opportunities/:id/edit" element={<CreateOpportunity />} />
             <Route path="/messages" element={<OrgMessages />} />
             <Route path="/settings" element={<OrgSettings />} />
           </>
@@ -88,7 +132,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>

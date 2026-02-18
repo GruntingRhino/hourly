@@ -20,6 +20,11 @@ model User {
   role          String    // DISTRICT_ADMIN, SCHOOL_ADMIN, TEACHER, STUDENT, ORG_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+  socialLinks   String?   // JSON string (for student social profiles)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -60,6 +65,7 @@ model School {
   createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
   requiredHours    Float    @default(40)
   verificationStandard String @default("OPEN")
+  zipCodes         String?  // JSON array of zip codes
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -98,6 +104,7 @@ model Organization {
   socialLinks  String?  // JSON string
   avatarUrl    String?
   status       String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
+  zipCodes     String?  // JSON array of zip codes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { sendOrgApprovalRequestEmail } from "../services/email";
 
 const router = Router();
 
@@ -59,11 +60,77 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
         description: req.body.description,
         website: req.body.website,
         socialLinks: req.body.socialLinks ? JSON.stringify(req.body.socialLinks) : undefined,
+        zipCodes: req.body.zipCodes ? JSON.stringify(req.body.zipCodes) : undefined,
       },
     });
     res.json(org);
   } catch (err) {
     console.error("Update org error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/organizations/:id/request-school/:schoolId — request to be added to school's approved list
+router.post("/:id/request-school/:schoolId", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.organizationId !== req.params.id) {
+      return res.status(403).json({ error: "Not your organization" });
+    }
+
+    const existing = await prisma.schoolOrganization.findUnique({
+      where: { schoolId_organizationId: { schoolId: req.params.schoolId, organizationId: req.params.id } },
+    });
+    if (existing) return res.status(409).json({ error: "Relationship already exists" });
+
+    const request = await prisma.schoolOrganization.create({
+      data: {
+        schoolId: req.params.schoolId,
+        organizationId: req.params.id,
+        status: "PENDING",
+      },
+    });
+
+    // Notify school admin (in-app + email)
+    const schoolAdmin = await prisma.user.findFirst({
+      where: { schoolId: req.params.schoolId, role: "SCHOOL_ADMIN" },
+    });
+    if (schoolAdmin) {
+      const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+      await prisma.notification.create({
+        data: {
+          userId: schoolAdmin.id,
+          type: "ORG_REQUEST",
+          title: "New Organization Request",
+          body: `${org?.name} has requested to be added to your approved organizations list.`,
+        },
+      });
+      sendOrgApprovalRequestEmail(schoolAdmin.email, org?.name ?? "An organization").catch(() => {});
+    }
+
+    res.status(201).json(request);
+  } catch (err) {
+    console.error("Request school error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/organizations/:id/schools — list schools this org is approved for
+router.get("/:id/schools", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.organizationId !== req.params.id) {
+      return res.status(403).json({ error: "Not your organization" });
+    }
+
+    const approvals = await prisma.schoolOrganization.findMany({
+      where: { organizationId: req.params.id },
+      include: { school: { select: { id: true, name: true, domain: true } } },
+    });
+
+    res.json(approvals);
+  } catch (err) {
+    console.error("Org schools error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

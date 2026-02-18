@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -18,6 +18,7 @@ interface Opportunity {
 
 export default function OrgOpportunities() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ACTIVE");
@@ -93,7 +94,13 @@ export default function OrgOpportunities() {
                 </div>
               </div>
               {opp.status === "ACTIVE" && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3">
+                  <button
+                    onClick={() => navigate(`/opportunities/${opp.id}/edit`)}
+                    className="text-sm text-blue-600 hover:underline font-medium"
+                  >
+                    Edit Details
+                  </button>
                   <button
                     onClick={() => handleCancel(opp.id)}
                     className="text-sm text-red-600 hover:underline"

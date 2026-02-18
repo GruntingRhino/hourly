@@ -23,6 +23,10 @@ export default function StudentSettings() {
   const [joining, setJoining] = useState(false);
   const [classroomMessage, setClassroomMessage] = useState("");
   const [classroomIsError, setClassroomIsError] = useState(false);
+  const [leaveConfirm, setLeaveConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +82,7 @@ export default function StudentSettings() {
   const handleLeaveClassroom = async () => {
     setClassroomMessage("");
     setClassroomIsError(false);
+    setLeaveConfirm(false);
     try {
       await api.post("/classrooms/leave");
       setClassroomMessage("Left classroom successfully");
@@ -85,6 +90,20 @@ export default function StudentSettings() {
     } catch (err: any) {
       setClassroomMessage(err.message || "Failed to leave classroom");
       setClassroomIsError(true);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await api.delete("/auth/account");
+      logout();
+    } catch (err: any) {
+      setPasswordMessage(err.message || "Failed to delete account");
+      setPasswordIsError(true);
+      setDeleting(false);
+      setDeleteConfirm(false);
+      setDeleteInput("");
     }
   };
 
@@ -182,10 +201,15 @@ export default function StudentSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Biography</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium text-gray-700">Biography</label>
+                <span className={`text-xs ${bio.length > 280 ? "text-red-500" : "text-gray-400"}`}>
+                  {bio.length}/300
+                </span>
+              </div>
               <textarea
                 value={bio}
-                onChange={(e) => setBio(e.target.value)}
+                onChange={(e) => setBio(e.target.value.slice(0, 300))}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
@@ -240,12 +264,35 @@ export default function StudentSettings() {
                   {user.school?.name || "School"}
                 </div>
               </div>
-              <button
-                onClick={handleLeaveClassroom}
-                className="text-red-600 text-sm hover:underline"
-              >
-                Leave Classroom
-              </button>
+              {leaveConfirm ? (
+                <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm font-medium text-yellow-800 mb-1">Leave this classroom?</p>
+                  <p className="text-xs text-yellow-700 mb-3">
+                    You'll need a new invite code from your teacher to re-join any classroom.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleLeaveClassroom}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                    >
+                      Leave
+                    </button>
+                    <button
+                      onClick={() => setLeaveConfirm(false)}
+                      className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setLeaveConfirm(true)}
+                  className="text-red-600 text-sm hover:underline"
+                >
+                  Leave Classroom
+                </button>
+              )}
             </div>
           ) : (
             <div>
@@ -328,6 +375,49 @@ export default function StudentSettings() {
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
           </form>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
+            <p className="text-sm text-gray-500 mb-3">
+              Permanently deletes your account, all your service records, signups, and personal data. This cannot be undone.
+            </p>
+            {!deleteConfirm ? (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+              >
+                Delete My Account
+              </button>
+            ) : (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm font-medium text-red-800 mb-3">
+                  Type <span className="font-mono font-bold">DELETE</span> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteInput !== "DELETE" || deleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting..." : "Permanently Delete"}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { sendStudentLeftClassroomEmail } from "../services/email";
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.post(
   }
 );
 
-// GET /api/classrooms — list classrooms for user's school
+// GET /api/classrooms — list classrooms for user's school (with stats)
 router.get(
   "/",
   authenticate,
@@ -63,16 +64,60 @@ router.get(
         return res.status(400).json({ error: "Not associated with a school" });
       }
 
+      const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
+
+      // TEACHER role: only see their own classroom
+      const whereClause: any = { schoolId: user.schoolId };
+      if (user.role === "TEACHER") {
+        whereClause.teacherId = user.id;
+      }
+
       const classrooms = await prisma.classroom.findMany({
-        where: { schoolId: user.schoolId },
+        where: whereClause,
         include: {
           teacher: { select: { id: true, name: true } },
-          _count: { select: { students: true } },
+          students: {
+            select: {
+              id: true,
+              serviceSessions: {
+                where: { verificationStatus: "APPROVED" },
+                select: { totalHours: true },
+              },
+            },
+          },
         },
         orderBy: { name: "asc" },
       });
 
-      res.json(classrooms);
+      const requiredHours = school?.requiredHours || 40;
+
+      const result = classrooms.map((c) => {
+        const studentCount = c.students.length;
+        let totalHours = 0;
+        let completedCount = 0;
+        let atRiskCount = 0;
+        for (const s of c.students) {
+          const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+          totalHours += hours;
+          if (hours >= requiredHours) completedCount++;
+          else if (hours < requiredHours * 0.5) atRiskCount++;
+        }
+        return {
+          id: c.id,
+          name: c.name,
+          inviteCode: c.inviteCode,
+          isActive: c.isActive,
+          createdAt: c.createdAt,
+          teacher: c.teacher,
+          studentCount,
+          totalHours: Math.round(totalHours * 100) / 100,
+          completedCount,
+          atRiskCount,
+          completionPercentage: studentCount > 0 ? Math.round((completedCount / studentCount) * 100) : 0,
+        };
+      });
+
+      res.json(result);
     } catch (err) {
       console.error("List classrooms error:", err);
       res.status(500).json({ error: "Internal server error" });
@@ -153,12 +198,14 @@ router.put(
         return res.status(403).json({ error: "Not your school" });
       }
 
+      const data: any = {};
+      if (req.body.name !== undefined) data.name = req.body.name;
+      if (req.body.isActive !== undefined) data.isActive = req.body.isActive;
+      if (req.body.teacherId !== undefined) data.teacherId = req.body.teacherId;
+
       const updated = await prisma.classroom.update({
         where: { id: req.params.id },
-        data: {
-          name: req.body.name,
-          isActive: req.body.isActive,
-        },
+        data,
       });
 
       res.json(updated);
@@ -242,10 +289,16 @@ router.post(
   requireRole("STUDENT"),
   async (req: Request, res: Response) => {
     try {
-      const student = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+      const student = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        include: { classroom: { include: { teacher: { select: { email: true, name: true } } } } },
+      });
       if (!student?.classroomId) {
         return res.status(400).json({ error: "Not in a classroom" });
       }
+
+      const classroomName = student.classroom?.name ?? "classroom";
+      const teacherEmail = student.classroom?.teacher?.email;
 
       await prisma.user.update({
         where: { id: req.user!.userId },
@@ -254,6 +307,11 @@ router.post(
           schoolId: null,
         },
       });
+
+      // Notify classroom admin via email
+      if (teacherEmail) {
+        sendStudentLeftClassroomEmail(teacherEmail, student.name, classroomName).catch(() => {});
+      }
 
       res.json({ message: "Left classroom successfully" });
     } catch (err) {

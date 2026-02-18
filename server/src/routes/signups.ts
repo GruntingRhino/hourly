@@ -103,6 +103,7 @@ router.get("/my", authenticate, requireRole("STUDENT"), async (req: Request, res
         opportunity: {
           include: {
             organization: { select: { id: true, name: true } },
+            _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
           },
         },
       },

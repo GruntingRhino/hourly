@@ -48,6 +48,8 @@ export default function SchoolGroups() {
   const [loading, setLoading] = useState(true);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [removeModal, setRemoveModal] = useState<{ sessionId: string; studentName: string } | null>(null);
+  const [removeReason, setRemoveReason] = useState("");
 
   const schoolId = user?.schoolId;
   const isOwner = user?.role === "SCHOOL_ADMIN";
@@ -98,12 +100,17 @@ export default function SchoolGroups() {
     setSearchParams(id ? { classroom: id } : {});
   };
 
-  const handleRemoveHours = async (sessionId: string, studentName: string) => {
-    const reason = prompt(`Remove verified hours for ${studentName}? Enter reason (optional):`);
-    if (reason === null) return;
-    setRemoving(sessionId);
+  const handleRemoveHours = (sessionId: string, studentName: string) => {
+    setRemoveReason("");
+    setRemoveModal({ sessionId, studentName });
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!removeModal) return;
+    setRemoving(removeModal.sessionId);
     try {
-      await api.post(`/schools/${schoolId}/remove-hours`, { sessionId, reason });
+      await api.post(`/schools/${schoolId}/remove-hours`, { sessionId: removeModal.sessionId, reason: removeReason });
+      setRemoveModal(null);
       loadData();
     } finally {
       setRemoving(null);
@@ -175,6 +182,41 @@ export default function SchoolGroups() {
           onClose={() => setShowAddStaff(false)}
           onAdded={() => { setShowAddStaff(false); loadData(); }}
         />
+      )}
+
+      {/* Remove Hours Modal */}
+      {removeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <h2 className="text-lg font-bold mb-2">Remove Verified Hours</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Remove verified hours for <strong>{removeModal.studentName}</strong>? Enter a reason (optional).
+            </p>
+            <textarea
+              value={removeReason}
+              onChange={(e) => setRemoveReason(e.target.value)}
+              placeholder="Reason (optional)"
+              rows={3}
+              autoFocus
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmRemove}
+                disabled={removing !== null}
+                className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {removing !== null ? "Removing..." : "Remove Hours"}
+              </button>
+              <button
+                onClick={() => setRemoveModal(null)}
+                className="flex-1 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="grid md:grid-cols-4 gap-6">
@@ -425,10 +467,12 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
   const [classroomId, setClassroomId] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ name: string; email: string; tempPassword: string } | null>(null);
+  const [formError, setFormError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setFormError("");
     try {
       const data = await api.post<{ name: string; email: string; tempPassword: string }>(
         `/schools/${schoolId}/staff`,
@@ -437,7 +481,7 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
       setResult(data);
       onAdded();
     } catch (err: any) {
-      alert(err.message || "Failed to create staff member");
+      setFormError(err.message || "Failed to create staff member");
     } finally {
       setLoading(false);
     }
@@ -462,6 +506,11 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                {formError}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} required

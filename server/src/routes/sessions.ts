@@ -42,7 +42,7 @@ router.post("/:id/checkin", authenticate, requireRole("STUDENT"), async (req: Re
     if (session.userId !== req.user!.userId) {
       return res.status(403).json({ error: "Not your session" });
     }
-    if (session.status !== "PENDING_CHECKIN") {
+    if (session.status !== "PENDING_CHECKIN" && session.status !== "COMMITTED") {
       return res.status(400).json({ error: "Already checked in or completed" });
     }
 

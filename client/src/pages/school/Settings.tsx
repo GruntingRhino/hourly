@@ -9,6 +9,7 @@ interface SchoolData {
   verified: boolean;
   requiredHours: number;
   verificationStandard: string;
+  zipCodes: string | null;
 }
 
 interface ClassroomData {
@@ -17,7 +18,7 @@ interface ClassroomData {
   inviteCode: string;
   isActive: boolean;
   teacher: { id: string; name: string };
-  _count: { students: number };
+  studentCount: number;
 }
 
 export default function SchoolSettings() {
@@ -28,12 +29,30 @@ export default function SchoolSettings() {
   const [schoolName, setSchoolName] = useState("");
   const [domain, setDomain] = useState("");
   const [requiredHours, setRequiredHours] = useState("40");
+  const [zipCodes, setZipCodes] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [newClassroomName, setNewClassroomName] = useState("");
   const [creatingClassroom, setCreatingClassroom] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await api.delete("/auth/account");
+      logout();
+    } catch (err: any) {
+      setMessage(err.message || "Failed to delete account");
+      setIsError(true);
+      setDeleting(false);
+      setDeleteConfirm(false);
+      setDeleteInput("");
+    }
+  };
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -45,6 +64,12 @@ export default function SchoolSettings() {
         setSchoolName(schoolData.name || "");
         setDomain(schoolData.domain || "");
         setRequiredHours(String(schoolData.requiredHours));
+        try {
+          const zips = schoolData.zipCodes ? JSON.parse(schoolData.zipCodes) : [];
+          setZipCodes(Array.isArray(zips) ? zips.join(", ") : "");
+        } catch {
+          setZipCodes("");
+        }
         setClassrooms(classroomData);
       }).finally(() => setLoading(false));
     } else {
@@ -59,10 +84,14 @@ export default function SchoolSettings() {
     setMessage("");
     setIsError(false);
     try {
+      const zipArray = zipCodes
+        ? zipCodes.split(",").map((z) => z.trim()).filter(Boolean)
+        : [];
       await api.put(`/schools/${user.schoolId}`, {
         name: schoolName,
         domain: domain || null,
         requiredHours: parseFloat(requiredHours),
+        zipCodes: zipArray,
       });
       setMessage("Settings updated!");
       await refreshUser();
@@ -175,6 +204,18 @@ export default function SchoolSettings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                School ZIP Codes <span className="text-gray-400">(comma-separated, for proximity matching)</span>
+              </label>
+              <input
+                type="text"
+                value={zipCodes}
+                onChange={(e) => setZipCodes(e.target.value)}
+                placeholder="e.g. 02101, 02102"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
 
             <button
               type="submit"
@@ -204,7 +245,7 @@ export default function SchoolSettings() {
                   <div>
                     <div className="font-medium">{c.name}</div>
                     <div className="text-sm text-gray-500">
-                      Teacher: {c.teacher.name} &middot; {c._count.students} students
+                      Teacher: {c.teacher.name} &middot; {c.studentCount} students
                     </div>
                   </div>
                   <div className="text-right">
@@ -242,10 +283,46 @@ export default function SchoolSettings() {
 
       {tab === "security" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Security</h3>
-          <p className="text-sm text-gray-500">
-            Security settings will be available in a future update.
+          <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
+          <p className="text-sm text-gray-500 mb-3">
+            Permanently deletes your account and removes all associated school data, classrooms, and student associations. This cannot be undone.
           </p>
+          {!deleteConfirm ? (
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+            >
+              Delete My Account
+            </button>
+          ) : (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm font-medium text-red-800 mb-3">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm:
+              </p>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                placeholder="DELETE"
+                className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteInput !== "DELETE" || deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? "Deleting..." : "Permanently Delete"}
+                </button>
+                <button
+                  onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

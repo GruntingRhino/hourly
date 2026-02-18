@@ -44,6 +44,15 @@ export default function OrgDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showAnnounce, setShowAnnounce] = useState(false);
+  const [announceOppId, setAnnounceOppId] = useState("");
+  const [announceMsg, setAnnounceMsg] = useState("");
+  const [announcing, setAnnouncing] = useState(false);
+  const [announceResult, setAnnounceResult] = useState("");
+  const [rejectModal, setRejectModal] = useState<{ sessionId: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -62,8 +71,8 @@ export default function OrgDashboard() {
       setPending(pend);
       setStats(st);
       setNotifications(notifs.slice(0, 5));
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setError("Failed to load dashboard. Please refresh the page.");
     } finally {
       setLoading(false);
     }
@@ -74,14 +83,41 @@ export default function OrgDashboard() {
     loadData();
   };
 
-  const handleReject = async (sessionId: string) => {
-    const reason = prompt("Reason for rejection:");
-    if (!reason) return;
-    await api.post(`/verification/${sessionId}/reject`, { reason });
-    loadData();
+  const handleReject = (sessionId: string) => {
+    setRejectReason("");
+    setRejectModal({ sessionId });
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectModal) return;
+    setRejecting(true);
+    try {
+      await api.post(`/verification/${rejectModal.sessionId}/reject`, { reason: rejectReason });
+      setRejectModal(null);
+      loadData();
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleAnnounce = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announceOppId || !announceMsg) return;
+    setAnnouncing(true);
+    setAnnounceResult("");
+    try {
+      const result = await api.post<{ sent: number }>(`/opportunities/${announceOppId}/announce`, { message: announceMsg });
+      setAnnounceResult(`Announcement sent to ${result.sent} student${result.sent !== 1 ? "s" : ""}.`);
+      setAnnounceMsg("");
+    } catch (err: any) {
+      setAnnounceResult(err.message || "Failed to send announcement");
+    } finally {
+      setAnnouncing(false);
+    }
   };
 
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
+  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
   const upcoming = opportunities
     .filter((o) => o.status === "ACTIVE" && new Date(o.date) >= new Date())
@@ -105,7 +141,99 @@ export default function OrgDashboard() {
         >
           My Opportunities
         </Link>
+        <button
+          onClick={() => { setShowAnnounce(true); setAnnounceResult(""); }}
+          className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
+        >
+          Make Announcement
+        </button>
       </div>
+
+      {/* Announcement Modal */}
+      {showAnnounce && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Make Announcement</h2>
+            {announceResult ? (
+              <div>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm mb-4">
+                  {announceResult}
+                </div>
+                <button onClick={() => { setShowAnnounce(false); setAnnounceResult(""); }} className="w-full py-2 bg-gray-900 text-white rounded-md">Done</button>
+              </div>
+            ) : (
+              <form onSubmit={handleAnnounce} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Opportunity</label>
+                  <select
+                    value={announceOppId}
+                    onChange={(e) => setAnnounceOppId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">Select opportunity...</option>
+                    {opportunities.filter((o) => o.status === "ACTIVE").map((o) => (
+                      <option key={o.id} value={o.id}>{o.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <textarea
+                    value={announceMsg}
+                    onChange={(e) => setAnnounceMsg(e.target.value)}
+                    required
+                    rows={4}
+                    placeholder="Write your announcement..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={announcing} className="flex-1 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {announcing ? "Sending..." : "Send to All Signups"}
+                  </button>
+                  <button type="button" onClick={() => setShowAnnounce(false)} className="flex-1 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <h2 className="text-lg font-bold mb-3">Reject Hours</h2>
+            <p className="text-sm text-gray-600 mb-4">Optionally provide a reason for this rejection.</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason (optional)"
+              rows={3}
+              autoFocus
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmReject}
+                disabled={rejecting}
+                className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {rejecting ? "Rejecting..." : "Reject"}
+              </button>
+              <button
+                onClick={() => setRejectModal(null)}
+                className="flex-1 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-6">
         {/* Activity feed / pending verifications */}

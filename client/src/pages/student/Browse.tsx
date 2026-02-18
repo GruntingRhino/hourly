@@ -162,7 +162,43 @@ export default function StudentBrowse() {
       {loading ? (
         <div className="text-gray-500">Loading opportunities...</div>
       ) : displayOpps.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">No opportunities found.</div>
+        <div className="text-center py-12">
+          {view === "saved" ? (
+            <>
+              <div className="text-3xl mb-3">★</div>
+              <div className="font-medium text-gray-700 mb-1">No saved opportunities</div>
+              <div className="text-sm text-gray-500">
+                Browse opportunities and click Save to bookmark ones you're interested in.
+              </div>
+            </>
+          ) : view === "skipped" ? (
+            <>
+              <div className="text-3xl mb-3">—</div>
+              <div className="font-medium text-gray-700 mb-1">No skipped opportunities</div>
+              <div className="text-sm text-gray-500">
+                Opportunities you skip will appear here so you can recover them later.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-3xl mb-3">⌕</div>
+              <div className="font-medium text-gray-700 mb-1">No opportunities found</div>
+              <div className="text-sm text-gray-500">
+                {(tagFilter || approvedOnly)
+                  ? "Try adjusting your filters."
+                  : "Check back later — new opportunities are added regularly."}
+              </div>
+              {(tagFilter || approvedOnly) && (
+                <button
+                  onClick={() => { setTagFilter(""); setApprovedOnly(false); }}
+                  className="mt-3 text-sm text-blue-600 hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {displayOpps.map((opp) => {

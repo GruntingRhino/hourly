@@ -57,7 +57,7 @@ export default function OrgMessages() {
     setSending(true);
     setSendError("");
     try {
-      await api.post("/messages", { receiverId: to, subject, body, priority: true });
+      await api.post("/messages", { receiverEmail: to, subject, body, priority: true });
       setShowCompose(false);
       setTo("");
       setSubject("");
@@ -92,8 +92,8 @@ export default function OrgMessages() {
           )}
           <form onSubmit={handleSend} className="space-y-3">
             <input
-              type="text"
-              placeholder="Recipient User ID"
+              type="email"
+              placeholder="Recipient email address"
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required

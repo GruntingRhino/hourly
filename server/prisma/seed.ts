@@ -9,6 +9,17 @@ function generateInviteCode(): string {
 }
 
 async function main() {
+  console.log("Cleaning up existing data...");
+  // Delete in dependency order, TRUNCATE CASCADE handles circular FKs
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "AuditLog", "Message", "Notification", "SavedOpportunity",
+      "StudentGroupMember", "StudentGroup", "ServiceSession",
+      "Signup", "SchoolOrganization", "Classroom", "Opportunity",
+      "User", "School", "Organization"
+    CASCADE
+  `);
+
   console.log("Seeding database...");
 
   // Create school admin user first

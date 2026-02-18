@@ -44,7 +44,7 @@ function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z
 }
 
 export default function Signup() {
-  const { signup, refreshUser } = useAuth();
+  const { signup } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -59,14 +59,13 @@ export default function Signup() {
   const [zipCodes, setZipCodes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [verificationUrl, setVerificationUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const result = await signup({
+      await signup({
         email,
         password,
         name,
@@ -77,61 +76,13 @@ export default function Signup() {
         schoolDomain: role === "SCHOOL_ADMIN" ? schoolDomain || undefined : undefined,
         zipCodes: (role === "ORG_ADMIN" || role === "SCHOOL_ADMIN") && zipCodes.length > 0 ? zipCodes : undefined,
       });
-      if (result.verificationUrl) {
-        setVerificationUrl(result.verificationUrl);
-      } else {
-        navigate("/dashboard");
-      }
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {
       setLoading(false);
     }
   };
-
-  // Email verification pending screen
-  if (verificationUrl) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-sm">
-          <Link to="/" className="block text-center text-2xl font-bold italic mb-8">Hourly</Link>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <div className="text-5xl mb-4">✉️</div>
-            <h2 className="text-xl font-bold mb-2">Verify your email</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              We sent a verification link to <strong>{email}</strong>. Click the link to activate your account.
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-left mb-4">
-              <p className="text-xs text-blue-700 font-medium mb-1">Development mode — verification link:</p>
-              <a
-                href={verificationUrl}
-                onClick={async (e) => {
-                  e.preventDefault();
-                  const token = new URL(verificationUrl).searchParams.get("token");
-                  try {
-                    await fetch(`/api/auth/verify-email?token=${token}`);
-                    await refreshUser();
-                  } catch {
-                    // ignore errors, still redirect
-                  }
-                  navigate("/dashboard");
-                }}
-                className="text-xs text-blue-600 underline break-all"
-              >
-                {verificationUrl}
-              </a>
-            </div>
-            <button
-              onClick={() => navigate("/login")}
-              className="w-full py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-            >
-              Back to Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Role selection screen
   if (!role) {

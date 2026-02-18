@@ -38,7 +38,11 @@ interface Signup {
     date: string;
     startTime: string;
     endTime: string;
+    location: string;
+    address: string | null;
+    capacity: number;
     organization: { name: string };
+    _count: { signups: number };
   };
 }
 
@@ -47,6 +51,7 @@ export default function StudentDashboard() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [signups, setSignups] = useState<Signup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -55,10 +60,13 @@ export default function StudentDashboard() {
     ]).then(([r, s]) => {
       setReport(r);
       setSignups(s);
+    }).catch(() => {
+      setError("Failed to load dashboard. Please refresh the page.");
     }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
+  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
   const upcoming = signups.filter(
     (s) => s.status === "CONFIRMED" && new Date(s.opportunity.date) >= new Date()
@@ -155,7 +163,15 @@ export default function StudentDashboard() {
                   <div className="text-sm text-gray-500">
                     {new Date(s.opportunity.date).toLocaleDateString()} &middot; {s.opportunity.startTime} - {s.opportunity.endTime}
                   </div>
-                  <div className="text-sm text-gray-400">{s.opportunity.organization.name}</div>
+                  <div className="text-sm text-gray-400">
+                    {s.opportunity.organization.name} &middot; {s.opportunity.location}
+                  </div>
+                  {s.opportunity.address && (
+                    <div className="text-xs text-gray-400">{s.opportunity.address}</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {s.opportunity._count?.signups ?? 0}/{s.opportunity.capacity} spots filled
+                  </div>
                 </Link>
               ))}
             </div>

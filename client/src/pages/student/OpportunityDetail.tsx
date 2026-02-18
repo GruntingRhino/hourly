@@ -44,6 +44,7 @@ export default function OpportunityDetail() {
   const [mySession, setMySession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [showVerifyForm, setShowVerifyForm] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState<"DRAWN" | "FILE">("DRAWN");
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -76,11 +77,12 @@ export default function OpportunityDetail() {
 
   const handleSignup = async () => {
     setActionLoading(true);
+    setActionError("");
     try {
       await api.post("/signups", { opportunityId: id });
       await loadData();
     } catch (err: any) {
-      alert(err.message);
+      setActionError(err.message || "Failed to sign up");
     } finally {
       setActionLoading(false);
     }
@@ -89,11 +91,12 @@ export default function OpportunityDetail() {
   const handleCancelSignup = async () => {
     if (!mySignup) return;
     setActionLoading(true);
+    setActionError("");
     try {
       await api.post(`/signups/${mySignup.id}/cancel`);
       await loadData();
     } catch (err: any) {
-      alert(err.message);
+      setActionError(err.message || "Failed to cancel");
     } finally {
       setActionLoading(false);
     }
@@ -102,11 +105,12 @@ export default function OpportunityDetail() {
   const handleCheckIn = async () => {
     if (!mySession) return;
     setActionLoading(true);
+    setActionError("");
     try {
       await api.post(`/sessions/${mySession.id}/checkin`);
       await loadData();
     } catch (err: any) {
-      alert(err.message);
+      setActionError(err.message || "Failed to check in");
     } finally {
       setActionLoading(false);
     }
@@ -115,11 +119,12 @@ export default function OpportunityDetail() {
   const handleCheckOut = async () => {
     if (!mySession) return;
     setActionLoading(true);
+    setActionError("");
     try {
       await api.post(`/sessions/${mySession.id}/checkout`);
       await loadData();
     } catch (err: any) {
-      alert(err.message);
+      setActionError(err.message || "Failed to check out");
     } finally {
       setActionLoading(false);
     }
@@ -127,28 +132,27 @@ export default function OpportunityDetail() {
 
   const handleSubmitVerification = async () => {
     if (!mySession) return;
+    setActionError("");
+    if (verifyMethod === "DRAWN" && !signatureData) {
+      setActionError("Please draw your signature before submitting.");
+      return;
+    }
+    if (verifyMethod === "FILE" && !signatureFile) {
+      setActionError("Please select a file before submitting.");
+      return;
+    }
     setActionLoading(true);
     try {
       if (verifyMethod === "DRAWN") {
-        if (!signatureData) {
-          alert("Please draw your signature");
-          setActionLoading(false);
-          return;
-        }
         await api.post(`/sessions/${mySession.id}/submit-verification`, {
           signatureType: "DRAWN",
           signatureData,
         });
       } else {
-        if (!signatureFile) {
-          alert("Please select a file");
-          setActionLoading(false);
-          return;
-        }
         const formData = new FormData();
-        formData.append("signatureFile", signatureFile);
+        formData.append("signatureFile", signatureFile!);
         formData.append("signatureType", "FILE");
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("hourly_token");
         const res = await fetch(`/api/sessions/${mySession.id}/submit-verification`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -162,7 +166,7 @@ export default function OpportunityDetail() {
       setShowVerifyForm(false);
       await loadData();
     } catch (err: any) {
-      alert(err.message);
+      setActionError(err.message || "Failed to submit verification");
     } finally {
       setActionLoading(false);
     }
@@ -242,6 +246,11 @@ export default function OpportunityDetail() {
 
         {/* Action buttons */}
         <div className="border-t border-gray-200 pt-4">
+          {actionError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+              {actionError}
+            </div>
+          )}
           {!mySignup && opp.status === "ACTIVE" && (
             <button
               onClick={handleSignup}

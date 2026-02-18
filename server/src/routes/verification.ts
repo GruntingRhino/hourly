@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { sendHourApprovedEmail } from "../services/email";
 
 const router = Router();
 
@@ -68,6 +69,13 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
         body: `Your ${hours} hours for "${session.opportunity.title}" have been approved.`,
       },
     });
+
+    // Send email to student
+    const student = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } });
+    const org = await prisma.organization.findUnique({ where: { id: session.opportunity.organizationId }, select: { name: true } });
+    if (student && org) {
+      sendHourApprovedEmail(student.email, org.name, hours, session.opportunity.title).catch(() => {});
+    }
 
     res.json(updated);
   } catch (err) {

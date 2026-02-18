@@ -1,9 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
 export default function CreateOpportunity() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditing = !!id;
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -21,6 +24,27 @@ export default function CreateOpportunity() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (isEditing) {
+      api.get<any>(`/opportunities/${id}`).then((opp) => {
+        setForm({
+          title: opp.title || "",
+          description: opp.description || "",
+          tags: opp.tags ? JSON.parse(opp.tags).join(", ") : "",
+          location: opp.location || "",
+          address: opp.address || "",
+          date: opp.date ? new Date(opp.date).toISOString().split("T")[0] : "",
+          startTime: opp.startTime || "",
+          endTime: opp.endTime || "",
+          durationHours: opp.durationHours?.toString() || "",
+          capacity: opp.capacity?.toString() || "",
+          ageRequirement: opp.ageRequirement?.toString() || "",
+          isRecurring: opp.isRecurring || false,
+        });
+      }).catch(() => setError("Failed to load opportunity"));
+    }
+  }, [id, isEditing]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setForm((f) => ({
@@ -34,10 +58,10 @@ export default function CreateOpportunity() {
     setError("");
     setLoading(true);
     try {
-      await api.post("/opportunities", {
+      const payload = {
         title: form.title,
         description: form.description,
-        tags: form.tags ? form.tags.split(",").map((t) => t.trim()) : [],
+        tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         location: form.location,
         address: form.address || undefined,
         date: form.date,
@@ -47,10 +71,16 @@ export default function CreateOpportunity() {
         capacity: parseInt(form.capacity),
         ageRequirement: form.ageRequirement ? parseInt(form.ageRequirement) : undefined,
         isRecurring: form.isRecurring,
-      });
+      };
+
+      if (isEditing) {
+        await api.put(`/opportunities/${id}`, payload);
+      } else {
+        await api.post("/opportunities", payload);
+      }
       navigate("/opportunities");
     } catch (err: any) {
-      setError(err.message || "Failed to create opportunity");
+      setError(err.message || `Failed to ${isEditing ? "update" : "create"} opportunity`);
     } finally {
       setLoading(false);
     }
@@ -58,7 +88,9 @@ export default function CreateOpportunity() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Create Opportunity</h1>
+      <h1 className="text-2xl font-bold mb-6">
+        {isEditing ? "Edit Opportunity" : "Create Opportunity"}
+      </h1>
 
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         {error && (
@@ -114,6 +146,20 @@ export default function CreateOpportunity() {
               value={form.location}
               onChange={handleChange}
               required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Address <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              name="address"
+              value={form.address}
+              onChange={handleChange}
+              placeholder="123 Main St, Boston MA"
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
@@ -220,7 +266,7 @@ export default function CreateOpportunity() {
               disabled={loading}
               className="px-6 py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Opportunity"}
+              {loading ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Opportunity")}
             </button>
             <button
               type="button"
