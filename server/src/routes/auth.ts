@@ -10,14 +10,20 @@ const router = Router();
 const VALID_ROLES = ["STUDENT", "ORG_ADMIN", "SCHOOL_ADMIN"] as const;
 
 const signupSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(1),
+  email: z.string().email().max(255),
+  password: z.string().min(8).max(128),
+  name: z.string().min(1).max(255),
   role: z.enum(VALID_ROLES),
-  age: z.number().optional(),
-  organizationName: z.string().optional(),
-  schoolName: z.string().optional(),
-  schoolDomain: z.string().optional(),
+  age: z.number().int().min(10).max(25).optional(),
+  grade: z.string().max(50).optional(),
+  organizationName: z.string().max(255).optional(),
+  orgName: z.string().max(255).optional(), // alias for organizationName
+  description: z.string().max(1000).optional(),
+  phone: z.string().max(20).optional(),
+  website: z.string().max(255).optional(),
+  schoolName: z.string().max(255).optional(),
+  schoolDomain: z.string().max(255).optional(),
+  zipCodes: z.array(z.string().regex(/^\d{5}$/, "Invalid ZIP code")).optional(),
 });
 
 const loginSchema = z.object({
@@ -40,12 +46,20 @@ router.post("/signup", async (req: Request, res: Response) => {
     let organizationId: string | undefined;
     let schoolId: string | undefined;
 
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // If signing up as an org admin, create the organization
     if (data.role === "ORG_ADMIN") {
       const org = await prisma.organization.create({
         data: {
-          name: data.organizationName || data.name,
+          name: data.organizationName || data.orgName || data.name,
           email: data.email,
+          phone: data.phone || null,
+          description: data.description || null,
+          website: data.website || null,
+          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
         },
       });
       organizationId = org.id;
@@ -60,7 +74,9 @@ router.post("/signup", async (req: Request, res: Response) => {
         role: data.role,
         age: data.role === "STUDENT" ? data.age : undefined,
         organizationId,
-        emailVerified: true,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpires,
       },
     });
 
@@ -72,6 +88,7 @@ router.post("/signup", async (req: Request, res: Response) => {
           domain: data.schoolDomain || undefined,
           verified: false,
           createdById: user.id,
+          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
         },
       });
       schoolId = school.id;
@@ -96,13 +113,19 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
+    // In dev, include the verification link in the response
+    const verificationUrl = `${process.env.APP_URL || "http://localhost:5173"}/verify-email?token=${emailVerificationToken}`;
+
     res.status(201).json({
       token,
+      requiresEmailVerification: true,
+      verificationUrl, // Dev only: include in response for testing
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
+        emailVerified: false,
         organizationId: user.organizationId,
         schoolId,
       },
@@ -156,6 +179,7 @@ router.post("/login", async (req: Request, res: Response) => {
         phone: user.phone,
         bio: user.bio,
         avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerified,
         organizationId: user.organizationId,
         organization: user.organization,
         schoolId: user.schoolId || studentSchool?.id,
@@ -199,6 +223,8 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       age: user.age,
       grade: user.grade,
       status: user.status,
+      emailVerified: user.emailVerified,
+      socialLinks: user.socialLinks ? JSON.parse(user.socialLinks) : null,
       organizationId: user.organizationId,
       organization: user.organization,
       schoolId: user.schoolId || studentSchool?.id,
@@ -246,22 +272,124 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
   }
 });
 
+const profileSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  phone: z.string().max(20).optional(),
+  bio: z.string().max(1000).optional(),
+  age: z.number().int().min(10).max(25).optional(),
+  grade: z.string().max(50).optional(),
+  socialLinks: z.object({
+    instagram: z.string().max(255).optional(),
+    tiktok: z.string().max(255).optional(),
+    twitter: z.string().max(255).optional(),
+    youtube: z.string().max(255).optional(),
+  }).optional(),
+});
+
 // PUT /api/auth/profile
 router.put("/profile", authenticate, async (req: Request, res: Response) => {
   try {
+    const data = profileSchema.parse(req.body);
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
       data: {
-        name: req.body.name,
-        phone: req.body.phone,
-        bio: req.body.bio,
-        age: req.body.age,
-        grade: req.body.grade,
+        name: data.name,
+        phone: data.phone,
+        bio: data.bio,
+        age: data.age,
+        grade: data.grade,
+        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
       },
     });
     res.json(user);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
     console.error("Profile update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/auth/verify-email?token=xxx
+router.get("/verify-email", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.query;
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ error: "Invalid token" });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired verification token" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    res.json({ message: "Email verified successfully", userId: user.id });
+  } catch (err) {
+    console.error("Email verification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/resend-verification
+router.post("/resend-verification", authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.emailVerified) return res.status(400).json({ error: "Email already verified" });
+
+    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken, emailVerificationExpires },
+    });
+
+    const verificationUrl = `${process.env.APP_URL || "http://localhost:5173"}/verify-email?token=${emailVerificationToken}`;
+
+    res.json({ message: "Verification email sent", verificationUrl });
+  } catch (err) {
+    console.error("Resend verification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/set-graduation-goal — school admin sets graduation hours goal after setup
+router.post("/set-graduation-goal", authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+    if (user.role !== "SCHOOL_ADMIN") return res.status(403).json({ error: "Not a school admin" });
+
+    const { requiredHours } = z.object({ requiredHours: z.number().min(1).max(1000) }).parse(req.body);
+
+    const school = await prisma.school.update({
+      where: { id: user.schoolId },
+      data: { requiredHours },
+    });
+
+    res.json(school);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Set graduation goal error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

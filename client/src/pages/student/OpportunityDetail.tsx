@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
-import { useAuth } from "../../hooks/useAuth";
 import SignaturePad from "../../components/SignaturePad";
 
 interface Opportunity {
@@ -39,7 +38,6 @@ interface Session {
 
 export default function OpportunityDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [mySignup, setMySignup] = useState<any>(null);

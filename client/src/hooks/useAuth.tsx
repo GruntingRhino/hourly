@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { api } from "../lib/api";
 
 type Role = "STUDENT" | "ORG_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "DISTRICT_ADMIN";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name: string;
@@ -13,24 +14,33 @@ interface User {
   avatarUrl?: string;
   age?: number;
   grade?: string;
+  emailVerified?: boolean;
+  socialLinks?: { instagram?: string; tiktok?: string; twitter?: string; youtube?: string } | null;
   organizationId?: string;
-  organization?: { id: string; name: string; description?: string };
+  organization?: { id: string; name: string; description?: string; zipCodes?: string | null };
   schoolId?: string;
-  school?: { id: string; name: string; domain?: string | null; verified: boolean };
+  school?: { id: string; name: string; domain?: string | null; verified: boolean; requiredHours?: number; zipCodes?: string | null };
   classroomId?: string;
-  classroom?: { id: string; name: string; school: { id: string; name: string } };
+  classroom?: { id: string; name: string; inviteCode?: string; school: { id: string; name: string } };
+}
+
+interface SignupResult {
+  token: string;
+  user: User;
+  requiresEmailVerification?: boolean;
+  verificationUrl?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: SignupData) => Promise<void>;
+  signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
 
-interface SignupData {
+export interface SignupData {
   email: string;
   password: string;
   name: string;
@@ -39,6 +49,7 @@ interface SignupData {
   organizationName?: string;
   schoolName?: string;
   schoolDomain?: string;
+  zipCodes?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -72,10 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
-  const signup = async (signupData: SignupData) => {
-    const data = await api.post<{ token: string; user: User }>("/auth/signup", signupData);
+  const signup = async (signupData: SignupData): Promise<SignupResult> => {
+    const data = await api.post<SignupResult>("/auth/signup", signupData);
     localStorage.setItem("hourly_token", data.token);
     setUser(data.user);
+    return data;
   };
 
   const logout = () => {

@@ -3,6 +3,8 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import * as zipcodes from "zipcodes";
+import * as geolib from "geolib";
 
 const router = Router();
 
@@ -28,7 +30,7 @@ const createSchema = z.object({
 // GET /api/opportunities — browse (public, filtered)
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { search, date, tag, organizationId, status } = req.query;
+    const { search, date, tag, organizationId, status, schoolId, approvedOnly } = req.query;
 
     const where: any = { status: (status as string) || "ACTIVE" };
 
@@ -49,10 +51,42 @@ router.get("/", async (req: Request, res: Response) => {
       where.organizationId = organizationId;
     }
 
+    // If approvedOnly and schoolId, filter to only approved orgs
+    let approvedOrgIds: string[] = [];
+    let schoolZip: string | null = null;
+    if (schoolId) {
+      const school = await prisma.school.findUnique({ where: { id: schoolId as string } });
+      if (school?.zipCodes) {
+        try {
+          const zips = JSON.parse(school.zipCodes);
+          if (zips.length > 0) schoolZip = zips[0];
+        } catch {}
+      }
+      const approvals = await prisma.schoolOrganization.findMany({
+        where: { schoolId: schoolId as string, status: "APPROVED" },
+        select: { organizationId: true },
+      });
+      approvedOrgIds = approvals.map((a) => a.organizationId);
+
+      // Also get blocked orgs and exclude them
+      const blocked = await prisma.schoolOrganization.findMany({
+        where: { schoolId: schoolId as string, status: "BLOCKED" },
+        select: { organizationId: true },
+      });
+      const blockedIds = blocked.map((b) => b.organizationId);
+      if (blockedIds.length > 0) {
+        where.organizationId = { notIn: blockedIds };
+      }
+    }
+
+    if (approvedOnly === "true" && approvedOrgIds.length > 0) {
+      where.organizationId = { in: approvedOrgIds };
+    }
+
     const opportunities = await prisma.opportunity.findMany({
       where,
       include: {
-        organization: { select: { id: true, name: true, avatarUrl: true } },
+        organization: { select: { id: true, name: true, avatarUrl: true, zipCodes: true } },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
       },
       orderBy: { date: "asc" },
@@ -69,6 +103,45 @@ router.get("/", async (req: Request, res: Response) => {
         } catch {
           return false;
         }
+      });
+    }
+
+    // Sort: approved orgs first, then by distance from school ZIP
+    if (schoolId && approvedOrgIds.length > 0) {
+      const schoolCoords = schoolZip ? ((zipcodes as any).lookup(schoolZip) ?? null) : null;
+
+      results = results.sort((a, b) => {
+        const aApproved = approvedOrgIds.includes(a.organizationId) ? 0 : 1;
+        const bApproved = approvedOrgIds.includes(b.organizationId) ? 0 : 1;
+        if (aApproved !== bApproved) return aApproved - bApproved;
+
+        // Within same approval group, sort by distance if we have coords
+        if (schoolCoords) {
+          const getOrgCoords = (opp: any) => {
+            try {
+              const orgZips = opp.organization.zipCodes ? JSON.parse(opp.organization.zipCodes) : [];
+              if (orgZips.length > 0) {
+                const info = (zipcodes as any).lookup(orgZips[0]) ?? null;
+                if (info) return { latitude: info.latitude, longitude: info.longitude };
+              }
+            } catch {}
+            return null;
+          };
+          const aCoords = getOrgCoords(a);
+          const bCoords = getOrgCoords(b);
+          if (aCoords && bCoords) {
+            const aDist = (geolib as any).getDistance(
+              { latitude: schoolCoords.latitude, longitude: schoolCoords.longitude },
+              aCoords
+            );
+            const bDist = (geolib as any).getDistance(
+              { latitude: schoolCoords.latitude, longitude: schoolCoords.longitude },
+              bCoords
+            );
+            return aDist - bDist;
+          }
+        }
+        return 0;
       });
     }
 
@@ -199,6 +272,42 @@ router.post("/:id/cancel", authenticate, requireRole("ORG_ADMIN"), async (req: R
     res.json(updated);
   } catch (err) {
     console.error("Cancel opportunity error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/opportunities/:id/announce — send announcement to all confirmed signups (org only)
+router.post("/:id/announce", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const opp = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
+    if (!opp) return res.status(404).json({ error: "Opportunity not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (opp.organizationId !== user?.organizationId) {
+      return res.status(403).json({ error: "Not your organization's opportunity" });
+    }
+
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: "Message is required" });
+
+    const signups = await prisma.signup.findMany({
+      where: { opportunityId: req.params.id, status: "CONFIRMED" },
+    });
+
+    for (const signup of signups) {
+      await prisma.notification.create({
+        data: {
+          userId: signup.userId,
+          type: "ANNOUNCEMENT",
+          title: `Announcement: ${opp.title}`,
+          body: message,
+        },
+      });
+    }
+
+    res.json({ sent: signups.length });
+  } catch (err) {
+    console.error("Announce error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

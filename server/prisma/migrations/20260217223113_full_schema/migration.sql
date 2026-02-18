@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -10,10 +13,14 @@ CREATE TABLE "User" (
     "role" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
     "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "emailVerificationToken" TEXT,
+    "emailVerificationExpires" TIMESTAMP(3),
+    "socialLinks" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "age" INTEGER,
     "grade" TEXT,
+    "classroomId" TEXT,
     "schoolId" TEXT,
     "organizationId" TEXT,
 
@@ -24,16 +31,30 @@ CREATE TABLE "User" (
 CREATE TABLE "School" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "address" TEXT,
-    "phone" TEXT,
-    "description" TEXT,
+    "domain" TEXT,
+    "verified" BOOLEAN NOT NULL DEFAULT false,
+    "createdById" TEXT NOT NULL,
     "requiredHours" DOUBLE PRECISION NOT NULL DEFAULT 40,
-    "verificationStandard" TEXT NOT NULL DEFAULT 'ORGANIZATION',
+    "verificationStandard" TEXT NOT NULL DEFAULT 'OPEN',
+    "zipCodes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "adminUserId" TEXT NOT NULL,
 
     CONSTRAINT "School_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Classroom" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "schoolId" TEXT NOT NULL,
+    "teacherId" TEXT NOT NULL,
+    "inviteCode" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Classroom_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -47,6 +68,7 @@ CREATE TABLE "Organization" (
     "socialLinks" TEXT,
     "avatarUrl" TEXT,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "zipCodes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -143,11 +165,16 @@ CREATE TABLE "ServiceSession" (
     "checkInTime" TIMESTAMP(3),
     "checkOutTime" TIMESTAMP(3),
     "totalHours" DOUBLE PRECISION,
-    "status" TEXT NOT NULL DEFAULT 'PENDING_CHECKIN',
+    "status" TEXT NOT NULL DEFAULT 'COMMITTED',
     "verificationStatus" TEXT NOT NULL DEFAULT 'PENDING',
     "verifiedBy" TEXT,
     "verifiedAt" TIMESTAMP(3),
     "rejectionReason" TEXT,
+    "signatureType" TEXT,
+    "signatureData" TEXT,
+    "signatureFileUrl" TEXT,
+    "signatureFileName" TEXT,
+    "submittedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -198,6 +225,9 @@ CREATE TABLE "Notification" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Classroom_inviteCode_key" ON "Classroom"("inviteCode");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "SchoolOrganization_schoolId_organizationId_key" ON "SchoolOrganization"("schoolId", "organizationId");
 
 -- CreateIndex
@@ -213,10 +243,22 @@ CREATE UNIQUE INDEX "SavedOpportunity_userId_opportunityId_key" ON "SavedOpportu
 CREATE UNIQUE INDEX "ServiceSession_userId_opportunityId_key" ON "ServiceSession"("userId", "opportunityId");
 
 -- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_classroomId_fkey" FOREIGN KEY ("classroomId") REFERENCES "Classroom"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "School" ADD CONSTRAINT "School_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Classroom" ADD CONSTRAINT "Classroom_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Classroom" ADD CONSTRAINT "Classroom_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SchoolOrganization" ADD CONSTRAINT "SchoolOrganization_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -265,3 +307,4 @@ ALTER TABLE "Message" ADD CONSTRAINT "Message_receiverId_fkey" FOREIGN KEY ("rec
 
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

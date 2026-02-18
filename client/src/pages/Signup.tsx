@@ -2,8 +2,49 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
+
+function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z: string[]) => void }) {
+  const [input, setInput] = useState("");
+  const addZip = () => {
+    const z = input.trim();
+    if (z && /^\d{5}$/.test(z) && !zipCodes.includes(z)) {
+      onChange([...zipCodes, z]);
+      setInput("");
+    }
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        ZIP Codes <span className="text-gray-400">(service area)</span>
+      </label>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addZip(); } }}
+          placeholder="e.g. 02101"
+          maxLength={5}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button type="button" onClick={addZip} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          Add
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {zipCodes.map((z) => (
+          <span key={z} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-sm">
+            {z}
+            <button type="button" onClick={() => onChange(zipCodes.filter((x) => x !== z))} className="text-blue-400 hover:text-blue-600">×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Signup() {
-  const { signup } = useAuth();
+  const { signup, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -15,15 +56,17 @@ export default function Signup() {
   const [orgName, setOrgName] = useState("");
   const [schoolName, setSchoolName] = useState("");
   const [schoolDomain, setSchoolDomain] = useState("");
+  const [zipCodes, setZipCodes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificationUrl, setVerificationUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await signup({
+      const result = await signup({
         email,
         password,
         name,
@@ -32,14 +75,63 @@ export default function Signup() {
         organizationName: orgName || undefined,
         schoolName: role === "SCHOOL_ADMIN" ? schoolName : undefined,
         schoolDomain: role === "SCHOOL_ADMIN" ? schoolDomain || undefined : undefined,
+        zipCodes: (role === "ORG_ADMIN" || role === "SCHOOL_ADMIN") && zipCodes.length > 0 ? zipCodes : undefined,
       });
-      navigate("/dashboard");
+      if (result.verificationUrl) {
+        setVerificationUrl(result.verificationUrl);
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {
       setLoading(false);
     }
   };
+
+  // Email verification pending screen
+  if (verificationUrl) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-sm">
+          <Link to="/" className="block text-center text-2xl font-bold italic mb-8">Hourly</Link>
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+            <div className="text-5xl mb-4">✉️</div>
+            <h2 className="text-xl font-bold mb-2">Verify your email</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              We sent a verification link to <strong>{email}</strong>. Click the link to activate your account.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-left mb-4">
+              <p className="text-xs text-blue-700 font-medium mb-1">Development mode — verification link:</p>
+              <a
+                href={verificationUrl}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const token = new URL(verificationUrl).searchParams.get("token");
+                  try {
+                    await fetch(`/api/auth/verify-email?token=${token}`);
+                    await refreshUser();
+                  } catch {
+                    // ignore errors, still redirect
+                  }
+                  navigate("/dashboard");
+                }}
+                className="text-xs text-blue-600 underline break-all"
+              >
+                {verificationUrl}
+              </a>
+            </div>
+            <button
+              onClick={() => navigate("/login")}
+              className="w-full py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Role selection screen
   if (!role) {
@@ -141,24 +233,29 @@ export default function Signup() {
                   type="number"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
+                  min={10}
+                  max={25}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             )}
 
             {role === "ORG_ADMIN" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Organization Name
-                </label>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Organization Name
+                  </label>
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <ZipCodeInput zipCodes={zipCodes} onChange={setZipCodes} />
+              </>
             )}
 
             {role === "SCHOOL_ADMIN" && (
@@ -187,6 +284,7 @@ export default function Signup() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                <ZipCodeInput zipCodes={zipCodes} onChange={setZipCodes} />
               </>
             )}
 

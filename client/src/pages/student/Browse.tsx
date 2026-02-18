@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
+import { useAuth } from "../../hooks/useAuth";
 
 interface Opportunity {
   id: string;
@@ -8,6 +9,7 @@ interface Opportunity {
   description: string;
   tags: string | null;
   location: string;
+  address: string | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -25,20 +27,27 @@ interface SavedOpp {
 }
 
 export default function StudentBrowse() {
+  const { user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [saved, setSaved] = useState<SavedOpp[]>([]);
   const [search, setSearch] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [approvedOnly, setApprovedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"browse" | "saved" | "skipped">("browse");
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [approvedOnly]);
 
   const loadData = async () => {
     setLoading(true);
+    const params = new URLSearchParams();
+    if (user?.schoolId) params.set("schoolId", user.schoolId);
+    if (approvedOnly) params.set("approvedOnly", "true");
+
     const [opps, savedOpps] = await Promise.all([
-      api.get<Opportunity[]>("/opportunities"),
+      api.get<Opportunity[]>(`/opportunities?${params.toString()}`),
       api.get<SavedOpp[]>("/saved").catch(() => [] as SavedOpp[]),
     ]);
     setOpportunities(opps);
@@ -51,15 +60,24 @@ export default function StudentBrowse() {
     loadData();
   };
 
+  // Collect all unique tags
+  const allTags = Array.from(new Set(
+    opportunities.flatMap((o) => {
+      try { return o.tags ? JSON.parse(o.tags) : []; } catch { return []; }
+    })
+  )).sort();
+
   const filtered = opportunities.filter((opp) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      opp.title.toLowerCase().includes(s) ||
-      opp.description.toLowerCase().includes(s) ||
-      opp.location.toLowerCase().includes(s) ||
-      opp.organization.name.toLowerCase().includes(s)
+    const searchMatch = !search || (
+      opp.title.toLowerCase().includes(search.toLowerCase()) ||
+      opp.description.toLowerCase().includes(search.toLowerCase()) ||
+      opp.location.toLowerCase().includes(search.toLowerCase()) ||
+      opp.organization.name.toLowerCase().includes(search.toLowerCase())
     );
+    const tagMatch = !tagFilter || (() => {
+      try { return opp.tags ? JSON.parse(opp.tags).includes(tagFilter) : false; } catch { return false; }
+    })();
+    return searchMatch && tagMatch;
   });
 
   const savedIds = saved.filter((s) => s.status === "SAVED").map((s) => s.opportunityId);
@@ -76,7 +94,8 @@ export default function StudentBrowse() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Browse Opportunities</h1>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Search + view tabs */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <input
           type="text"
           placeholder="Search opportunities..."
@@ -85,31 +104,59 @@ export default function StudentBrowse() {
           className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="flex gap-2">
-          <button
-            onClick={() => setView("browse")}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              view === "browse" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setView("saved")}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              view === "saved" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Saved
-          </button>
-          <button
-            onClick={() => setView("skipped")}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              view === "skipped" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Skipped
-          </button>
+          {(["browse", "saved", "skipped"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
+                view === v ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {v === "browse" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        {/* Tag filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Tag:</label>
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
+          >
+            <option value="">All tags</option>
+            {allTags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Approved orgs toggle */}
+        {user?.schoolId && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={approvedOnly}
+              onChange={(e) => setApprovedOnly(e.target.checked)}
+              className="w-4 h-4 text-blue-600"
+            />
+            <span className="text-sm font-medium text-gray-700">Approved orgs only</span>
+          </label>
+        )}
+
+        {/* Clear filters */}
+        {(tagFilter || approvedOnly) && (
+          <button
+            onClick={() => { setTagFilter(""); setApprovedOnly(false); }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -119,7 +166,7 @@ export default function StudentBrowse() {
       ) : (
         <div className="space-y-4">
           {displayOpps.map((opp) => {
-            const tags = opp.tags ? JSON.parse(opp.tags) : [];
+            const tags = opp.tags ? (() => { try { return JSON.parse(opp.tags!); } catch { return []; } })() : [];
             const isSaved = savedIds.includes(opp.id);
             return (
               <div
@@ -140,15 +187,19 @@ export default function StudentBrowse() {
                     <div className="text-sm text-gray-500 mt-1">
                       {new Date(opp.date).toLocaleDateString()} &middot; {opp.startTime} - {opp.endTime} &middot; {opp.location}
                     </div>
+                    {opp.address && (
+                      <div className="text-xs text-gray-400 mt-0.5">{opp.address}</div>
+                    )}
                     {tags.length > 0 && (
                       <div className="flex gap-1 mt-2">
                         {tags.map((tag: string) => (
-                          <span
+                          <button
                             key={tag}
-                            className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full"
+                            onClick={() => setTagFilter(tag)}
+                            className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100"
                           >
                             {tag}
-                          </span>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -159,23 +210,34 @@ export default function StudentBrowse() {
                     </div>
                     <div className="text-xs text-gray-400">spots taken</div>
                     <div className="flex gap-1 mt-2">
-                      <button
-                        onClick={() => handleSave(opp.id, isSaved ? "SKIPPED" : "SAVED")}
-                        className={`text-xs px-2 py-1 rounded ${
-                          isSaved
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        {isSaved ? "Saved" : "Save"}
-                      </button>
-                      {view !== "skipped" && !isSaved && (
+                      {view === "skipped" ? (
                         <button
-                          onClick={() => handleSave(opp.id, "SKIPPED")}
-                          className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                          onClick={() => handleSave(opp.id, "SAVED")}
+                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                         >
-                          Skip
+                          Recover
                         </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleSave(opp.id, isSaved ? "SKIPPED" : "SAVED")}
+                            className={`text-xs px-2 py-1 rounded ${
+                              isSaved
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                          >
+                            {isSaved ? "Saved" : "Save"}
+                          </button>
+                          {!isSaved && (
+                            <button
+                              onClick={() => handleSave(opp.id, "SKIPPED")}
+                              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                            >
+                              Skip
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

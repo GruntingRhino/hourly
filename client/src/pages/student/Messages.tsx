@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { useAuth } from "../../hooks/useAuth";
 
 interface Message {
   id: string;
@@ -23,7 +22,6 @@ interface Notification {
 }
 
 export default function StudentMessages() {
-  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">("inbox");
@@ -61,7 +59,7 @@ export default function StudentMessages() {
     setSending(true);
     setSendError("");
     try {
-      await api.post("/messages", { receiverId: to, subject, body });
+      await api.post("/messages", { receiverEmail: to, subject, body });
       setShowCompose(false);
       setTo("");
       setSubject("");
@@ -102,8 +100,8 @@ export default function StudentMessages() {
           )}
           <form onSubmit={handleSend} className="space-y-3">
             <input
-              type="text"
-              placeholder="Recipient User ID"
+              type="email"
+              placeholder="Recipient email address"
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required
