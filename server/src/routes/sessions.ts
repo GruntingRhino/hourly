@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
+import os from "os";
 import crypto from "crypto";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
@@ -9,8 +10,13 @@ import { requireRole } from "../middleware/rbac";
 const router = Router();
 
 // Multer config for signature file uploads
+// Use os.tmpdir() on serverless (Vercel) where the local filesystem is read-only
+const uploadDir = process.env.VERCEL
+  ? os.tmpdir()
+  : path.join(__dirname, "../../uploads");
+
 const storage = multer.diskStorage({
-  destination: path.join(__dirname, "../../uploads"),
+  destination: uploadDir,
   filename: (_req, file, cb) => {
     const unique = crypto.randomBytes(8).toString("hex");
     cb(null, `sig-${unique}${path.extname(file.originalname)}`);
