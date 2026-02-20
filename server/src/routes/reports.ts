@@ -157,7 +157,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     const { type } = req.query;
 
     let rows: string[][] = [];
-    let filename = "hourly-report.csv";
+    let filename = "goodhours-report.csv";
 
     if (type === "student" || req.user!.role === "STUDENT") {
       const sessions = await prisma.serviceSession.findMany({

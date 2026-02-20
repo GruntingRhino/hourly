@@ -152,7 +152,7 @@ export default function OpportunityDetail() {
         const formData = new FormData();
         formData.append("signatureFile", signatureFile!);
         formData.append("signatureType", "FILE");
-        const token = localStorage.getItem("hourly_token");
+        const token = localStorage.getItem("goodhours_token");
         const res = await fetch(`/api/sessions/${mySession.id}/submit-verification`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },

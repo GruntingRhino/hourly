@@ -24,7 +24,7 @@ export default function EmailVerificationRequired() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm text-center">
-        <h1 className="text-2xl font-bold italic mb-8">Hourly</h1>
+        <h1 className="text-2xl font-bold italic mb-8">GoodHours</h1>
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="text-4xl mb-4">✉️</div>
           <h2 className="text-xl font-bold mb-2">Verify your email</h2>

@@ -6,7 +6,7 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-2xl font-bold italic">Hourly</h1>
+          <h1 className="text-2xl font-bold italic">GoodHours</h1>
           <div className="flex gap-3">
             <Link
               to="/login"
@@ -34,7 +34,7 @@ export default function Landing() {
             The System of Record for Student Volunteer Hours
           </h2>
           <p className="text-lg text-gray-600 mb-8">
-            Hourly connects students, service organizations, and schools with a trusted
+            GoodHours connects students, service organizations, and schools with a trusted
             platform for tracking, verifying, and reporting community service hours.
           </p>
           <Link
@@ -106,7 +106,7 @@ export default function Landing() {
       <footer className="py-8 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-500">
-            © {new Date().getFullYear()} Hourly. All rights reserved.
+            © {new Date().getFullYear()} GoodHours. All rights reserved.
           </div>
           <div className="flex gap-6 text-sm">
             <a href="#" className="text-gray-500 hover:text-gray-800">Help & Support</a>

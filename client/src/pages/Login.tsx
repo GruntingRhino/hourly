@@ -28,7 +28,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <Link to="/" className="block text-center text-2xl font-bold italic mb-8">
-          Hourly
+          GoodHours
         </Link>
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-bold mb-6 text-center">Sign In</h2>

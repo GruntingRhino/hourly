@@ -39,7 +39,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Hourly API running on http://localhost:${PORT}`);
+  console.log(`GoodHours API running on http://localhost:${PORT}`);
 });
 
 export default app;

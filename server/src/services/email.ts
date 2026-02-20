@@ -1,8 +1,9 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM ?? "noreply@hourly.app";
-const CLIENT_URL = process.env.CLIENT_URL ?? "http://localhost:5173";
+const FROM = process.env.EMAIL_FROM ?? "noreply@goodhours.app";
+const CLIENT_URL = process.env.CLIENT_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
 
 function base(title: string, body: string, cta?: { label: string; url: string }): string {
   const ctaHtml = cta
@@ -12,7 +13,7 @@ function base(title: string, body: string, cta?: { label: string; url: string })
     : "";
   return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0">
 <div style="max-width:520px;margin:48px auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">
-  <div style="background:#2563eb;padding:20px 32px"><span style="color:#fff;font-size:20px;font-weight:700">Hourly</span></div>
+  <div style="background:#2563eb;padding:20px 32px"><span style="color:#fff;font-size:20px;font-weight:700">GoodHours</span></div>
   <div style="padding:32px">
     <h2 style="margin:0 0 12px;font-size:20px;color:#111827">${title}</h2>
     <div style="color:#374151;font-size:15px;line-height:1.6">${body}</div>
@@ -37,10 +38,10 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 export async function sendVerificationEmail(to: string, verificationLink: string): Promise<void> {
   await send(
     to,
-    "Verify your Hourly account",
+    "Verify your GoodHours account",
     base(
       "Verify your email address",
-      "Thanks for signing up for Hourly. Click the button below to verify your email address and activate your account. This link expires in 24 hours.",
+      "Thanks for signing up for GoodHours. Click the button below to verify your email address and activate your account. This link expires in 24 hours.",
       { label: "Verify Email", url: verificationLink }
     )
   );
@@ -49,10 +50,10 @@ export async function sendVerificationEmail(to: string, verificationLink: string
 export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
   await send(
     to,
-    "Reset your Hourly password",
+    "Reset your GoodHours password",
     base(
       "Reset your password",
-      "We received a request to reset your Hourly password. Click the button below to choose a new password. This link expires in 1 hour. If you didn't request a reset, you can ignore this email.",
+      "We received a request to reset your GoodHours password. Click the button below to choose a new password. This link expires in 1 hour. If you didn't request a reset, you can ignore this email.",
       { label: "Reset Password", url: resetLink }
     )
   );

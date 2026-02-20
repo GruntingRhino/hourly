@@ -39,7 +39,7 @@ export default function VerifyEmail() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm text-center">
-        <Link to="/" className="block text-2xl font-bold italic mb-8">Hourly</Link>
+        <Link to="/" className="block text-2xl font-bold italic mb-8">GoodHours</Link>
         {status === "verifying" && (
           <div>
             <div className="text-4xl mb-4">⏳</div>

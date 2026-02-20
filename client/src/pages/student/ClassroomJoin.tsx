@@ -26,7 +26,7 @@ export default function ClassroomJoin() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold italic">Hourly</h1>
+          <h1 className="text-2xl font-bold italic">GoodHours</h1>
           <p className="text-gray-500 mt-2 text-sm">Welcome! Enter a classroom code to get started.</p>
         </div>
 

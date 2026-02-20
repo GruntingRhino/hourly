@@ -68,9 +68,9 @@ export default function StudentDashboard() {
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
-  const upcoming = signups.filter(
-    (s) => s.status === "CONFIRMED" && new Date(s.opportunity.date) >= new Date()
-  );
+  const upcoming = signups
+    .filter((s) => s.status === "CONFIRMED" && new Date(s.opportunity.date) >= new Date())
+    .sort((a, b) => new Date(a.opportunity.date).getTime() - new Date(b.opportunity.date).getTime());
 
   return (
     <div>

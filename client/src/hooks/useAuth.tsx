@@ -63,13 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api.get<User>("/auth/me");
       setUser(data);
     } catch {
-      localStorage.removeItem("hourly_token");
+      localStorage.removeItem("goodhours_token");
       setUser(null);
     }
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("hourly_token");
+    const token = localStorage.getItem("goodhours_token");
     if (token) {
       refreshUser().finally(() => setLoading(false));
     } else {
@@ -79,19 +79,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const data = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
-    localStorage.setItem("hourly_token", data.token);
+    localStorage.setItem("goodhours_token", data.token);
     setUser(data.user);
   };
 
   const signup = async (signupData: SignupData): Promise<SignupResult> => {
     const data = await api.post<SignupResult>("/auth/signup", signupData);
-    localStorage.setItem("hourly_token", data.token);
+    localStorage.setItem("goodhours_token", data.token);
     setUser(data.user);
     return data;
   };
 
   const logout = () => {
-    localStorage.removeItem("hourly_token");
+    localStorage.removeItem("goodhours_token");
     setUser(null);
   };
 

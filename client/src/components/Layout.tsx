@@ -47,7 +47,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link to="/dashboard" className="text-xl font-bold italic text-gray-900">
-            Hourly
+            GoodHours
           </Link>
           <nav className="flex items-center gap-1" aria-label="Main navigation">
             {navItems.map((item) => (

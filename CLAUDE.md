@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Hourly** is a community service coordination, tracking, and verification platform — the system of record for student volunteer hours. It connects students, service organizations, and schools with a trusted platform for tracking, verifying, and reporting community service hours.
+**GoodHours** is a community service coordination, tracking, and verification platform — the system of record for student volunteer hours. It connects students, service organizations, and schools with a trusted platform for tracking, verifying, and reporting community service hours.
 
 Core priorities (in order): Legitimacy > Verification > Compliance > Adoption.
 

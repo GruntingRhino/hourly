@@ -60,19 +60,14 @@ export default function SchoolGroups() {
 
   useEffect(() => {
     if (selectedClassroom && schoolId) {
-      api.get<StudentInfo[]>(`/schools/${schoolId}/groups/${selectedClassroom}/students`)
-        .then(setStudents)
-        .catch(() => {
-          // Try loading all students and filtering by classroom
-          api.get<AllStudent[]>(`/schools/${schoolId}/students`).then((all) => {
-            const cls = all.filter((s) => s.classroom?.id === selectedClassroom);
-            setStudents(cls.map((s) => ({
-              ...s,
-              requiredHours,
-              status: calcStatus(s.approvedHours, requiredHours),
-            })));
-          });
-        });
+      api.get<AllStudent[]>(`/schools/${schoolId}/students`).then((all) => {
+        const cls = all.filter((s) => s.classroom?.id === selectedClassroom);
+        setStudents(cls.map((s) => ({
+          ...s,
+          requiredHours,
+          status: calcStatus(s.approvedHours, requiredHours),
+        })));
+      }).catch(() => setStudents([]));
     }
   }, [selectedClassroom]);
 
