@@ -440,7 +440,10 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
 
     const session = await prisma.serviceSession.findUnique({
       where: { id: sessionId },
-      include: { opportunity: true, user: true },
+      include: {
+        opportunity: true,
+        user: { select: { id: true, email: true, name: true, classroomId: true, notificationPreferences: true } },
+      },
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
 
@@ -481,8 +484,17 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       },
     });
 
-    // Send email to student
-    sendHourRemovedEmail(session.user.email, session.totalHours ?? 0, session.opportunity.title).catch(() => {});
+    // Send email to student (check notification preferences)
+    let sendRemovalEmail = true;
+    if (session.user.notificationPreferences) {
+      try {
+        const prefs = JSON.parse(session.user.notificationPreferences as string);
+        if (prefs.hourRemoval?.email === false) sendRemovalEmail = false;
+      } catch {}
+    }
+    if (sendRemovalEmail) {
+      sendHourRemovedEmail(session.user.email, session.totalHours ?? 0, session.opportunity.title).catch(() => {});
+    }
 
     res.json({ message: "Hours removed successfully" });
   } catch (err) {

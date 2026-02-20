@@ -25,6 +25,7 @@ const createSchema = z.object({
   gradeRequirement: z.string().optional(),
   isRecurring: z.boolean().optional(),
   recurringPattern: z.string().optional(),
+  customFields: z.string().optional(), // JSON string: [{label, value}]
 });
 
 // GET /api/opportunities — browse (public, filtered)
@@ -190,9 +191,20 @@ router.post("/", authenticate, requireRole("ORG_ADMIN"), async (req: Request, re
         tags: data.tags ? JSON.stringify(data.tags) : null,
         date: new Date(data.date),
         organizationId: user.organizationId,
+        customFields: data.customFields || null,
       },
       include: {
         organization: { select: { id: true, name: true } },
+      },
+    });
+
+    // Notify org admin of event creation
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: "EVENT_CREATED",
+        title: "Event Created",
+        body: `"${opp.title}" has been posted`,
       },
     });
 
@@ -224,6 +236,7 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
     if (updateData.date) {
       updateData.date = new Date(updateData.date);
     }
+    // customFields already stored as JSON string, pass through as-is
 
     const updated = await prisma.opportunity.update({
       where: { id: req.params.id },

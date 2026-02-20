@@ -75,7 +75,7 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       },
     });
 
-    // Notification
+    // Notification to student
     await prisma.notification.create({
       data: {
         userId: req.user!.userId,
@@ -86,6 +86,26 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
           : `You've been waitlisted for "${opp.title}"`,
       },
     });
+
+    // Notify org admins of new signup
+    const orgAdmins = await prisma.user.findMany({
+      where: { organizationId: opp.organizationId, role: "ORG_ADMIN" },
+      select: { id: true },
+    });
+    if (orgAdmins.length > 0) {
+      const student = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { name: true },
+      });
+      await prisma.notification.createMany({
+        data: orgAdmins.map((admin) => ({
+          userId: admin.id,
+          type: "STUDENT_SIGNUP",
+          title: "New Signup",
+          body: `${student?.name || "A student"} signed up for "${opp.title}"`,
+        })),
+      });
+    }
 
     res.status(201).json(signup);
   } catch (err) {
@@ -151,6 +171,26 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
             title: "Spot Available!",
             body: `A spot opened up for "${opp.title}" — you're now confirmed!`,
           },
+        });
+      }
+
+      // Notify org admins of cancellation
+      const orgAdmins = await prisma.user.findMany({
+        where: { organizationId: opp.organizationId, role: "ORG_ADMIN" },
+        select: { id: true },
+      });
+      if (orgAdmins.length > 0) {
+        const student = await prisma.user.findUnique({
+          where: { id: signup.userId },
+          select: { name: true },
+        });
+        await prisma.notification.createMany({
+          data: orgAdmins.map((admin) => ({
+            userId: admin.id,
+            type: "SIGNUP_CANCELLED",
+            title: "Signup Cancelled",
+            body: `${student?.name || "A student"} cancelled their signup for "${opp.title}"`,
+          })),
         });
       }
     }

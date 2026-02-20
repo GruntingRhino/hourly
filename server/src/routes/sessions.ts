@@ -257,6 +257,22 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
       });
     }
 
+    // Notify org admins of verification submission
+    const orgAdmins = await prisma.user.findMany({
+      where: { organizationId: session.opportunity.organizationId, role: "ORG_ADMIN" },
+      select: { id: true },
+    });
+    if (orgAdmins.length > 0) {
+      await prisma.notification.createMany({
+        data: orgAdmins.map((admin) => ({
+          userId: admin.id,
+          type: "VERIFICATION_SUBMITTED",
+          title: "Verification Request",
+          body: `${session.user.name} submitted verification for "${session.opportunity.title}" — ${session.totalHours}h`,
+        })),
+      });
+    }
+
     res.json(updated);
   } catch (err) {
     console.error("Submit verification error:", err);

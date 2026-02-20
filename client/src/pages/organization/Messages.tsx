@@ -21,10 +21,20 @@ interface Notification {
   createdAt: string;
 }
 
+type SenderFilter = "all" | "students" | "organizations" | "schools";
+
+const SENDER_ROLE_MAP: Record<SenderFilter, string[]> = {
+  all: [],
+  students: ["STUDENT"],
+  organizations: ["ORG_ADMIN"],
+  schools: ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"],
+};
+
 export default function OrgMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">("notifications");
+  const [senderFilter, setSenderFilter] = useState<SenderFilter>("all");
   const [showCompose, setShowCompose] = useState(false);
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
@@ -125,7 +135,7 @@ export default function OrgMessages() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-3">
         {(["notifications", "inbox", "sent"] as const).map((f) => (
           <button
             key={f}
@@ -138,6 +148,24 @@ export default function OrgMessages() {
           </button>
         ))}
       </div>
+
+      {/* Sender filter (inbox only) */}
+      {folder === "inbox" && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-gray-500">Filter:</span>
+          {(["all", "students", "organizations", "schools"] as SenderFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setSenderFilter(f)}
+              className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                senderFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-gray-500">Loading...</div>
@@ -161,22 +189,28 @@ export default function OrgMessages() {
         </div>
       ) : (
         <div className="space-y-2">
-          {messages.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">No messages.</div>
-          ) : (
-            messages.map((m) => (
-              <div key={m.id} className={`bg-white border rounded-lg p-4 ${m.priority ? "border-l-4 border-l-red-500" : "border-gray-200"}`}>
-                <div className="flex justify-between">
-                  <div>
-                    <div className="font-medium text-sm">{folder === "inbox" ? m.sender.name : m.receiver.name}</div>
-                    {m.subject && <div className="text-sm text-gray-700">{m.subject}</div>}
-                    <div className="text-sm text-gray-500 mt-1">{m.body}</div>
+          {(() => {
+            const allowedRoles = SENDER_ROLE_MAP[senderFilter];
+            const filtered = folder === "inbox" && senderFilter !== "all"
+              ? messages.filter((m) => allowedRoles.includes(m.sender.role))
+              : messages;
+            return filtered.length === 0 ? (
+              <div className="text-gray-500 text-center py-8">No messages.</div>
+            ) : (
+              filtered.map((m) => (
+                <div key={m.id} className={`bg-white border rounded-lg p-4 ${m.priority ? "border-l-4 border-l-red-500" : "border-gray-200"}`}>
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="font-medium text-sm">{folder === "inbox" ? m.sender.name : m.receiver.name}</div>
+                      {m.subject && <div className="text-sm text-gray-700">{m.subject}</div>}
+                      <div className="text-sm text-gray-500 mt-1">{m.body}</div>
+                    </div>
+                    <div className="text-xs text-gray-400">{new Date(m.createdAt).toLocaleDateString()}</div>
                   </div>
-                  <div className="text-xs text-gray-400">{new Date(m.createdAt).toLocaleDateString()}</div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            );
+          })()}
         </div>
       )}
     </div>

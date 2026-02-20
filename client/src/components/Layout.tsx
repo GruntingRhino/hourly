@@ -71,6 +71,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-full object-cover hidden md:block"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium text-gray-600 hidden md:block">
+                  {user.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span className="text-sm text-gray-500 hidden md:inline">{user.name}</span>
               <button
                 onClick={handleLogout}

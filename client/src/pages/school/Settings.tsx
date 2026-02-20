@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 
+type Tab = "profile" | "classrooms" | "security" | "notifications" | "privacy" | "data";
+
 interface SchoolData {
   id: string;
   name: string;
@@ -23,7 +25,7 @@ interface ClassroomData {
 
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
-  const [tab, setTab] = useState<"profile" | "classrooms" | "security">("profile");
+  const [tab, setTab] = useState<Tab>("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
   const [classrooms, setClassrooms] = useState<ClassroomData[]>([]);
   const [schoolName, setSchoolName] = useState("");
@@ -36,23 +38,37 @@ export default function SchoolSettings() {
   const [isError, setIsError] = useState(false);
   const [newClassroomName, setNewClassroomName] = useState("");
   const [creatingClassroom, setCreatingClassroom] = useState(false);
+
+  // Security
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordIsError, setPasswordIsError] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const handleDeleteAccount = async () => {
-    setDeleting(true);
-    try {
-      await api.delete("/auth/account");
-      logout();
-    } catch (err: any) {
-      setMessage(err.message || "Failed to delete account");
-      setIsError(true);
-      setDeleting(false);
-      setDeleteConfirm(false);
-      setDeleteInput("");
-    }
+  // Notifications
+  const defaultNotifPrefs = {
+    studentJoin: { email: true, inApp: true },
+    hourApproval: { email: true, inApp: true },
+    orgRequest: { email: true, inApp: true },
   };
+  const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
+    (user as any)?.notificationPreferences || defaultNotifPrefs
+  );
+  const [savingNotif, setSavingNotif] = useState(false);
+  const [notifMessage, setNotifMessage] = useState("");
+
+  // Privacy
+  const defaultMsgPrefs = { allowFrom: "EVERYONE", profileVisibility: "EVERYONE" };
+  const [msgPrefs, setMsgPrefs] = useState<typeof defaultMsgPrefs>(
+    (user as any)?.messagePreferences || defaultMsgPrefs
+  );
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState("");
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -119,14 +135,124 @@ export default function SchoolSettings() {
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage("");
+    setPasswordIsError(false);
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("Passwords do not match");
+      setPasswordIsError(true);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordMessage("Password must be at least 8 characters");
+      setPasswordIsError(true);
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.put("/auth/password", { currentPassword, newPassword });
+      setPasswordMessage("Password changed successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPasswordMessage(err.message || "Failed to change password");
+      setPasswordIsError(true);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await api.delete("/auth/account");
+      logout();
+    } catch (err: any) {
+      setMessage(err.message || "Failed to delete account");
+      setIsError(true);
+      setDeleting(false);
+      setDeleteConfirm(false);
+      setDeleteInput("");
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    setSavingNotif(true);
+    setNotifMessage("");
+    try {
+      await api.put("/auth/profile", { notificationPreferences: notifPrefs });
+      setNotifMessage("Notification preferences saved!");
+    } catch {
+      setNotifMessage("Failed to save preferences");
+    } finally {
+      setSavingNotif(false);
+    }
+  };
+
+  const handleSavePrivacy = async () => {
+    setSavingPrivacy(true);
+    setPrivacyMessage("");
+    try {
+      await api.put("/auth/profile", { messagePreferences: msgPrefs });
+      setPrivacyMessage("Privacy settings saved!");
+    } catch {
+      setPrivacyMessage("Failed to save settings");
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
+  const toggleNotif = (key: keyof typeof defaultNotifPrefs, channel: "email" | "inApp") => {
+    setNotifPrefs((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], [channel]: !prev[key][channel] },
+    }));
+  };
+
+  const handleExportActivityLog = async () => {
+    if (!user?.schoolId) return;
+    try {
+      const sessions = await api.get<any[]>(`/schools/${user.schoolId}/sessions`).catch(() => [] as any[]);
+      const rows = [
+        ["Student", "Opportunity", "Date", "Hours", "Status"],
+        ...sessions.map((s: any) => [
+          s.user?.name || "",
+          s.opportunity?.title || "",
+          s.opportunity?.date ? new Date(s.opportunity.date).toLocaleDateString() : "",
+          s.totalHours?.toString() || "",
+          s.verificationStatus || s.status || "",
+        ]),
+      ];
+      const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "activity-log.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setMessage(err.message || "Failed to export");
+      setIsError(true);
+    }
+  };
+
+  const notifRows = [
+    { key: "studentJoin" as const, label: "Student Joins/Leaves" },
+    { key: "hourApproval" as const, label: "Hour Approval Alert" },
+    { key: "orgRequest" as const, label: "Org Request Alert" },
+  ];
+
   if (loading) return <div className="text-gray-500">Loading settings...</div>;
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-      <div className="flex gap-2 mb-6">
-        {(["profile", "classrooms", "security"] as const).map((t) => (
+      <div className="flex flex-wrap gap-2 mb-6">
+        {(["profile", "classrooms", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -283,46 +409,221 @@ export default function SchoolSettings() {
 
       {tab === "security" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
-          <p className="text-sm text-gray-500 mb-3">
-            Permanently deletes your account and removes all associated school data, classrooms, and student associations. This cannot be undone.
-          </p>
-          {!deleteConfirm ? (
-            <button
-              onClick={() => setDeleteConfirm(true)}
-              className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
-            >
-              Delete My Account
-            </button>
-          ) : (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm font-medium text-red-800 mb-3">
-                Type <span className="font-mono font-bold">DELETE</span> to confirm:
-              </p>
-              <input
-                type="text"
-                value={deleteInput}
-                onChange={(e) => setDeleteInput(e.target.value)}
-                placeholder="DELETE"
-                className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleteInput !== "DELETE" || deleting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
-                >
-                  {deleting ? "Deleting..." : "Permanently Delete"}
-                </button>
-                <button
-                  onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
+          <h3 className="font-semibold mb-4">Change Password</h3>
+          {passwordMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              passwordIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {passwordMessage}
             </div>
           )}
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            >
+              {changingPassword ? "Changing..." : "Change Password"}
+            </button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
+            <p className="text-sm text-gray-500 mb-3">
+              Permanently deletes your account and removes all associated school data, classrooms, and student associations. This cannot be undone.
+            </p>
+            {!deleteConfirm ? (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+              >
+                Delete My Account
+              </button>
+            ) : (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm font-medium text-red-800 mb-3">
+                  Type <span className="font-mono font-bold">DELETE</span> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteInput !== "DELETE" || deleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting..." : "Permanently Delete"}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "notifications" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold mb-1">Notification Preferences</h3>
+          <p className="text-sm text-gray-500 mb-6">Choose how you want to be notified.</p>
+
+          {notifMessage && (
+            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+              {notifMessage}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-2">
+              <div>Notification</div>
+              <div className="text-center">Email</div>
+              <div className="text-center">In-App</div>
+            </div>
+            {notifRows.map(({ key, label }) => (
+              <div key={key} className="grid grid-cols-3 gap-4 items-center">
+                <div className="text-sm font-medium text-gray-700">{label}</div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => toggleNotif(key, "email")}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${
+                      notifPrefs[key].email ? "bg-blue-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      notifPrefs[key].email ? "translate-x-5" : "translate-x-0.5"
+                    }`} />
+                  </button>
+                </div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => toggleNotif(key, "inApp")}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${
+                      notifPrefs[key].inApp ? "bg-blue-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      notifPrefs[key].inApp ? "translate-x-5" : "translate-x-0.5"
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleSaveNotifications}
+            disabled={savingNotif}
+            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+          >
+            {savingNotif ? "Saving..." : "Save Preferences"}
+          </button>
+        </div>
+      )}
+
+      {tab === "privacy" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold mb-1">Privacy Settings</h3>
+          <p className="text-sm text-gray-500 mb-6">Control visibility and message restrictions.</p>
+
+          {privacyMessage && (
+            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+              {privacyMessage}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Profile Visibility</label>
+              <select
+                value={msgPrefs.profileVisibility}
+                onChange={(e) => setMsgPrefs((p) => ({ ...p, profileVisibility: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="EVERYONE">Everyone</option>
+                <option value="SCHOOL">School Only</option>
+                <option value="PRIVATE">Private</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message Restrictions</label>
+              <select
+                value={msgPrefs.allowFrom}
+                onChange={(e) => setMsgPrefs((p) => ({ ...p, allowFrom: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="EVERYONE">Everyone</option>
+                <option value="ORGS_ONLY">Organizations Only</option>
+                <option value="ADMINS_ONLY">Admins Only</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSavePrivacy}
+            disabled={savingPrivacy}
+            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+          >
+            {savingPrivacy ? "Saving..." : "Save Settings"}
+          </button>
+        </div>
+      )}
+
+      {tab === "data" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold mb-2">Export Activity Log</h3>
+          <p className="text-sm text-gray-500 mb-6">
+            Download a CSV of all student service sessions at your school.
+          </p>
+          <button
+            onClick={handleExportActivityLog}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
+          >
+            Export Activity Log (CSV)
+          </button>
         </div>
       )}
     </div>

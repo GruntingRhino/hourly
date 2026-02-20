@@ -227,6 +227,8 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       status: user.status,
       emailVerified: user.emailVerified,
       socialLinks: user.socialLinks ? JSON.parse(user.socialLinks) : null,
+      notificationPreferences: user.notificationPreferences ? JSON.parse(user.notificationPreferences) : null,
+      messagePreferences: user.messagePreferences ? JSON.parse(user.messagePreferences) : null,
       organizationId: user.organizationId,
       organization: user.organization,
       schoolId: user.schoolId || studentSchool?.id,
@@ -280,28 +282,39 @@ const profileSchema = z.object({
   bio: z.string().max(1000).optional(),
   age: z.number().int().min(10).max(25).optional(),
   grade: z.string().max(50).optional(),
+  avatarUrl: z.string().nullable().optional(),
   socialLinks: z.object({
     instagram: z.string().max(255).optional(),
     tiktok: z.string().max(255).optional(),
     twitter: z.string().max(255).optional(),
     youtube: z.string().max(255).optional(),
   }).optional(),
+  notificationPreferences: z.record(z.any()).optional(),
+  messagePreferences: z.record(z.any()).optional(),
 });
 
 // PUT /api/auth/profile
 router.put("/profile", authenticate, async (req: Request, res: Response) => {
   try {
     const data = profileSchema.parse(req.body);
+    const updateData: any = {
+      name: data.name,
+      phone: data.phone,
+      bio: data.bio,
+      age: data.age,
+      grade: data.grade,
+      socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
+    };
+    if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
+    if (data.notificationPreferences !== undefined) {
+      updateData.notificationPreferences = JSON.stringify(data.notificationPreferences);
+    }
+    if (data.messagePreferences !== undefined) {
+      updateData.messagePreferences = JSON.stringify(data.messagePreferences);
+    }
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
-      data: {
-        name: data.name,
-        phone: data.phone,
-        bio: data.bio,
-        age: data.age,
-        grade: data.grade,
-        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
-      },
+      data: updateData,
     });
     res.json(user);
   } catch (err) {

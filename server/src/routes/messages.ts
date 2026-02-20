@@ -42,6 +42,20 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Recipient not found. Please check the email address." });
     }
 
+    // Check receiver's message preferences
+    if (receiver.messagePreferences) {
+      try {
+        const prefs = JSON.parse(receiver.messagePreferences);
+        const senderRole = req.user!.role;
+        if (prefs.allowFrom === "ORGS_ONLY" && senderRole !== "ORG_ADMIN") {
+          return res.status(403).json({ error: "This user only accepts messages from organizations" });
+        }
+        if (prefs.allowFrom === "ADMINS_ONLY" && !["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"].includes(senderRole)) {
+          return res.status(403).json({ error: "This user only accepts messages from school administrators" });
+        }
+      } catch {}
+    }
+
     const message = await prisma.message.create({
       data: {
         senderId: req.user!.userId,

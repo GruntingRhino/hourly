@@ -1,6 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
+
+interface CustomField {
+  label: string;
+  value: string;
+}
 
 export default function CreateOpportunity() {
   const navigate = useNavigate();
@@ -10,7 +15,6 @@ export default function CreateOpportunity() {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    tags: "",
     location: "",
     address: "",
     date: "",
@@ -21,6 +25,14 @@ export default function CreateOpportunity() {
     ageRequirement: "",
     isRecurring: false,
   });
+
+  // Chip tags state
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+
+  // Custom fields state
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,7 +42,6 @@ export default function CreateOpportunity() {
         setForm({
           title: opp.title || "",
           description: opp.description || "",
-          tags: opp.tags ? JSON.parse(opp.tags).join(", ") : "",
           location: opp.location || "",
           address: opp.address || "",
           date: opp.date ? new Date(opp.date).toISOString().split("T")[0] : "",
@@ -41,6 +52,16 @@ export default function CreateOpportunity() {
           ageRequirement: opp.ageRequirement?.toString() || "",
           isRecurring: opp.isRecurring || false,
         });
+        try {
+          setTags(opp.tags ? JSON.parse(opp.tags) : []);
+        } catch {
+          setTags([]);
+        }
+        try {
+          setCustomFields(opp.customFields ? JSON.parse(opp.customFields) : []);
+        } catch {
+          setCustomFields([]);
+        }
       }).catch(() => setError("Failed to load opportunity"));
     }
   }, [id, isEditing]);
@@ -53,6 +74,35 @@ export default function CreateOpportunity() {
     }));
   };
 
+  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = tagInput.trim().replace(/,$/, "");
+      if (val && !tags.includes(val)) {
+        setTags([...tags, val]);
+      }
+      setTagInput("");
+    } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+      setTags(tags.slice(0, -1));
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag));
+  };
+
+  const addCustomField = () => {
+    setCustomFields([...customFields, { label: "", value: "" }]);
+  };
+
+  const updateCustomField = (index: number, field: keyof CustomField, value: string) => {
+    setCustomFields(customFields.map((cf, i) => i === index ? { ...cf, [field]: value } : cf));
+  };
+
+  const removeCustomField = (index: number) => {
+    setCustomFields(customFields.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -61,7 +111,7 @@ export default function CreateOpportunity() {
       const payload = {
         title: form.title,
         description: form.description,
-        tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        tags,
         location: form.location,
         address: form.address || undefined,
         date: form.date,
@@ -71,6 +121,9 @@ export default function CreateOpportunity() {
         capacity: parseInt(form.capacity),
         ageRequirement: form.ageRequirement ? parseInt(form.ageRequirement) : undefined,
         isRecurring: form.isRecurring,
+        customFields: customFields.filter((f) => f.label.trim()).length > 0
+          ? JSON.stringify(customFields.filter((f) => f.label.trim()))
+          : undefined,
       };
 
       if (isEditing) {
@@ -124,18 +177,40 @@ export default function CreateOpportunity() {
             />
           </div>
 
+          {/* Chip tag input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tags (comma-separated)
-            </label>
-            <input
-              type="text"
-              name="tags"
-              value={form.tags}
-              onChange={handleChange}
-              placeholder="outdoors, cleanup, community"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-sm"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="text-blue-400 hover:text-blue-700 font-bold leading-none"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => {
+                  const val = tagInput.trim();
+                  if (val && !tags.includes(val)) setTags([...tags, val]);
+                  setTagInput("");
+                }}
+                placeholder={tags.length === 0 ? "Type tag and press Enter or comma" : ""}
+                className="flex-1 min-w-20 outline-none text-sm bg-transparent"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Press Enter or comma to add a tag</p>
           </div>
 
           <div>
@@ -258,6 +333,50 @@ export default function CreateOpportunity() {
               className="w-4 h-4"
             />
             <label className="text-sm font-medium text-gray-700">Recurring Event</label>
+          </div>
+
+          {/* Custom Fields */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">Custom Fields</label>
+              <button
+                type="button"
+                onClick={addCustomField}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                + Add Field
+              </button>
+            </div>
+            {customFields.length === 0 && (
+              <p className="text-xs text-gray-400">Add custom fields to display extra information on your event.</p>
+            )}
+            <div className="space-y-2">
+              {customFields.map((cf, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={cf.label}
+                    onChange={(e) => updateCustomField(i, "label", e.target.value)}
+                    placeholder="Field label"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={cf.value}
+                    onChange={(e) => updateCustomField(i, "value", e.target.value)}
+                    placeholder="Field value"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCustomField(i)}
+                    className="text-red-400 hover:text-red-600 text-lg leading-none px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">

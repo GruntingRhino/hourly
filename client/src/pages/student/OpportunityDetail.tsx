@@ -17,6 +17,7 @@ interface Opportunity {
   capacity: number;
   ageRequirement: number | null;
   gradeRequirement: string | null;
+  customFields: string | null;
   isRecurring: boolean;
   status: string;
   organization: { id: string; name: string; description?: string };
@@ -230,10 +231,16 @@ export default function OpportunityDetail() {
             <span className="text-gray-500">Duration:</span>
             <div className="font-medium">{opp.durationHours} hours</div>
           </div>
-          {opp.ageRequirement && (
+          {opp.ageRequirement != null && opp.ageRequirement > 0 && (
             <div>
               <span className="text-gray-500">Age Requirement:</span>
               <div className="font-medium">{opp.ageRequirement}+</div>
+            </div>
+          )}
+          {opp.gradeRequirement && (
+            <div>
+              <span className="text-gray-500">Grade Requirement:</span>
+              <div className="font-medium">{opp.gradeRequirement}</div>
             </div>
           )}
           {opp.isRecurring && (
@@ -243,6 +250,27 @@ export default function OpportunityDetail() {
             </div>
           )}
         </div>
+
+        {/* Custom fields */}
+        {(() => {
+          try {
+            const fields: { label: string; value: string }[] = opp.customFields ? JSON.parse(opp.customFields) : [];
+            if (fields.length === 0) return null;
+            return (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Additional Information</h3>
+                <div className="space-y-2">
+                  {fields.map((f, i) => (
+                    <div key={i} className="flex gap-2 text-sm">
+                      <span className="text-gray-500 min-w-24">{f.label}:</span>
+                      <span className="font-medium">{f.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          } catch { return null; }
+        })()}
 
         {/* Action buttons */}
         <div className="border-t border-gray-200 pt-4">

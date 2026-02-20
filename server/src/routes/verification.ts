@@ -70,11 +70,23 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
       },
     });
 
-    // Send email to student
-    const student = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } });
-    const org = await prisma.organization.findUnique({ where: { id: session.opportunity.organizationId }, select: { name: true } });
-    if (student && org) {
-      sendHourApprovedEmail(student.email, org.name, hours, session.opportunity.title).catch(() => {});
+    // Send email to student (check notification preferences)
+    const student = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, notificationPreferences: true },
+    });
+    let sendEmail = true;
+    if (student?.notificationPreferences) {
+      try {
+        const prefs = JSON.parse(student.notificationPreferences);
+        if (prefs.hourApproval?.email === false) sendEmail = false;
+      } catch {}
+    }
+    if (sendEmail && student) {
+      const org = await prisma.organization.findUnique({ where: { id: session.opportunity.organizationId }, select: { name: true } });
+      if (org) {
+        sendHourApprovedEmail(student.email, org.name, hours, session.opportunity.title).catch(() => {});
+      }
     }
 
     res.json(updated);

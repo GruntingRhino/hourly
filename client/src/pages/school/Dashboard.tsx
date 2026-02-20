@@ -44,6 +44,7 @@ export default function SchoolDashboard() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [blockConfirmOrgId, setBlockConfirmOrgId] = useState<string | null>(null);
   const [blocking, setBlocking] = useState(false);
+  const [orgSearch, setOrgSearch] = useState("");
 
   const schoolId = user?.schoolId;
   const isOwner = user?.role === "SCHOOL_ADMIN";
@@ -106,8 +107,15 @@ export default function SchoolDashboard() {
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
-  const pendingOrgs = orgData?.pendingOrgs || [];
-  const approvedOrgs = orgData?.approvals.filter((a) => a.status === "APPROVED") || [];
+  const allPendingOrgs = orgData?.pendingOrgs || [];
+  const allApprovedOrgs = orgData?.approvals.filter((a) => a.status === "APPROVED") || [];
+
+  const pendingOrgs = orgSearch
+    ? allPendingOrgs.filter((o) => o.name.toLowerCase().includes(orgSearch.toLowerCase()))
+    : allPendingOrgs;
+  const approvedOrgs = orgSearch
+    ? allApprovedOrgs.filter((a) => a.organization.name.toLowerCase().includes(orgSearch.toLowerCase()))
+    : allApprovedOrgs;
 
   return (
     <div>
@@ -273,6 +281,17 @@ export default function SchoolDashboard() {
       {/* Org approvals (owner only) */}
       {isOwner && (
         <>
+          {(allPendingOrgs.length > 0 || allApprovedOrgs.length > 0) && (
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search organizations..."
+                value={orgSearch}
+                onChange={(e) => setOrgSearch(e.target.value)}
+                className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
           {pendingOrgs.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-3">Pending Organization Requests</h2>
