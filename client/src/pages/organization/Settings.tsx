@@ -2,6 +2,51 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 
+const PASSWORD_RULES = [
+  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number", test: (p: string) => /[0-9]/.test(p) },
+  { label: "One special character", test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
+];
+
+function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z: string[]) => void }) {
+  const [input, setInput] = useState("");
+  const addZip = () => {
+    const z = input.trim();
+    if (z && /^\d{5}$/.test(z) && !zipCodes.includes(z)) {
+      onChange([...zipCodes, z]);
+      setInput("");
+    }
+  };
+  return (
+    <div>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addZip(); } }}
+          placeholder="e.g. 02101"
+          maxLength={5}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button type="button" onClick={addZip} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+          Add
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {zipCodes.map((z) => (
+          <span key={z} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-sm">
+            {z}
+            <button type="button" onClick={() => onChange(zipCodes.filter((x) => x !== z))} className="text-blue-400 hover:text-blue-600">×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type Tab = "profile" | "schools" | "security" | "notifications" | "analytics" | "data";
 
 interface OrgData {
@@ -12,6 +57,7 @@ interface OrgData {
   description: string | null;
   website: string | null;
   socialLinks: string | null;
+  zipCodes: string | null;
 }
 
 interface SchoolApproval {
@@ -51,6 +97,7 @@ export default function OrgSettings() {
   const [tiktok, setTiktok] = useState("");
   const [twitter, setTwitter] = useState("");
   const [youtube, setYoutube] = useState("");
+  const [zipCodes, setZipCodes] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -99,6 +146,9 @@ export default function OrgSettings() {
         setPhone(data.phone || "");
         setDescription(data.description || "");
         setWebsite(data.website || "");
+        if (data.zipCodes) {
+          try { setZipCodes(JSON.parse(data.zipCodes)); } catch {}
+        }
         if (data.socialLinks) {
           try {
             const links = JSON.parse(data.socialLinks);
@@ -156,6 +206,7 @@ export default function OrgSettings() {
         description,
         website,
         socialLinks: { instagram, tiktok, twitter, youtube },
+        zipCodes,
       });
       setMessage("Profile updated!");
       await refreshUser();
@@ -208,8 +259,9 @@ export default function OrgSettings() {
       setPasswordIsError(true);
       return;
     }
-    if (newPassword.length < 8) {
-      setPasswordMessage("Password must be at least 8 characters");
+    const failedRule = PASSWORD_RULES.find((r) => !r.test(newPassword));
+    if (failedRule) {
+      setPasswordMessage(failedRule.label + " required");
       setPasswordIsError(true);
       return;
     }
@@ -414,6 +466,18 @@ export default function OrgSettings() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Service Area ZIP Codes
+              </label>
+              {zipCodes.length === 0 && (
+                <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs">
+                  No ZIP codes set. If students sort by distance, your opportunities will appear at the bottom of the list since your location is unknown.
+                </div>
+              )}
+              <ZipCodeInput zipCodes={zipCodes} onChange={setZipCodes} />
+            </div>
+
             <button
               type="submit"
               disabled={saving}
@@ -551,9 +615,17 @@ export default function OrgSettings() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
-                minLength={8}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
+              {newPassword.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {PASSWORD_RULES.map((r) => (
+                    <li key={r.label} className={`text-xs flex items-center gap-1.5 ${r.test(newPassword) ? "text-green-600" : "text-gray-400"}`}>
+                      <span>{r.test(newPassword) ? "✓" : "○"}</span> {r.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>

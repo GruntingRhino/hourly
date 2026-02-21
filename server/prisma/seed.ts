@@ -41,6 +41,7 @@ async function main() {
       verified: false,
       createdById: schoolAdmin.id,
       requiredHours: 40,
+      zipCodes: JSON.stringify(["10001"]), // Midtown Manhattan — reference point for distance sorting
     },
   });
 
@@ -79,6 +80,7 @@ async function main() {
       description: "Environmental conservation and community cleanup organization",
       website: "https://greenearth.org",
       status: "APPROVED",
+      zipCodes: JSON.stringify(["10002"]), // Lower East Side — close to school
     },
   });
 
@@ -101,6 +103,7 @@ async function main() {
       phone: "(555) 222-3333",
       description: "Local library tutoring and reading programs",
       status: "APPROVED",
+      zipCodes: JSON.stringify(["90210"]), // Beverly Hills — far from school (demonstrates distance sort)
     },
   });
 

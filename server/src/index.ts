@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
 import opportunityRoutes from "./routes/opportunities";
 import signupRoutes from "./routes/signups";
@@ -32,6 +33,20 @@ app.use("/api/classrooms", classroomRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/saved", savedRoutes);
+
+// Geocode endpoint — proxies Nominatim so the client never touches the external API directly
+// GET /api/geocode?address=123+Main+St,+Springfield,+IL
+app.get("/api/geocode", async (req, res) => {
+  const address = req.query.address as string | undefined;
+  if (!address?.trim()) {
+    return res.status(400).json({ error: "address query param required" });
+  }
+  const coords = await geocodeAddress(address.trim());
+  if (!coords) {
+    return res.status(404).json({ error: "Address not found" });
+  }
+  res.json(coords);
+});
 
 // Health check
 app.get("/api/health", (_req, res) => {

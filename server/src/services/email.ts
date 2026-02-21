@@ -1,9 +1,31 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM ?? "noreply@goodhours.app";
-const CLIENT_URL = process.env.CLIENT_URL ??
+
+const FROM = process.env.EMAIL_FROM;
+
+// Prefer an explicit, stable app URL in production.
+// Falls back to Vercel-provided URL for previews, and localhost for local dev.
+const CLIENT_URL =
+  process.env.CLIENT_URL ??
+  process.env.NEXT_PUBLIC_CLIENT_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
+
+if (process.env.VERCEL_ENV === "production") {
+  if (!process.env.RESEND_API_KEY) {
+    console.error("[email] Missing RESEND_API_KEY in production environment");
+  }
+  if (!FROM) {
+    console.error(
+      "[email] Missing EMAIL_FROM in production environment (do not rely on a default sender)"
+    );
+  }
+  if (!process.env.CLIENT_URL && !process.env.NEXT_PUBLIC_CLIENT_URL) {
+    console.warn(
+      `[email] CLIENT_URL not explicitly set in production; using fallback CLIENT_URL=${CLIENT_URL}`
+    );
+  }
+}
 
 function base(title: string, body: string, cta?: { label: string; url: string }): string {
   const ctaHtml = cta
@@ -18,20 +40,55 @@ function base(title: string, body: string, cta?: { label: string; url: string })
     <h2 style="margin:0 0 12px;font-size:20px;color:#111827">${title}</h2>
     <div style="color:#374151;font-size:15px;line-height:1.6">${body}</div>
     ${ctaHtml}
-    <p style="color:#9ca3af;font-size:12px;margin-top:32px 0 0">If you didn't expect this email, you can safely ignore it.</p>
+    <p style="color:#9ca3af;font-size:12px;margin:32px 0 0">If you didn't expect this email, you can safely ignore it.</p>
   </div>
 </div>
 </body></html>`;
 }
 
 async function send(to: string, subject: string, html: string): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    const msg = "[email] RESEND_API_KEY is not set";
+    console.error(msg);
+    throw new Error(msg);
+  }
+  if (!FROM) {
+    const msg = "[email] EMAIL_FROM is not set (sender address missing)";
+    console.error(msg);
+    throw new Error(msg);
+  }
+
   try {
-    const { error } = await resend.emails.send({ from: FROM, to, subject, html });
+    const res = await resend.emails.send({ from: FROM, to, subject, html });
+
+    // Resend returns either { data } or { error }
+    // We throw on error so API routes can surface a 500 and Vercel logs show the cause.
+    // @ts-expect-error - Resend types vary by version
+    const error = res?.error;
     if (error) {
-      console.error(`[email] Failed to send "${subject}" to ${to}:`, error.message);
+      console.error(
+        `[email] Failed to send \"${subject}\" to ${to}:`,
+        {
+          name: error.name,
+          message: error.message,
+          // include any status/code fields if present
+          statusCode: (error as any).statusCode,
+          code: (error as any).code,
+        }
+      );
+      throw new Error(error.message ?? "Resend email send failed");
+    }
+
+    // @ts-expect-error - Resend types vary by version
+    const data = res?.data;
+    if (!data) {
+      console.warn(`[email] No data returned when sending \"${subject}\" to ${to}\"`);
+    } else {
+      console.info(`[email] Sent \"${subject}\" to ${to}`, { id: (data as any).id });
     }
   } catch (err) {
-    console.error(`[email] Failed to send "${subject}" to ${to}:`, err);
+    console.error(`[email] Exception while sending \"${subject}\" to ${to}:`, err);
+    throw err;
   }
 }
 

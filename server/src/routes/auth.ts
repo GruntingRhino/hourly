@@ -2,17 +2,56 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
 import { sendVerificationEmail, sendPasswordResetEmail, CLIENT_URL } from "../services/email";
+
+// Limits for endpoints that trigger outbound email — the primary DDOS surface.
+// Each limit is per IP address and resets on a rolling window.
+
+// Signup: 5 accounts per IP per hour
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many signup attempts from this IP. Please try again later." },
+});
+
+// Forgot-password: 5 requests per IP per 15 minutes
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset requests from this IP. Please try again later." },
+});
+
+// Resend-verification: 3 requests per IP per hour
+const resendVerificationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many resend requests from this IP. Please try again later." },
+});
 
 const router = Router();
 
 const VALID_ROLES = ["STUDENT", "ORG_ADMIN", "SCHOOL_ADMIN"] as const;
 
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128)
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
+  .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
+
 const signupSchema = z.object({
   email: z.string().email().max(255),
-  password: z.string().min(8).max(128),
+  password: passwordSchema,
   name: z.string().min(1).max(255),
   role: z.enum(VALID_ROLES),
   age: z.number().int().min(10).max(25).optional(),
@@ -33,7 +72,7 @@ const loginSchema = z.object({
 });
 
 // POST /api/auth/signup
-router.post("/signup", async (req: Request, res: Response) => {
+router.post("/signup", signupLimiter, async (req: Request, res: Response) => {
   try {
     const data = signupSchema.parse(req.body);
 
@@ -249,8 +288,9 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: "Current password and new password are required" });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    const pwResult = passwordSchema.safeParse(newPassword);
+    if (!pwResult.success) {
+      return res.status(400).json({ error: pwResult.error.errors[0].message });
     }
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
@@ -362,7 +402,7 @@ router.get("/verify-email", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/resend-verification
-router.post("/resend-verification", authenticate, async (req: Request, res: Response) => {
+router.post("/resend-verification", resendVerificationLimiter, authenticate, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -388,7 +428,7 @@ router.post("/resend-verification", authenticate, async (req: Request, res: Resp
 });
 
 // POST /api/auth/forgot-password
-router.post("/forgot-password", async (req: Request, res: Response) => {
+router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
     const user = await prisma.user.findUnique({ where: { email } });

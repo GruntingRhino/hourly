@@ -21,3 +21,4 @@ dist-ssr/
 # Logs
 *.log
 .vercel
+.env*.local

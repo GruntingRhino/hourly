@@ -2,6 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
+const PASSWORD_RULES = [
+  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number", test: (p: string) => /[0-9]/.test(p) },
+  { label: "One special character", test: (p: string) => /[^a-zA-Z0-9]/.test(p) },
+];
+
 
 function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z: string[]) => void }) {
   const [input, setInput] = useState("");
@@ -60,9 +68,15 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const passwordOk = PASSWORD_RULES.every((r) => r.test(password));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!passwordOk) {
+      setError("Password does not meet all requirements");
+      return;
+    }
     setLoading(true);
     try {
       await signup({
@@ -246,9 +260,17 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {password.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {PASSWORD_RULES.map((r) => (
+                    <li key={r.label} className={`text-xs flex items-center gap-1.5 ${r.test(password) ? "text-green-600" : "text-gray-400"}`}>
+                      <span>{r.test(password) ? "✓" : "○"}</span> {r.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <button

@@ -5,6 +5,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import * as zipcodes from "zipcodes";
 import * as geolib from "geolib";
+import { geocodeAddress } from "../lib/geocode";
 
 const router = Router();
 
@@ -107,40 +108,40 @@ router.get("/", async (req: Request, res: Response) => {
       });
     }
 
-    // Sort: approved orgs first, then by distance from school ZIP
-    if (schoolId && approvedOrgIds.length > 0) {
-      const schoolCoords = schoolZip ? ((zipcodes as any).lookup(schoolZip) ?? null) : null;
+    // Sort: approved orgs first, then by approximate distance from school ZIP
+    if (schoolId && schoolZip) {
+      const schoolCoords = (zipcodes as any).lookup(schoolZip) ?? null;
+
+      const getOppCoords = (opp: any): { latitude: number; longitude: number } | null => {
+        // Prefer the opportunity's own geocoded lat/lng (most accurate)
+        if (opp.latitude != null && opp.longitude != null) {
+          return { latitude: opp.latitude, longitude: opp.longitude };
+        }
+        // Fall back to org ZIP centroid (approximate)
+        try {
+          const orgZips = opp.organization.zipCodes ? JSON.parse(opp.organization.zipCodes) : [];
+          if (orgZips.length > 0) {
+            const info = (zipcodes as any).lookup(orgZips[0]) ?? null;
+            if (info) return { latitude: info.latitude, longitude: info.longitude };
+          }
+        } catch {}
+        return null;
+      };
 
       results = results.sort((a, b) => {
+        // Approved orgs always appear before unapproved
         const aApproved = approvedOrgIds.includes(a.organizationId) ? 0 : 1;
         const bApproved = approvedOrgIds.includes(b.organizationId) ? 0 : 1;
         if (aApproved !== bApproved) return aApproved - bApproved;
 
-        // Within same approval group, sort by distance if we have coords
+        // Within same approval tier, sort by distance if school coords are available
         if (schoolCoords) {
-          const getOrgCoords = (opp: any) => {
-            try {
-              const orgZips = opp.organization.zipCodes ? JSON.parse(opp.organization.zipCodes) : [];
-              if (orgZips.length > 0) {
-                const info = (zipcodes as any).lookup(orgZips[0]) ?? null;
-                if (info) return { latitude: info.latitude, longitude: info.longitude };
-              }
-            } catch {}
-            return null;
-          };
-          const aCoords = getOrgCoords(a);
-          const bCoords = getOrgCoords(b);
-          if (aCoords && bCoords) {
-            const aDist = (geolib as any).getDistance(
-              { latitude: schoolCoords.latitude, longitude: schoolCoords.longitude },
-              aCoords
-            );
-            const bDist = (geolib as any).getDistance(
-              { latitude: schoolCoords.latitude, longitude: schoolCoords.longitude },
-              bCoords
-            );
-            return aDist - bDist;
-          }
+          const aCoords = getOppCoords(a);
+          const bCoords = getOppCoords(b);
+          const ref = { latitude: schoolCoords.latitude, longitude: schoolCoords.longitude };
+          const aDist = aCoords ? (geolib as any).getDistance(ref, aCoords) : Infinity;
+          const bDist = bCoords ? (geolib as any).getDistance(ref, bCoords) : Infinity;
+          return aDist - bDist;
         }
         return 0;
       });
@@ -185,9 +186,21 @@ router.post("/", authenticate, requireRole("ORG_ADMIN"), async (req: Request, re
       return res.status(400).json({ error: "User not associated with an organization" });
     }
 
+    // Auto-geocode address → lat/lng if not explicitly supplied
+    let { latitude, longitude } = data;
+    if (data.address && latitude === undefined && longitude === undefined) {
+      const coords = await geocodeAddress(data.address);
+      if (coords) {
+        latitude = coords.lat;
+        longitude = coords.lng;
+      }
+    }
+
     const opp = await prisma.opportunity.create({
       data: {
         ...data,
+        latitude,
+        longitude,
         tags: data.tags ? JSON.stringify(data.tags) : null,
         date: new Date(data.date),
         organizationId: user.organizationId,
@@ -237,6 +250,15 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
       updateData.date = new Date(updateData.date);
     }
     // customFields already stored as JSON string, pass through as-is
+
+    // Auto-geocode if address changed but lat/lng not provided
+    if (updateData.address && updateData.latitude === undefined && updateData.longitude === undefined) {
+      const coords = await geocodeAddress(updateData.address);
+      if (coords) {
+        updateData.latitude = coords.lat;
+        updateData.longitude = coords.lng;
+      }
+    }
 
     const updated = await prisma.opportunity.update({
       where: { id: req.params.id },

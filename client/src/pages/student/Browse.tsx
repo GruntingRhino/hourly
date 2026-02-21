@@ -41,6 +41,8 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type SortBy = "alphabetical" | "date" | "popular" | "distance";
+
 export default function StudentBrowse() {
   const { user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -49,12 +51,28 @@ export default function StudentBrowse() {
   const [tagFilter, setTagFilter] = useState("");
   const [approvedOnly, setApprovedOnly] = useState(false);
   const [distanceFilter, setDistanceFilter] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("alphabetical");
+  const [schoolCoords, setSchoolCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"browse" | "saved" | "skipped" | "discarded">("browse");
 
   useEffect(() => {
     loadData();
   }, [approvedOnly]);
+
+  // Fetch school coordinates once for distance sorting/filtering
+  useEffect(() => {
+    if (!user?.school?.zipCodes) return;
+    try {
+      const zips = JSON.parse(user.school.zipCodes);
+      if (zips.length > 0) {
+        fetch(`/api/geocode?address=${encodeURIComponent(zips[0])}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => { if (data) setSchoolCoords({ lat: data.lat, lng: data.lng }); })
+          .catch(() => {});
+      }
+    } catch {}
+  }, [user?.school?.zipCodes]);
 
   const loadData = async () => {
     setLoading(true);
@@ -83,8 +101,6 @@ export default function StudentBrowse() {
     })
   )).sort();
 
-  // Get school lat/lng (approximation from first zip if available)
-  // Distance filter uses opportunity lat/lng if available
   const filtered = opportunities.filter((opp) => {
     const searchMatch = !search || (
       opp.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,16 +111,34 @@ export default function StudentBrowse() {
     const tagMatch = !tagFilter || (() => {
       try { return opp.tags ? JSON.parse(opp.tags).includes(tagFilter) : false; } catch { return false; }
     })();
-
-    // Distance filter: use opp lat/lng if available
     let distMatch = true;
-    if (distanceFilter && opp.latitude && opp.longitude) {
-      // We'd need school lat/lng — skip if not available
-      // If school has no coords, show all
-      distMatch = true; // TODO: full zip-to-lat requires server-side lookup
+    if (distanceFilter && schoolCoords && opp.latitude && opp.longitude) {
+      const d = haversineDistance(schoolCoords.lat, schoolCoords.lng, opp.latitude, opp.longitude);
+      distMatch = d <= distanceFilter;
     }
-
     return searchMatch && tagMatch && distMatch;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case "date":
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      case "popular":
+        return b._count.signups - a._count.signups;
+      case "distance": {
+        if (!schoolCoords) return 0;
+        const aDist = a.latitude && a.longitude
+          ? haversineDistance(schoolCoords.lat, schoolCoords.lng, a.latitude, a.longitude)
+          : Infinity;
+        const bDist = b.latitude && b.longitude
+          ? haversineDistance(schoolCoords.lat, schoolCoords.lng, b.latitude, b.longitude)
+          : Infinity;
+        return aDist - bDist;
+      }
+      case "alphabetical":
+      default:
+        return a.title.localeCompare(b.title);
+    }
   });
 
   const savedIds = saved.filter((s) => s.status === "SAVED").map((s) => s.opportunityId);
@@ -114,12 +148,12 @@ export default function StudentBrowse() {
 
   const displayOpps =
     view === "saved"
-      ? filtered.filter((o) => savedIds.includes(o.id))
+      ? sorted.filter((o) => savedIds.includes(o.id))
       : view === "skipped"
-      ? filtered.filter((o) => skippedIds.includes(o.id))
+      ? sorted.filter((o) => skippedIds.includes(o.id))
       : view === "discarded"
-      ? filtered.filter((o) => discardedIds.includes(o.id))
-      : filtered.filter((o) => !hiddenIds.includes(o.id));
+      ? sorted.filter((o) => discardedIds.includes(o.id))
+      : sorted.filter((o) => !hiddenIds.includes(o.id));
 
   return (
     <div>
@@ -149,8 +183,23 @@ export default function StudentBrowse() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters + Sort */}
       <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Sort:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
+          >
+            <option value="alphabetical">Alphabetical</option>
+            <option value="date">Date</option>
+            <option value="popular">Most Popular</option>
+            <option value="distance">Distance{!schoolCoords ? " (no school ZIP)" : ""}</option>
+          </select>
+        </div>
+
         {/* Tag filter */}
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Tag:</label>
@@ -167,20 +216,22 @@ export default function StudentBrowse() {
         </div>
 
         {/* Distance filter */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Distance:</label>
-          <select
-            value={distanceFilter ?? ""}
-            onChange={(e) => setDistanceFilter(e.target.value ? Number(e.target.value) : null)}
-            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
-          >
-            <option value="">Any distance</option>
-            <option value="5">Within 5 mi</option>
-            <option value="10">Within 10 mi</option>
-            <option value="25">Within 25 mi</option>
-            <option value="50">Within 50 mi</option>
-          </select>
-        </div>
+        {user?.schoolId && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Within:</label>
+            <select
+              value={distanceFilter ?? ""}
+              onChange={(e) => setDistanceFilter(e.target.value ? Number(e.target.value) : null)}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
+            >
+              <option value="">Any distance</option>
+              <option value="5">5 mi</option>
+              <option value="10">10 mi</option>
+              <option value="25">25 mi</option>
+              <option value="50">50 mi</option>
+            </select>
+          </div>
+        )}
 
         {/* Approved orgs toggle */}
         {user?.schoolId && (

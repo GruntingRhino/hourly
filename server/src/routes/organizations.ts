@@ -60,7 +60,11 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
         description: req.body.description,
         website: req.body.website,
         socialLinks: req.body.socialLinks ? JSON.stringify(req.body.socialLinks) : undefined,
-        zipCodes: req.body.zipCodes ? JSON.stringify(req.body.zipCodes) : undefined,
+        zipCodes: "zipCodes" in req.body
+          ? (Array.isArray(req.body.zipCodes) && req.body.zipCodes.length > 0
+              ? JSON.stringify(req.body.zipCodes)
+              : null)
+          : undefined,
       },
     });
     res.json(org);
