@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm install && rm -rf server/node_modules",
   "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
