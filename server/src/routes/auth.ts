@@ -155,8 +155,13 @@ router.post("/signup", signupLimiter, async (req: Request, res: Response) => {
 
     const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
 
-    // Send verification email (non-blocking)
-    sendVerificationEmail(user.email, verificationUrl).catch(() => {});
+    // Send verification email — awaited so it completes before Lambda returns.
+    // Errors are caught and logged but signup still succeeds.
+    try {
+      await sendVerificationEmail(user.email, verificationUrl);
+    } catch (emailErr) {
+      console.error("[signup] Failed to send verification email:", emailErr);
+    }
 
     res.status(201).json({
       token,
@@ -418,7 +423,11 @@ router.post("/resend-verification", resendVerificationLimiter, authenticate, asy
 
     const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
 
-    sendVerificationEmail(user.email, verificationUrl).catch(() => {});
+    try {
+      await sendVerificationEmail(user.email, verificationUrl);
+    } catch (emailErr) {
+      console.error("[resend-verification] Failed to send verification email:", emailErr);
+    }
 
     res.json({ message: "Verification email sent" });
   } catch (err) {
@@ -444,7 +453,11 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       });
 
       const resetLink = `${CLIENT_URL}/reset-password?token=${resetToken}`;
-      sendPasswordResetEmail(user.email, resetLink).catch(() => {});
+      try {
+        await sendPasswordResetEmail(user.email, resetLink);
+      } catch (emailErr) {
+        console.error("[forgot-password] Failed to send reset email:", emailErr);
+      }
     }
 
     res.json({ message: "If an account with that email exists, a password reset link has been sent." });

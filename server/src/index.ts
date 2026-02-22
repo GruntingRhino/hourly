@@ -17,6 +17,10 @@ import savedRoutes from "./routes/saved";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust Vercel/reverse-proxy X-Forwarded-For so express-rate-limit
+// can identify real client IPs instead of always seeing the proxy IP.
+app.set("trust proxy", 1);
+
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
