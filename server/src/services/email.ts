@@ -63,8 +63,7 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 
     // Resend returns either { data } or { error }
     // We throw on error so API routes can surface a 500 and Vercel logs show the cause.
-    // @ts-expect-error - Resend types vary by version
-    const error = res?.error;
+    const error = (res as any)?.error;
     if (error) {
       console.error(
         `[email] Failed to send \"${subject}\" to ${to}:`,
@@ -79,8 +78,7 @@ async function send(to: string, subject: string, html: string): Promise<void> {
       throw new Error(error.message ?? "Resend email send failed");
     }
 
-    // @ts-expect-error - Resend types vary by version
-    const data = res?.data;
+    const data = (res as any)?.data;
     if (!data) {
       console.warn(`[email] No data returned when sending \"${subject}\" to ${to}\"`);
     } else {
