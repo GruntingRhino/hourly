@@ -1,4 +1,4 @@
-import { useState, useEffect, KeyboardEvent } from "react";
+import { useState, useEffect, type KeyboardEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
