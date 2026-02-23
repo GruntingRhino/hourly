@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "https://goodhours.app",
+      "localStorage": [
+        {
+          "name": "goodhours_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx5Y2NhYnkwMDBpbXVueDlsemRucWc4IiwiZW1haWwiOiJqb2huQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4MDQ3NzcsImV4cCI6MTc3MjQwOTU3N30.igzbEK_nb_LoVYO5xP2C9oyf4BZ8epGRBKiwWbq6Aws"
+        }
+      ]
+    }
+  ]
+}
