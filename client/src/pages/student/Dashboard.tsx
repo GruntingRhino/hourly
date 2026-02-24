@@ -52,29 +52,121 @@ export default function StudentDashboard() {
   const [signups, setSignups] = useState<Signup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionLoadingSessionId, setActionLoadingSessionId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
 
-  useEffect(() => {
-    Promise.all([
-      api.get<ReportData>("/reports/student"),
-      api.get<Signup[]>("/signups/my"),
-    ]).then(([r, s]) => {
+  const loadData = async (showSpinner = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
+    setError("");
+    try {
+      const [r, s] = await Promise.all([
+        api.get<ReportData>("/reports/student"),
+        api.get<Signup[]>("/signups/my"),
+      ]);
       setReport(r);
       setSignups(s);
-    }).catch(() => {
+    } catch {
       setError("Failed to load dashboard. Please refresh the page.");
-    }).finally(() => setLoading(false));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadData(true);
   }, []);
+
+  const handleCheckIn = async (sessionId: string) => {
+    setActionLoadingSessionId(sessionId);
+    setActionMessage("");
+    const checkInTime = new Date().toISOString();
+    setReport((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sessions: prev.sessions.map((session) =>
+          session.id === sessionId
+            ? {
+                ...session,
+                status: "CHECKED_IN",
+                checkInTime,
+              }
+            : session
+        ),
+      };
+    });
+    try {
+      await api.post(`/sessions/${sessionId}/checkin`);
+      setActionMessage("Checked in");
+      void loadData();
+    } catch {
+      setActionMessage("Failed to check in");
+      void loadData();
+    } finally {
+      setActionLoadingSessionId(null);
+    }
+  };
+
+  const handleCheckOut = async (sessionId: string) => {
+    setActionLoadingSessionId(sessionId);
+    setActionMessage("");
+    const now = Date.now();
+    setReport((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sessions: prev.sessions.map((session) => {
+          if (session.id !== sessionId) return session;
+          const checkInMs = session.checkInTime ? new Date(session.checkInTime).getTime() : NaN;
+          const computedHours =
+            Number.isFinite(checkInMs) && now > checkInMs
+              ? Math.round(((now - checkInMs) / (1000 * 60 * 60)) * 100) / 100
+              : session.totalHours ?? 0;
+          return {
+            ...session,
+            status: "CHECKED_OUT",
+            totalHours: computedHours,
+          };
+        }),
+      };
+    });
+    try {
+      await api.post(`/sessions/${sessionId}/checkout`);
+      setActionMessage("Checked out");
+      void loadData();
+    } catch {
+      setActionMessage("Failed to check out");
+      void loadData();
+    } finally {
+      setActionLoadingSessionId(null);
+    }
+  };
 
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const upcoming = signups
-    .filter((s) => s.status === "CONFIRMED" && new Date(s.opportunity.date) >= new Date())
+    .filter((s) => s.status === "CONFIRMED" && new Date(s.opportunity.date) >= today)
     .sort((a, b) => new Date(a.opportunity.date).getTime() - new Date(b.opportunity.date).getTime());
+
+  const sessionByOppId = new Map(
+    (report?.sessions || []).map((session) => [session.opportunity.id, session]),
+  );
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+
+      {actionMessage && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-700 text-sm">
+          {actionMessage}
+        </div>
+      )}
 
       {/* Join classroom prompt */}
       {!user?.classroomId && (
@@ -172,6 +264,46 @@ export default function StudentDashboard() {
                   <div className="text-xs text-gray-500 mt-0.5">
                     {s.opportunity._count?.signups ?? 0}/{s.opportunity.capacity} spots filled
                   </div>
+                  {(() => {
+                    const session = sessionByOppId.get(s.opportunity.id);
+                    if (!session) return null;
+                    if (session.status === "PENDING_CHECKIN" || session.status === "COMMITTED") {
+                      return (
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            await handleCheckIn(session.id);
+                          }}
+                          disabled={actionLoadingSessionId === session.id}
+                          className="mt-2 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {actionLoadingSessionId === session.id ? "Checking in..." : "Check In"}
+                        </button>
+                      );
+                    }
+                    if (session.status === "CHECKED_IN") {
+                      return (
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            await handleCheckOut(session.id);
+                          }}
+                          disabled={actionLoadingSessionId === session.id}
+                          className="mt-2 px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          {actionLoadingSessionId === session.id ? "Checking out..." : "Check Out"}
+                        </button>
+                      );
+                    }
+                    if (session.status === "CHECKED_OUT") {
+                      return (
+                        <div className="mt-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 inline-block">
+                          Checked out • {session.totalHours ?? 0} hours
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </Link>
               ))}
             </div>

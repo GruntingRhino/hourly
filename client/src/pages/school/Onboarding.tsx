@@ -18,11 +18,12 @@ export default function SchoolOnboarding() {
     setSaving(true);
     setError("");
     try {
-      await api.post("/auth/set-graduation-goal", { requiredHours: hours });
-      // Mark onboarding complete in localStorage
+      // Persist completion flag immediately so route transitions do not race
+      // against this network request in fresh contexts.
       if (user?.schoolId) {
         localStorage.setItem(`school_onboarding_${user.schoolId}`, "done");
       }
+      await api.post("/auth/set-graduation-goal", { requiredHours: hours });
       await refreshUser();
     } catch (err: any) {
       setError(err.message || "Failed to save hours goal");

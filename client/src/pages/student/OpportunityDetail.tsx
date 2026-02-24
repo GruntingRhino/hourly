@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import SignaturePad from "../../components/SignaturePad";
+import { useAuth } from "../../hooks/useAuth";
 
 interface Opportunity {
   id: string;
@@ -37,11 +38,17 @@ interface Session {
   rejectionReason: string | null;
 }
 
+interface SignupRecord {
+  id: string;
+  status: string;
+}
+
 export default function OpportunityDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [opp, setOpp] = useState<Opportunity | null>(null);
-  const [mySignup, setMySignup] = useState<any>(null);
+  const [mySignup, setMySignup] = useState<SignupRecord | null>(null);
   const [mySession, setMySession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -50,39 +57,58 @@ export default function OpportunityDetail() {
   const [verifyMethod, setVerifyMethod] = useState<"DRAWN" | "FILE">("DRAWN");
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const loadRequestIdRef = useRef(0);
 
   const loadData = async () => {
+    const requestId = ++loadRequestIdRef.current;
+    setLoading(true);
     try {
       const oppData = await api.get<Opportunity>(`/opportunities/${id}`);
+      if (requestId !== loadRequestIdRef.current) return;
       setOpp(oppData);
+      const mine = user?.id
+        ? oppData.signups.find((signup) => signup.user.id === user.id)
+        : null;
+      setMySignup(mine ? { id: mine.id, status: mine.status } : null);
+      setLoading(false);
 
-      // Check if student has signed up
-      const signups = await api.get<any[]>("/signups/my");
-      const mine = signups.find((s) => s.opportunity.id === id);
-      setMySignup(mine || null);
-
-      // Check if student has a session
-      const sessions = await api.get<Session[]>("/sessions/my");
-      const sess = sessions.find((s: any) => s.opportunity.id === id);
-      setMySession(sess || null);
+      // Session fetch runs separately so detail actions render without waiting
+      // on the full "/sessions/my" payload.
+      const sessions = await api
+        .get<any[]>(`/sessions/my?opportunityId=${encodeURIComponent(String(id || ""))}`)
+        .catch(() => []);
+      if (requestId !== loadRequestIdRef.current) return;
+      const sess = sessions.find((s) => s?.opportunity?.id === id || s?.opportunityId === id) || null;
+      setMySession(sess);
     } catch (err) {
+      if (requestId !== loadRequestIdRef.current) return;
       console.error(err);
-    } finally {
+      setOpp(null);
+      setMySignup(null);
+      setMySession(null);
       setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [id]);
+  }, [id, user?.id]);
 
   const handleSignup = async () => {
     setActionLoading(true);
     setActionError("");
+    const isWaitlistAttempt = spotsLeft <= 0;
+    if (isWaitlistAttempt) {
+      setMySignup({ id: `pending-${Date.now()}`, status: "WAITLISTED" });
+    }
     try {
-      await api.post("/signups", { opportunityId: id });
-      await loadData();
+      const created = await api.post<SignupRecord>("/signups", { opportunityId: id });
+      setMySignup(created);
+      void loadData();
     } catch (err: any) {
+      if (isWaitlistAttempt) {
+        setMySignup(null);
+      }
       setActionError(err.message || "Failed to sign up");
     } finally {
       setActionLoading(false);
@@ -91,13 +117,23 @@ export default function OpportunityDetail() {
 
   const handleCancelSignup = async () => {
     if (!mySignup) return;
+    // Invalidate any in-flight load so stale responses can't override this optimistic cancel.
+    loadRequestIdRef.current += 1;
+    const previousSignup = mySignup;
+    const cancelledSignup: SignupRecord = {
+      ...previousSignup,
+      status: "CANCELLED",
+    };
     setActionLoading(true);
     setActionError("");
+    setMySignup(cancelledSignup);
+    setMySession((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
     try {
       await api.post(`/signups/${mySignup.id}/cancel`);
-      await loadData();
     } catch (err: any) {
+      setMySignup(previousSignup);
       setActionError(err.message || "Failed to cancel");
+      void loadData();
     } finally {
       setActionLoading(false);
     }
@@ -160,12 +196,33 @@ export default function OpportunityDetail() {
           body: formData,
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to submit");
+          let message = "Failed to submit";
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const data = await res.json().catch(() => null);
+            if (data && typeof data === "object" && "error" in data) {
+              message = String((data as any).error || message);
+            }
+          } else {
+            const text = await res.text().catch(() => "");
+            if (/Only PDF, PNG, JPG files are allowed/i.test(text)) {
+              message = "Only PDF, PNG, JPG files are allowed";
+            }
+          }
+          throw new Error(message);
         }
       }
       setShowVerifyForm(false);
-      await loadData();
+      setMySession((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "PENDING_VERIFICATION",
+              verificationStatus: "PENDING",
+            }
+          : prev,
+      );
+      void loadData();
     } catch (err: any) {
       setActionError(err.message || "Failed to submit verification");
     } finally {
@@ -173,14 +230,56 @@ export default function OpportunityDetail() {
     }
   };
 
-  // Check if opportunity date has passed (can submit verification)
-  const canSubmitVerification = opp && mySession?.status === "COMMITTED" && new Date(opp.date) <= new Date();
+  // Verification is allowed once checked out and event date has passed.
+  const canSubmitVerification =
+    !!opp &&
+    ["CHECKED_OUT", "PENDING_VERIFICATION", "REJECTED"].includes(mySession?.status || "") &&
+    new Date(opp.date) <= new Date();
+  const showVerificationUnlockNotice =
+    !!opp && !!mySession && new Date(opp.date) > new Date() && !canSubmitVerification;
 
   if (loading) return <div className="text-gray-500">Loading...</div>;
   if (!opp) return <div className="text-red-500">Opportunity not found</div>;
 
   const tags = opp.tags ? JSON.parse(opp.tags) : [];
   const spotsLeft = opp.capacity - opp._count.signups;
+  const customFields = (() => {
+    if (!opp.customFields) return [];
+    try {
+      const parsed = JSON.parse(opp.customFields);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item: any) => {
+            if (!item) return null;
+            if (typeof item === "string") {
+              return { label: "Custom Field", value: item };
+            }
+            const label = String(item.label ?? item.name ?? item.key ?? "Custom Field");
+            const value = String(item.value ?? item.answer ?? item.text ?? "");
+            return value ? { label, value } : null;
+          })
+          .filter(Boolean) as Array<{ label: string; value: string }>;
+      }
+
+      if (parsed && typeof parsed === "object") {
+        return Object.entries(parsed as Record<string, any>)
+          .map(([label, value]) => ({
+            label,
+            value: value == null ? "" : String(value),
+          }))
+          .filter((item) => item.value);
+      }
+
+      if (typeof parsed === "string" && parsed.trim()) {
+        return [{ label: "Custom Field", value: parsed.trim() }];
+      }
+    } catch {
+      if (opp.customFields.trim()) {
+        return [{ label: "Custom Field", value: opp.customFields.trim() }];
+      }
+    }
+    return [];
+  })();
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -252,25 +351,21 @@ export default function OpportunityDetail() {
         </div>
 
         {/* Custom fields */}
-        {(() => {
-          try {
-            const fields: { label: string; value: string }[] = opp.customFields ? JSON.parse(opp.customFields) : [];
-            if (fields.length === 0) return null;
-            return (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Additional Information</h3>
-                <div className="space-y-2">
-                  {fields.map((f, i) => (
-                    <div key={i} className="flex gap-2 text-sm">
-                      <span className="text-gray-500 min-w-24">{f.label}:</span>
-                      <span className="font-medium">{f.value}</span>
-                    </div>
-                  ))}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Custom Fields</h3>
+          {customFields.length > 0 ? (
+            <div className="space-y-2">
+              {customFields.map((f, i) => (
+                <div key={`${f.label}-${i}`} className="flex gap-2 text-sm">
+                  <span className="text-gray-500 min-w-24">{f.label}:</span>
+                  <span className="font-medium">{f.value}</span>
                 </div>
-              </div>
-            );
-          } catch { return null; }
-        })()}
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">No custom fields provided.</div>
+          )}
+        </div>
 
         {/* Action buttons */}
         <div className="border-t border-gray-200 pt-4">
@@ -280,13 +375,20 @@ export default function OpportunityDetail() {
             </div>
           )}
           {!mySignup && opp.status === "ACTIVE" && (
-            <button
-              onClick={handleSignup}
-              disabled={actionLoading || spotsLeft <= 0}
-              className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {actionLoading ? "Signing up..." : spotsLeft <= 0 ? "Join Waitlist" : "Sign Up"}
-            </button>
+            <>
+              <button
+                onClick={handleSignup}
+                disabled={actionLoading}
+                className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {actionLoading ? "Signing up..." : spotsLeft <= 0 ? "Join Waitlist" : "Sign Up"}
+              </button>
+              {actionLoading && spotsLeft <= 0 && (
+                <div className="mt-3 p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                  Joining waitlist...
+                </div>
+              )}
+            </>
           )}
 
           {mySignup && mySignup.status === "CONFIRMED" && (
@@ -295,14 +397,45 @@ export default function OpportunityDetail() {
                 You're signed up for this opportunity
               </div>
 
-              {/* COMMITTED state — waiting for opportunity date to pass */}
-              {mySession?.status === "COMMITTED" && !canSubmitVerification && (
-                <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center">
-                  Committed &middot; {mySession.totalHours}h &middot; Verification unlocks after {new Date(opp!.date).toLocaleDateString()}
+              {(mySession?.status === "COMMITTED" || mySession?.status === "PENDING_CHECKIN") && (
+                <button
+                  onClick={handleCheckIn}
+                  disabled={actionLoading}
+                  className="w-full py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50"
+                >
+                  {actionLoading ? "Checking in..." : "Check In"}
+                </button>
+              )}
+
+              {mySession?.status === "CHECKED_IN" && (
+                <div>
+                  <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center mb-3">
+                    Checked in at {new Date(mySession.checkInTime!).toLocaleTimeString()}
+                  </div>
+                  <button
+                    onClick={handleCheckOut}
+                    disabled={actionLoading}
+                    className="w-full py-3 bg-orange-600 text-white rounded-md font-medium hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {actionLoading ? "Checking out..." : "Check Out"}
+                  </button>
                 </div>
               )}
 
-              {/* COMMITTED and date has passed — show Submit Verification */}
+              {mySession?.status === "CHECKED_OUT" && (
+                <>
+                  <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                    Checked out &middot; {mySession.totalHours} hours
+                  </div>
+                </>
+              )}
+
+              {showVerificationUnlockNotice && (
+                <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center">
+                  Verification unlocks after {new Date(opp.date).toLocaleDateString()}
+                </div>
+              )}
+
               {canSubmitVerification && !showVerifyForm && (
                 <button
                   onClick={() => setShowVerifyForm(true)}
@@ -312,7 +445,6 @@ export default function OpportunityDetail() {
                 </button>
               )}
 
-              {/* Verification submission form */}
               {canSubmitVerification && showVerifyForm && (
                 <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                   <h3 className="font-medium">Submit Verification</h3>
@@ -371,42 +503,9 @@ export default function OpportunityDetail() {
                 </div>
               )}
 
-              {/* PENDING_VERIFICATION state */}
               {mySession?.status === "PENDING_VERIFICATION" && (
                 <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
-                  Verification submitted &middot; {mySession.totalHours}h &middot; Awaiting school review
-                </div>
-              )}
-
-              {/* Legacy check-in/out flow states */}
-              {mySession?.status === "PENDING_CHECKIN" && (
-                <button
-                  onClick={handleCheckIn}
-                  disabled={actionLoading}
-                  className="w-full py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50"
-                >
-                  {actionLoading ? "Checking in..." : "Check In"}
-                </button>
-              )}
-
-              {mySession?.status === "CHECKED_IN" && (
-                <div>
-                  <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center mb-3">
-                    Checked in at {new Date(mySession.checkInTime!).toLocaleTimeString()}
-                  </div>
-                  <button
-                    onClick={handleCheckOut}
-                    disabled={actionLoading}
-                    className="w-full py-3 bg-orange-600 text-white rounded-md font-medium hover:bg-orange-700 disabled:opacity-50"
-                  >
-                    {actionLoading ? "Checking out..." : "Check Out"}
-                  </button>
-                </div>
-              )}
-
-              {mySession?.status === "CHECKED_OUT" && (
-                <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
-                  Checked out &middot; {mySession.totalHours} hours &middot; Awaiting verification
+                  Status: PENDING_VERIFICATION &middot; {mySession.totalHours}h
                 </div>
               )}
 
@@ -425,7 +524,7 @@ export default function OpportunityDetail() {
                 </div>
               )}
 
-              {(mySession?.status === "COMMITTED" || mySession?.status === "PENDING_CHECKIN") && (
+              {mySession?.status !== "VERIFIED" && (
                 <button
                   onClick={handleCancelSignup}
                   disabled={actionLoading}
@@ -440,7 +539,7 @@ export default function OpportunityDetail() {
           {mySignup?.status === "WAITLISTED" && (
             <div className="space-y-3">
               <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
-                You're on the waitlist
+                Status: WAITLISTED
               </div>
               <button
                 onClick={handleCancelSignup}

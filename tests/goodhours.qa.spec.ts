@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const BASE_URL = 'https://goodhours.app';
-const MAILINATOR_BASE = 'https://www.mailinator.com/v4/public/inboxes.jsp?to=';
+const BASE_URL = process.env.QA_BASE_URL || 'http://localhost:5173';
+const MAILINATOR_API_BASE = 'https://www.mailinator.com/api/v2/domains/public/inboxes';
 
 const ROOT = process.cwd();
 const TESTS_DIR = path.join(ROOT, 'tests');
@@ -117,6 +117,8 @@ const flowState: {
   latestCreateOpportunityResponse: null,
 };
 
+const mailinatorSeenActionLinks = new Map<string, Set<string>>();
+
 function assertOrThrow(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
@@ -133,6 +135,12 @@ function safeNowTag(): string {
 
 function sanitizeFilename(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 160);
+}
+
+function normalizeMailinatorTime(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n < 1_000_000_000_000 ? n * 1000 : n;
 }
 
 function daysFromNow(offset: number): string {
@@ -293,8 +301,36 @@ async function stopSession(session: Session): Promise<void> {
 
 async function ensureStudentSignupRole(page: import('@playwright/test').Page): Promise<void> {
   await page.goto(`${BASE_URL}/signup`, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: /I would like to volunteer/i }).click();
-  await page.waitForTimeout(300);
+  const signOut = page.getByRole('button', { name: /Sign out/i }).first();
+  if (await signOut.count()) {
+    await signOut.click();
+    await page.waitForTimeout(400);
+    await page.goto(`${BASE_URL}/signup`, { waitUntil: 'networkidle' });
+  }
+  const explicitVolunteerPicker = page.getByRole('button', { name: /I would like to volunteer/i }).first();
+  if (await explicitVolunteerPicker.count()) {
+    await explicitVolunteerPicker.click();
+    await page.waitForTimeout(300);
+    return;
+  }
+
+  const volunteerBanner = page.getByRole('button', { name: /Signing up as a Volunteer/i }).first();
+  if (await volunteerBanner.count()) {
+    return;
+  }
+
+  const changeRole = page.getByRole('button', { name: /Change role/i }).first();
+  if (await changeRole.count()) {
+    await changeRole.click();
+    await page.waitForTimeout(200);
+    if (await explicitVolunteerPicker.count()) {
+      await explicitVolunteerPicker.click();
+      await page.waitForTimeout(300);
+      return;
+    }
+  }
+
+  throw new Error('Volunteer signup role selector not found on /signup');
 }
 
 async function signupVolunteer(
@@ -327,51 +363,128 @@ async function fetchMailinatorMessage(
   subjectPattern: RegExp,
   timeoutMs = 120_000,
 ): Promise<MailinatorMessage> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
+  void browser;
+  const requestedAt = Date.now();
+  const freshnessFloor = requestedAt - 15_000;
+  const seenKey = `${inbox}::${subjectPattern.source}::${subjectPattern.flags}`;
+  if (!mailinatorSeenActionLinks.has(seenKey)) {
+    mailinatorSeenActionLinks.set(seenKey, new Set<string>());
+  }
+  const seenLinks = mailinatorSeenActionLinks.get(seenKey)!;
   const deadline = Date.now() + timeoutMs;
-  await page.goto(`${MAILINATOR_BASE}${encodeURIComponent(inbox)}`, { waitUntil: 'domcontentloaded' });
+  let lastError = '';
 
-  let row = page.locator('tr').filter({ hasText: subjectPattern }).first();
-  while (!(await row.count()) && Date.now() < deadline) {
-    await page.waitForTimeout(5000);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    row = page.locator('tr').filter({ hasText: subjectPattern }).first();
+  while (Date.now() < deadline) {
+    try {
+      const localResp = await fetch(`${BASE_URL}/api/auth/__test-email?inbox=${encodeURIComponent(inbox)}`);
+      if (localResp.ok) {
+        const localData = (await localResp.json()) as any;
+        const localMessages = Array.isArray(localData?.messages) ? localData.messages : [];
+        const localMatching = localMessages
+          .filter(
+            (m: any) =>
+              subjectPattern.test(String(m?.subject || '')) && Number(m?.sentAt || 0) >= freshnessFloor,
+          )
+          .sort((a: any, b: any) => Number(b?.sentAt || 0) - Number(a?.sentAt || 0));
+
+        for (const localMsg of localMatching) {
+          const rawText = `${String(localMsg?.from || '').trim()} ${String(localMsg?.subject || '').trim()}\n${String(
+            localMsg?.html || '',
+          )}`.trim();
+          const links = Array.from(
+            new Set(
+              (rawText.match(/https?:\/\/[^\s"'<>]+/g) || [])
+                .map((link) => link.replace(/&amp;/g, '&').replace(/[\])}>.,!?]+$/, ''))
+                .filter(Boolean),
+            ),
+          );
+          const actionLinks = links.filter((link) => /verify-email\?token=|reset-password\?token=/i.test(link));
+          const unseenActionLink = actionLinks.find((link) => !seenLinks.has(link));
+          if (actionLinks.length > 0 && !unseenActionLink) {
+            continue;
+          }
+          if (unseenActionLink) {
+            seenLinks.add(unseenActionLink);
+          }
+          return {
+            rowText: `${String(localMsg?.from || '').trim()} ${String(localMsg?.subject || '').trim()}`.trim(),
+            rawText,
+            links,
+          };
+        }
+      }
+
+      const listResp = await fetch(`${MAILINATOR_API_BASE}/${encodeURIComponent(inbox)}`);
+      if (!listResp.ok) {
+        lastError = `Mailinator list API HTTP ${listResp.status}`;
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        continue;
+      }
+
+      const listData = (await listResp.json()) as any;
+      const messages = Array.isArray(listData?.msgs) ? listData.msgs : [];
+      const matching = messages
+        .map((m: any) => ({ ...m, _normalizedTime: normalizeMailinatorTime(m?.time) }))
+        .filter(
+          (m: any) => subjectPattern.test(String(m?.subject || '')) && Number(m?._normalizedTime || 0) >= freshnessFloor,
+        )
+        .sort((a: any, b: any) => Number(b?._normalizedTime || 0) - Number(a?._normalizedTime || 0));
+
+      for (const msgMeta of matching) {
+        const messageId = String(msgMeta?.id || '');
+        if (!messageId) continue;
+
+        const detailResp = await fetch(
+          `${MAILINATOR_API_BASE}/${encodeURIComponent(inbox)}/messages/${encodeURIComponent(messageId)}`,
+        );
+        if (!detailResp.ok) continue;
+
+        const detail = (await detailResp.json()) as any;
+        const parts = Array.isArray(detail?.parts) ? detail.parts : [];
+        const rawChunks: string[] = [];
+        if (detail?.headers) rawChunks.push(JSON.stringify(detail.headers));
+        for (const part of parts) {
+          if (typeof part?.body === 'string') {
+            rawChunks.push(part.body);
+          }
+        }
+        const rawText = rawChunks.join('\n');
+        const links = Array.from(
+          new Set(
+            (rawText.match(/https?:\/\/[^\s"'<>]+/g) || [])
+              .map((link) => link.replace(/&amp;/g, '&').replace(/[\])}>.,!?]+$/, ''))
+              .filter(Boolean),
+          ),
+        );
+
+        const actionLinks = links.filter((link) => /verify-email\?token=|reset-password\?token=/i.test(link));
+        const unseenActionLink = actionLinks.find((link) => !seenLinks.has(link));
+        if (actionLinks.length > 0 && !unseenActionLink) {
+          continue;
+        }
+
+        if (unseenActionLink) {
+          seenLinks.add(unseenActionLink);
+        }
+
+        const from = String(detail?.fromfull || detail?.from || msgMeta?.fromfull || msgMeta?.from || '').trim();
+        const subject = String(detail?.subject || msgMeta?.subject || '').trim();
+        return {
+          rowText: `${from} ${subject}`.trim(),
+          rawText,
+          links,
+        };
+      }
+    } catch (err: any) {
+      lastError = err?.message ? String(err.message) : String(err);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2500));
   }
 
-  if (!(await row.count())) {
-    await context.close();
-    throw new Error(`Mailinator message not found for inbox ${inbox} with subject ${subjectPattern}`);
-  }
-
-  const rowText = (await row.innerText()).replace(/\s+/g, ' ').trim();
-  await row.click();
-  await page.waitForTimeout(1200);
-
-  let rawText = '';
-  if (await page.locator('#pills-raw-tab').count()) {
-    await page.locator('#pills-raw-tab').click();
-    await page.waitForTimeout(700);
-    rawText = await page.locator('#pills-raw').innerText().catch(() => '');
-  }
-
-  let links: string[] = [];
-  if (await page.locator('#pills-links-tab').count()) {
-    await page.locator('#pills-links-tab').click();
-    await page.waitForTimeout(700);
-    links = await page
-      .locator('#pills-links a')
-      .evaluateAll((els) =>
-        els
-          .map((e) => e.getAttribute('href') || '')
-          .filter((h) => Boolean(h))
-          .map((h) => String(h)),
-      );
-  }
-
-  await context.close();
-  return { rowText, rawText, links };
+  throw new Error(
+    `Mailinator message not found for inbox ${inbox} with subject ${subjectPattern}${lastError ? ` (${lastError})` : ''}`,
+  );
 }
 
 async function findOpportunityLinks(page: import('@playwright/test').Page): Promise<Array<{ title: string; href: string }>> {
@@ -1465,11 +1578,27 @@ test('GoodHours full manual checklist automation', async ({ browser }) => {
     });
 
     await runItem(55, orgSession, 'Organization Flow', async () => {
-      const body = await orgSession!.page.locator('main').innerText();
-      if (!/override|custom hours/i.test(body)) {
-        throw new Error('Approve-with-override UI/control not present in organization verification flow');
-      }
-      throw new Error('Override UI detected but automated override path not implemented in current page structure');
+      const approveBtn = orgSession!.page.getByRole('button', { name: /Approve/i }).first();
+      assertOrThrow(await approveBtn.count(), 'No pending verification available for override approval');
+      const overrideInput = orgSession!.page.locator('input[placeholder*="Override"]').first();
+      assertOrThrow(await overrideInput.count(), 'Approve-with-override UI/control not present in organization verification flow');
+      await overrideInput.fill('1.25');
+
+      const [resp] = await Promise.all([
+        orgSession!.page.waitForResponse(
+          (r) => r.url().includes('/api/verification/') && r.url().includes('/approve') && r.request().method() === 'POST',
+          { timeout: 60_000 },
+        ),
+        approveBtn.click(),
+      ]);
+
+      assertOrThrow(resp.status() === 200, `Override approve request failed with status ${resp.status()}`);
+      const data = await resp.json().catch(() => null as any);
+      const approvedHours = Number(data?.totalHours);
+      assertOrThrow(
+        Number.isFinite(approvedHours) && Math.abs(approvedHours - 1.25) < 0.001,
+        `verifiedHours did not reflect override value. got=${String(data?.totalHours)}`,
+      );
     });
 
     await runItem(56, orgSession, 'Organization Flow', async () => {

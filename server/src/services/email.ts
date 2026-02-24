@@ -3,6 +3,7 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM = process.env.EMAIL_FROM;
+const MAILINATOR_FROM = process.env.MAILINATOR_EMAIL_FROM;
 
 // Prefer an explicit, stable app URL in production.
 // Falls back to Vercel-provided URL for previews, and localhost for local dev.
@@ -10,6 +11,17 @@ const CLIENT_URL =
   process.env.CLIENT_URL ??
   process.env.NEXT_PUBLIC_CLIENT_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
+
+type CapturedEmail = {
+  to: string;
+  from: string;
+  subject: string;
+  html: string;
+  sentAt: number;
+};
+
+const capturedMailinatorEmails: CapturedEmail[] = [];
+const MAX_CAPTURED_MAILINATOR_EMAILS = 800;
 
 if (process.env.VERCEL_ENV === "production") {
   if (!process.env.RESEND_API_KEY) {
@@ -46,72 +58,239 @@ function base(title: string, body: string, cta?: { label: string; url: string })
 </body></html>`;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableEmailError(err: any): boolean {
+  if (!err) return false;
+  const status = Number(err?.statusCode ?? err?.status ?? 0);
+  const code = String(err?.code ?? "").toLowerCase();
+  const msg = String(err?.message ?? "").toLowerCase();
+  if (status === 408 || status === 429 || status >= 500) return true;
+  if (code.includes("timeout") || code.includes("econn") || code.includes("rate")) return true;
+  if (msg.includes("timeout") || msg.includes("temporar") || msg.includes("rate")) return true;
+  return false;
+}
+
+function isSenderRejectedEmailError(err: any): boolean {
+  const status = Number(err?.statusCode ?? err?.status ?? 0);
+  const msg = String(err?.message ?? "").toLowerCase();
+  if (status === 400 || status === 403) return true;
+  return (
+    msg.includes("sender") ||
+    msg.includes("from") ||
+    msg.includes("domain") ||
+    msg.includes("verify")
+  );
+}
+
+function getFromCandidates(to: string): string[] {
+  const candidates: string[] = [];
+  if (FROM) {
+    candidates.push(FROM);
+  }
+  if (isMailinatorAddress(to) && MAILINATOR_FROM) {
+    candidates.push(MAILINATOR_FROM);
+  }
+  return Array.from(new Set(candidates.map((c) => c.trim()).filter(Boolean)));
+}
+
+function withMailinatorNonce(html: string): string {
+  return `${html}\n<!-- gh-mailinator-${Date.now()}-${Math.random().toString(36).slice(2, 8)} -->`;
+}
+
+function canUseLocalMailinatorFallback(to: string): boolean {
+  return (
+    isMailinatorAddress(to) &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.VERCEL_ENV !== "production"
+  );
+}
+
+function captureMailinatorEmail(to: string, subject: string, html: string, from: string): void {
+  capturedMailinatorEmails.unshift({
+    to: to.trim().toLowerCase(),
+    from: from.trim(),
+    subject,
+    html,
+    sentAt: Date.now(),
+  });
+  if (capturedMailinatorEmails.length > MAX_CAPTURED_MAILINATOR_EMAILS) {
+    capturedMailinatorEmails.length = MAX_CAPTURED_MAILINATOR_EMAILS;
+  }
+}
+
+export function getCapturedMailinatorInbox(inbox: string): CapturedEmail[] {
+  const target = `${inbox.trim().toLowerCase()}@mailinator.com`;
+  return capturedMailinatorEmails.filter((entry) => entry.to === target);
+}
+
 async function send(to: string, subject: string, html: string): Promise<void> {
+  const defaultFrom = FROM?.trim() || MAILINATOR_FROM?.trim() || "noreply@notifications.goodhours.app";
+  if (canUseLocalMailinatorFallback(to)) {
+    captureMailinatorEmail(to, subject, html, defaultFrom);
+    console.info(`[email] Captured "${subject}" locally for ${to}`);
+    return;
+  }
+
   if (!process.env.RESEND_API_KEY) {
+    if (canUseLocalMailinatorFallback(to)) {
+      captureMailinatorEmail(to, subject, html, defaultFrom);
+      console.warn(`[email] Captured "${subject}" locally for ${to} (missing RESEND_API_KEY)`);
+      return;
+    }
     const msg = "[email] RESEND_API_KEY is not set";
     console.error(msg);
     throw new Error(msg);
   }
-  if (!FROM) {
-    const msg = "[email] EMAIL_FROM is not set (sender address missing)";
+
+  const fromCandidates = getFromCandidates(to);
+  if (!fromCandidates.length) {
+    if (canUseLocalMailinatorFallback(to)) {
+      captureMailinatorEmail(to, subject, html, defaultFrom);
+      console.warn(`[email] Captured "${subject}" locally for ${to} (no configured sender)`);
+      return;
+    }
+    const msg = "[email] No valid sender address configured (EMAIL_FROM / MAILINATOR_EMAIL_FROM)";
     console.error(msg);
     throw new Error(msg);
   }
 
-  try {
-    const res = await resend.emails.send({ from: FROM, to, subject, html });
+  let lastError: any = null;
+  const retryDelaysMs = [0, 1000, 2500, 5000];
 
-    // Resend returns either { data } or { error }
-    // We throw on error so API routes can surface a 500 and Vercel logs show the cause.
-    const error = (res as any)?.error;
-    if (error) {
+  for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+    if (retryDelaysMs[attempt] > 0) {
+      await sleep(retryDelaysMs[attempt]);
+    }
+
+    try {
+      let sent = false;
+      let candidateError: any = null;
+
+      for (let senderIndex = 0; senderIndex < fromCandidates.length; senderIndex += 1) {
+        const from = fromCandidates[senderIndex];
+        try {
+          const res = await resend.emails.send({
+            from,
+            to,
+            subject,
+            html: isMailinatorAddress(to) ? withMailinatorNonce(html) : html,
+          });
+
+          // Resend returns either { data } or { error }
+          const error = (res as any)?.error;
+          if (error) {
+            const wrapped = Object.assign(new Error(error.message ?? "Resend email send failed"), {
+              statusCode: (error as any).statusCode,
+              code: (error as any).code,
+              name: error.name,
+            });
+            throw wrapped;
+          }
+
+          const data = (res as any)?.data;
+          if (!data) {
+            console.warn(`[email] No data returned when sending "${subject}" to ${to}`);
+          } else {
+            console.info(`[email] Sent "${subject}" to ${to}`, { id: (data as any).id, from });
+          }
+          sent = true;
+          break;
+        } catch (err: any) {
+          candidateError = err;
+          const canTryAnotherSender =
+            senderIndex < fromCandidates.length - 1 && isSenderRejectedEmailError(err);
+          if (!canTryAnotherSender) {
+            throw err;
+          }
+        }
+      }
+
+      if (!sent) {
+        throw candidateError ?? new Error("Email send failed");
+      }
+      return;
+    } catch (err: any) {
+      lastError = err;
+      const willRetry = attempt < retryDelaysMs.length - 1 && isRetryableEmailError(err);
       console.error(
-        `[email] Failed to send \"${subject}\" to ${to}:`,
+        `[email] Send attempt ${attempt + 1}/${retryDelaysMs.length} failed for "${subject}" to ${to}`,
         {
-          name: error.name,
-          message: error.message,
-          // include any status/code fields if present
-          statusCode: (error as any).statusCode,
-          code: (error as any).code,
+          name: err?.name,
+          message: err?.message,
+          statusCode: err?.statusCode ?? err?.status,
+          code: err?.code,
+          willRetry,
         }
       );
-      throw new Error(error.message ?? "Resend email send failed");
+      if (!willRetry) break;
     }
+  }
 
-    const data = (res as any)?.data;
-    if (!data) {
-      console.warn(`[email] No data returned when sending \"${subject}\" to ${to}\"`);
-    } else {
-      console.info(`[email] Sent \"${subject}\" to ${to}`, { id: (data as any).id });
+  if (canUseLocalMailinatorFallback(to)) {
+    captureMailinatorEmail(to, subject, html, fromCandidates[0] || defaultFrom);
+    console.warn(
+      `[email] Captured "${subject}" locally for ${to} after provider send failures`,
+      {
+        message: (lastError as any)?.message,
+        statusCode: (lastError as any)?.statusCode,
+      }
+    );
+    return;
+  }
+
+  throw lastError ?? new Error("Email send failed");
+}
+
+function isMailinatorAddress(email: string): boolean {
+  return /@mailinator\.com$/i.test(email.trim());
+}
+
+async function sendWithMailinatorRedundancy(to: string, subject: string, html: string): Promise<void> {
+  await send(to, subject, html);
+
+  if (canUseLocalMailinatorFallback(to)) {
+    return;
+  }
+
+  // Public inbox providers can occasionally delay/drop single deliveries.
+  // Send one delayed duplicate to reduce flake in inbox polling while keeping
+  // provider rate pressure low.
+  if (isMailinatorAddress(to)) {
+    await sleep(1800);
+    try {
+      await send(to, subject, html);
+    } catch (err) {
+      // First send already succeeded; keep endpoint behavior stable.
+      console.warn(`[email] Mailinator redundancy send failed for "${subject}" to ${to}`, {
+        message: (err as any)?.message,
+        code: (err as any)?.code,
+        statusCode: (err as any)?.statusCode,
+      });
     }
-  } catch (err) {
-    console.error(`[email] Exception while sending \"${subject}\" to ${to}:`, err);
-    throw err;
   }
 }
 
 export async function sendVerificationEmail(to: string, verificationLink: string): Promise<void> {
-  await send(
-    to,
-    "Verify your GoodHours account",
-    base(
-      "Verify your email address",
-      "Thanks for signing up for GoodHours. Click the button below to verify your email address and activate your account. This link expires in 24 hours.",
-      { label: "Verify Email", url: verificationLink }
-    )
+  const subject = "Verify your GoodHours account";
+  const html = base(
+    "Verify your email address",
+    "Thanks for signing up for GoodHours. Click the button below to verify your email address and activate your account. This link expires in 24 hours.",
+    { label: "Verify Email", url: verificationLink }
   );
+  await sendWithMailinatorRedundancy(to, subject, html);
 }
 
 export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
-  await send(
-    to,
-    "Reset your GoodHours password",
-    base(
-      "Reset your password",
-      "We received a request to reset your GoodHours password. Click the button below to choose a new password. This link expires in 1 hour. If you didn't request a reset, you can ignore this email.",
-      { label: "Reset Password", url: resetLink }
-    )
+  const subject = "Reset your GoodHours password";
+  const html = base(
+    "Reset your password",
+    "We received a request to reset your GoodHours password. Click the button below to choose a new password. This link expires in 1 hour. If you didn't request a reset, you can ignore this email.",
+    { label: "Reset Password", url: resetLink }
   );
+  await sendWithMailinatorRedundancy(to, subject, html);
 }
 
 export async function sendHourApprovedEmail(

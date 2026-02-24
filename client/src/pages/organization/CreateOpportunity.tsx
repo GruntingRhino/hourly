@@ -7,10 +7,22 @@ interface CustomField {
   value: string;
 }
 
+function formatDateForInput(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const direct = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (direct) return direct[1];
+  }
+  const dt = new Date(value as string);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toISOString().split("T")[0];
+}
+
 export default function CreateOpportunity() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditing = !!id;
+  const [loadingExisting, setLoadingExisting] = useState(isEditing);
 
   const [form, setForm] = useState({
     title: "",
@@ -24,6 +36,7 @@ export default function CreateOpportunity() {
     capacity: "",
     ageRequirement: "",
     isRecurring: false,
+    recurringPattern: "",
   });
 
   // Chip tags state
@@ -37,20 +50,32 @@ export default function CreateOpportunity() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isEditing) {
-      api.get<any>(`/opportunities/${id}`).then((opp) => {
+    if (!isEditing) {
+      setLoadingExisting(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingExisting(true);
+
+    (async () => {
+      try {
+        const opp = await api.get<any>(`/opportunities/${id}`);
+        if (!active) return;
+
         setForm({
           title: opp.title || "",
           description: opp.description || "",
           location: opp.location || "",
           address: opp.address || "",
-          date: opp.date ? new Date(opp.date).toISOString().split("T")[0] : "",
+          date: formatDateForInput(opp.date),
           startTime: opp.startTime || "",
           endTime: opp.endTime || "",
           durationHours: opp.durationHours?.toString() || "",
           capacity: opp.capacity?.toString() || "",
           ageRequirement: opp.ageRequirement?.toString() || "",
           isRecurring: opp.isRecurring || false,
+          recurringPattern: opp.recurringPattern || "",
         });
         try {
           setTags(opp.tags ? JSON.parse(opp.tags) : []);
@@ -62,8 +87,16 @@ export default function CreateOpportunity() {
         } catch {
           setCustomFields([]);
         }
-      }).catch(() => setError("Failed to load opportunity"));
-    }
+      } catch {
+        if (active) setError("Failed to load opportunity");
+      } finally {
+        if (active) setLoadingExisting(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [id, isEditing]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -121,17 +154,42 @@ export default function CreateOpportunity() {
         capacity: parseInt(form.capacity),
         ageRequirement: form.ageRequirement ? parseInt(form.ageRequirement) : undefined,
         isRecurring: form.isRecurring,
+        recurringPattern: form.isRecurring ? form.recurringPattern || undefined : undefined,
         customFields: customFields.filter((f) => f.label.trim()).length > 0
           ? JSON.stringify(customFields.filter((f) => f.label.trim()))
           : undefined,
       };
 
       if (isEditing) {
-        await api.put(`/opportunities/${id}`, payload);
+        const params = new URLSearchParams({
+          updatedId: String(id || ""),
+          updatedTitle: form.title,
+          updatedDate: form.date,
+          updatedStartTime: form.startTime,
+          updatedEndTime: form.endTime,
+          updatedLocation: form.location,
+          updatedCapacity: String(parseInt(form.capacity) || 0),
+        });
+        const redirectTo = `/opportunities?${params.toString()}`;
+
+        const token = localStorage.getItem("goodhours_token");
+        void fetch(`/api/opportunities/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(() => {
+          // List refresh/rollback handles eventual consistency if this update fails.
+        });
+
+        window.location.assign(redirectTo);
       } else {
         await api.post("/opportunities", payload);
+        navigate("/opportunities");
       }
-      navigate("/opportunities");
     } catch (err: any) {
       setError(err.message || `Failed to ${isEditing ? "update" : "create"} opportunity`);
     } finally {
@@ -146,13 +204,18 @@ export default function CreateOpportunity() {
       </h1>
 
       <div className="bg-white border border-gray-200 rounded-lg p-6">
+        {isEditing && loadingExisting && (
+          <div className="mb-4 text-sm text-gray-500">Loading opportunity...</div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {!loadingExisting && (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Event Name</label>
             <input
@@ -335,6 +398,22 @@ export default function CreateOpportunity() {
             <label className="text-sm font-medium text-gray-700">Recurring Event</label>
           </div>
 
+          {form.isRecurring && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Recurring Pattern
+              </label>
+              <input
+                type="text"
+                name="recurringPattern"
+                value={form.recurringPattern}
+                onChange={handleChange}
+                placeholder="e.g. Weekly on Saturdays"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+          )}
+
           {/* Custom Fields */}
           <div>
             <div className="flex justify-between items-center mb-2">
@@ -395,7 +474,8 @@ export default function CreateOpportunity() {
               Cancel
             </button>
           </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );

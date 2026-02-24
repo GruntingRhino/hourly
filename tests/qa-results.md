@@ -1,6 +1,6 @@
 # GoodHours QA Results
 
-Generated: 2026-02-23T00:05:15.081Z
+Generated: 2026-02-24T01:50:05.795Z
 
 # GoodHours — Manual QA Checklist
 
@@ -23,31 +23,15 @@ Generated: 2026-02-23T00:05:15.081Z
 
 - [ ] **Signup — Student** · Select "I would like to volunteer" → fill form → "Create Account" — PASS
   _Expect: redirected to `/dashboard` showing "Verify your email" screen with the correct address_
-- [ ] **Verification email delivered** · Check `mailinator.com/v4/public/inboxes.jsp?to=qa-test-01` — FAIL
-  - Error: Mailinator message not found for inbox qa-test-04 with subject /Verify your GoodHours account/i
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-002-2026-02-22T23-56-28-637Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/auth-flow-2026-02-22T23-53-14-442Z.zip
+- [ ] **Verification email delivered** · Check `mailinator.com/v4/public/inboxes.jsp?to=qa-test-01` — PASS
   _Expect: email from `noreply@notifications.goodhours.app`, subject "Verify your GoodHours account"_
-- [ ] **Email link works** · Click "Verify Email" button in email — FAIL
-  - Error: Missing verification link from previous step
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-003-2026-02-22T23-56-28-655Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/auth-flow-2026-02-22T23-53-14-442Z.zip
+- [ ] **Email link works** · Click "Verify Email" button in email — PASS
   _Expect: app shows ✅ "Email verified!" then redirects to "Join a Classroom"_
 - [ ] **Login with wrong password** · Try logging in with bad credentials — PASS
   _Expect: "Invalid email or password" error, no token issued_
-- [ ] **Forgot password** · `/login` → "Forgot password?" → enter email → check mailinator — FAIL
-  - Error: Mailinator message not found for inbox qa-test-04 with subject /Reset/i
-  - URL: https://goodhours.app/forgot-password
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-005-2026-02-22T23-59-35-281Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/auth-flow-2026-02-22T23-53-14-442Z.zip
+- [ ] **Forgot password** · `/login` → "Forgot password?" → enter email → check mailinator — PASS
   _Expect: reset email arrives; clicking link lands on `/reset-password` form_
-- [ ] **Reset password** · Enter new password matching all rules → submit — FAIL
-  - Error: Missing reset link from previous step
-  - URL: https://goodhours.app/forgot-password
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-006-2026-02-22T23-59-35-308Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/auth-flow-2026-02-22T23-53-14-442Z.zip
+- [ ] **Reset password** · Enter new password matching all rules → submit — PASS
   _Expect: success message; can log in with new password_
 - [ ] **Duplicate signup** · Try signing up with an already-registered email — PASS
   _Expect: 409 "Email already registered"_
@@ -69,84 +53,30 @@ Generated: 2026-02-23T00:05:15.081Z
 - [ ] **Search** · Type a partial title → list filters in real time — PASS
 - [ ] **Tag filter** · Select a tag → only matching opps shown; clear → all return — PASS
 - [ ] **Sort: Date** · Events appear in chronological order — PASS
-- [ ] **Sort: Most Popular** · Higher-signup events appear first — FAIL
-  - Error: Higher-signup opportunities are not first in Most Popular sort
-  - URL: https://goodhours.app/browse
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-016-2026-02-22T23-59-44-734Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Sort: Most Popular** · Higher-signup events appear first — PASS
 - [ ] **Approved Orgs Only** toggle · List narrows to school-approved orgs — PASS
-- [ ] **Save** · Click Save on an opp → appears in "Saved" tab — FAIL
-  - Error: locator.click: Error: strict mode violation: getByRole('button', { name: /^Saved$/i }) resolved to 6 elements:
-    1) <button class="px-4 py-2 rounded-md text-sm font-medium capitalize bg-gray-100 text-gray-700 hover:bg-gray-200">Saved</button> aka getByRole('button', { name: 'Saved' }).first()
-    2) <button class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Saved</button> aka getByRole('button', { name: 'Saved' }).nth(1)
-    3) <button class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Saved</button> aka getByRole('button', { name: 'Saved' }).nth(2)
-    4) <button class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Saved</button> aka getByRole('button', { name: 'Saved' }).nth(3)
-    5) <button class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Saved</button> aka getByRole('button', { name: 'Saved' }).nth(4)
-    6) <button class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Saved</button> aka getByRole('button', { name: 'Saved' }).nth(5)
-
-Call log:
-[2m  - waiting for getByRole('button', { name: /^Saved$/i })[22m
-
-  - URL: https://goodhours.app/browse
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-018-2026-02-22T23-59-46-562Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Save** · Click Save on an opp → appears in "Saved" tab — PASS
 - [ ] **Skip** · Click Skip on another opp → appears in "Skipped" tab — PASS
 - [ ] **Discard** · Click Discard → appears in "Discarded" tab — PASS
 - [ ] **Recover** · From Skipped/Discarded tab, recover → moves back to main list — PASS
 
 ### 2c · Opportunity Detail & Signup
-- [ ] Click an opportunity → detail view shows org name, date, time, location, capacity, tags, custom fields — FAIL
-  - Error: Opportunity detail missing custom fields display
-  - URL: https://goodhours.app/opportunity/cmlyd9edy0002k104mybl5fdx
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-022-2026-02-22T23-59-52-051Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
-- [ ] **Sign up** · Click "Sign Up" → button changes; confirm appears in student's signups — FAIL
-  - Error: No opportunity with Sign Up button found
-  - URL: https://goodhours.app/opportunity/cmlyccawq0010munxishkzkg5
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-023-2026-02-23T00-00-01-691Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
-- [ ] **Capacity full → Waitlist** · If opp is at capacity, button reads "Join Waitlist"; status shows WAITLISTED — FAIL
-  - Error: Join Waitlist button is disabled
-  - URL: https://goodhours.app/opportunity/cmlyd47zq0001jl04m7e4p8bx
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-024-2026-02-23T00-00-16-119Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-jane-2026-02-23T00-00-01-774Z.zip
-- [ ] **Cancel signup** · Cancel a CONFIRMED signup → slot freed, confirmation shown — FAIL
-  - Error: No signed opportunity title recorded from item 23
-  - URL: https://goodhours.app/opportunity/cmlyccawq0010munxishkzkg5
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-025-2026-02-23T00-00-16-146Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
-- [ ] **Waitlist promotion** · If another student cancels and a waitlisted student exists, waitlisted student becomes CONFIRMED (check DB or re-browse) — FAIL
-  - Error: Waitlisted student was not promoted to CONFIRMED after cancellation
-  - URL: https://goodhours.app/opportunity/cmlyd47zq0001jl04m7e4p8bx
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-026-2026-02-23T00-00-18-212Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-jane-2026-02-23T00-00-01-774Z.zip
+- [ ] Click an opportunity → detail view shows org name, date, time, location, capacity, tags, custom fields — PASS
+- [ ] **Sign up** · Click "Sign Up" → button changes; confirm appears in student's signups — PASS
+- [ ] **Capacity full → Waitlist** · If opp is at capacity, button reads "Join Waitlist"; status shows WAITLISTED — PASS
+- [ ] **Cancel signup** · Cancel a CONFIRMED signup → slot freed, confirmation shown — PASS
+- [ ] **Waitlist promotion** · If another student cancels and a waitlisted student exists, waitlisted student becomes CONFIRMED (check DB or re-browse) — PASS
 
 ### 2d · Check-In / Check-Out
-- [ ] **Check in** · From dashboard or activity, click "Check In" on a confirmed session — FAIL
-  - Error: Check In button not found on dashboard/activity for confirmed session
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-027-2026-02-23T00-00-19-013Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Check in** · From dashboard or activity, click "Check In" on a confirmed session — PASS
   _Expect: session status → CHECKED_IN; check-in time recorded_
-- [ ] **Check out** · Click "Check Out" — FAIL
-  - Error: Check Out button not found after check-in
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-028-2026-02-23T00-00-19-073Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Check out** · Click "Check Out" — PASS
   _Expect: status → CHECKED_OUT; `totalHours` auto-calculated from elapsed time_
 
 ### 2e · Submit Verification
-- [ ] **Drawn signature** · On a CHECKED_OUT session, open "Submit Verification" → draw signature → submit — FAIL
-  - Error: No signable opportunity found to create a verification session
-  - URL: https://goodhours.app/opportunity/cmlyccawq0010munxishkzkg5
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-029-2026-02-23T00-00-39-904Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Drawn signature** · On a CHECKED_OUT session, open "Submit Verification" → draw signature → submit — PASS
   _Expect: status → PENDING_VERIFICATION; org & school notified_
-- [ ] **File upload** · Submit verification with a PDF/PNG/JPG upload — FAIL
-  - Error: No suitable opportunity found for file upload verification test
-  - URL: https://goodhours.app/opportunity/cmlyccawq0010munxishkzkg5
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-030-2026-02-23T00-01-00-970Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **File upload** · Submit verification with a PDF/PNG/JPG upload — PASS
   _Expect: accepted; unsupported types (e.g. `.exe`) rejected_
 - [ ] **Before event date** · Try submitting verification before event date — PASS
   _Expect: blocked with appropriate error_
@@ -185,51 +115,23 @@ Call log:
 
 ### 3a · Dashboard
 - [ ] Stats cards show (Total Opportunities, Signups, Approved Hours, Unique Volunteers) — PASS
-- [ ] "Pending Verifications" section lists sessions awaiting action — FAIL
-  - Error: Pending Verifications section missing
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-047-2026-02-23T00-01-29-904Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] "Pending Verifications" section lists sessions awaiting action — PASS
 - [ ] Recent activity feed shows last notifications — PASS
 
 ### 3b · Create & Manage Opportunities
 - [ ] **Create** · Click "Create Opportunity" → fill all fields including address → Save — PASS
   _Expect: opp appears in Opportunities list with ACTIVE status_
 - [ ] **Auto-geocode** · Created opp with address → lat/lng populated (visible to students as distance sort) — PASS
-- [ ] **Edit** · Edit title/description/capacity → Save → changes reflected immediately — FAIL
-  - Error: Updated opportunity title not reflected immediately in list
-  - URL: https://goodhours.app/opportunities/cmlyccauk000wmunxm6r05gwn/edit
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-051-2026-02-23T00-01-33-146Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
-- [ ] **Cancel** · Cancel the opp → status → CANCELLED; signed-up students receive notification — FAIL
-  - Error: Updated opportunity card not found for cancel action
-  - URL: https://goodhours.app/opportunities/cmlyccauk000wmunxm6r05gwn/edit
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-052-2026-02-23T00-01-33-199Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
-- [ ] **Recurring pattern field** · Enable "Recurring" toggle → recurring pattern field appears; saved correctly — FAIL
-  - Error: Recurring pattern field did not appear after enabling Recurring toggle
-  - URL: https://goodhours.app/opportunities/new
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-053-2026-02-23T00-01-34-563Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] **Edit** · Edit title/description/capacity → Save → changes reflected immediately — PASS
+- [ ] **Cancel** · Cancel the opp → status → CANCELLED; signed-up students receive notification — PASS
+- [ ] **Recurring pattern field** · Enable "Recurring" toggle → recurring pattern field appears; saved correctly — PASS
 
 ### 3c · Verify Hours
-- [ ] **Approve** · From Dashboard pending list or verification queue, click Approve on a PENDING_VERIFICATION session — FAIL
-  - Error: No pending verification available to approve
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-054-2026-02-23T00-01-35-388Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] **Approve** · From Dashboard pending list or verification queue, click Approve on a PENDING_VERIFICATION session — PASS
   _Expect: status → VERIFIED; student receives email notification_
-- [ ] **Approve with override** · Approve with a custom hours value (different from totalHours) — FAIL
-  - Error: Approve-with-override UI/control not present in organization verification flow
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-055-2026-02-23T00-01-35-433Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] **Approve with override** · Approve with a custom hours value (different from totalHours) — PASS
   _Expect: `verifiedHours` reflects overridden value_
-- [ ] **Reject** · Click Reject → enter reason (required) → submit — FAIL
-  - Error: No pending verification available to reject
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-056-2026-02-23T00-01-35-461Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] **Reject** · Click Reject → enter reason (required) → submit — PASS
   _Expect: status → REJECTED; reason stored; student notified_
 - [ ] **Self-verification blocked** · Org admin who is also verifier cannot verify their own session — MANUAL REQUIRED
   - Reason: Seed data does not include a user who is both org verifier and session owner; self-verification cannot be produced from available UI states.
@@ -241,20 +143,12 @@ Call log:
   _Expect: all confirmed signups for that opp receive a notification/message_
 
 ### 3e · Messages & Notifications
-- [ ] Compose message to john@student.edu → appears in Sent — FAIL
-  - Error: Org message to john not present in Sent folder
-  - URL: https://goodhours.app/messages
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-059-2026-02-23T00-01-39-648Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] Compose message to john@student.edu → appears in Sent — PASS
 - [ ] Student's message from 2g appears in Inbox → mark read — PASS
 
 ### 3f · Settings
 - [ ] **Profile** · Edit description (500-char limit), website, phone → Save → persists — PASS
-- [ ] **ZIP codes** · Add a ZIP code → appears in list; remove it → gone — FAIL
-  - Error: Removed ZIP code still present in list
-  - URL: https://goodhours.app/settings
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-062-2026-02-23T00-01-44-655Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/org-volunteer-2026-02-23T00-01-26-545Z.zip
+- [ ] **ZIP codes** · Add a ZIP code → appears in list; remove it → gone — PASS
 - [ ] **Schools tab** · Search for "Lincoln" → request approval — PASS
   _Expect: "Pending" status shown; school admin sees request_
 - [ ] **Analytics** · Volunteer count and total hours display correctly — PASS
@@ -271,166 +165,44 @@ Call log:
 > **Log in as:** admin@lincoln.edu
 
 ### 4a · Onboarding (first-time)
-- [ ] On first login (clear `school_onboarding_*` from localStorage), graduation hours goal screen appears — FAIL
-  - Error: Onboarding goal screen did not appear after clearing school_onboarding_* localStorage keys
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-068-2026-02-23T00-01-52-796Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-  - Console/Network Logs Snippet:
-
-```text
-[2026-02-23T00:01:52.652Z] requestfailed: POST https://goodhours.app/api/auth/set-graduation-goal -> net::ERR_ABORTED
-[2026-02-23T00:01:52.734Z] requestfailed: GET https://goodhours.app/api/auth/me -> net::ERR_ABORTED
-```
-- [ ] Enter hours (e.g. 40) → Save → lands on Dashboard — FAIL
-  - Error: Continue to Dashboard button not present for onboarding step
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-069-2026-02-23T00-01-52-847Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] On first login (clear `school_onboarding_*` from localStorage), graduation hours goal screen appears — PASS
+- [ ] Enter hours (e.g. 40) → Save → lands on Dashboard — PASS
 
 ### 4b · Dashboard
-- [ ] School stats: Total Students, Total Hours, Goal Completion %, At Risk count — FAIL
-  - Error: Dashboard stat missing: Total Students
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-070-2026-02-23T00-01-52-896Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] Classroom grid shows each classroom with: student count, completion count, at-risk count, invite code — FAIL
-  - Error: Classroom grid section missing
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-071-2026-02-23T00-01-52-945Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Copy invite code** · Click copy button → clipboard contains the code — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^Copy$/i }).first()[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-072-2026-02-23T00-02-08-000Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Org requests** · Org request from 3f appears in "Pending Requests" → Approve it — FAIL
-  - Error: No pending org request found to approve from step 3f
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-073-2026-02-23T00-02-08-088Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] School stats: Total Students, Total Hours, Goal Completion %, At Risk count — PASS
+- [ ] Classroom grid shows each classroom with: student count, completion count, at-risk count, invite code — PASS
+- [ ] **Copy invite code** · Click copy button → clipboard contains the code — MANUAL REQUIRED
+  - Reason: Clipboard API read is unavailable in this run environment.
+  - Manual Step: Click copy invite code and manually paste to verify copied code is correct.
+- [ ] **Org requests** · Org request from 3f appears in "Pending Requests" → Approve it — PASS
   _Expect: org status → APPROVED; org receives notification_
-- [ ] **Reject org** · Reject a different pending org → status → REJECTED — FAIL
-  - Error: No second pending org request found to reject
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-074-2026-02-23T00-02-08-149Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Block org** · Block an approved org → confirmation modal → blocked; org disappears from approved list — FAIL
-  - Error: No approved org available to block
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-075-2026-02-23T00-02-08-196Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] **Reject org** · Reject a different pending org → status → REJECTED — PASS
+- [ ] **Block org** · Block an approved org → confirmation modal → blocked; org disappears from approved list — PASS
 
 ### 4c · Groups (Student Management)
-- [ ] Left sidebar shows "All Students" + individual classrooms — FAIL
-  - Error: All Students sidebar entry missing
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-076-2026-02-23T00-02-08-943Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Search** · Type student name → list filters — FAIL
-  - Error: Student search input missing
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-077-2026-02-23T00-02-09-006Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Filter: Completed** · Shows only students at/above goal — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /Completed/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-078-2026-02-23T00-02-24-067Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Filter: At Risk** · Shows students with < 50% of goal — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^At Risk/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-079-2026-02-23T00-02-39-137Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Filter: Not Started** · Shows 0-hour students — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /Not Started/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-080-2026-02-23T00-02-54-205Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Select student** · Click a student → right panel shows name, email, hours progress bar, status badge — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /All Students/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-081-2026-02-23T00-03-24-311Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Send Reminder** · Opens compose window pre-filled with student as recipient — FAIL
-  - Error: Send Reminder button not found
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-082-2026-02-23T00-03-24-392Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **View Hour History** · Shows up to 5 sessions; each has date, opp, hours, status — FAIL
-  - Error: View Hour History control not found
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-083-2026-02-23T00-03-24-449Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Remove Hours** · On a VERIFIED session, click Remove → optionally enter reason → confirm — FAIL
-  - Error: Remove Hours action not found on a VERIFIED session
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-084-2026-02-23T00-03-24-498Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] Left sidebar shows "All Students" + individual classrooms — PASS
+- [ ] **Search** · Type student name → list filters — PASS
+- [ ] **Filter: Completed** · Shows only students at/above goal — PASS
+- [ ] **Filter: At Risk** · Shows students with < 50% of goal — PASS
+- [ ] **Filter: Not Started** · Shows 0-hour students — PASS
+- [ ] **Select student** · Click a student → right panel shows name, email, hours progress bar, status badge — PASS
+- [ ] **Send Reminder** · Opens compose window pre-filled with student as recipient — PASS
+- [ ] **View Hour History** · Shows up to 5 sessions; each has date, opp, hours, status — PASS
+- [ ] **Remove Hours** · On a VERIFIED session, click Remove → optionally enter reason → confirm — PASS
   _Expect: session status → REJECTED; student receives email notification; school hours total decreases_
 
 ### 4d · Add Staff
-- [ ] Click "Add Staff Member" → fill name, email, optional classroom → Submit — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /Add Staff Member/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-085-2026-02-23T00-03-40-139Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] Click "Add Staff Member" → fill name, email, optional classroom → Submit — PASS
   _Expect: success message with temporary password displayed; new teacher can log in_
 
 ### 4e · Settings
-- [ ] **Profile** · Edit school name, domain, required hours, ZIP codes → Save → persists — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^profile$/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-086-2026-02-23T00-03-55-817Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Classrooms** · "Create Classroom" → enter name → created; appears in list with invite code — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^classrooms$/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-087-2026-02-23T00-04-10-887Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
-- [ ] **Data Export** · Export activity log CSV → downloads file with Student, Opportunity, Date, Hours, Status columns — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^data$/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-088-2026-02-23T00-04-25-973Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] **Profile** · Edit school name, domain, required hours, ZIP codes → Save → persists — PASS
+- [ ] **Classrooms** · "Create Classroom" → enter name → created; appears in list with invite code — PASS
+- [ ] **Data Export** · Export activity log CSV → downloads file with Student, Opportunity, Date, Hours, Status columns — PASS
 - [ ] **Change password** · Works correctly — MANUAL REQUIRED
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-- [ ] **Notifications** · Toggle off an option → save → persists — FAIL
-  - Error: locator.click: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for getByRole('button', { name: /^notifications$/i })[22m
-
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-090-2026-02-23T00-04-41-075Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] **Notifications** · Toggle off an option → save → persists — PASS
 
 ---
 
@@ -438,17 +210,9 @@ Call log:
 
 > These require switching accounts. Do them last.
 
-- [ ] **Message preference enforcement** · Set student privacy to "Admins Only" → log in as org → attempt to message that student — FAIL
-  - Error: Org-to-student message was not blocked by student privacy Admins Only setting
-  - URL: https://goodhours.app/settings
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-091-2026-02-23T00-04-44-143Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/student-john-2026-02-22T23-59-36-494Z.zip
+- [ ] **Message preference enforcement** · Set student privacy to "Admins Only" → log in as org → attempt to message that student — PASS
   _Expect: blocked with "Message preferences do not allow this"_
-- [ ] **Audit trail** · School admin views audit log for a session that was approved then had hours removed — FAIL
-  - Error: No audit trail UI found for approved-then-removed session history verification
-  - URL: https://goodhours.app/
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-092-2026-02-23T00-04-45-240Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/school-admin-2026-02-23T00-01-50-287Z.zip
+- [ ] **Audit trail** · School admin views audit log for a session that was approved then had hours removed — PASS
   _Expect: two entries — APPROVE (by org/school) then OVERRIDE (by school)_
 - [ ] **Rate limit** · Attempt 6+ signups from same IP within 1 hour — PASS
   _Expect: 429 "Too many signup attempts"_
@@ -456,17 +220,7 @@ Call log:
   - Reason: Token-expiry >24h cannot be time-traveled from UI and no exposed admin control was found to mint an already-expired verification token.
   - Manual Step: Generate a verification token, wait past 24 hours (or use backend/admin tooling to mint expired token), then open link and confirm "Invalid or expired verification token".
   _Expect: "Invalid or expired verification token" error_
-- [ ] **Resend verification** · On email verification screen, click "Resend" → new email arrives — FAIL
-  - Error: Failed to create resend-test account. status=429
-  - URL: https://goodhours.app/signup
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-095-2026-02-23T00-04-50-034Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/auth-flow-2026-02-22T23-53-14-442Z.zip
-  - Console/Network Logs Snippet:
-
-```text
-[2026-02-23T00:04:49.029Z] response: 429 POST https://goodhours.app/api/auth/signup
-[2026-02-23T00:04:49.030Z] console.error: Failed to load resource: the server responded with a status of 429 ()
-```
+- [ ] **Resend verification** · On email verification screen, click "Resend" → new email arrives — PASS
   _Expect: new email in inbox; old token no longer works_
 
 ---
@@ -479,17 +233,5 @@ Call log:
 - [ ] Login as john@student.edu → Dashboard loads with no errors — PASS
 - [ ] Browse page loads opportunities — PASS
 - [ ] Login as volunteer@greenearth.org → Opportunities list loads — PASS
-- [ ] Login as admin@lincoln.edu → Dashboard stats load — FAIL
-  - Error: locator.innerText: Timeout 15000ms exceeded.
-Call log:
-[2m  - waiting for locator('main')[22m
-
-  - URL: https://goodhours.app/dashboard
-  - Screenshot: /Users/abhay/Hourly/tests/artifacts/screenshots/item-100-2026-02-23T00-05-14-386Z.png
-  - Trace: /Users/abhay/Hourly/tests/artifacts/traces/quick-admin-2026-02-23T00-04-56-552Z.zip
-  - Console/Network Logs Snippet:
-
-```text
-[2026-02-23T00:04:58.757Z] requestfailed: POST https://goodhours.app/api/auth/set-graduation-goal -> net::ERR_ABORTED
-```
+- [ ] Login as admin@lincoln.edu → Dashboard stats load — PASS
 - [ ] No console errors on any of the above pages — PASS

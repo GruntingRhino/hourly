@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";
 import os from "os";
@@ -36,6 +36,21 @@ const upload = multer({
     }
   },
 });
+
+function uploadSignatureFile(req: Request, res: Response, next: NextFunction) {
+  upload.single("signatureFile")(req, res, (err: any) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "File must be 5MB or smaller" });
+    }
+
+    const message = typeof err?.message === "string" && err.message.trim()
+      ? err.message.trim()
+      : "Invalid signature file upload";
+    return res.status(400).json({ error: message });
+  });
+}
 
 // POST /api/sessions/:id/checkin — student checks in
 router.post("/:id/checkin", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
@@ -127,10 +142,11 @@ router.post("/:id/checkout", authenticate, requireRole("STUDENT"), async (req: R
 // GET /api/sessions/my — student's service sessions
 router.get("/my", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
-    const { status, verificationStatus } = req.query;
+    const { status, verificationStatus, opportunityId } = req.query;
     const where: any = { userId: req.user!.userId };
     if (status) where.status = status;
     if (verificationStatus) where.verificationStatus = verificationStatus;
+    if (opportunityId) where.opportunityId = opportunityId;
 
     const sessions = await prisma.serviceSession.findMany({
       where,
@@ -176,7 +192,7 @@ router.get("/organization", authenticate, requireRole("ORG_ADMIN"), async (req: 
 });
 
 // POST /api/sessions/:id/submit-verification — student submits verification with signature
-router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), upload.single("signatureFile"), async (req: Request, res: Response) => {
+router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), uploadSignatureFile, async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.id },
@@ -186,8 +202,8 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
     if (session.userId !== req.user!.userId) {
       return res.status(403).json({ error: "Not your session" });
     }
-    if (session.status !== "COMMITTED") {
-      return res.status(400).json({ error: "Session is not in COMMITTED state" });
+    if (!["COMMITTED", "CHECKED_OUT", "PENDING_VERIFICATION", "REJECTED"].includes(session.status)) {
+      return res.status(400).json({ error: "Session is not ready for verification" });
     }
 
     // Check opportunity end date has passed

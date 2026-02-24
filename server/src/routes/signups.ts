@@ -33,11 +33,11 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
           where: { id: existing.id },
           data: { status },
         });
-        // Reset service session to COMMITTED
+        // Reset service session to a signup-ready state.
         await prisma.serviceSession.updateMany({
           where: { userId: req.user!.userId, opportunityId },
           data: {
-            status: "COMMITTED",
+            status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
             totalHours: opp.durationHours,
             verificationStatus: "PENDING",
             signatureType: null,
@@ -65,38 +65,43 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       },
     });
 
-    // Create a committed service session with pre-filled hours
+    // Create a service session tied to signup state.
     await prisma.serviceSession.create({
       data: {
         userId: req.user!.userId,
         opportunityId,
-        status: "COMMITTED",
+        status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
         totalHours: opp.durationHours,
       },
     });
 
-    // Notification to student
-    await prisma.notification.create({
-      data: {
-        userId: req.user!.userId,
-        type: "SIGNUP_CONFIRMED",
-        title: status === "CONFIRMED" ? "Signup Confirmed" : "Added to Waitlist",
-        body: status === "CONFIRMED"
-          ? `You're signed up for "${opp.title}"`
-          : `You've been waitlisted for "${opp.title}"`,
-      },
-    });
+    res.status(201).json(signup);
 
-    // Notify org admins of new signup
-    const orgAdmins = await prisma.user.findMany({
-      where: { organizationId: opp.organizationId, role: "ORG_ADMIN" },
-      select: { id: true },
-    });
-    if (orgAdmins.length > 0) {
+    // Keep core signup latency low; notifications are non-blocking side effects.
+    void (async () => {
+      await prisma.notification.create({
+        data: {
+          userId: req.user!.userId,
+          type: "SIGNUP_CONFIRMED",
+          title: status === "CONFIRMED" ? "Signup Confirmed" : "Added to Waitlist",
+          body: status === "CONFIRMED"
+            ? `You're signed up for "${opp.title}"`
+            : `You've been waitlisted for "${opp.title}"`,
+        },
+      });
+
+      const orgAdmins = await prisma.user.findMany({
+        where: { organizationId: opp.organizationId, role: "ORG_ADMIN" },
+        select: { id: true },
+      });
+
+      if (orgAdmins.length === 0) return;
+
       const student = await prisma.user.findUnique({
         where: { id: req.user!.userId },
         select: { name: true },
       });
+
       await prisma.notification.createMany({
         data: orgAdmins.map((admin) => ({
           userId: admin.id,
@@ -105,9 +110,9 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
           body: `${student?.name || "A student"} signed up for "${opp.title}"`,
         })),
       });
-    }
-
-    res.status(201).json(signup);
+    })().catch((sideEffectErr) => {
+      console.error("Signup side-effect error:", sideEffectErr);
+    });
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -152,6 +157,11 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
       data: { status: "CANCELLED" },
     });
 
+    await prisma.serviceSession.updateMany({
+      where: { userId: signup.userId, opportunityId: signup.opportunityId },
+      data: { status: "CANCELLED" },
+    });
+
     // If a confirmed spot opens, promote first waitlisted
     const opp = await prisma.opportunity.findUnique({ where: { id: signup.opportunityId } });
     if (opp) {
@@ -163,6 +173,10 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
         await prisma.signup.update({
           where: { id: firstWaitlisted.id },
           data: { status: "CONFIRMED" },
+        });
+        await prisma.serviceSession.updateMany({
+          where: { userId: firstWaitlisted.userId, opportunityId: signup.opportunityId },
+          data: { status: "PENDING_CHECKIN" },
         });
         await prisma.notification.create({
           data: {

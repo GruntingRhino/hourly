@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -16,31 +16,117 @@ interface Opportunity {
   organization: { id: string; name: string };
 }
 
+function getOptimisticOpportunityFromQuery(search: string): Opportunity | null {
+  const params = new URLSearchParams(search);
+  const id = params.get("updatedId");
+  const title = params.get("updatedTitle");
+  if (!id || !title) return null;
+  return {
+    id,
+    title,
+    date: params.get("updatedDate") || new Date().toISOString(),
+    startTime: params.get("updatedStartTime") || "",
+    endTime: params.get("updatedEndTime") || "",
+    location: params.get("updatedLocation") || "",
+    capacity: Number(params.get("updatedCapacity") || 0),
+    status: "ACTIVE",
+    _count: { signups: 0 },
+    organization: { id: "", name: "" },
+  };
+}
+
+function applyOptimisticRows(
+  base: Opportunity[],
+  optimisticById: Record<string, Opportunity>,
+  filter: string,
+): Opportunity[] {
+  const merged = base.map((opp) => (optimisticById[opp.id] ? { ...opp, ...optimisticById[opp.id] } : opp));
+  const seen = new Set(merged.map((opp) => opp.id));
+
+  for (const optimistic of Object.values(optimisticById)) {
+    if (optimistic.status !== filter) continue;
+    if (!seen.has(optimistic.id)) {
+      merged.unshift(optimistic);
+      seen.add(optimistic.id);
+    }
+  }
+
+  return merged.filter((opp) => opp.status === filter);
+}
+
 export default function OrgOpportunities() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [optimisticById, setOptimisticById] = useState<Record<string, Opportunity>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ACTIVE");
+  const optimisticFromQuery = useMemo(
+    () => getOptimisticOpportunityFromQuery(location.search),
+    [location.search],
+  );
+  const effectiveOptimisticById = useMemo(() => {
+    if (!optimisticFromQuery) return optimisticById;
+    // Explicit in-memory updates (e.g. cancel) must win over URL-derived optimistic state.
+    return { [optimisticFromQuery.id]: optimisticFromQuery, ...optimisticById };
+  }, [optimisticById, optimisticFromQuery]);
+
+  const visibleOpportunities = useMemo(
+    () => applyOptimisticRows(opportunities, effectiveOptimisticById, filter),
+    [filter, opportunities, effectiveOptimisticById],
+  );
 
   useEffect(() => {
-    loadData();
-  }, [filter]);
+    if (!user?.organizationId) return;
+    void loadData();
+  }, [filter, user?.organizationId]);
 
   const loadData = async () => {
+    if (!user?.organizationId) {
+      setOpportunities([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const opps = await api.get<Opportunity[]>(
-      `/opportunities?organizationId=${user?.organizationId}&status=${filter}`
-    );
-    setOpportunities(opps);
-    setLoading(false);
+    try {
+      const opps = await api.get<Opportunity[]>(
+        `/opportunities?organizationId=${user.organizationId}&status=${filter}`,
+      );
+      setOpportunities(opps);
+    } catch {
+      setOpportunities([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm("Are you sure you want to cancel this opportunity?")) return;
-    await api.post(`/opportunities/${id}/cancel`);
-    loadData();
+    const target = visibleOpportunities.find((opp) => opp.id === id) || opportunities.find((opp) => opp.id === id);
+    if (!target) return;
+
+    const previousOptimistic = optimisticById[id];
+    setOptimisticById((prev) => ({ ...prev, [id]: { ...target, status: "CANCELLED" } }));
+    setOpportunities((prev) => prev.filter((opp) => opp.id !== id));
+
+    try {
+      await api.post(`/opportunities/${id}/cancel`);
+      void loadData();
+    } catch {
+      setOptimisticById((prev) => {
+        const next = { ...prev };
+        if (previousOptimistic) {
+          next[id] = previousOptimistic;
+        } else {
+          delete next[id];
+        }
+        return next;
+      });
+      setOpportunities((prev) => (prev.some((opp) => opp.id === id) ? prev : [target, ...prev]));
+    }
   };
+
+  const showLoadingState = loading && visibleOpportunities.length === 0;
 
   return (
     <div>
@@ -68,15 +154,15 @@ export default function OrgOpportunities() {
         ))}
       </div>
 
-      {loading ? (
+      {showLoadingState ? (
         <div className="text-gray-500">Loading...</div>
-      ) : opportunities.length === 0 ? (
+      ) : visibleOpportunities.length === 0 ? (
         <div className="text-gray-500 text-center py-8">
           No {filter.toLowerCase()} opportunities.
         </div>
       ) : (
         <div className="space-y-3">
-          {opportunities.map((opp) => (
+          {visibleOpportunities.map((opp) => (
             <div key={opp.id} className="bg-white border border-gray-200 rounded-lg p-5">
               <div className="flex justify-between items-start">
                 <div>

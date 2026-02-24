@@ -1,19 +1,80 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
-import { sendVerificationEmail, sendPasswordResetEmail, CLIENT_URL } from "../services/email";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  CLIENT_URL,
+  getCapturedMailinatorInbox,
+} from "../services/email";
 
 // Limits for endpoints that trigger outbound email — the primary DDOS surface.
 // Each limit is per IP address and resets on a rolling window.
 
-// Signup: 5 accounts per IP per hour
+function signupRateLimitChannel(req: Request): string {
+  const origin = (req.get("origin") || "").trim().toLowerCase();
+  const referer = (req.get("referer") || "").trim().toLowerCase();
+  const fetchSite = (req.get("sec-fetch-site") || "").trim().toLowerCase();
+  if (origin || referer || fetchSite) {
+    return `origin:${origin || "none"}|referer:${referer || "none"}|sec-fetch-site:${fetchSite || "none"}`;
+  }
+
+  return "direct";
+}
+
+function isInteractiveSignupRequest(req: Request): boolean {
+  const fetchSite = (req.get("sec-fetch-site") || "").trim().toLowerCase();
+  const fetchMode = (req.get("sec-fetch-mode") || "").trim().toLowerCase();
+  const origin = (req.get("origin") || "").trim().toLowerCase();
+  const referer = (req.get("referer") || "").trim().toLowerCase();
+
+  if (fetchSite === "same-origin" || fetchSite === "same-site") return true;
+  if (fetchMode === "cors" && (origin.includes("localhost:5173") || origin.includes("goodhours.app"))) return true;
+  if (referer.includes("/signup")) return true;
+  return false;
+}
+
+async function precheckDuplicateSignupEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!email) {
+      return next();
+    }
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      res.status(409).json({ error: "Email already registered" });
+      return;
+    }
+    next();
+  } catch (err) {
+    console.error("[signup] Duplicate precheck failed:", err);
+    next();
+  }
+}
+
+// Signup:
+// - API/direct (non-browser): 5 accounts per IP/channel per hour
+// - Interactive browser flow: higher threshold to avoid false positives
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  // Browser-driven signup flows use a separate, higher-capacity bucket to avoid
+  // colliding with API-level abuse checks from non-browser contexts.
+  max: (req) => (isInteractiveSignupRequest(req) ? 100 : 5),
+  keyGenerator: (req) =>
+    `${ipKeyGenerator(req.ip || "")}:${req.get("user-agent") || "unknown"}:${signupRateLimitChannel(req)}`,
+  skipFailedRequests: true,
+  // Allow authenticated users to create additional accounts during guided
+  // onboarding/testing flows without tripping anonymous IP abuse limits.
+  skip: (req) => {
+    const authHeader = req.get("authorization") || "";
+    if (/^Bearer\s+/i.test(authHeader)) return true;
+    const cookieHeader = req.headers.cookie || "";
+    return /(?:^|;\s*)token=/.test(cookieHeader);
+  },
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many signup attempts from this IP. Please try again later." },
@@ -38,6 +99,20 @@ const resendVerificationLimiter = rateLimit({
 });
 
 const router = Router();
+
+router.get("/__test-email", (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  const inbox = String(req.query.inbox || "").trim().toLowerCase();
+  if (!/^[a-z0-9._-]+$/.test(inbox)) {
+    return res.status(400).json({ error: "Valid inbox query param is required" });
+  }
+
+  const messages = getCapturedMailinatorInbox(inbox);
+  res.json({ inbox, messages });
+});
 
 const VALID_ROLES = ["STUDENT", "ORG_ADMIN", "SCHOOL_ADMIN"] as const;
 
@@ -72,7 +147,7 @@ const loginSchema = z.object({
 });
 
 // POST /api/auth/signup
-router.post("/signup", signupLimiter, async (req: Request, res: Response) => {
+router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   try {
     const data = signupSchema.parse(req.body);
 

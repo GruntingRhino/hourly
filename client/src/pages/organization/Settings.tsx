@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 
@@ -15,7 +15,7 @@ function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z
   const addZip = () => {
     const z = input.trim();
     if (z && /^\d{5}$/.test(z) && !zipCodes.includes(z)) {
-      onChange([...zipCodes, z]);
+      onChange([z, ...zipCodes]);
       setInput("");
     }
   };
@@ -127,9 +127,24 @@ export default function OrgSettings() {
     hourRequest: { email: true, inApp: true },
     schoolApproval: { email: true, inApp: true },
   };
+  const mergeNotifPrefs = (incoming: any) => ({
+    studentSignup: {
+      email: incoming?.studentSignup?.email ?? defaultNotifPrefs.studentSignup.email,
+      inApp: incoming?.studentSignup?.inApp ?? defaultNotifPrefs.studentSignup.inApp,
+    },
+    hourRequest: {
+      email: incoming?.hourRequest?.email ?? defaultNotifPrefs.hourRequest.email,
+      inApp: incoming?.hourRequest?.inApp ?? defaultNotifPrefs.hourRequest.inApp,
+    },
+    schoolApproval: {
+      email: incoming?.schoolApproval?.email ?? defaultNotifPrefs.schoolApproval.email,
+      inApp: incoming?.schoolApproval?.inApp ?? defaultNotifPrefs.schoolApproval.inApp,
+    },
+  });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    (user as any)?.notificationPreferences || defaultNotifPrefs
+    mergeNotifPrefs((user as any)?.notificationPreferences)
   );
+  const notifPrefsRef = useRef(notifPrefs);
   const [savingNotif, setSavingNotif] = useState(false);
   const [notifMessage, setNotifMessage] = useState("");
 
@@ -168,6 +183,16 @@ export default function OrgSettings() {
       loadAnalytics();
     }
   }, [tab]);
+
+  useEffect(() => {
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
+
+  useEffect(() => {
+    const merged = mergeNotifPrefs((user as any)?.notificationPreferences);
+    setNotifPrefs(merged);
+    notifPrefsRef.current = merged;
+  }, [(user as any)?.notificationPreferences]);
 
   const loadAnalytics = async () => {
     if (!user?.organizationId) return;
@@ -298,7 +323,8 @@ export default function OrgSettings() {
     setSavingNotif(true);
     setNotifMessage("");
     try {
-      await api.put("/auth/profile", { notificationPreferences: notifPrefs });
+      await api.put("/auth/profile", { notificationPreferences: notifPrefsRef.current });
+      void refreshUser();
       setNotifMessage("Notification preferences saved!");
     } catch {
       setNotifMessage("Failed to save preferences");
@@ -308,10 +334,14 @@ export default function OrgSettings() {
   };
 
   const toggleNotif = (key: keyof typeof defaultNotifPrefs, channel: "email" | "inApp") => {
-    setNotifPrefs((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], [channel]: !prev[key][channel] },
-    }));
+    setNotifPrefs((prev) => {
+      const next = {
+        ...prev,
+        [key]: { ...prev[key], [channel]: !prev[key][channel] },
+      };
+      notifPrefsRef.current = next;
+      return next;
+    });
   };
 
   const handleExportCSV = async () => {

@@ -60,9 +60,28 @@ export default function StudentSettings() {
     eventChange: { email: true, inApp: true },
     orgRequest: { email: true, inApp: true },
   };
+  const mergeNotifPrefs = (incoming: any) => ({
+    hourApproval: {
+      email: incoming?.hourApproval?.email ?? defaultNotifPrefs.hourApproval.email,
+      inApp: incoming?.hourApproval?.inApp ?? defaultNotifPrefs.hourApproval.inApp,
+    },
+    hourRemoval: {
+      email: incoming?.hourRemoval?.email ?? defaultNotifPrefs.hourRemoval.email,
+      inApp: incoming?.hourRemoval?.inApp ?? defaultNotifPrefs.hourRemoval.inApp,
+    },
+    eventChange: {
+      email: incoming?.eventChange?.email ?? defaultNotifPrefs.eventChange.email,
+      inApp: incoming?.eventChange?.inApp ?? defaultNotifPrefs.eventChange.inApp,
+    },
+    orgRequest: {
+      email: incoming?.orgRequest?.email ?? defaultNotifPrefs.orgRequest.email,
+      inApp: incoming?.orgRequest?.inApp ?? defaultNotifPrefs.orgRequest.inApp,
+    },
+  });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    (user as any)?.notificationPreferences || defaultNotifPrefs
+    mergeNotifPrefs((user as any)?.notificationPreferences)
   );
+  const notifPrefsRef = useRef(notifPrefs);
   const [savingNotif, setSavingNotif] = useState(false);
   const [notifMessage, setNotifMessage] = useState("");
 
@@ -78,6 +97,16 @@ export default function StudentSettings() {
     // Load signup count
     api.get<any[]>("/signups/my").then((s) => setSignupCount(s.length)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
+
+  useEffect(() => {
+    const merged = mergeNotifPrefs((user as any)?.notificationPreferences);
+    setNotifPrefs(merged);
+    notifPrefsRef.current = merged;
+  }, [(user as any)?.notificationPreferences]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -242,7 +271,8 @@ export default function StudentSettings() {
     setSavingNotif(true);
     setNotifMessage("");
     try {
-      await api.put("/auth/profile", { notificationPreferences: notifPrefs });
+      await api.put("/auth/profile", { notificationPreferences: notifPrefsRef.current });
+      void refreshUser();
       setNotifMessage("Notification preferences saved!");
     } catch {
       setNotifMessage("Failed to save preferences");
@@ -256,6 +286,7 @@ export default function StudentSettings() {
     setPrivacyMessage("");
     try {
       await api.put("/auth/profile", { messagePreferences: msgPrefs });
+      await refreshUser();
       setPrivacyMessage("Privacy settings saved!");
     } catch {
       setPrivacyMessage("Failed to save settings");
@@ -265,10 +296,14 @@ export default function StudentSettings() {
   };
 
   const toggleNotif = (key: keyof typeof defaultNotifPrefs, channel: "email" | "inApp") => {
-    setNotifPrefs((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], [channel]: !prev[key][channel] },
-    }));
+    setNotifPrefs((prev) => {
+      const next = {
+        ...prev,
+        [key]: { ...prev[key], [channel]: !prev[key][channel] },
+      };
+      notifPrefsRef.current = next;
+      return next;
+    });
   };
 
   const notifRows = [

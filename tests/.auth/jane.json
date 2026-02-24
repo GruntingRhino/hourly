@@ -2,11 +2,15 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "https://goodhours.app",
+      "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "goodhours_user",
+          "value": "{\"id\":\"cmlzy1o4w000kmu8yzikh9em0\",\"email\":\"jane@student.edu\",\"name\":\"Jane Davis\",\"role\":\"STUDENT\",\"phone\":null,\"bio\":null,\"avatarUrl\":null,\"age\":17,\"grade\":\"12th\",\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":null,\"notificationPreferences\":null,\"messagePreferences\":null,\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:45:38.908Z\"},\"classroomId\":\"cmlzy1n920006mu8ypkttt3fd\",\"classroom\":{\"id\":\"cmlzy1n920006mu8ypkttt3fd\",\"name\":\"AP Community Service\",\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"teacherId\":\"cmlzy1n380000mu8yv00au332\",\"inviteCode\":\"8c38b71b\",\"isActive\":true,\"createdAt\":\"2026-02-24T01:45:39.063Z\",\"updatedAt\":\"2026-02-24T01:45:39.063Z\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:45:38.908Z\"}}}"
+        },
+        {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx5Y2NhaXgwMDBrbXVueGM4dGtjM2JxIiwiZW1haWwiOiJqYW5lQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4MDQ4MDIsImV4cCI6MTc3MjQwOTYwMn0.ERBfRxjLVIzJe9BZ6KT4qTodBB9uBHkGPsy7UvlIU5A"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFvNHcwMDBrbXU4eXppa2g5ZW0wIiwiZW1haWwiOiJqYW5lQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4OTc2NjAsImV4cCI6MTc3MjUwMjQ2MH0.-S7eF6bkE3zS8S8y5VuOuImdES0Z3LnOKGGEQnFDo9Y"
         }
       ]
     }

@@ -9,6 +9,9 @@ function generateInviteCode(): string {
 }
 
 async function main() {
+  const now = new Date();
+  const plusDays = (days: number) => new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
   console.log("Cleaning up existing data...");
   // Delete in dependency order, TRUNCATE CASCADE handles circular FKs
   await prisma.$executeRawUnsafe(`
@@ -107,7 +110,7 @@ async function main() {
     },
   });
 
-  await prisma.user.create({
+  const org2User = await prisma.user.create({
     data: {
       email: "staff@library.org",
       passwordHash: await bcrypt.hash("password123", 12),
@@ -168,6 +171,21 @@ async function main() {
       emailVerified: true,
     },
   });
+
+  // Reserve low-numbered qa-test inboxes so auth flow uses a fresher inbox.
+  for (let i = 1; i <= 20; i += 1) {
+    const suffix = String(i).padStart(2, "0");
+    await prisma.user.create({
+      data: {
+        email: `qa-test-${suffix}@mailinator.com`,
+        passwordHash: await bcrypt.hash("Password1!", 12),
+        name: `QA Reserved ${suffix}`,
+        role: "STUDENT",
+        age: 16,
+        emailVerified: false,
+      },
+    });
+  }
 
   // Create student groups
   const group1 = await prisma.studentGroup.create({
@@ -249,16 +267,34 @@ async function main() {
 
   const opp5 = await prisma.opportunity.create({
     data: {
-      title: "Food Drive Sorting",
-      description: "Help sort and organize donations for the annual food drive.",
+      title: "R Waitlist Probe",
+      description: "Deterministic waitlist seed opportunity for QA promotion flow.",
       tags: JSON.stringify(["food", "community", "indoor"]),
       location: "500 Oak Avenue",
-      date: new Date("2025-09-20"),
+      // Place this early so it is the first sign-up candidate after seed data
+      // already-signed opportunities are skipped in popularity order.
+      date: new Date("2025-08-28"),
       startTime: "1:00 PM",
       endTime: "4:00 PM",
       durationHours: 3,
-      capacity: 15,
+      capacity: 2,
       organizationId: org2.id,
+    },
+  });
+
+  // Future opportunity to guarantee Upcoming + Check-in/Check-out coverage.
+  const opp6 = await prisma.opportunity.create({
+    data: {
+      title: "QA Upcoming Check-In Session",
+      description: "Seeded future session for deterministic check-in/check-out coverage.",
+      tags: JSON.stringify(["qa", "upcoming"]),
+      location: "500 Example Road",
+      date: plusDays(2),
+      startTime: "9:00 AM",
+      endTime: "11:00 AM",
+      durationHours: 2,
+      capacity: 5,
+      organizationId: org.id,
     },
   });
 
@@ -297,8 +333,44 @@ async function main() {
     },
   });
 
+  // Pre-sign John on additional opportunities so item 23 deterministically
+  // targets the waitlist probe and item 30 targets submit-verification flows.
+  for (const opp of [opp3, opp4]) {
+    await prisma.signup.create({
+      data: { userId: student1.id, opportunityId: opp.id, status: "CONFIRMED" },
+    });
+    await prisma.serviceSession.create({
+      data: {
+        userId: student1.id,
+        opportunityId: opp.id,
+        checkInTime: new Date(opp.date.getTime() + 5 * 60000),
+        checkOutTime: new Date(opp.date.getTime() + opp.durationHours * 3600000),
+        totalHours: Math.max(0, opp.durationHours - 0.08),
+        status: "VERIFIED",
+        verificationStatus: "APPROVED",
+        verifiedBy: opp.organizationId === org2.id ? org2User.id : orgUser.id,
+        verifiedAt: new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
+      },
+    });
+  }
+
+  // Seed a deterministic upcoming session for check-in/out flow.
+  await prisma.signup.create({
+    data: { userId: student1.id, opportunityId: opp6.id, status: "CONFIRMED" },
+  });
+  await prisma.serviceSession.create({
+    data: {
+      userId: student1.id,
+      opportunityId: opp6.id,
+      totalHours: opp6.durationHours,
+      status: "PENDING_CHECKIN",
+      verificationStatus: "PENDING",
+    },
+  });
+
   // Student2 has more hours
   for (const opp of [opp1, opp3, opp4]) {
+    const orgQueuePending = opp.organizationId === org.id;
     await prisma.signup.create({
       data: { userId: student2.id, opportunityId: opp.id, status: "CONFIRMED" },
     });
@@ -309,13 +381,30 @@ async function main() {
         checkInTime: new Date(opp.date.getTime() + 5 * 60000),
         checkOutTime: new Date(opp.date.getTime() + opp.durationHours * 3600000),
         totalHours: opp.durationHours - 0.08,
-        status: "VERIFIED",
-        verificationStatus: "APPROVED",
-        verifiedBy: orgUser.id,
-        verifiedAt: new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
+        status: orgQueuePending ? "CHECKED_OUT" : "VERIFIED",
+        verificationStatus: orgQueuePending ? "PENDING" : "APPROVED",
+        verifiedBy: orgQueuePending ? null : orgUser.id,
+        verifiedAt: orgQueuePending ? null : new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
       },
     });
   }
+
+  // Add a full-capacity seed signup to drive deterministic waitlist and
+  // provide an additional org-pending verification session.
+  await prisma.signup.create({
+    data: { userId: student3.id, opportunityId: opp5.id, status: "CONFIRMED" },
+  });
+  await prisma.serviceSession.create({
+    data: {
+      userId: student3.id,
+      opportunityId: opp5.id,
+      checkInTime: new Date("2025-08-28T13:05:00"),
+      checkOutTime: new Date("2025-08-28T16:00:00"),
+      totalHours: 2.92,
+      status: "CHECKED_OUT",
+      verificationStatus: "PENDING",
+    },
+  });
 
   // Audit logs
   await prisma.auditLog.create({

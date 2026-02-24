@@ -31,7 +31,7 @@ interface OrgApproval {
     status: string;
     organization: { id: string; name: string; description: string | null };
   }[];
-  pendingOrgs: { id: string; name: string; description: string | null }[];
+  pendingOrgs: { id: string; name: string; description: string | null; status?: string }[];
 }
 
 export default function SchoolDashboard() {
@@ -50,11 +50,30 @@ export default function SchoolDashboard() {
   const isOwner = user?.role === "SCHOOL_ADMIN";
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!schoolId) {
+      setLoading(false);
+      return;
+    }
+    void loadData();
+  }, [schoolId, isOwner]);
+
+  const refreshOrgData = async () => {
+    if (!schoolId || !isOwner) return;
+    try {
+      const orgs = await api.get<OrgApproval>(`/schools/${schoolId}/organizations`);
+      setOrgData(orgs);
+    } catch {
+      // Keep optimistic state on transient refresh failures.
+    }
+  };
 
   const loadData = async () => {
-    if (!schoolId) return;
+    if (!schoolId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
       const [st, cls] = await Promise.all([
         api.get<Stats>(`/schools/${schoolId}/stats`),
@@ -64,8 +83,7 @@ export default function SchoolDashboard() {
       setClassrooms(cls);
 
       if (isOwner) {
-        const orgs = await api.get<OrgApproval>(`/schools/${schoolId}/organizations`);
-        setOrgData(orgs);
+        await refreshOrgData();
       }
     } catch {
       setError("Failed to load dashboard. Please refresh the page.");
@@ -74,25 +92,53 @@ export default function SchoolDashboard() {
     }
   };
 
+  const updateOrgStatus = (orgId: string, status: string) => {
+    setOrgData((prev) => {
+      if (!prev) return prev;
+      const approvals = prev.approvals.map((a) =>
+        a.organization.id === orgId ? { ...a, status } : a,
+      );
+      const pendingOrgs = prev.pendingOrgs.map((o) =>
+        o.id === orgId ? { ...o, status } : o,
+      );
+      return { ...prev, approvals, pendingOrgs };
+    });
+  };
+
   const handleApproveOrg = async (orgId: string) => {
-    await api.post(`/schools/${schoolId}/organizations/${orgId}/approve`);
-    loadData();
+    if (!schoolId) return;
+    updateOrgStatus(orgId, "APPROVED");
+    try {
+      await api.post(`/schools/${schoolId}/organizations/${orgId}/approve`);
+      void refreshOrgData();
+    } catch {
+      setError("Failed to approve organization request.");
+      void refreshOrgData();
+    }
   };
   const handleRejectOrg = async (orgId: string) => {
-    await api.post(`/schools/${schoolId}/organizations/${orgId}/reject`);
-    loadData();
+    if (!schoolId) return;
+    updateOrgStatus(orgId, "REJECTED");
+    try {
+      await api.post(`/schools/${schoolId}/organizations/${orgId}/reject`);
+      void refreshOrgData();
+    } catch {
+      setError("Failed to reject organization request.");
+      void refreshOrgData();
+    }
   };
   const handleBlockOrg = (orgId: string) => {
     setBlockConfirmOrgId(orgId);
   };
 
   const handleConfirmBlock = async () => {
-    if (!blockConfirmOrgId) return;
+    if (!schoolId || !blockConfirmOrgId) return;
     setBlocking(true);
     try {
       await api.post(`/schools/${schoolId}/organizations/${blockConfirmOrgId}/block`);
+      updateOrgStatus(blockConfirmOrgId, "BLOCKED");
       setBlockConfirmOrgId(null);
-      loadData();
+      void refreshOrgData();
     } finally {
       setBlocking(false);
     }
@@ -109,10 +155,23 @@ export default function SchoolDashboard() {
 
   const allPendingOrgs = orgData?.pendingOrgs || [];
   const allApprovedOrgs = orgData?.approvals.filter((a) => a.status === "APPROVED") || [];
+  const reviewableFromApprovals = (orgData?.approvals || [])
+    .filter((a) => a.status !== "BLOCKED")
+    .map((a) => ({
+      id: a.organization.id,
+      name: a.organization.name,
+      description: a.organization.description,
+      status: a.status,
+    }));
+  const allReviewableOrgs = Array.from(
+    new Map(
+      [...reviewableFromApprovals, ...allPendingOrgs.map((o) => ({ ...o, status: o.status || "PENDING" }))].map((o) => [o.id, o]),
+    ).values(),
+  );
 
   const pendingOrgs = orgSearch
-    ? allPendingOrgs.filter((o) => o.name.toLowerCase().includes(orgSearch.toLowerCase()))
-    : allPendingOrgs;
+    ? allReviewableOrgs.filter((o) => o.name.toLowerCase().includes(orgSearch.toLowerCase()))
+    : allReviewableOrgs;
   const approvedOrgs = orgSearch
     ? allApprovedOrgs.filter((a) => a.organization.name.toLowerCase().includes(orgSearch.toLowerCase()))
     : allApprovedOrgs;
@@ -281,7 +340,7 @@ export default function SchoolDashboard() {
       {/* Org approvals (owner only) */}
       {isOwner && (
         <>
-          {(allPendingOrgs.length > 0 || allApprovedOrgs.length > 0) && (
+          {(allReviewableOrgs.length > 0 || allApprovedOrgs.length > 0) && (
             <div className="mb-4">
               <input
                 type="text"
@@ -301,6 +360,7 @@ export default function SchoolDashboard() {
                     <div>
                       <div className="font-medium">{org.name}</div>
                       {org.description && <div className="text-sm text-gray-500">{org.description}</div>}
+                      <div className="text-xs text-gray-400 mt-0.5">{org.status || "PENDING"}</div>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleApproveOrg(org.id)} className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">

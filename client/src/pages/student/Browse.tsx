@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -55,9 +55,11 @@ export default function StudentBrowse() {
   const [schoolCoords, setSchoolCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"browse" | "saved" | "skipped" | "discarded">("browse");
+  const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    loadData();
+    void loadData(initialLoadRef.current);
+    initialLoadRef.current = false;
   }, [approvedOnly]);
 
   // Fetch school coordinates once for distance sorting/filtering
@@ -74,24 +76,31 @@ export default function StudentBrowse() {
     } catch {}
   }, [user?.school?.zipCodes]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showSpinner = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
     const params = new URLSearchParams();
     if (user?.schoolId) params.set("schoolId", user.schoolId);
     if (approvedOnly) params.set("approvedOnly", "true");
 
-    const [opps, savedOpps] = await Promise.all([
-      api.get<Opportunity[]>(`/opportunities?${params.toString()}`),
-      api.get<SavedOpp[]>("/saved").catch(() => [] as SavedOpp[]),
-    ]);
-    setOpportunities(opps);
-    setSaved(savedOpps);
-    setLoading(false);
+    try {
+      const [opps, savedOpps] = await Promise.all([
+        api.get<Opportunity[]>(`/opportunities?${params.toString()}`),
+        api.get<SavedOpp[]>("/saved").catch(() => [] as SavedOpp[]),
+      ]);
+      setOpportunities(opps);
+      setSaved(savedOpps);
+    } catch {
+      // Keep prior results if a transient network error occurs.
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async (oppId: string, status: string) => {
     await api.post("/saved", { opportunityId: oppId, status });
-    loadData();
+    await loadData();
   };
 
   // Collect all unique tags
@@ -124,7 +133,10 @@ export default function StudentBrowse() {
       case "date":
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       case "popular":
-        return b._count.signups - a._count.signups;
+        if (b._count.signups !== a._count.signups) {
+          return b._count.signups - a._count.signups;
+        }
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
       case "distance": {
         if (!schoolCoords) return 0;
         const aDist = a.latitude && a.longitude
@@ -311,6 +323,14 @@ export default function StudentBrowse() {
             const tags = opp.tags ? (() => { try { return JSON.parse(opp.tags!); } catch { return []; } })() : [];
             const isSaved = savedIds.includes(opp.id);
             const isDiscarded = discardedIds.includes(opp.id);
+            const dateLabel =
+              sortBy === "popular"
+                ? new Date(opp.date).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : new Date(opp.date).toLocaleDateString();
             return (
               <div
                 key={opp.id}
@@ -328,7 +348,7 @@ export default function StudentBrowse() {
                       {opp.organization.name}
                     </div>
                     <div className="text-sm text-gray-500 mt-1">
-                      {new Date(opp.date).toLocaleDateString()} &middot; {opp.startTime} - {opp.endTime} &middot; {opp.location}
+                      {dateLabel} &middot; {opp.startTime} - {opp.endTime} &middot; {opp.location}
                     </div>
                     {opp.address && (
                       <div className="text-xs text-gray-400 mt-0.5">{opp.address}</div>
@@ -368,32 +388,28 @@ export default function StudentBrowse() {
                       ) : (
                         <>
                           <button
-                            onClick={() => handleSave(opp.id, isSaved ? "SKIPPED" : "SAVED")}
+                            onClick={() => handleSave(opp.id, "SAVED")}
                             className={`text-xs px-2 py-1 rounded ${
                               isSaved
                                 ? "bg-blue-100 text-blue-700"
                                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             }`}
                           >
-                            {isSaved ? "Saved" : "Save"}
+                            Save
                           </button>
-                          {!isSaved && (
-                            <>
-                              <button
-                                onClick={() => handleSave(opp.id, "SKIPPED")}
-                                className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                              >
-                                Skip
-                              </button>
-                              <button
-                                onClick={() => handleSave(opp.id, "DISCARDED")}
-                                className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                                title="Discard (don't show again)"
-                              >
-                                ✕
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => handleSave(opp.id, "SKIPPED")}
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                          >
+                            Skip
+                          </button>
+                          <button
+                            onClick={() => handleSave(opp.id, "DISCARDED")}
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                            title="Discard (don't show again)"
+                          >
+                            ✕
+                          </button>
                         </>
                       )}
                     </div>

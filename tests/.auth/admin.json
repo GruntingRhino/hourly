@@ -1,4 +1,22 @@
 {
   "cookies": [],
-  "origins": []
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "school_onboarding_cmlzy1n4r0002mu8y605frpxa",
+          "value": "done"
+        },
+        {
+          "name": "goodhours_user",
+          "value": "{\"id\":\"cmlzy1n380000mu8yv00au332\",\"email\":\"admin@lincoln.edu\",\"name\":\"Principal Johnson\",\"role\":\"SCHOOL_ADMIN\",\"phone\":null,\"bio\":null,\"avatarUrl\":null,\"age\":null,\"grade\":null,\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":null,\"notificationPreferences\":{\"studentJoin\":{\"email\":false,\"inApp\":true},\"hourApproval\":{\"email\":true,\"inApp\":true},\"orgRequest\":{\"email\":true,\"inApp\":true}},\"messagePreferences\":null,\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School QA 1771897774359\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\",\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:49:34.437Z\"},\"classroomId\":null,\"classroom\":null}"
+        },
+        {
+          "name": "goodhours_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFuMzgwMDAwbXU4eXYwMGF1MzMyIiwiZW1haWwiOiJhZG1pbkBsaW5jb2xuLmVkdSIsInJvbGUiOiJTQ0hPT0xfQURNSU4iLCJpYXQiOjE3NzE4OTc3NTYsImV4cCI6MTc3MjUwMjU1Nn0.Sv7dkyAPzfDbY2T80BF_8U0p_hf7dQulK3t-9kbrL3A"
+        }
+      ]
+    }
+  ]
 }

@@ -48,10 +48,10 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
         const prefs = JSON.parse(receiver.messagePreferences);
         const senderRole = req.user!.role;
         if (prefs.allowFrom === "ORGS_ONLY" && senderRole !== "ORG_ADMIN") {
-          return res.status(403).json({ error: "This user only accepts messages from organizations" });
+          return res.status(403).json({ error: "Message preferences do not allow this" });
         }
         if (prefs.allowFrom === "ADMINS_ONLY" && !["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"].includes(senderRole)) {
-          return res.status(403).json({ error: "This user only accepts messages from school administrators" });
+          return res.status(403).json({ error: "Message preferences do not allow this" });
         }
       } catch {}
     }

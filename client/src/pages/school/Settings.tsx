@@ -56,8 +56,13 @@ export default function SchoolSettings() {
     hourApproval: { email: true, inApp: true },
     orgRequest: { email: true, inApp: true },
   };
+  const mergeNotifPrefs = (raw: any) => ({
+    studentJoin: { ...defaultNotifPrefs.studentJoin, ...(raw?.studentJoin || {}) },
+    hourApproval: { ...defaultNotifPrefs.hourApproval, ...(raw?.hourApproval || {}) },
+    orgRequest: { ...defaultNotifPrefs.orgRequest, ...(raw?.orgRequest || {}) },
+  });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    (user as any)?.notificationPreferences || defaultNotifPrefs
+    mergeNotifPrefs((user as any)?.notificationPreferences)
   );
   const [savingNotif, setSavingNotif] = useState(false);
   const [notifMessage, setNotifMessage] = useState("");
@@ -92,6 +97,10 @@ export default function SchoolSettings() {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    setNotifPrefs(mergeNotifPrefs((user as any)?.notificationPreferences));
+  }, [(user as any)?.notificationPreferences]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,6 +192,7 @@ export default function SchoolSettings() {
     setNotifMessage("");
     try {
       await api.put("/auth/profile", { notificationPreferences: notifPrefs });
+      void refreshUser();
       setNotifMessage("Notification preferences saved!");
     } catch {
       setNotifMessage("Failed to save preferences");

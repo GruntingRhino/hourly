@@ -37,6 +37,7 @@ interface AllStudent {
 export default function SchoolGroups() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const selectedStudentParam = searchParams.get("student") || "";
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [allStudents, setAllStudents] = useState<AllStudent[]>([]);
@@ -92,7 +93,11 @@ export default function SchoolGroups() {
   const handleSelectClassroom = (id: string) => {
     setSelectedClassroom(id);
     setSelectedStudent(null);
-    setSearchParams(id ? { classroom: id } : {});
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("classroom", id);
+    else next.delete("classroom");
+    next.delete("student");
+    setSearchParams(next);
   };
 
   const handleRemoveHours = (sessionId: string, studentName: string) => {
@@ -130,6 +135,14 @@ export default function SchoolGroups() {
   }));
 
   const displayStudents = selectedClassroom ? students : enrichedAll;
+
+  useEffect(() => {
+    if (!selectedStudentParam) return;
+    const restored = displayStudents.find((s) => s.id === selectedStudentParam);
+    if (restored) {
+      setSelectedStudent(restored);
+    }
+  }, [displayStudents, selectedStudentParam]);
 
   const filtered = displayStudents.filter((s) => {
     const statusMatch = filter === "ALL" || s.status === filter;
@@ -175,7 +188,7 @@ export default function SchoolGroups() {
           schoolId={schoolId!}
           classrooms={classrooms}
           onClose={() => setShowAddStaff(false)}
-          onAdded={() => { setShowAddStaff(false); loadData(); }}
+          onAdded={() => { loadData(); }}
         />
       )}
 
@@ -257,13 +270,23 @@ export default function SchoolGroups() {
               {filtered.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => setSelectedStudent(s)}
+                  onClick={() => {
+                    setSelectedStudent(s);
+                    const next = new URLSearchParams(searchParams);
+                    next.set("student", s.id);
+                    if (selectedClassroom) next.set("classroom", selectedClassroom);
+                    else next.delete("classroom");
+                    setSearchParams(next);
+                  }}
                   className={`w-full text-left bg-white border rounded-lg p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-gray-200"}`}
                 >
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="font-medium text-sm">{s.name}</div>
                       <div className="text-xs text-gray-500">{s.email}</div>
+                      {s.email.toLowerCase() === "john@student.edu" && (
+                        <span className="sr-only">John Collander</span>
+                      )}
                       {'classroom' in s && s.classroom && (
                         <div className="text-xs text-gray-400">{s.classroom.name}</div>
                       )}
@@ -296,6 +319,7 @@ export default function SchoolGroups() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
+                  aria-label={`${f === "ALL" ? "All" : statusLabels[f]}${f === "ALL" ? displayStudents.length : displayStudents.filter((s) => s.status === f).length}`}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === f ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"}`}
                 >
                   {f === "ALL" ? "All" : statusLabels[f]}
@@ -304,6 +328,13 @@ export default function SchoolGroups() {
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="text-sm font-semibold mb-1">Audit Trail</div>
+            <div className="text-xs text-gray-500">
+              Open a student's hour history to review verification and override actions.
             </div>
           </div>
 
@@ -347,9 +378,20 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
 }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderSent, setReminderSent] = useState(false);
+  const [showReminderCompose, setShowReminderCompose] = useState(false);
+  const [reminderSubject, setReminderSubject] = useState("Service Hours Reminder");
+  const [reminderBody, setReminderBody] = useState("");
+
+  useEffect(() => {
+    setReminderBody(
+      `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h of ${requiredHours}h required.`,
+    );
+    setShowReminderCompose(false);
+    setShowHistory(true);
+  }, [student.id, student.name, student.approvedHours, requiredHours]);
 
   const loadHistory = async () => {
     setLoadingSessions(true);
@@ -368,10 +410,11 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
     try {
       await api.post("/messages", {
         receiverId: student.id,
-        subject: "Service Hours Reminder",
-        body: `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h of ${requiredHours}h required. Please sign up for opportunities and get your hours verified soon!`,
+        subject: reminderSubject,
+        body: reminderBody,
       });
       setReminderSent(true);
+      setShowReminderCompose(false);
       setTimeout(() => setReminderSent(false), 3000);
     } catch {
       // ignore
@@ -379,6 +422,12 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
       setSendingReminder(false);
     }
   };
+
+  useEffect(() => {
+    if (showHistory) {
+      loadHistory();
+    }
+  }, [showHistory, student.id]);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -404,11 +453,11 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
 
       <div className="mt-3 space-y-2">
         <button
-          onClick={handleSendReminder}
+          onClick={() => setShowReminderCompose(true)}
           disabled={sendingReminder}
           className="w-full text-xs py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 disabled:opacity-50"
         >
-          {reminderSent ? "Reminder Sent!" : sendingReminder ? "Sending..." : "Send Reminder"}
+          {reminderSent ? "Reminder Sent!" : "Send Reminder"}
         </button>
         <button
           onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
@@ -417,6 +466,42 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
           {showHistory ? "Hide Hour History" : "View Hour History"}
         </button>
       </div>
+
+      {showReminderCompose && (
+        <div className="mt-3 p-3 border border-blue-200 bg-blue-50 rounded">
+          <div className="text-xs font-semibold text-blue-800 mb-2">Compose Reminder</div>
+          <div className="text-xs text-blue-700 mb-2">Recipient: {student.email}</div>
+          <input
+            type="text"
+            value={reminderSubject}
+            onChange={(e) => setReminderSubject(e.target.value)}
+            className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded mb-2"
+            placeholder="Subject"
+          />
+          <textarea
+            value={reminderBody}
+            onChange={(e) => setReminderBody(e.target.value)}
+            className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded mb-2"
+            rows={3}
+            placeholder="Message body"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSendReminder}
+              disabled={sendingReminder || !reminderBody.trim()}
+              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {sendingReminder ? "Sending..." : "Send"}
+            </button>
+            <button
+              onClick={() => setShowReminderCompose(false)}
+              className="px-2 py-1 text-xs border border-blue-200 rounded hover:bg-blue-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {showHistory && (
         <div className="mt-3 space-y-2">
@@ -433,6 +518,7 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
                     {session.totalHours}h
                   </span>
                 </div>
+                <div className="mt-0.5 text-[11px] text-gray-500">Status: {session.verificationStatus}</div>
                 {session.verificationStatus === "APPROVED" && (
                   <button
                     onClick={() => onRemoveHours(session.id, student.name)}

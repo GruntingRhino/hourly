@@ -2,11 +2,15 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "https://goodhours.app",
+      "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "goodhours_user",
+          "value": "{\"id\":\"cmlzy1nxc000imu8yp74hsdcm\",\"email\":\"john@student.edu\",\"name\":\"John QA 1771897708840\",\"role\":\"STUDENT\",\"phone\":\"(555) 123-4567\",\"bio\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"avatarUrl\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2xWfQAAAAASUVORK5CYII=\",\"age\":16,\"grade\":\"11th\",\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":{\"instagram\":\"@johnqa1771897714193\",\"tiktok\":\"\",\"twitter\":\"\",\"youtube\":\"\"},\"notificationPreferences\":{\"hourApproval\":{\"email\":false,\"inApp\":true},\"hourRemoval\":{\"email\":true,\"inApp\":true},\"eventChange\":{\"email\":true,\"inApp\":true},\"orgRequest\":{\"email\":true,\"inApp\":true}},\"messagePreferences\":{\"allowFrom\":\"ADMINS_ONLY\",\"profileVisibility\":\"EVERYONE\"},\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School QA 1771897774359\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\",\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:49:34.437Z\"},\"classroomId\":\"cmlzy1n7q0004mu8y83fk83vr\",\"classroom\":{\"id\":\"cmlzy1n7q0004mu8y83fk83vr\",\"name\":\"General\",\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"teacherId\":\"cmlzy1n380000mu8yv00au332\",\"inviteCode\":\"c69fb959\",\"isActive\":true,\"createdAt\":\"2026-02-24T01:45:39.015Z\",\"updatedAt\":\"2026-02-24T01:45:39.015Z\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School QA 1771897774359\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\",\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:49:34.437Z\"}}}"
+        },
+        {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx5Y2NhYnkwMDBpbXVueDlsemRucWc4IiwiZW1haWwiOiJqb2huQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4MDQ3NzcsImV4cCI6MTc3MjQwOTU3N30.igzbEK_nb_LoVYO5xP2C9oyf4BZ8epGRBKiwWbq6Aws"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFueGMwMDBpbXU4eXA3NGhzZGNtIiwiZW1haWwiOiJqb2huQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4OTc2MzUsImV4cCI6MTc3MjUwMjQzNX0.tlksivT3b3MxeTGyZ9mzMoyauD09eH5YGo5L6rfE-uY"
         }
       ]
     }

@@ -72,7 +72,8 @@ export default function OrgMessages() {
       setTo("");
       setSubject("");
       setBody("");
-      loadMessages();
+      setFolder("sent");
+      await loadMessages();
     } catch (err: any) {
       setSendError(err.message || "Failed to send message");
     } finally {

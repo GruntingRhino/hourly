@@ -53,6 +53,7 @@ export default function OrgDashboard() {
   const [rejectModal, setRejectModal] = useState<{ sessionId: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [overrideHours, setOverrideHours] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
@@ -79,8 +80,19 @@ export default function OrgDashboard() {
   };
 
   const handleApprove = async (sessionId: string) => {
-    await api.post(`/verification/${sessionId}/approve`);
-    loadData();
+    const raw = overrideHours[sessionId]?.trim();
+    const approvedHours = raw ? Number(raw) : undefined;
+    const previousPending = pending;
+    setPending((prev) => prev.filter((p) => p.id !== sessionId));
+    try {
+      await api.post(`/verification/${sessionId}/approve`, {
+        approvedHours: Number.isFinite(approvedHours) ? approvedHours : undefined,
+      });
+      void loadData();
+    } catch {
+      setPending(previousPending);
+      setError("Failed to approve pending verification");
+    }
   };
 
   const handleReject = (sessionId: string) => {
@@ -90,11 +102,18 @@ export default function OrgDashboard() {
 
   const handleConfirmReject = async () => {
     if (!rejectModal) return;
+    if (!rejectReason.trim()) return;
     setRejecting(true);
+    const sessionId = rejectModal.sessionId;
+    const previousPending = pending;
+    setPending((prev) => prev.filter((p) => p.id !== sessionId));
     try {
-      await api.post(`/verification/${rejectModal.sessionId}/reject`, { reason: rejectReason });
+      await api.post(`/verification/${sessionId}/reject`, { reason: rejectReason.trim() });
       setRejectModal(null);
-      loadData();
+      void loadData();
+    } catch {
+      setPending(previousPending);
+      setError("Failed to reject pending verification");
     } finally {
       setRejecting(false);
     }
@@ -207,11 +226,11 @@ export default function OrgDashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm">
             <h2 className="text-lg font-bold mb-3">Reject Hours</h2>
-            <p className="text-sm text-gray-600 mb-4">Optionally provide a reason for this rejection.</p>
+            <p className="text-sm text-gray-600 mb-4">A rejection reason is required.</p>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Reason (optional)"
+              placeholder="Reason (required)"
               rows={3}
               autoFocus
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
@@ -239,19 +258,34 @@ export default function OrgDashboard() {
         {/* Activity feed / pending verifications */}
         <div className="md:col-span-2">
           {/* Pending verifications */}
-          {pending.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Pending Verifications</h2>
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3">Pending Verifications</h2>
+            {pending.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-500">
+                No pending verifications.
+              </div>
+            ) : (
               <div className="space-y-2">
                 {pending.map((p) => (
-                  <div key={p.id} className="bg-white border border-yellow-200 rounded-lg p-4 flex justify-between items-center">
+                  <div key={p.id} className="bg-white border border-yellow-200 rounded-lg p-4 flex justify-between items-center gap-4">
                     <div>
                       <div className="font-medium text-sm">{p.user.name}</div>
                       <div className="text-xs text-gray-500">
                         {p.opportunity.title} &middot; {p.totalHours} hours
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        placeholder={`Override (${p.totalHours ?? 0})`}
+                        value={overrideHours[p.id] ?? ""}
+                        onChange={(e) =>
+                          setOverrideHours((prev) => ({ ...prev, [p.id]: e.target.value }))
+                        }
+                        className="w-28 px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
                       <button
                         onClick={() => handleApprove(p.id)}
                         className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
@@ -268,8 +302,8 @@ export default function OrgDashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Recent activity */}
           <h2 className="text-lg font-semibold mb-3">Recent Activity Feed</h2>

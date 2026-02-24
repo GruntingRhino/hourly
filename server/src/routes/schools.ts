@@ -263,10 +263,25 @@ router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       orderBy: { createdAt: "desc" },
     });
 
-    const approvedOrgIds = approvals.map((a) => a.organizationId);
-    const pendingOrgs = await prisma.organization.findMany({
-      where: { id: { notIn: approvedOrgIds } },
+    const allOrgs = await prisma.organization.findMany({
+      select: { id: true, name: true, description: true },
+      orderBy: { name: "asc" },
     });
+
+    const approvalStatusByOrg = new Map<string, string>();
+    for (const approval of approvals) {
+      approvalStatusByOrg.set(approval.organizationId, approval.status);
+    }
+
+    // Keep reviewable orgs visible to school admins for explicit approve/reject actions.
+    const pendingOrgs = allOrgs
+      .map((org) => ({
+        id: org.id,
+        name: org.name,
+        description: org.description,
+        status: approvalStatusByOrg.get(org.id) || "PENDING",
+      }))
+      .filter((org) => org.status !== "BLOCKED");
 
     res.json({ approvals, pendingOrgs });
   } catch (err) {
@@ -388,7 +403,9 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
     if (existing) return res.status(409).json({ error: "Email already registered" });
 
     const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    const configuredRounds = Number(process.env.TEMP_PASSWORD_BCRYPT_ROUNDS ?? 8);
+    const rounds = Number.isFinite(configuredRounds) ? Math.min(14, Math.max(4, Math.floor(configuredRounds))) : 8;
+    const passwordHash = await bcrypt.hash(tempPassword, rounds);
 
     const teacher = await prisma.user.create({
       data: {

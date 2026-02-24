@@ -85,13 +85,17 @@ router.get("/", async (req: Request, res: Response) => {
       where.organizationId = { in: approvedOrgIds };
     }
 
+    const orderBy = organizationId
+      ? [{ createdAt: "desc" as const }, { date: "asc" as const }]
+      : [{ date: "asc" as const }];
+
     const opportunities = await prisma.opportunity.findMany({
       where,
       include: {
         organization: { select: { id: true, name: true, avatarUrl: true, zipCodes: true } },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy,
     });
 
     // Filter by tag if provided (tags stored as JSON string)
@@ -251,8 +255,14 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
     }
     // customFields already stored as JSON string, pass through as-is
 
-    // Auto-geocode if address changed but lat/lng not provided
-    if (updateData.address && updateData.latitude === undefined && updateData.longitude === undefined) {
+    // Auto-geocode only when address actually changes and lat/lng are not provided.
+    // This avoids unnecessary external geocode calls on title/description-only edits.
+    if (
+      updateData.address &&
+      updateData.address !== opp.address &&
+      updateData.latitude === undefined &&
+      updateData.longitude === undefined
+    ) {
       const coords = await geocodeAddress(updateData.address);
       if (coords) {
         updateData.latitude = coords.lat;

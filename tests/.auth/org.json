@@ -2,11 +2,15 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "https://goodhours.app",
+      "origin": "http://localhost:5173",
       "localStorage": [
         {
+          "name": "goodhours_user",
+          "value": "{\"id\":\"cmlzy1ngg0009mu8ygz7f8m6f\",\"email\":\"volunteer@greenearth.org\",\"name\":\"Sarah Mitchell\",\"role\":\"ORG_ADMIN\",\"phone\":null,\"bio\":null,\"avatarUrl\":null,\"age\":null,\"grade\":null,\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":null,\"notificationPreferences\":{\"studentSignup\":{\"email\":false,\"inApp\":true},\"hourRequest\":{\"email\":true,\"inApp\":true},\"schoolApproval\":{\"email\":true,\"inApp\":true}},\"messagePreferences\":null,\"organizationId\":\"cmlzy1n9n0007mu8yi15p2x1k\",\"organization\":{\"id\":\"cmlzy1n9n0007mu8yi15p2x1k\",\"name\":\"Green Earth Foundation\",\"email\":\"contact@greenearth.org\",\"phone\":\"(555) 222-3333\",\"description\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"website\":\"https://greenearth.example.org\",\"socialLinks\":\"{\\\"instagram\\\":\\\"\\\",\\\"tiktok\\\":\\\"\\\",\\\"twitter\\\":\\\"\\\",\\\"youtube\\\":\\\"\\\"}\",\"avatarUrl\":null,\"status\":\"APPROVED\",\"zipCodes\":\"[\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:39.084Z\",\"updatedAt\":\"2026-02-24T01:49:06.296Z\"},\"school\":null,\"classroomId\":null,\"classroom\":null}"
+        },
+        {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx5Y2M5dXYwMDA5bXVueG4wMThwejd5IiwiZW1haWwiOiJ2b2x1bnRlZXJAZ3JlZW5lYXJ0aC5vcmciLCJyb2xlIjoiT1JHX0FETUlOIiwiaWF0IjoxNzcxODA0ODg3LCJleHAiOjE3NzI0MDk2ODd9.vZcFwhgM29hTmFNpbp1dkY3ByAGmfezWrRhJkrFx-O8"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFuZ2cwMDA5bXU4eWd6N2Y4bTZmIiwiZW1haWwiOiJ2b2x1bnRlZXJAZ3JlZW5lYXJ0aC5vcmciLCJyb2xlIjoiT1JHX0FETUlOIiwiaWF0IjoxNzcxODk3NzI0LCJleHAiOjE3NzI1MDI1MjR9.g4sFGxYQvttsouFr9LImm2KkV21BK8ukHW-Mt6n8aGo"
         }
       ]
     }
