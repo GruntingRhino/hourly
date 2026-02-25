@@ -1,0 +1,2 @@
+ALTER TABLE "School"
+ADD COLUMN "allowJoinByCode" BOOLEAN NOT NULL DEFAULT false;

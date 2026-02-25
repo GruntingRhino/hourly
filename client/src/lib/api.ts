@@ -32,7 +32,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const method = (options?.method || "GET").toUpperCase();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), getTimeoutMs());
 
@@ -83,6 +82,16 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: "PUT",
+      body:
+        typeof FormData !== "undefined" && body instanceof FormData
+          ? body
+          : body !== undefined
+          ? JSON.stringify(body)
+          : undefined,
+    }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: "PATCH",
       body:
         typeof FormData !== "undefined" && body instanceof FormData
           ? body

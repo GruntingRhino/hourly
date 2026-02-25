@@ -7,6 +7,9 @@ import { requireRole } from "../middleware/rbac";
 import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
 
 const router = Router();
+const schoolJoinSettingsSchema = z.object({
+  allowJoinByCode: z.boolean(),
+});
 
 // GET /api/schools — public search (for orgs to find schools)
 router.get("/", authenticate, async (req: Request, res: Response) => {
@@ -28,6 +31,60 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     res.json(schools);
   } catch (err) {
     console.error("List schools error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/schools/settings — current school-level settings for the authenticated school staff
+router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: { id: true, allowJoinByCode: true },
+    });
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({
+      schoolId: school.id,
+      allowJoinByCode: school.allowJoinByCode,
+    });
+  } catch (err) {
+    console.error("Get school settings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/schools/settings — update school-level settings
+router.patch("/settings", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const data = schoolJoinSettingsSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const updated = await prisma.school.update({
+      where: { id: user.schoolId },
+      data: { allowJoinByCode: data.allowJoinByCode },
+      select: { id: true, allowJoinByCode: true },
+    });
+
+    res.json({
+      schoolId: updated.id,
+      allowJoinByCode: updated.allowJoinByCode,
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Update school settings error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

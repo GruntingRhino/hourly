@@ -23,6 +23,11 @@ interface ClassroomData {
   studentCount: number;
 }
 
+interface SchoolSettingsData {
+  schoolId: string;
+  allowJoinByCode: boolean;
+}
+
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
   const [tab, setTab] = useState<Tab>("profile");
@@ -36,6 +41,12 @@ export default function SchoolSettings() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [allowJoinByCode, setAllowJoinByCode] = useState(false);
+  const [updatingJoinByCode, setUpdatingJoinByCode] = useState(false);
+  const [joinByCodeToast, setJoinByCodeToast] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [newClassroomName, setNewClassroomName] = useState("");
   const [creatingClassroom, setCreatingClassroom] = useState(false);
 
@@ -80,11 +91,16 @@ export default function SchoolSettings() {
       Promise.all([
         api.get<SchoolData>(`/schools/${user.schoolId}`),
         api.get<ClassroomData[]>("/classrooms"),
-      ]).then(([schoolData, classroomData]) => {
+        api.get<SchoolSettingsData>("/schools/settings").catch(() => ({
+          schoolId: user.schoolId!,
+          allowJoinByCode: false,
+        })),
+      ]).then(([schoolData, classroomData, schoolSettings]) => {
         setSchool(schoolData);
         setSchoolName(schoolData.name || "");
         setDomain(schoolData.domain || "");
         setRequiredHours(String(schoolData.requiredHours));
+        setAllowJoinByCode(Boolean(schoolSettings.allowJoinByCode));
         try {
           const zips = schoolData.zipCodes ? JSON.parse(schoolData.zipCodes) : [];
           setZipCodes(Array.isArray(zips) ? zips.join(", ") : "");
@@ -101,6 +117,12 @@ export default function SchoolSettings() {
   useEffect(() => {
     setNotifPrefs(mergeNotifPrefs((user as any)?.notificationPreferences));
   }, [(user as any)?.notificationPreferences]);
+
+  useEffect(() => {
+    if (!joinByCodeToast) return;
+    const timeoutId = window.setTimeout(() => setJoinByCodeToast(null), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [joinByCodeToast]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +147,38 @@ export default function SchoolSettings() {
       setIsError(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleAllowJoinByCode = async () => {
+    if (user?.role !== "SCHOOL_ADMIN") return;
+
+    const previousValue = allowJoinByCode;
+    const nextValue = !previousValue;
+
+    setAllowJoinByCode(nextValue);
+    setUpdatingJoinByCode(true);
+    setMessage("");
+    setIsError(false);
+
+    try {
+      const updated = await api.patch<SchoolSettingsData>("/schools/settings", {
+        allowJoinByCode: nextValue,
+      });
+      setAllowJoinByCode(Boolean(updated.allowJoinByCode));
+      setMessage("Join-by-code setting updated.");
+      setIsError(false);
+      setJoinByCodeToast({ type: "success", text: "Join-by-code setting saved." });
+    } catch (err: any) {
+      setAllowJoinByCode(previousValue);
+      setMessage(err.message || "Failed to update join-by-code setting");
+      setIsError(true);
+      setJoinByCodeToast({
+        type: "error",
+        text: err.message || "Failed to update join-by-code setting",
+      });
+    } finally {
+      setUpdatingJoinByCode(false);
     }
   };
 
@@ -352,6 +406,38 @@ export default function SchoolSettings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
+
+            {user?.role === "SCHOOL_ADMIN" && (
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      Allow students to join with invite code
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      When off, students cannot join classrooms using a code.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={allowJoinByCode}
+                    aria-label="Allow students to join with invite code"
+                    onClick={handleToggleAllowJoinByCode}
+                    disabled={updatingJoinByCode}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                      allowJoinByCode ? "bg-blue-600" : "bg-gray-300"
+                    } ${updatingJoinByCode ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                        allowJoinByCode ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -634,6 +720,20 @@ export default function SchoolSettings() {
           >
             Export Activity Log (CSV)
           </button>
+        </div>
+      )}
+
+      {joinByCodeToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-4 right-4 z-50 rounded-md border px-4 py-3 text-sm shadow-lg ${
+            joinByCodeToast.type === "success"
+              ? "border-green-200 bg-green-50 text-green-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {joinByCodeToast.text}
         </div>
       )}
     </div>

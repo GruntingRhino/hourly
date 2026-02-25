@@ -250,6 +250,11 @@ router.post(
       if (!classroom.isActive) {
         return res.status(400).json({ error: "This classroom is no longer active" });
       }
+      if (!classroom.school.allowJoinByCode) {
+        return res.status(403).json({
+          error: "Joining by code is currently disabled by your school.",
+        });
+      }
 
       // Attach student to classroom and implicitly to school
       const updated = await prisma.user.update({

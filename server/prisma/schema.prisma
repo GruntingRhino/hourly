@@ -68,6 +68,7 @@ model School {
   createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
   requiredHours    Float    @default(40)
   verificationStandard String @default("OPEN")
+  allowJoinByCode  Boolean  @default(false)
   zipCodes         String?  // JSON array of zip codes
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
