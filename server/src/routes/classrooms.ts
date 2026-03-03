@@ -143,7 +143,6 @@ router.get(
               name: true,
               email: true,
               grade: true,
-              age: true,
               serviceSessions: {
                 where: { verificationStatus: "APPROVED" },
                 select: { totalHours: true },
@@ -166,8 +165,7 @@ router.get(
         name: s.name,
         email: s.email,
         grade: s.grade,
-        age: s.age,
-        approvedHours: s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0),
+        approvedHours: s.serviceSessions.reduce((sum: number, ss: any) => sum + (ss.totalHours || 0), 0),
       }));
 
       res.json({

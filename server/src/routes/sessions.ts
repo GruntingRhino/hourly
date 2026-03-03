@@ -179,7 +179,7 @@ router.get("/organization", authenticate, requireRole("ORG_ADMIN"), async (req: 
     const sessions = await prisma.serviceSession.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        user: { select: { id: true, name: true, email: true } },
         opportunity: { select: { id: true, title: true, date: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -234,7 +234,7 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
         verificationStatus: "PENDING",
         signatureType: file ? "FILE" : "DRAWN",
         signatureData: signatureType === "DRAWN" ? signatureData : null,
-        signatureFileUrl: file ? `/uploads/${file.filename}` : null,
+        // signatureFileUrl removed from schema
         signatureFileName: file ? file.originalname : null,
         submittedAt: new Date(),
       },

@@ -13,27 +13,27 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  passwordHash  String
+  passwordHash  String?   // nullable — Google-OAuth users may not have a password initially
   name          String
   phone         String?
-  bio           String?
-  avatarUrl     String?
-  role          String    // DISTRICT_ADMIN, SCHOOL_ADMIN, TEACHER, STUDENT, ORG_ADMIN
+  role          String    // SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN, STUDENT, BENEFICIARY_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
   emailVerificationToken String?
   emailVerificationExpires DateTime?
   passwordResetToken String?
   passwordResetExpires DateTime?
-  socialLinks              String?   // JSON string (for student social profiles)
-  notificationPreferences  String?   // JSON: {hourApproval:{email,inApp}, hourRemoval:{email,inApp}, eventChange:{email,inApp}, orgRequest:{email,inApp}}
-  messagePreferences       String?   // JSON: {allowFrom:"EVERYONE"|"ORGS_ONLY"|"ADMINS_ONLY", profileVisibility:"EVERYONE"|"SCHOOL"|"PRIVATE"}
+  googleId      String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Student-specific
-  age           Int?
   grade         String?
+  house         String?   // optional house affiliation (configurable per school)
+  cohortId      String?
+  cohort        Cohort?   @relation("CohortStudents", fields: [cohortId], references: [id])
+
+  // Legacy classroom (kept for migration, no longer used for new students)
   classroomId   String?
   classroom     Classroom? @relation("ClassroomStudents", fields: [classroomId], references: [id])
 
@@ -41,7 +41,11 @@ model User {
   schoolId      String?
   school        School?   @relation("SchoolStaff", fields: [schoolId], references: [id])
 
-  // Organization-specific (ORG_ADMIN)
+  // Beneficiary association (BENEFICIARY_ADMIN)
+  beneficiaryId String?
+  beneficiary   Beneficiary? @relation("BeneficiaryMembers", fields: [beneficiaryId], references: [id])
+
+  // Legacy org (kept for backward compat during migration)
   organizationId String?
   organization   Organization? @relation("OrgMembers", fields: [organizationId], references: [id])
 
@@ -55,6 +59,7 @@ model User {
   savedOpportunities   SavedOpportunity[]
   createdSchools       School[]         @relation("SchoolCreator")
   taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
+  selfSubmissions      SelfSubmittedRequest[]
 }
 
 // ─── Schools ────────────────────────────────────────────────────
@@ -62,24 +67,293 @@ model User {
 model School {
   id               String   @id @default(cuid())
   name             String
-  domain           String?
+  // Directory reference — if this school came from the schools directory
+  directoryId      String?  // references SchoolDirectory.id
+  directoryEntry   SchoolDirectory? @relation(fields: [directoryId], references: [id])
+  type             String?  // public, private, charter
+  address          String?
+  city             String?
+  state            String?
+  zip              String?
+  latitude         Float?
+  longitude        Float?
+  domain           String?  // official email domain(s) — eligibility check only, not self-enrollment
   verified         Boolean  @default(false)
+  // Magic link registration
+  registrationToken      String?   @unique
+  registrationTokenExpires DateTime?
+  registrationEmail      String?   // email to which the magic link was sent
   createdById      String
   createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
   requiredHours    Float    @default(40)
-  verificationStandard String @default("OPEN")
+  verificationStandard String @default("STANDARD")
+  // Legacy
   allowJoinByCode  Boolean  @default(false)
-  zipCodes         String?  // JSON array of zip codes
+  zipCodes         String?  // JSON array of zip codes (service area)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   staff            User[]               @relation("SchoolStaff")
-  classrooms       Classroom[]
-  approvedOrgs     SchoolOrganization[]
+  cohorts          Cohort[]
+  classrooms       Classroom[]          // legacy
+  approvedOrgs     SchoolOrganization[] // legacy
+  beneficiaryApprovals SchoolBeneficiaryApproval[]
   groups           StudentGroup[]
+  verifiedDomains  VerifiedDomain[]
+  selfSubmissions  SelfSubmittedRequest[]
 }
 
-// ─── Classrooms ─────────────────────────────────────────────────
+// ─── School Directory (imported from CSV data) ───────────────────
+
+model SchoolDirectory {
+  id       String  @id @default(cuid())
+  name     String
+  type     String? // public, private, charter
+  address  String?
+  city     String?
+  state    String?
+  zip      String?
+  latitude Float?
+  longitude Float?
+  emailDomain String? // known official email domain if any
+  claimed  Boolean @default(false)
+  claimedBySchoolId String?
+
+  schools  School[]
+}
+
+// ─── Verified Domains (per school) ──────────────────────────────
+
+model VerifiedDomain {
+  id       String @id @default(cuid())
+  schoolId String
+  domain   String // e.g. "lincoln.edu"
+  school   School @relation(fields: [schoolId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([schoolId, domain])
+}
+
+// ─── Cohorts (replaces Classroom for new arch) ──────────────────
+
+model Cohort {
+  id            String   @id @default(cuid())
+  name          String   // e.g. "Class of 2028"
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id])
+  requiredHours Float?   // override school default if set
+  startYear     Int?
+  endYear       Int?
+  status        String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  students      User[]            @relation("CohortStudents")
+  invitations   StudentInvitation[]
+}
+
+// ─── Student Invitations ─────────────────────────────────────────
+
+model StudentInvitation {
+  id         String   @id @default(cuid())
+  cohortId   String
+  cohort     Cohort   @relation(fields: [cohortId], references: [id])
+  email      String
+  name       String?
+  token      String   @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  status     String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  createdAt  DateTime @default(now())
+
+  @@unique([cohortId, email])
+}
+
+// ─── Beneficiaries ──────────────────────────────────────────────
+
+model Beneficiary {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  description String?
+  website     String?
+  category    String?  // environment, education, food, etc.
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  latitude    Float?
+  longitude   Float?
+  // Directory status
+  directoryId String?  // references BeneficiaryDirectory.id
+  directoryEntry BeneficiaryDirectory? @relation(fields: [directoryId], references: [id])
+  status      String   @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  visibility  String   @default("PRIVATE") // PUBLIC, PRIVATE (school-created)
+  claimed     Boolean  @default(false)
+  createdBySchoolId String? // if school-created custom beneficiary
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     User[]              @relation("BeneficiaryMembers")
+  opportunities BeneficiaryOpportunity[]
+  schoolApprovals SchoolBeneficiaryApproval[]
+  invitations BeneficiaryInvitation[]
+}
+
+// ─── Beneficiary Directory (IRS 501c3 + public institutions) ────
+
+model BeneficiaryDirectory {
+  id       String  @id @default(cuid())
+  name     String
+  ein      String? @unique // EIN for 501c3s
+  category String?
+  address  String?
+  city     String?
+  state    String?
+  zip      String?
+  latitude Float?
+  longitude Float?
+  email    String?
+  website  String?
+  claimed  Boolean @default(false)
+
+  beneficiaries Beneficiary[]
+}
+
+// ─── School <-> Beneficiary Approval ────────────────────────────
+
+model SchoolBeneficiaryApproval {
+  id             String      @id @default(cuid())
+  schoolId       String
+  beneficiaryId  String
+  status         String      @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
+  approvedAt     DateTime?
+  school         School      @relation(fields: [schoolId], references: [id])
+  beneficiary    Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@unique([schoolId, beneficiaryId])
+}
+
+// ─── Beneficiary Invitations ─────────────────────────────────────
+
+model BeneficiaryInvitation {
+  id             String      @id @default(cuid())
+  schoolId       String      // which school is inviting
+  beneficiaryId  String
+  beneficiary    Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  token          String      @unique
+  expiresAt      DateTime
+  status         String      @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  sentTo         String      // email address sent to
+  acceptedAt     DateTime?
+  respondedAt    DateTime?
+  createdAt      DateTime    @default(now())
+}
+
+// ─── Self-Submitted Volunteering Requests ───────────────────────
+
+model SelfSubmittedRequest {
+  id              String   @id @default(cuid())
+  studentId       String
+  student         User     @relation(fields: [studentId], references: [id])
+  schoolId        String
+  school          School   @relation(fields: [schoolId], references: [id])
+  organizationName String  // name of place they volunteered at
+  description     String
+  date            DateTime
+  hours           Float
+  evidenceNote    String?  // optional description/link
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  convertedSessionId String? // if approved → creates a ServiceSession
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── Beneficiary Opportunities ───────────────────────────────────
+
+model BeneficiaryOpportunity {
+  id              String      @id @default(cuid())
+  title           String
+  description     String
+  beneficiaryId   String
+  beneficiary     Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  category        String?
+  location        String?
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  startDate       DateTime
+  endDate         DateTime?
+  status          String      @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
+  requirementsNote String?
+  customFields    String?     // JSON
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  timeSlots       BeneficiaryTimeSlot[]
+}
+
+// ─── Beneficiary Time Slots ───────────────────────────────────────
+
+model BeneficiaryTimeSlot {
+  id              String                 @id @default(cuid())
+  opportunityId   String
+  opportunity     BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id])
+  date            DateTime
+  startTime       String  // "10:00 AM"
+  endTime         String  // "2:00 PM"
+  durationHours   Float
+  capacity        Int     @default(10)
+  createdAt       DateTime @default(now())
+
+  signups         BeneficiarySignup[]
+}
+
+// ─── Beneficiary Signups (new model) ────────────────────────────
+
+model BeneficiarySignup {
+  id          String              @id @default(cuid())
+  slotId      String
+  slot        BeneficiaryTimeSlot @relation(fields: [slotId], references: [id])
+  studentId   String
+  status      String              @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
+  checkedIn   Boolean             @default(false)
+  checkedInAt DateTime?
+  checkedOut  Boolean             @default(false)
+  checkedOutAt DateTime?
+  totalHours  Float?
+  verificationStatus String      @default("PENDING") // PENDING, APPROVED, REJECTED
+  verifiedBy  String?
+  verifiedAt  DateTime?
+  rejectionReason String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  auditLogs   BeneficiaryAuditLog[]
+
+  @@unique([slotId, studentId])
+}
+
+// ─── Beneficiary Audit Log ────────────────────────────────────────
+
+model BeneficiaryAuditLog {
+  id        String            @id @default(cuid())
+  action    String            // APPROVE, REJECT, OVERRIDE, CHECK_IN, CHECK_OUT
+  details   String?           // JSON
+  actorId   String
+  signupId  String?
+  signup    BeneficiarySignup? @relation(fields: [signupId], references: [id])
+  createdAt DateTime          @default(now())
+}
+
+// ─── Legacy: Classrooms ─────────────────────────────────────────
+// Kept for backward compat — new schools use Cohorts instead
 
 model Classroom {
   id          String   @id @default(cuid())
@@ -96,7 +370,8 @@ model Classroom {
   students    User[]   @relation("ClassroomStudents")
 }
 
-// ─── Organizations ──────────────────────────────────────────────
+// ─── Legacy: Organizations ──────────────────────────────────────
+// Kept for backward compat — new entities use Beneficiary model
 
 model Organization {
   id           String   @id @default(cuid())
@@ -105,7 +380,6 @@ model Organization {
   phone        String?
   description  String?
   website      String?
-  socialLinks  String?  // JSON string
   avatarUrl    String?
   status       String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
   zipCodes     String?  // JSON array of zip codes
@@ -117,13 +391,13 @@ model Organization {
   schoolApprovals SchoolOrganization[]
 }
 
-// ─── School <-> Organization approval ───────────────────────────
+// ─── Legacy: School <-> Organization approval ───────────────────
 
 model SchoolOrganization {
   id             String       @id @default(cuid())
   schoolId       String
   organizationId String
-  status         String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  status         String       @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
   approvedAt     DateTime?
   school         School       @relation(fields: [schoolId], references: [id])
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -154,7 +428,7 @@ model StudentGroupMember {
   @@unique([groupId, studentId])
 }
 
-// ─── Opportunities ──────────────────────────────────────────────
+// ─── Legacy: Opportunities ──────────────────────────────────────
 
 model Opportunity {
   id              String       @id @default(cuid())
@@ -186,7 +460,7 @@ model Opportunity {
   savedBy         SavedOpportunity[]
 }
 
-// ─── Signups ────────────────────────────────────────────────────
+// ─── Legacy: Signups ────────────────────────────────────────────
 
 model Signup {
   id              String      @id @default(cuid())
@@ -235,7 +509,6 @@ model ServiceSession {
   // Verification submission fields
   signatureType     String?   // "DRAWN" or "FILE"
   signatureData     String?   // Base64 eSignature data (for DRAWN type)
-  signatureFileUrl  String?   // File path for uploaded signature (for FILE type)
   signatureFileName String?   // Original filename
   submittedAt       DateTime? // When verification was submitted
 
@@ -279,13 +552,12 @@ model Message {
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
 
-
 // ─── Notifications ──────────────────────────────────────────────
 
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // SIGNUP_CONFIRMED, EVENT_REMINDER, VERIFICATION_UPDATE, etc.
+  type      String   // SIGNUP_CONFIRMED, EVENT_REMINDER, VERIFICATION_UPDATE, INVITATION, etc.
   title     String
   body      String
   read      Boolean  @default(false)

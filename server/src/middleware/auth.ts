@@ -33,6 +33,6 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export function signToken(payload: AuthPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+export function signToken(payload: object, options?: { expiresIn?: string }): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: options?.expiresIn ?? "7d" } as any);
 }

@@ -168,21 +168,11 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Join classroom prompt */}
-      {!user?.classroomId && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
-          <div>
-            <div className="font-medium text-yellow-900">No classroom yet</div>
-            <div className="text-sm text-yellow-700">
-              Join a classroom with an invite code from your teacher to link to a school.
-            </div>
-          </div>
-          <Link
-            to="/settings"
-            className="px-4 py-2 bg-yellow-600 text-white rounded-md text-sm hover:bg-yellow-700"
-          >
-            Join Classroom
-          </Link>
+      {/* Cohort info */}
+      {user?.cohort && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          Cohort: <strong>{user.cohort.name}</strong>
+          {user.cohort.requiredHours && <span className="ml-2 text-blue-600">Goal: {user.cohort.requiredHours}h</span>}
         </div>
       )}
 

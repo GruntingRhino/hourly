@@ -42,7 +42,6 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
             verificationStatus: "PENDING",
             signatureType: null,
             signatureData: null,
-            signatureFileUrl: null,
             signatureFileName: null,
             submittedAt: null,
             rejectionReason: null,

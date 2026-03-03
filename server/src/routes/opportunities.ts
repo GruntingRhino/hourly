@@ -92,7 +92,7 @@ router.get("/", async (req: Request, res: Response) => {
     const opportunities = await prisma.opportunity.findMany({
       where,
       include: {
-        organization: { select: { id: true, name: true, avatarUrl: true, zipCodes: true } },
+        organization: { select: { id: true, name: true, zipCodes: true } },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
       },
       orderBy,
@@ -164,10 +164,10 @@ router.get("/:id", async (req: Request, res: Response) => {
     const opp = await prisma.opportunity.findUnique({
       where: { id: req.params.id },
       include: {
-        organization: { select: { id: true, name: true, description: true, avatarUrl: true } },
+        organization: { select: { id: true, name: true, description: true } },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
         signups: {
-          include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+          include: { user: { select: { id: true, name: true } } },
         },
       },
     });

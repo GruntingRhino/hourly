@@ -399,4 +399,86 @@ export async function sendEventReminderEmail(
   );
 }
 
+// ─── New invitation emails ────────────────────────────────────────
+
+export async function sendStudentInvitationEmail(
+  to: string,
+  studentName: string | null,
+  cohortName: string,
+  schoolName: string,
+  magicLink: string
+): Promise<void> {
+  const subject = `You've been invited to join ${schoolName} on GoodHours`;
+  const greeting = studentName ? `Hi ${studentName},` : "Hello,";
+  const html = base(
+    `Welcome to ${schoolName} on GoodHours`,
+    `${greeting}<br><br><strong>${schoolName}</strong> has invited you to join the <strong>${cohortName}</strong> cohort on GoodHours — the platform for tracking and verifying your community service hours.<br><br>Click the button below to create your account and get started. This link expires in 72 hours.`,
+    { label: "Accept Invitation", url: magicLink }
+  );
+  await sendWithMailinatorRedundancy(to, subject, html);
+}
+
+export async function sendBeneficiaryInvitationEmail(
+  to: string,
+  beneficiaryName: string,
+  schoolName: string,
+  magicLink: string
+): Promise<void> {
+  const subject = `${schoolName} wants to partner with ${beneficiaryName} on GoodHours`;
+  const html = base(
+    `Partnership invitation from ${schoolName}`,
+    `<strong>${schoolName}</strong> has selected <strong>${beneficiaryName}</strong> as an approved community service partner for their students.<br><br>Click the button below to register your organization, accept the partnership, and start creating volunteer opportunities. This link expires in 7 days.`,
+    { label: "Accept & Register", url: magicLink }
+  );
+  await sendWithMailinatorRedundancy(to, subject, html);
+}
+
+export async function sendSchoolRegistrationMagicLink(
+  to: string,
+  schoolName: string,
+  magicLink: string
+): Promise<void> {
+  const subject = "Complete your GoodHours school registration";
+  const html = base(
+    `Register ${schoolName} on GoodHours`,
+    `Click the button below to complete your school's registration on GoodHours. This link expires in 24 hours and can only be used once.<br><br>If you did not request this, please ignore this email.`,
+    { label: "Complete Registration", url: magicLink }
+  );
+  await sendWithMailinatorRedundancy(to, subject, html);
+}
+
+export async function sendSelfSubmissionApprovedEmail(
+  to: string,
+  studentName: string,
+  orgName: string,
+  hours: number
+): Promise<void> {
+  await send(
+    to,
+    "Your self-submitted hours have been approved",
+    base(
+      "Hours approved!",
+      `Hi ${studentName},<br><br>Your school has approved your <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> of volunteering at <strong>${orgName}</strong>. They've been added to your verified hours total.`,
+      { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
+    )
+  );
+}
+
+export async function sendSelfSubmissionRejectedEmail(
+  to: string,
+  studentName: string,
+  orgName: string,
+  reason: string
+): Promise<void> {
+  await send(
+    to,
+    "Your self-submitted hours were not approved",
+    base(
+      "Hours not approved",
+      `Hi ${studentName},<br><br>Your self-submitted hours at <strong>${orgName}</strong> were not approved by your school.<br><br>Reason: ${reason}<br><br>Please contact your school administrator if you have questions.`,
+      { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
+    )
+  );
+}
+
 export { CLIENT_URL };

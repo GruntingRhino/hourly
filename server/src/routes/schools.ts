@@ -156,7 +156,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
         classroom: { schoolId: req.params.id },
       },
       select: {
-        id: true, name: true, email: true, grade: true, age: true, avatarUrl: true,
+        id: true, name: true, email: true, grade: true,
         classroomId: true,
         classroom: { select: { id: true, name: true } },
         serviceSessions: {
@@ -169,7 +169,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
 
     const result = students.map((s) => ({
       ...s,
-      approvedHours: s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0),
+      approvedHours: s.serviceSessions.reduce((sum: number, ss: any) => sum + (ss.totalHours || 0), 0),
       serviceSessions: undefined,
     }));
 
@@ -516,7 +516,7 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       where: { id: sessionId },
       include: {
         opportunity: true,
-        user: { select: { id: true, email: true, name: true, classroomId: true, notificationPreferences: true } },
+        user: { select: { id: true, email: true, name: true, classroomId: true } },
       },
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
@@ -558,17 +558,7 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       },
     });
 
-    // Send email to student (check notification preferences)
-    let sendRemovalEmail = true;
-    if (session.user.notificationPreferences) {
-      try {
-        const prefs = JSON.parse(session.user.notificationPreferences as string);
-        if (prefs.hourRemoval?.email === false) sendRemovalEmail = false;
-      } catch {}
-    }
-    if (sendRemovalEmail) {
-      sendHourRemovedEmail(session.user.email, session.totalHours ?? 0, session.opportunity.title).catch(() => {});
-    }
+    sendHourRemovedEmail(session.user.email, session.totalHours ?? 0, session.opportunity.title).catch(() => {});
 
     res.json({ message: "Hours removed successfully" });
   } catch (err) {

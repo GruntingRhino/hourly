@@ -2,41 +2,43 @@ import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { api, ApiError } from "../lib/api";
 
-type Role = "STUDENT" | "ORG_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "DISTRICT_ADMIN";
+type Role = "STUDENT" | "ORG_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "DISTRICT_ADMIN" | "BENEFICIARY_ADMIN";
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: Role;
-  phone?: string;
-  bio?: string;
-  avatarUrl?: string;
-  age?: number;
-  grade?: string;
   emailVerified?: boolean;
-  socialLinks?: { instagram?: string; tiktok?: string; twitter?: string; youtube?: string } | null;
-  organizationId?: string;
-  organization?: { id: string; name: string; description?: string; zipCodes?: string | null };
+  grade?: string;
+  house?: string;
   schoolId?: string;
   school?: { id: string; name: string; domain?: string | null; verified: boolean; requiredHours?: number; zipCodes?: string | null };
+  cohortId?: string;
+  cohort?: { id: string; name: string; requiredHours?: number };
+  beneficiaryId?: string;
+  beneficiary?: { id: string; name: string };
+  // Legacy fields (kept for compatibility with existing settings/browse pages)
+  organizationId?: string;
+  organization?: { id: string; name: string; description?: string; zipCodes?: string | null };
   classroomId?: string;
   classroom?: { id: string; name: string; inviteCode?: string; school: { id: string; name: string } };
-  notificationPreferences?: Record<string, any> | null;
-  messagePreferences?: Record<string, any> | null;
+  phone?: string;
+  bio?: string;
+  avatarUrl?: string | null;
+  socialLinks?: { instagram?: string; tiktok?: string; twitter?: string; youtube?: string } | null;
 }
 
 interface SignupResult {
   token: string;
   user: User;
-  requiresEmailVerification?: boolean;
-  verificationUrl?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (token: string, user: User) => void;
   signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -47,11 +49,8 @@ export interface SignupData {
   password: string;
   name: string;
   role: string;
-  age?: number;
-  organizationName?: string;
   schoolName?: string;
   schoolDomain?: string;
-  zipCodes?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -93,8 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data);
       writeCachedUser(data);
     } catch (err) {
-      // Only clear auth state on true auth failures; transient abort/network
-      // errors should not force-log the user out.
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         localStorage.removeItem("goodhours_token");
         writeCachedUser(null);
@@ -119,6 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeCachedUser(data.user);
   };
 
+  const loginWithToken = (token: string, u: User) => {
+    localStorage.setItem("goodhours_token", token);
+    setUser(u);
+    writeCachedUser(u);
+  };
+
   const signup = async (signupData: SignupData): Promise<SignupResult> => {
     const data = await api.post<SignupResult>("/auth/signup", signupData);
     localStorage.setItem("goodhours_token", data.token);
@@ -134,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithToken, signup, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

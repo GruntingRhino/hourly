@@ -1,8 +1,10 @@
+import "./lib/env"; // Validate required env vars at startup
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
+import googleAuthRoutes from "./routes/googleAuth";
 import opportunityRoutes from "./routes/opportunities";
 import signupRoutes from "./routes/signups";
 import sessionRoutes from "./routes/sessions";
@@ -13,6 +15,11 @@ import classroomRoutes from "./routes/classrooms";
 import messageRoutes from "./routes/messages";
 import reportRoutes from "./routes/reports";
 import savedRoutes from "./routes/saved";
+// New school-orchestrated architecture routes
+import cohortRoutes from "./routes/cohorts";
+import beneficiaryRoutes from "./routes/beneficiaries";
+import invitationRoutes from "./routes/invitations";
+import selfSubmissionRoutes from "./routes/selfSubmissions";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +34,15 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/auth/google", googleAuthRoutes);
+
+// New architecture routes
+app.use("/api/cohorts", cohortRoutes);
+app.use("/api/beneficiaries", beneficiaryRoutes);
+app.use("/api/invitations", invitationRoutes);
+app.use("/api/self-submissions", selfSubmissionRoutes);
+
+// Legacy routes (kept for backward compat)
 app.use("/api/opportunities", opportunityRoutes);
 app.use("/api/signups", signupRoutes);
 app.use("/api/sessions", sessionRoutes);

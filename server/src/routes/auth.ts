@@ -114,7 +114,8 @@ router.get("/__test-email", (req: Request, res: Response) => {
   res.json({ inbox, messages });
 });
 
-const VALID_ROLES = ["STUDENT", "ORG_ADMIN", "SCHOOL_ADMIN"] as const;
+// Only SCHOOL_ADMIN can self-register. Students and Beneficiary admins must use invitation flows.
+const VALID_ROLES = ["SCHOOL_ADMIN"] as const;
 
 const passwordSchema = z.string()
   .min(8, "Password must be at least 8 characters")
@@ -124,18 +125,12 @@ const passwordSchema = z.string()
   .regex(/[0-9]/, "Password must contain at least one number")
   .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 
+// School admin self-signup schema — students/beneficiaries use invitation flows
 const signupSchema = z.object({
   email: z.string().email().max(255),
   password: passwordSchema,
   name: z.string().min(1).max(255),
   role: z.enum(VALID_ROLES),
-  age: z.number().int().min(10).max(25).optional(),
-  grade: z.string().max(50).optional(),
-  organizationName: z.string().max(255).optional(),
-  orgName: z.string().max(255).optional(), // alias for organizationName
-  description: z.string().max(1000).optional(),
-  phone: z.string().max(20).optional(),
-  website: z.string().max(255).optional(),
   schoolName: z.string().max(255).optional(),
   schoolDomain: z.string().max(255).optional(),
   zipCodes: z.array(z.string().regex(/^\d{5}$/, "Invalid ZIP code")).optional(),
@@ -158,27 +153,11 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
-    let organizationId: string | undefined;
     let schoolId: string | undefined;
 
     // Generate email verification token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    // If signing up as an org admin, create the organization
-    if (data.role === "ORG_ADMIN") {
-      const org = await prisma.organization.create({
-        data: {
-          name: data.organizationName || data.orgName || data.name,
-          email: data.email,
-          phone: data.phone || null,
-          description: data.description || null,
-          website: data.website || null,
-          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
-        },
-      });
-      organizationId = org.id;
-    }
 
     // Create the user first (school creation needs user id)
     const user = await prisma.user.create({
@@ -187,8 +166,6 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         passwordHash,
         name: data.name,
         role: data.role,
-        age: data.role === "STUDENT" ? data.age : undefined,
-        organizationId,
         emailVerified: false,
         emailVerificationToken,
         emailVerificationExpires,
@@ -271,6 +248,8 @@ router.post("/login", async (req: Request, res: Response) => {
         organization: true,
         school: true,
         classroom: { include: { school: true } },
+        cohort: { include: { school: true } },
+        beneficiary: true,
       },
     });
     if (!user) {
@@ -280,6 +259,10 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Account is " + user.status.toLowerCase() });
     }
 
+    if (!user.passwordHash) {
+      return res.status(401).json({ error: "This account uses Google Sign-In. Please use that method." });
+    }
+
     const valid = await bcrypt.compare(data.password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
@@ -287,8 +270,9 @@ router.post("/login", async (req: Request, res: Response) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
-    // Derive school info for students from classroom
-    const studentSchool = user.classroom?.school || null;
+    // Derive school info: from direct association, classroom, or cohort
+    const studentSchool = user.school || user.classroom?.school || user.cohort?.school || null;
+    const schoolId = user.schoolId || user.classroom?.school?.id || user.cohort?.school?.id || null;
 
     res.json({
       token,
@@ -297,16 +281,17 @@ router.post("/login", async (req: Request, res: Response) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        phone: user.phone,
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
         emailVerified: user.emailVerified,
         organizationId: user.organizationId,
         organization: user.organization,
-        schoolId: user.schoolId || studentSchool?.id,
-        school: user.school || studentSchool,
+        schoolId,
+        school: studentSchool,
         classroomId: user.classroomId,
         classroom: user.classroom,
+        cohortId: user.cohortId,
+        cohort: user.cohort,
+        beneficiaryId: user.beneficiaryId,
+        beneficiary: user.beneficiary,
       },
     });
   } catch (err) {
@@ -327,33 +312,34 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
         organization: true,
         school: true,
         classroom: { include: { school: true } },
+        cohort: { include: { school: true } },
+        beneficiary: true,
       },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const studentSchool = user.classroom?.school || null;
+    const studentSchool = user.school || user.classroom?.school || user.cohort?.school || null;
+    const schoolId = user.schoolId || user.classroom?.school?.id || user.cohort?.school?.id || null;
 
     res.json({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      phone: user.phone,
-      bio: user.bio,
-      avatarUrl: user.avatarUrl,
-      age: user.age,
       grade: user.grade,
+      house: user.house,
       status: user.status,
       emailVerified: user.emailVerified,
-      socialLinks: user.socialLinks ? JSON.parse(user.socialLinks) : null,
-      notificationPreferences: user.notificationPreferences ? JSON.parse(user.notificationPreferences) : null,
-      messagePreferences: user.messagePreferences ? JSON.parse(user.messagePreferences) : null,
       organizationId: user.organizationId,
       organization: user.organization,
-      schoolId: user.schoolId || studentSchool?.id,
-      school: user.school || studentSchool,
+      schoolId,
+      school: studentSchool,
       classroomId: user.classroomId,
       classroom: user.classroom,
+      cohortId: user.cohortId,
+      cohort: user.cohort,
+      beneficiaryId: user.beneficiaryId,
+      beneficiary: user.beneficiary,
     });
   } catch (err) {
     console.error("Me error:", err);
@@ -378,6 +364,9 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    if (!user.passwordHash) {
+      return res.status(400).json({ error: "This account uses Google Sign-In. Password cannot be changed here." });
+    }
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Current password is incorrect" });

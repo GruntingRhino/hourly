@@ -15,8 +15,8 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     const messages = await prisma.message.findMany({
       where,
       include: {
-        sender: { select: { id: true, name: true, role: true, avatarUrl: true } },
-        receiver: { select: { id: true, name: true, role: true, avatarUrl: true } },
+        sender: { select: { id: true, name: true, role: true } },
+        receiver: { select: { id: true, name: true, role: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -42,19 +42,7 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Recipient not found. Please check the email address." });
     }
 
-    // Check receiver's message preferences
-    if (receiver.messagePreferences) {
-      try {
-        const prefs = JSON.parse(receiver.messagePreferences);
-        const senderRole = req.user!.role;
-        if (prefs.allowFrom === "ORGS_ONLY" && senderRole !== "ORG_ADMIN") {
-          return res.status(403).json({ error: "Message preferences do not allow this" });
-        }
-        if (prefs.allowFrom === "ADMINS_ONLY" && !["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"].includes(senderRole)) {
-          return res.status(403).json({ error: "Message preferences do not allow this" });
-        }
-      } catch {}
-    }
+    // Message preferences removed in new architecture
 
     const message = await prisma.message.create({
       data: {

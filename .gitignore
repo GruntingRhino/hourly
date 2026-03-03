@@ -22,3 +22,4 @@ dist-ssr/
 *.log
 .vercel
 .env*.local
+google_oAuth_secrets.json

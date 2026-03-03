@@ -7,7 +7,7 @@ import { sendHourApprovedEmail } from "../services/email";
 const router = Router();
 
 // POST /api/verification/:sessionId/approve — approve hours
-router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEFICIARY_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },
@@ -73,16 +73,9 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
     // Send email to student (check notification preferences)
     const student = await prisma.user.findUnique({
       where: { id: session.userId },
-      select: { email: true, notificationPreferences: true },
+      select: { email: true },
     });
-    let sendEmail = true;
-    if (student?.notificationPreferences) {
-      try {
-        const prefs = JSON.parse(student.notificationPreferences);
-        if (prefs.hourApproval?.email === false) sendEmail = false;
-      } catch {}
-    }
-    if (sendEmail && student) {
+    if (student) {
       const org = await prisma.organization.findUnique({ where: { id: session.opportunity.organizationId }, select: { name: true } });
       if (org) {
         sendHourApprovedEmail(student.email, org.name, hours, session.opportunity.title).catch(() => {});
@@ -97,7 +90,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
 });
 
 // POST /api/verification/:sessionId/reject — reject hours
-router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "BENEFICIARY_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },

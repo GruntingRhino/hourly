@@ -1,1 +1,28 @@
-Commit before major rework
+During rework.
+
+
+
+ENV + SECRETS REQUIREMENTS (DO THIS AUTOMATICALLY)
+
+1) DO NOT ask me to manually do .env work unless absolutely required.
+2) DO NOT print secret values in output.
+3) Scan the repo to discover all currently used environment variables and integrations:
+   - Resend/email (API keys, from address, base URL)
+   - Neon/Postgres (DATABASE_URL)
+   - Vercel runtime assumptions (NEXT_PUBLIC_* usage, serverless file storage pitfalls)
+   - Auth provider config (Google OAuth vars if present)
+4) Create/Update:
+   - `.env.example` containing EVERY env var name required to run locally and in production (no values).
+   - `ENV_SETUP.md` listing each env var, purpose, and whether it’s required for dev/prod.
+   - A runtime env validator that fails fast on boot with a clear error listing missing vars (no secret dumps).
+5) Implement a “best-effort auto-detect” mode:
+   - If a value is already set in process.env, use it.
+   - If missing, the app must show a clear actionable error telling me the exact env var names to add.
+6) Assume I will paste in new env var VALUES myself after you add the new required variable NAMES.
+7) If you introduce new variables (Google OAuth, storage, base URLs), keep the list minimal and consistent with existing patterns in the repo.
+
+DELIVERABLES
+- `.env.example` updated
+- `ENV_SETUP.md` added/updated
+- env validation added (e.g., `env.ts` or equivalent)
+- Final output includes: “NEW ENV VARS I MUST ADD” (names only), and “EXISTING ENV VARS DETECTED” (names only).
