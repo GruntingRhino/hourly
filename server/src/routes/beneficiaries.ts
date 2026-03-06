@@ -162,6 +162,76 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
   }
 });
 
+// GET /api/beneficiaries/my-signups — student's own BeneficiarySignup records
+router.get("/my-signups", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const signups = await prisma.beneficiarySignup.findMany({
+      where: { studentId: req.user!.userId },
+      include: {
+        slot: {
+          include: {
+            opportunity: {
+              include: {
+                beneficiary: { select: { id: true, name: true, category: true } },
+              },
+            },
+            _count: { select: { signups: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(signups);
+  } catch (err) {
+    console.error("My signups error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/available-slots — future slots from school-approved beneficiaries (student)
+router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    let schoolId = user?.schoolId ?? null;
+    if (!schoolId && user?.cohortId) {
+      const cohort = await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } });
+      schoolId = cohort?.schoolId ?? null;
+    }
+    if (!schoolId) return res.json([]);
+
+    const approvals = await prisma.schoolBeneficiaryApproval.findMany({
+      where: { schoolId, status: "APPROVED" },
+      select: { beneficiaryId: true },
+    });
+    const beneficiaryIds = approvals.map((a) => a.beneficiaryId);
+    if (!beneficiaryIds.length) return res.json([]);
+
+    const now = new Date();
+    const slots = await prisma.beneficiaryTimeSlot.findMany({
+      where: {
+        date: { gte: now },
+        opportunity: {
+          beneficiaryId: { in: beneficiaryIds },
+          status: "ACTIVE",
+        },
+      },
+      include: {
+        opportunity: {
+          include: {
+            beneficiary: { select: { id: true, name: true, category: true } },
+          },
+        },
+        _count: { select: { signups: true } },
+      },
+      orderBy: { date: "asc" },
+    });
+    res.json(slots);
+  } catch (err) {
+    console.error("Available slots error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/beneficiaries/:id — get beneficiary details
 router.get("/:id", authenticate, async (req: Request, res: Response) => {
   try {
@@ -423,6 +493,49 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     res.status(201).json(signup);
   } catch (err) {
     console.error("Slot signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/:id/signups — list signups for a beneficiary (beneficiary admin)
+router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const statusFilter = req.query.status as string | undefined;
+    const signups = await prisma.beneficiarySignup.findMany({
+      where: {
+        slot: { opportunity: { beneficiaryId: req.params.id } },
+        ...(statusFilter ? { verificationStatus: statusFilter } : {}),
+      },
+      include: {
+        slot: {
+          include: {
+            opportunity: { select: { title: true } },
+          },
+        },
+        // student info via relation not defined, fetch separately
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Fetch student names
+    const studentIds = [...new Set(signups.map((s) => s.studentId))];
+    const students = await prisma.user.findMany({
+      where: { id: { in: studentIds } },
+      select: { id: true, name: true, email: true },
+    });
+    const studentMap = new Map(students.map((s) => [s.id, s]));
+
+    const result = signups.map((s) => ({
+      ...s,
+      student: studentMap.get(s.studentId) ?? { id: s.studentId, name: "Unknown", email: "" },
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("List beneficiary signups error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

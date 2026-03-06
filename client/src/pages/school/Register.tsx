@@ -280,7 +280,7 @@ export default function SchoolRegister() {
                   placeholder="principal@schoolname.edu"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">Must be an official school email address.</p>
+                <p className="text-xs text-gray-400 mt-1">Enter any email address where you can receive the verification link (school email, Gmail, etc.).</p>
               </div>
               <button
                 type="submit"

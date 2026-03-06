@@ -3,460 +3,201 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
-interface Stats {
-  totalStudents: number;
-  totalSchoolHours: number;
-  studentsCompletedGoal: number;
-  studentsAtRisk: number;
-  completionPercentage: number;
-  requiredHours: number;
-}
-
-interface Classroom {
+interface CohortSummary {
   id: string;
   name: string;
-  inviteCode: string;
-  isActive: boolean;
-  teacher: { id: string; name: string };
+  status: string;
+  requiredHours: number;
   studentCount: number;
   totalHours: number;
   completedCount: number;
   atRiskCount: number;
   completionPercentage: number;
+  invitationsPending: number;
 }
 
-interface OrgApproval {
-  approvals: {
-    id: string;
-    status: string;
-    organization: { id: string; name: string; description: string | null };
-  }[];
-  pendingOrgs: { id: string; name: string; description: string | null; status?: string }[];
+interface Beneficiary {
+  id: string;
+  name: string;
+  category: string | null;
+  approvalStatus: string;
 }
 
 export default function SchoolDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [orgData, setOrgData] = useState<OrgApproval | null>(null);
+  const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [blockConfirmOrgId, setBlockConfirmOrgId] = useState<string | null>(null);
-  const [blocking, setBlocking] = useState(false);
-  const [orgSearch, setOrgSearch] = useState("");
-
-  const schoolId = user?.schoolId;
-  const isOwner = user?.role === "SCHOOL_ADMIN";
 
   useEffect(() => {
-    if (!schoolId) {
-      setLoading(false);
-      return;
-    }
     void loadData();
-  }, [schoolId, isOwner]);
-
-  const refreshOrgData = async () => {
-    if (!schoolId || !isOwner) return;
-    try {
-      const orgs = await api.get<OrgApproval>(`/schools/${schoolId}/organizations`);
-      setOrgData(orgs);
-    } catch {
-      // Keep optimistic state on transient refresh failures.
-    }
-  };
+  }, []);
 
   const loadData = async () => {
-    if (!schoolId) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const [st, cls] = await Promise.all([
-        api.get<Stats>(`/schools/${schoolId}/stats`),
-        api.get<Classroom[]>(`/classrooms`),
+      const [c, b] = await Promise.all([
+        api.get<CohortSummary[]>("/cohorts"),
+        api.get<Beneficiary[]>("/beneficiaries?status=APPROVED"),
       ]);
-      setStats(st);
-      setClassrooms(cls);
-
-      if (isOwner) {
-        await refreshOrgData();
-      }
+      setCohorts(c);
+      setBeneficiaries(b);
     } catch {
-      setError("Failed to load dashboard. Please refresh the page.");
+      setError("Failed to load dashboard. Please refresh.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateOrgStatus = (orgId: string, status: string) => {
-    setOrgData((prev) => {
-      if (!prev) return prev;
-      const approvals = prev.approvals.map((a) =>
-        a.organization.id === orgId ? { ...a, status } : a,
-      );
-      const pendingOrgs = prev.pendingOrgs.map((o) =>
-        o.id === orgId ? { ...o, status } : o,
-      );
-      return { ...prev, approvals, pendingOrgs };
-    });
-  };
-
-  const handleApproveOrg = async (orgId: string) => {
-    if (!schoolId) return;
-    updateOrgStatus(orgId, "APPROVED");
-    try {
-      await api.post(`/schools/${schoolId}/organizations/${orgId}/approve`);
-      void refreshOrgData();
-    } catch {
-      setError("Failed to approve organization request.");
-      void refreshOrgData();
-    }
-  };
-  const handleRejectOrg = async (orgId: string) => {
-    if (!schoolId) return;
-    updateOrgStatus(orgId, "REJECTED");
-    try {
-      await api.post(`/schools/${schoolId}/organizations/${orgId}/reject`);
-      void refreshOrgData();
-    } catch {
-      setError("Failed to reject organization request.");
-      void refreshOrgData();
-    }
-  };
-  const handleBlockOrg = (orgId: string) => {
-    setBlockConfirmOrgId(orgId);
-  };
-
-  const handleConfirmBlock = async () => {
-    if (!schoolId || !blockConfirmOrgId) return;
-    setBlocking(true);
-    try {
-      await api.post(`/schools/${schoolId}/organizations/${blockConfirmOrgId}/block`);
-      updateOrgStatus(blockConfirmOrgId, "BLOCKED");
-      setBlockConfirmOrgId(null);
-      void refreshOrgData();
-    } finally {
-      setBlocking(false);
-    }
-  };
-
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
   };
 
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
-  const allPendingOrgs = orgData?.pendingOrgs || [];
-  const allApprovedOrgs = orgData?.approvals.filter((a) => a.status === "APPROVED") || [];
-  const reviewableFromApprovals = (orgData?.approvals || [])
-    .filter((a) => a.status !== "BLOCKED")
-    .map((a) => ({
-      id: a.organization.id,
-      name: a.organization.name,
-      description: a.organization.description,
-      status: a.status,
-    }));
-  const allReviewableOrgs = Array.from(
-    new Map(
-      [...reviewableFromApprovals, ...allPendingOrgs.map((o) => ({ ...o, status: o.status || "PENDING" }))].map((o) => [o.id, o]),
-    ).values(),
-  );
-
-  const pendingOrgs = orgSearch
-    ? allReviewableOrgs.filter((o) => o.name.toLowerCase().includes(orgSearch.toLowerCase()))
-    : allReviewableOrgs;
-  const approvedOrgs = orgSearch
-    ? allApprovedOrgs.filter((a) => a.organization.name.toLowerCase().includes(orgSearch.toLowerCase()))
-    : allApprovedOrgs;
+  // Aggregate stats across all cohorts
+  const totalStudents = cohorts.reduce((s, c) => s + c.studentCount, 0);
+  const totalHours = cohorts.reduce((s, c) => s + c.totalHours, 0);
+  const totalCompleted = cohorts.reduce((s, c) => s + c.completedCount, 0);
+  const totalAtRisk = cohorts.reduce((s, c) => s + c.atRiskCount, 0);
+  const pendingInvites = cohorts.reduce((s, c) => s + c.invitationsPending, 0);
 
   return (
     <div>
-      {/* Block Org Confirm Modal */}
-      {blockConfirmOrgId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-            <h2 className="text-lg font-bold mb-2">Block Organization?</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Their opportunities will be hidden from your students. You can re-approve them later.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmBlock}
-                disabled={blocking}
-                className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                {blocking ? "Blocking..." : "Block"}
-              </button>
-              <button
-                onClick={() => setBlockConfirmOrgId(null)}
-                className="flex-1 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        {isOwner && (
-          <div className="flex gap-2">
-            <Link
-              to="/groups"
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200"
-            >
-              Student Roster
-            </Link>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Link to="/cohorts" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
+            Manage Cohorts
+          </Link>
+        </div>
       </div>
 
       {/* School-wide stats */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-500">Total Students</div>
-            <div className="text-2xl font-bold">{stats.totalStudents}</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-500">Total Hours</div>
-            <div className="text-2xl font-bold text-blue-600">{stats.totalSchoolHours}</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-500">Goal Completion</div>
-            <div className="text-2xl font-bold text-green-600">
-              {stats.studentsCompletedGoal}/{stats.totalStudents}
-            </div>
-            <div className="text-xs text-gray-400">{stats.completionPercentage}% on track</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-500">At Risk</div>
-            <div className="text-2xl font-bold text-red-600">{stats.studentsAtRisk}</div>
-            <div className="text-xs text-gray-400">below 50% of {stats.requiredHours}h goal</div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">Total Students</div>
+          <div className="text-2xl font-bold">{totalStudents}</div>
         </div>
-      )}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">Total Hours</div>
+          <div className="text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">Goal Reached</div>
+          <div className="text-2xl font-bold text-green-600">{totalCompleted}</div>
+          <div className="text-xs text-gray-400">of {totalStudents} students</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">At Risk</div>
+          <div className="text-2xl font-bold text-red-600">{totalAtRisk}</div>
+          <div className="text-xs text-gray-400">below 50% of goal</div>
+        </div>
+      </div>
 
       {/* Quick links */}
-      {stats && (
-        <div className="flex gap-3 mb-8">
-          <Link to="/groups?filter=ON_TRACK" className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-md text-sm font-medium hover:bg-green-100">
-            View On-Track Students
-          </Link>
-          <Link to="/groups?filter=AT_RISK" className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm font-medium hover:bg-red-100">
-            View At-Risk Students ({stats.studentsAtRisk})
+      <div className="flex gap-3 mb-8 flex-wrap">
+        <Link to="/cohorts" className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium hover:bg-blue-100">
+          View All Cohorts ({cohorts.length})
+        </Link>
+        <Link to="/beneficiaries" className="px-4 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-sm font-medium hover:bg-purple-100">
+          Partners ({beneficiaries.length} approved)
+        </Link>
+        <Link to="/submissions" className="px-4 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-md text-sm font-medium hover:bg-orange-100">
+          Self-Submitted Hours
+        </Link>
+      </div>
+
+      {/* Pending invites alert */}
+      {pendingInvites > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <span className="text-sm text-blue-800">{pendingInvites} student invitation{pendingInvites !== 1 ? "s" : ""} pending across cohorts.</span>
+          <Link to="/cohorts" className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+            View Cohorts
           </Link>
         </div>
       )}
 
-      {/* Classrooms */}
+      {/* Cohorts list */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Classrooms</h2>
-          {isOwner && (
-            <CreateClassroomButton onCreated={loadData} />
-          )}
+          <h2 className="text-lg font-semibold">Cohorts</h2>
+          <Link to="/cohorts" className="text-sm text-blue-600 hover:underline">Manage →</Link>
         </div>
 
-        {classrooms.length === 0 ? (
+        {cohorts.length === 0 ? (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500">
-            No classrooms yet.{" "}
-            {isOwner && "Create one to get started."}
+            No cohorts yet.{" "}
+            <Link to="/cohorts" className="text-blue-600 hover:underline">Create your first cohort</Link> to get started.
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classrooms.map((cls) => (
-              <div key={cls.id} className="bg-white border border-gray-200 rounded-lg p-5">
+            {cohorts.map((c) => (
+              <Link key={c.id} to={`/cohorts/${c.id}`} className="block bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 transition-colors">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <div className="font-semibold">{cls.name}</div>
-                    <div className="text-sm text-gray-500">{cls.teacher.name}</div>
+                    <div className="font-semibold">{c.name}</div>
+                    <div className="text-xs text-gray-500">{c.requiredHours}h goal</div>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${cls.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                    {cls.isActive ? "Active" : "Inactive"}
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.status === "PUBLISHED" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
+                    {c.status}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center mb-3">
                   <div>
-                    <div className="text-lg font-bold">{cls.studentCount}</div>
+                    <div className="text-lg font-bold">{c.studentCount}</div>
                     <div className="text-xs text-gray-500">Students</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-green-600">{cls.completedCount}</div>
+                    <div className="text-lg font-bold text-green-600">{c.completedCount}</div>
                     <div className="text-xs text-gray-500">Completed</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-red-500">{cls.atRiskCount}</div>
+                    <div className="text-lg font-bold text-red-500">{c.atRiskCount}</div>
                     <div className="text-xs text-gray-500">At Risk</div>
                   </div>
                 </div>
 
-                {cls.studentCount > 0 && (
-                  <div className="mb-3">
+                {c.studentCount > 0 && (
+                  <div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className="bg-blue-500 h-1.5 rounded-full"
-                        style={{ width: `${cls.completionPercentage}%` }}
-                      />
+                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${c.completionPercentage}%` }} />
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{cls.completionPercentage}% completion</div>
+                    <div className="text-xs text-gray-400 mt-1">{c.completionPercentage}% completion</div>
                   </div>
                 )}
 
-                {/* Invite code */}
-                <div className="flex items-center gap-2 bg-gray-50 rounded p-2">
-                  <span className="text-xs text-gray-500 font-mono flex-1">{cls.inviteCode}</span>
-                  <button
-                    onClick={() => copyCode(cls.inviteCode)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    {copiedCode === cls.inviteCode ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-
-                <div className="mt-3">
-                  <Link
-                    to={`/groups?classroom=${cls.id}`}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    View students →
-                  </Link>
-                </div>
-              </div>
+                {c.invitationsPending > 0 && (
+                  <div className="mt-2 text-xs text-blue-600">{c.invitationsPending} invitation{c.invitationsPending !== 1 ? "s" : ""} pending</div>
+                )}
+              </Link>
             ))}
           </div>
         )}
       </div>
 
-      {/* Org approvals (owner only) */}
-      {isOwner && (
-        <>
-          {(allReviewableOrgs.length > 0 || allApprovedOrgs.length > 0) && (
-            <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Search organizations..."
-                value={orgSearch}
-                onChange={(e) => setOrgSearch(e.target.value)}
-                className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
-          {pendingOrgs.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Pending Organization Requests</h2>
-              <div className="space-y-2">
-                {pendingOrgs.map((org) => (
-                  <div key={org.id} className="bg-white border border-yellow-200 rounded-lg p-4 flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">{org.name}</div>
-                      {org.description && <div className="text-sm text-gray-500">{org.description}</div>}
-                      <div className="text-xs text-gray-400 mt-0.5">{org.status || "PENDING"}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleApproveOrg(org.id)} className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
-                        Approve
-                      </button>
-                      <button onClick={() => handleRejectOrg(org.id)} className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
+      {/* Partners */}
+      {beneficiaries.length > 0 && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Approved Partners</h2>
+            <Link to="/beneficiaries" className="text-sm text-blue-600 hover:underline">Manage →</Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {beneficiaries.slice(0, 6).map((b) => (
+              <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-sm font-medium">{b.name}</div>
+                {b.category && <div className="text-xs text-gray-400 mt-0.5">{b.category}</div>}
               </div>
-            </div>
+            ))}
+          </div>
+          {beneficiaries.length > 6 && (
+            <Link to="/beneficiaries" className="block mt-2 text-sm text-blue-600 hover:underline">
+              View all {beneficiaries.length} partners →
+            </Link>
           )}
-
-          {approvedOrgs.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold mb-3">Approved Organizations</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {approvedOrgs.map((a) => (
-                  <div key={a.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{a.organization.name}</div>
-                      <span className="text-xs text-green-600">Approved</span>
-                    </div>
-                    <button onClick={() => handleBlockOrg(a.organization.id)} className="text-xs text-red-400 hover:text-red-600">
-                      Block
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
-  );
-}
-
-function CreateClassroomButton({ onCreated }: { onCreated: () => void }) {
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [newCode, setNewCode] = useState<string | null>(null);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const result = await api.post<{ inviteCode: string; name: string }>("/classrooms", { name });
-      setNewCode(result.inviteCode);
-      setName("");
-      onCreated();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (newCode) {
-    return (
-      <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2 text-sm">
-        <span className="text-green-700">Classroom created! Code:</span>
-        <span className="font-mono font-bold text-green-800">{newCode}</span>
-        <button onClick={() => { setNewCode(null); setShowForm(false); }} className="text-green-600 hover:text-green-800 ml-2">×</button>
-      </div>
-    );
-  }
-
-  if (!showForm) {
-    return (
-      <button
-        onClick={() => setShowForm(true)}
-        className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
-      >
-        + New Classroom
-      </button>
-    );
-  }
-
-  return (
-    <form onSubmit={handleCreate} className="flex gap-2">
-      <input
-        autoFocus
-        type="text"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Classroom name"
-        required
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <button type="submit" disabled={loading} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
-        {loading ? "Creating..." : "Create"}
-      </button>
-      <button type="button" onClick={() => setShowForm(false)} className="px-3 py-2 text-gray-500 hover:text-gray-800">
-        Cancel
-      </button>
-    </form>
   );
 }

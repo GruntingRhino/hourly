@@ -6,12 +6,11 @@ interface SelfSubmission {
   status: string;
   organizationName: string;
   description: string;
-  dateOfService: string;
-  hoursRequested: number;
-  hoursApproved: number | null;
+  date: string;
+  hours: number;
   createdAt: string;
   student: { id: string; name: string; email: string };
-  reviewNote: string | null;
+  rejectionReason: string | null;
 }
 
 export default function SchoolSelfSubmissions() {
@@ -48,7 +47,7 @@ export default function SchoolSelfSubmissions() {
     setSubmitting(true);
     try {
       await api.post(`/self-submissions/${id}/approve`, {
-        hoursApproved: hoursOverride ? parseFloat(hoursOverride) : undefined,
+        adjustedHours: hoursOverride ? parseFloat(hoursOverride) : undefined,
       });
       setReviewingId(null);
       void load();
@@ -108,22 +107,19 @@ export default function SchoolSelfSubmissions() {
                 <div className="flex-1">
                   <div className="font-medium">{sub.organizationName}</div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {sub.student.name} &middot; {new Date(sub.dateOfService).toLocaleDateString()}
+                    {sub.student.name} &middot; {new Date(sub.date).toLocaleDateString()}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">{sub.description}</div>
                   <div className="text-sm mt-1">
-                    <span className="font-medium">{sub.hoursRequested}h requested</span>
-                    {sub.hoursApproved !== null && (
-                      <span className="text-green-600 ml-2">{sub.hoursApproved}h approved</span>
-                    )}
+                    <span className="font-medium">{sub.hours}h requested</span>
                   </div>
-                  {sub.reviewNote && (
-                    <div className="text-xs text-gray-400 mt-1 italic">{sub.reviewNote}</div>
+                  {sub.rejectionReason && (
+                    <div className="text-xs text-gray-400 mt-1 italic">Reason: {sub.rejectionReason}</div>
                   )}
                 </div>
                 <div className="ml-4 flex flex-col items-end gap-2">
                   {filter === "PENDING" && reviewingId !== sub.id && (
-                    <button onClick={() => openReview(sub.id, sub.hoursRequested)}
+                    <button onClick={() => openReview(sub.id, sub.hours)}
                       className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
                       Review
                     </button>

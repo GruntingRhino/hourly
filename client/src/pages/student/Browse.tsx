@@ -1,418 +1,155 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { useAuth } from "../../hooks/useAuth";
 
-interface Opportunity {
+interface TimeSlot {
   id: string;
-  title: string;
-  description: string;
-  tags: string | null;
-  location: string;
-  address: string | null;
   date: string;
   startTime: string;
   endTime: string;
   durationHours: number;
   capacity: number;
-  ageRequirement: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  organization: { id: string; name: string; zipCodes?: string | null };
   _count: { signups: number };
+  opportunity: {
+    id: string;
+    title: string;
+    description: string;
+    location: string | null;
+    category: string | null;
+    requirementsNote: string | null;
+    beneficiary: { id: string; name: string; category: string | null };
+  };
 }
-
-interface SavedOpp {
-  id: string;
-  status: string;
-  opportunityId: string;
-}
-
-// Simple haversine distance in miles
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3958.8;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-type SortBy = "alphabetical" | "date" | "popular" | "distance";
 
 export default function StudentBrowse() {
-  const { user } = useAuth();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [saved, setSaved] = useState<SavedOpp[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const [mySignupIds, setMySignupIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [tagFilter, setTagFilter] = useState("");
-  const [approvedOnly, setApprovedOnly] = useState(false);
-  const [distanceFilter, setDistanceFilter] = useState<number | null>(null);
-  const [sortBy, setSortBy] = useState<SortBy>("alphabetical");
-  const [schoolCoords, setSchoolCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"browse" | "saved" | "skipped" | "discarded">("browse");
-  const initialLoadRef = useRef(true);
+  const [error, setError] = useState("");
+  const [signingUp, setSigningUp] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ slotId: string; msg: string; ok: boolean } | null>(null);
 
-  useEffect(() => {
-    void loadData(initialLoadRef.current);
-    initialLoadRef.current = false;
-  }, [approvedOnly]);
-
-  // Fetch school coordinates once for distance sorting/filtering
-  useEffect(() => {
-    if (!user?.school?.zipCodes) return;
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const zips = JSON.parse(user.school.zipCodes);
-      if (zips.length > 0) {
-        fetch(`/api/geocode?address=${encodeURIComponent(zips[0])}`)
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => { if (data) setSchoolCoords({ lat: data.lat, lng: data.lng }); })
-          .catch(() => {});
-      }
-    } catch {}
-  }, [user?.school?.zipCodes]);
-
-  const loadData = async (showSpinner = false) => {
-    if (showSpinner) {
-      setLoading(true);
-    }
-    const params = new URLSearchParams();
-    if (user?.schoolId) params.set("schoolId", user.schoolId);
-    if (approvedOnly) params.set("approvedOnly", "true");
-
-    try {
-      const [opps, savedOpps] = await Promise.all([
-        api.get<Opportunity[]>(`/opportunities?${params.toString()}`),
-        api.get<SavedOpp[]>("/saved").catch(() => [] as SavedOpp[]),
+      const [available, mySignups] = await Promise.all([
+        api.get<TimeSlot[]>("/beneficiaries/available-slots"),
+        api.get<{ slot: { id: string } }[]>("/beneficiaries/my-signups").catch(() => []),
       ]);
-      setOpportunities(opps);
-      setSaved(savedOpps);
+      setSlots(available);
+      setMySignupIds(new Set(mySignups.map((s) => s.slot.id)));
     } catch {
-      // Keep prior results if a transient network error occurs.
+      setError("Failed to load opportunities. Please refresh.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (oppId: string, status: string) => {
-    await api.post("/saved", { opportunityId: oppId, status });
-    await loadData();
+  useEffect(() => { void loadData(); }, []);
+
+  const handleSignup = async (slotId: string) => {
+    setSigningUp(slotId);
+    setActionMsg(null);
+    try {
+      await api.post(`/beneficiaries/slots/${slotId}/signup`, {});
+      setMySignupIds((prev) => new Set([...prev, slotId]));
+      setActionMsg({ slotId, msg: "Signed up!", ok: true });
+    } catch (err: any) {
+      setActionMsg({ slotId, msg: err.message || "Failed to sign up.", ok: false });
+    } finally {
+      setSigningUp(null);
+    }
   };
 
-  // Collect all unique tags
-  const allTags = Array.from(new Set(
-    opportunities.flatMap((o) => {
-      try { return o.tags ? JSON.parse(o.tags) : []; } catch { return []; }
-    })
-  )).sort();
-
-  const filtered = opportunities.filter((opp) => {
-    const searchMatch = !search || (
-      opp.title.toLowerCase().includes(search.toLowerCase()) ||
-      opp.description.toLowerCase().includes(search.toLowerCase()) ||
-      opp.location.toLowerCase().includes(search.toLowerCase()) ||
-      opp.organization.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = slots.filter((s) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      s.opportunity.title.toLowerCase().includes(q) ||
+      s.opportunity.description.toLowerCase().includes(q) ||
+      s.opportunity.beneficiary.name.toLowerCase().includes(q) ||
+      (s.opportunity.location?.toLowerCase().includes(q) ?? false) ||
+      (s.opportunity.category?.toLowerCase().includes(q) ?? false)
     );
-    const tagMatch = !tagFilter || (() => {
-      try { return opp.tags ? JSON.parse(opp.tags).includes(tagFilter) : false; } catch { return false; }
-    })();
-    let distMatch = true;
-    if (distanceFilter && schoolCoords && opp.latitude && opp.longitude) {
-      const d = haversineDistance(schoolCoords.lat, schoolCoords.lng, opp.latitude, opp.longitude);
-      distMatch = d <= distanceFilter;
-    }
-    return searchMatch && tagMatch && distMatch;
   });
-
-  const sorted = [...filtered].sort((a, b) => {
-    switch (sortBy) {
-      case "date":
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-      case "popular":
-        if (b._count.signups !== a._count.signups) {
-          return b._count.signups - a._count.signups;
-        }
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-      case "distance": {
-        if (!schoolCoords) return 0;
-        const aDist = a.latitude && a.longitude
-          ? haversineDistance(schoolCoords.lat, schoolCoords.lng, a.latitude, a.longitude)
-          : Infinity;
-        const bDist = b.latitude && b.longitude
-          ? haversineDistance(schoolCoords.lat, schoolCoords.lng, b.latitude, b.longitude)
-          : Infinity;
-        return aDist - bDist;
-      }
-      case "alphabetical":
-      default:
-        return a.title.localeCompare(b.title);
-    }
-  });
-
-  const savedIds = saved.filter((s) => s.status === "SAVED").map((s) => s.opportunityId);
-  const skippedIds = saved.filter((s) => s.status === "SKIPPED").map((s) => s.opportunityId);
-  const discardedIds = saved.filter((s) => s.status === "DISCARDED").map((s) => s.opportunityId);
-  const hiddenIds = [...skippedIds, ...discardedIds];
-
-  const displayOpps =
-    view === "saved"
-      ? sorted.filter((o) => savedIds.includes(o.id))
-      : view === "skipped"
-      ? sorted.filter((o) => skippedIds.includes(o.id))
-      : view === "discarded"
-      ? sorted.filter((o) => discardedIds.includes(o.id))
-      : sorted.filter((o) => !hiddenIds.includes(o.id));
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Browse Opportunities</h1>
 
-      {/* Search + view tabs */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search opportunities..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="flex gap-2 flex-wrap">
-          {(["browse", "saved", "skipped", "discarded"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-                view === v ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {v === "browse" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Filters + Sort */}
-      <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        {/* Sort */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Sort:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
-          >
-            <option value="alphabetical">Alphabetical</option>
-            <option value="date">Date</option>
-            <option value="popular">Most Popular</option>
-            <option value="distance">Distance{!schoolCoords ? " (no school ZIP)" : ""}</option>
-          </select>
-        </div>
-
-        {/* Tag filter */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Tag:</label>
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
-          >
-            <option value="">All tags</option>
-            {allTags.map((tag) => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Distance filter */}
-        {user?.schoolId && (
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Within:</label>
-            <select
-              value={distanceFilter ?? ""}
-              onChange={(e) => setDistanceFilter(e.target.value ? Number(e.target.value) : null)}
-              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none"
-            >
-              <option value="">Any distance</option>
-              <option value="5">5 mi</option>
-              <option value="10">10 mi</option>
-              <option value="25">25 mi</option>
-              <option value="50">50 mi</option>
-            </select>
-          </div>
-        )}
-
-        {/* Approved orgs toggle */}
-        {user?.schoolId && (
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={approvedOnly}
-              onChange={(e) => setApprovedOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-sm font-medium text-gray-700">Approved orgs only</span>
-          </label>
-        )}
-
-        {/* Clear filters */}
-        {(tagFilter || approvedOnly || distanceFilter) && (
-          <button
-            onClick={() => { setTagFilter(""); setApprovedOnly(false); setDistanceFilter(null); }}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
+      <input
+        type="text"
+        placeholder="Search opportunities, organizations, or categories..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+      />
 
       {loading ? (
         <div className="text-gray-500">Loading opportunities...</div>
-      ) : displayOpps.length === 0 ? (
+      ) : error ? (
+        <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          {view === "saved" ? (
-            <>
-              <div className="text-3xl mb-3">★</div>
-              <div className="font-medium text-gray-700 mb-1">No saved opportunities</div>
-              <div className="text-sm text-gray-500">
-                Browse opportunities and click Save to bookmark ones you're interested in.
-              </div>
-            </>
-          ) : view === "skipped" ? (
-            <>
-              <div className="text-3xl mb-3">—</div>
-              <div className="font-medium text-gray-700 mb-1">No skipped opportunities</div>
-              <div className="text-sm text-gray-500">
-                Opportunities you skip will appear here so you can recover them later.
-              </div>
-            </>
-          ) : view === "discarded" ? (
-            <>
-              <div className="text-3xl mb-3">✕</div>
-              <div className="font-medium text-gray-700 mb-1">No discarded opportunities</div>
-              <div className="text-sm text-gray-500">
-                Opportunities you discard will appear here. You can recover them any time.
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-3xl mb-3">⌕</div>
-              <div className="font-medium text-gray-700 mb-1">No opportunities found</div>
-              <div className="text-sm text-gray-500">
-                {(tagFilter || approvedOnly)
-                  ? "Try adjusting your filters."
-                  : "Check back later — new opportunities are added regularly."}
-              </div>
-              {(tagFilter || approvedOnly) && (
-                <button
-                  onClick={() => { setTagFilter(""); setApprovedOnly(false); }}
-                  className="mt-3 text-sm text-blue-600 hover:underline"
-                >
-                  Clear filters
-                </button>
-              )}
-            </>
-          )}
+          <div className="text-3xl mb-3">⌕</div>
+          <div className="font-medium text-gray-700 mb-1">No opportunities found</div>
+          <div className="text-sm text-gray-500">
+            {search ? "Try a different search term." : "Your school hasn't approved any partner organizations yet. Check back later."}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
-          {displayOpps.map((opp) => {
-            const tags = opp.tags ? (() => { try { return JSON.parse(opp.tags!); } catch { return []; } })() : [];
-            const isSaved = savedIds.includes(opp.id);
-            const isDiscarded = discardedIds.includes(opp.id);
-            const dateLabel =
-              sortBy === "popular"
-                ? new Date(opp.date).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : new Date(opp.date).toLocaleDateString();
+          {filtered.map((slot) => {
+            const isSignedUp = mySignupIds.has(slot.id);
+            const isFull = slot._count.signups >= slot.capacity;
+            const msg = actionMsg?.slotId === slot.id ? actionMsg : null;
             return (
-              <div
-                key={opp.id}
-                className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-200 transition-colors"
-              >
-                <div className="flex justify-between items-start">
+              <div key={slot.id} className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-200 transition-colors">
+                <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
-                    <Link
-                      to={`/opportunity/${opp.id}`}
-                      className="text-lg font-semibold hover:text-blue-600"
-                    >
-                      {opp.title}
-                    </Link>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {opp.organization.name}
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {dateLabel} &middot; {opp.startTime} - {opp.endTime} &middot; {opp.location}
-                    </div>
-                    {opp.address && (
-                      <div className="text-xs text-gray-400 mt-0.5">{opp.address}</div>
+                    <div className="text-lg font-semibold">{slot.opportunity.title}</div>
+                    <div className="text-sm text-gray-500 mt-0.5">{slot.opportunity.beneficiary.name}</div>
+                    {slot.opportunity.category && (
+                      <div className="text-xs text-purple-600 mt-0.5">{slot.opportunity.category}</div>
                     )}
-                    {opp.ageRequirement != null && opp.ageRequirement > 0 && (
-                      <div className="text-xs text-orange-600 mt-0.5">
-                        Age requirement: {opp.ageRequirement}+
-                      </div>
+                    <div className="text-sm text-gray-600 mt-2">
+                      {new Date(slot.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                      {" "}&middot;{" "}
+                      {slot.startTime}–{slot.endTime}
+                      {" "}&middot;{" "}
+                      <span className="font-medium text-blue-700">{slot.durationHours}h</span>
+                    </div>
+                    {slot.opportunity.location && (
+                      <div className="text-sm text-gray-500 mt-0.5">{slot.opportunity.location}</div>
                     )}
-                    {tags.length > 0 && (
-                      <div className="flex gap-1 mt-2">
-                        {tags.map((tag: string) => (
-                          <button
-                            key={tag}
-                            onClick={() => setTagFilter(tag)}
-                            className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
+                    {slot.opportunity.description && (
+                      <div className="text-sm text-gray-600 mt-2">{slot.opportunity.description}</div>
+                    )}
+                    {slot.opportunity.requirementsNote && (
+                      <div className="text-xs text-orange-600 mt-1">Note: {slot.opportunity.requirementsNote}</div>
                     )}
                   </div>
-                  <div className="text-right ml-4">
-                    <div className="text-lg font-bold text-blue-600">
-                      {opp._count.signups}/{opp.capacity}
-                    </div>
-                    <div className="text-xs text-gray-400">spots taken</div>
-                    <div className="flex gap-1 mt-2">
-                      {(view === "skipped" || view === "discarded" || isDiscarded) ? (
-                        <button
-                          onClick={() => handleSave(opp.id, "SAVED")}
-                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                        >
-                          Recover
-                        </button>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-medium text-gray-700">{slot._count.signups}/{slot.capacity}</div>
+                    <div className="text-xs text-gray-400">spots</div>
+                    <div className="mt-3">
+                      {isSignedUp ? (
+                        <span className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-full font-medium">Signed Up</span>
+                      ) : isFull ? (
+                        <span className="text-xs px-3 py-1.5 bg-gray-100 text-gray-500 rounded-full">Full</span>
                       ) : (
-                        <>
-                          <button
-                            onClick={() => handleSave(opp.id, "SAVED")}
-                            className={`text-xs px-2 py-1 rounded ${
-                              isSaved
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                            }`}
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => handleSave(opp.id, "SKIPPED")}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                          >
-                            Skip
-                          </button>
-                          <button
-                            onClick={() => handleSave(opp.id, "DISCARDED")}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                            title="Discard (don't show again)"
-                          >
-                            ✕
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleSignup(slot.id)}
+                          disabled={signingUp === slot.id}
+                          className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {signingUp === slot.id ? "Signing up..." : "Sign Up"}
+                        </button>
                       )}
                     </div>
+                    {msg && (
+                      <div className={`text-xs mt-1 ${msg.ok ? "text-green-600" : "text-red-500"}`}>{msg.msg}</div>
+                    )}
                   </div>
                 </div>
               </div>

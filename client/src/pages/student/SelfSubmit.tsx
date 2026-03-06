@@ -6,11 +6,10 @@ interface SelfSubmission {
   status: string;
   organizationName: string;
   description: string;
-  dateOfService: string;
-  hoursRequested: number;
-  hoursApproved: number | null;
+  date: string;
+  hours: number;
   createdAt: string;
-  reviewNote: string | null;
+  rejectionReason: string | null;
 }
 
 export default function StudentSelfSubmit() {
@@ -21,8 +20,9 @@ export default function StudentSelfSubmit() {
   const [form, setForm] = useState({
     organizationName: "",
     description: "",
-    dateOfService: "",
-    hoursRequested: "",
+    date: "",
+    hours: "",
+    evidenceNote: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
@@ -45,14 +45,16 @@ export default function StudentSelfSubmit() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    setSuccess("");
     try {
       await api.post("/self-submissions", {
         organizationName: form.organizationName,
         description: form.description,
-        dateOfService: form.dateOfService,
-        hoursRequested: parseFloat(form.hoursRequested),
+        date: form.date,
+        hours: parseFloat(form.hours),
+        evidenceNote: form.evidenceNote || undefined,
       });
-      setForm({ organizationName: "", description: "", dateOfService: "", hoursRequested: "" });
+      setForm({ organizationName: "", description: "", date: "", hours: "", evidenceNote: "" });
       setShowForm(false);
       setSuccess("Submission sent for review.");
       void load();
@@ -77,7 +79,7 @@ export default function StudentSelfSubmit() {
       {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{success}</div>}
 
       {showForm && (
-        <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5">
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5 max-w-lg">
           <h2 className="font-semibold mb-4">Report Volunteer Hours</h2>
           <p className="text-sm text-gray-600 mb-4">
             Use this form to report hours you completed outside of school-organized events.
@@ -94,8 +96,9 @@ export default function StudentSelfSubmit() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date of Service *</label>
-                <input type="date" value={form.dateOfService}
-                  onChange={(e) => setForm((p) => ({ ...p, dateOfService: e.target.value }))} required
+                <input type="date" value={form.date}
+                  onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} required
+                  max={new Date().toISOString().split("T")[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
             </div>
@@ -106,12 +109,21 @@ export default function StudentSelfSubmit() {
                 rows={3} placeholder="Describe what you did..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
             </div>
-            <div className="sm:w-48">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hours *</label>
-              <input type="number" value={form.hoursRequested}
-                onChange={(e) => setForm((p) => ({ ...p, hoursRequested: e.target.value }))} required
-                min={0.5} step={0.5} placeholder="e.g. 3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hours *</label>
+                <input type="number" value={form.hours}
+                  onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} required
+                  min={0.5} max={24} step={0.5} placeholder="e.g. 3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Evidence / Notes</label>
+                <input type="text" value={form.evidenceNote}
+                  onChange={(e) => setForm((p) => ({ ...p, evidenceNote: e.target.value }))}
+                  placeholder="Supervisor name, confirmation #..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              </div>
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={submitting}
@@ -141,15 +153,14 @@ export default function StudentSelfSubmit() {
                 <div>
                   <div className="font-medium">{sub.organizationName}</div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {new Date(sub.dateOfService).toLocaleDateString()} &middot; {sub.hoursRequested}h requested
-                    {sub.hoursApproved !== null && <span className="text-green-600 ml-1">→ {sub.hoursApproved}h approved</span>}
+                    {new Date(sub.date).toLocaleDateString()} &middot; {sub.hours}h
                   </div>
                   <div className="text-sm text-gray-600 mt-1">{sub.description}</div>
-                  {sub.reviewNote && (
-                    <div className="text-xs text-gray-400 mt-1 italic">Note: {sub.reviewNote}</div>
+                  {sub.rejectionReason && (
+                    <div className="text-xs text-red-500 mt-1 italic">Reason: {sub.rejectionReason}</div>
                   )}
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ml-3 ${
+                <span className={`text-xs px-2 py-0.5 rounded-full ml-3 shrink-0 ${
                   sub.status === "APPROVED" ? "bg-green-50 text-green-700" :
                   sub.status === "REJECTED" ? "bg-red-50 text-red-600" :
                   "bg-yellow-50 text-yellow-700"

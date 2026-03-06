@@ -31,7 +31,7 @@ export default function BeneficiaryOpportunities() {
     title: "",
     description: "",
     location: "",
-    slots: [{ date: "", startTime: "", endTime: "", capacity: "" }],
+    slots: [{ date: "", startTime: "", endTime: "", durationHours: "", capacity: "" }],
   });
 
   const benId = user?.beneficiaryId;
@@ -52,7 +52,7 @@ export default function BeneficiaryOpportunities() {
   useEffect(() => { void load(); }, [benId]);
 
   const addSlot = () => {
-    setForm((p) => ({ ...p, slots: [...p.slots, { date: "", startTime: "", endTime: "", capacity: "" }] }));
+    setForm((p) => ({ ...p, slots: [...p.slots, { date: "", startTime: "", endTime: "", durationHours: "", capacity: "" }] }));
   };
 
   const updateSlot = (i: number, field: string, value: string) => {
@@ -72,16 +72,18 @@ export default function BeneficiaryOpportunities() {
     try {
       await api.post(`/beneficiaries/${benId}/opportunities`, {
         title: form.title,
-        description: form.description || undefined,
+        description: form.description,
         location: form.location || undefined,
-        slots: form.slots.map((s) => ({
+        startDate: form.slots[0]?.date || new Date().toISOString().split("T")[0],
+        timeSlots: form.slots.map((s) => ({
           date: s.date,
           startTime: s.startTime,
           endTime: s.endTime,
-          capacity: s.capacity ? parseInt(s.capacity) : undefined,
+          durationHours: parseFloat(s.durationHours) || 1,
+          capacity: s.capacity ? parseInt(s.capacity) : 10,
         })),
       });
-      setForm({ title: "", description: "", location: "", slots: [{ date: "", startTime: "", endTime: "", capacity: "" }] });
+      setForm({ title: "", description: "", location: "", slots: [{ date: "", startTime: "", endTime: "", durationHours: "", capacity: "" }] });
       setShowForm(false);
       void load();
     } catch (err: any) {
@@ -138,13 +140,15 @@ export default function BeneficiaryOpportunities() {
               </div>
               <div className="space-y-2">
                 {form.slots.map((slot, i) => (
-                  <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                  <div key={i} className="grid grid-cols-6 gap-2 items-center">
                     <input type="date" value={slot.date} onChange={(e) => updateSlot(i, "date", e.target.value)} required
                       className="px-2 py-1.5 border border-gray-300 rounded text-sm col-span-2" />
                     <input type="time" value={slot.startTime} onChange={(e) => updateSlot(i, "startTime", e.target.value)} required
                       className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
                     <input type="time" value={slot.endTime} onChange={(e) => updateSlot(i, "endTime", e.target.value)} required
                       className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                    <input type="number" value={slot.durationHours} onChange={(e) => updateSlot(i, "durationHours", e.target.value)}
+                      placeholder="Hrs" min={0.5} step={0.5} required className="px-2 py-1.5 border border-gray-300 rounded text-sm" title="Duration in hours" />
                     <div className="flex gap-1 items-center">
                       <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
                         placeholder="Cap" min={1} className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm" />

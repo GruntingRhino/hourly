@@ -6,28 +6,25 @@ import { useAuth } from "../../hooks/useAuth";
 interface Signup {
   id: string;
   status: string;
+  verificationStatus: string;
+  totalHours: number | null;
   student: { name: string; email: string };
   slot: {
+    durationHours: number;
     opportunity: { title: string };
     startTime: string;
+    date: string;
   };
-  totalHours: number | null;
-}
-
-interface Stats {
-  pendingApprovalCount: number;
-  totalApprovedHours: number;
-  totalStudents: number;
-  upcomingSlots: number;
 }
 
 export default function BeneficiaryDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<Stats | null>(null);
   const [pendingSignups, setPendingSignups] = useState<Signup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [approving, setApproving] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const benId = user?.beneficiaryId;
 
@@ -37,12 +34,6 @@ export default function BeneficiaryDashboard() {
     try {
       const signups = await api.get<Signup[]>(`/beneficiaries/${benId}/signups?status=PENDING`);
       setPendingSignups(signups);
-      setStats({
-        pendingApprovalCount: signups.length,
-        totalApprovedHours: 0,
-        totalStudents: 0,
-        upcomingSlots: 0,
-      });
     } catch {
       setError("Failed to load dashboard data.");
     } finally {
@@ -65,11 +56,15 @@ export default function BeneficiaryDashboard() {
   };
 
   const handleReject = async (signupId: string) => {
-    const reason = window.prompt("Reason for rejection:");
-    if (reason === null) return;
+    if (!rejectReason.trim()) {
+      setError("Please enter a reason for rejection.");
+      return;
+    }
     setApproving(signupId);
     try {
-      await api.post(`/beneficiaries/signups/${signupId}/reject`, { reason });
+      await api.post(`/beneficiaries/signups/${signupId}/reject`, { reason: rejectReason });
+      setRejectingId(null);
+      setRejectReason("");
       void load();
     } catch (err: any) {
       setError(err.message || "Failed to reject.");
@@ -89,7 +84,7 @@ export default function BeneficiaryDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         <div className="bg-white border border-gray-200 rounded-lg p-5 text-center">
-          <div className="text-3xl font-bold text-orange-500">{stats?.pendingApprovalCount || 0}</div>
+          <div className="text-3xl font-bold text-orange-500">{pendingSignups.length}</div>
           <div className="text-sm text-gray-500 mt-1">Pending Hour Approvals</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-5 text-center">
@@ -110,25 +105,54 @@ export default function BeneficiaryDashboard() {
                   <div>
                     <div className="font-medium">{signup.student.name}</div>
                     <div className="text-xs text-gray-500">{signup.slot.opportunity.title}</div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(signup.slot.date).toLocaleDateString()} &middot; {signup.slot.startTime}
+                    </div>
                     <div className="text-sm text-gray-600 mt-1">
-                      {signup.totalHours !== null ? `${signup.totalHours}h` : "Hours not logged"}
+                      {signup.slot.durationHours}h expected
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApprove(signup.id, signup.totalHours || 0)}
-                      disabled={approving === signup.id}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleReject(signup.id)}
-                      disabled={approving === signup.id}
-                      className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50">
-                      Reject
-                    </button>
-                  </div>
+                  {rejectingId !== signup.id && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(signup.id, signup.slot.durationHours)}
+                        disabled={approving === signup.id}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
+                        {approving === signup.id ? "..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(signup.id); setRejectReason(""); setError(""); }}
+                        disabled={approving === signup.id}
+                        className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50">
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
+                {rejectingId === signup.id && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <input
+                      type="text"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Reason for rejection..."
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm mb-2"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReject(signup.id)}
+                        disabled={approving === signup.id}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50">
+                        {approving === signup.id ? "..." : "Confirm Reject"}
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                        className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -33,18 +33,31 @@ router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_A
         // fetch students with hour data
         const students = await prisma.user.findMany({
           where: { cohortId: c.id },
-          include: {
-            serviceSessions: {
-              where: { verificationStatus: "APPROVED" },
-              select: { totalHours: true },
-            },
-          },
+          select: { id: true },
         });
+        const studentIds = students.map((s) => s.id);
+        const [benSignups, selfSubs] = await Promise.all([
+          prisma.beneficiarySignup.findMany({
+            where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
+            select: { studentId: true, totalHours: true },
+          }),
+          prisma.selfSubmittedRequest.findMany({
+            where: { studentId: { in: studentIds }, status: "APPROVED" },
+            select: { studentId: true, hours: true },
+          }),
+        ]);
+        const hoursMap = new Map<string, number>();
+        for (const bs of benSignups) {
+          hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
+        }
+        for (const ss of selfSubs) {
+          hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
+        }
         let totalHours = 0;
         let completedCount = 0;
         let atRiskCount = 0;
         for (const s of students) {
-          const h = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours ?? 0), 0);
+          const h = hoursMap.get(s.id) || 0;
           totalHours += h;
           const req = c.requiredHours ?? requiredHours;
           if (h >= req) completedCount++;
@@ -120,10 +133,7 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRIC
       where: { id: req.params.id },
       include: {
         students: {
-          select: {
-            id: true, name: true, email: true, grade: true, house: true,
-            serviceSessions: { where: { verificationStatus: "APPROVED" }, select: { totalHours: true } },
-          },
+          select: { id: true, name: true, email: true, grade: true, house: true },
         },
         invitations: { orderBy: { createdAt: "desc" } },
         school: { select: { requiredHours: true } },
@@ -133,10 +143,27 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRIC
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
     const requiredHours = cohort.requiredHours ?? cohort.school.requiredHours ?? 40;
+    const studentIds = cohort.students.map((s) => s.id);
+    const [benSignups, selfSubs] = await Promise.all([
+      prisma.beneficiarySignup.findMany({
+        where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
+        select: { studentId: true, totalHours: true },
+      }),
+      prisma.selfSubmittedRequest.findMany({
+        where: { studentId: { in: studentIds }, status: "APPROVED" },
+        select: { studentId: true, hours: true },
+      }),
+    ]);
+    const hoursMap = new Map<string, number>();
+    for (const bs of benSignups) {
+      hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
+    }
+    for (const ss of selfSubs) {
+      hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
+    }
     const studentsWithHours = cohort.students.map((s) => ({
       ...s,
-      approvedHours: s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours ?? 0), 0),
-      serviceSessions: undefined,
+      approvedHours: hoursMap.get(s.id) || 0,
     }));
 
     res.json({ ...cohort, students: studentsWithHours, requiredHours });
