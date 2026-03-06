@@ -25,6 +25,7 @@ import StudentSelfSubmit from "./pages/student/SelfSubmit";
 
 // School pages
 import SchoolDashboard from "./pages/school/Dashboard";
+import StudentList from "./pages/school/StudentList";
 import SchoolCohorts from "./pages/school/Cohorts";
 import CohortDetail from "./pages/school/CohortDetail";
 import SchoolBeneficiaries from "./pages/school/Beneficiaries";
@@ -81,8 +82,13 @@ function AppRoutes() {
           {SCHOOL_ROLES.includes(user.role) && (
             <>
               <Route path="/dashboard" element={<SchoolDashboard />} />
+              <Route path="/students" element={<StudentList />} />
+              <Route path="/students/on-track" element={<StudentList />} />
+              <Route path="/students/off-track" element={<StudentList />} />
               <Route path="/cohorts" element={<SchoolCohorts />} />
               <Route path="/cohorts/:id" element={<CohortDetail />} />
+              <Route path="/cohorts/:id/on-track" element={<StudentList />} />
+              <Route path="/cohorts/:id/off-track" element={<StudentList />} />
               <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
               <Route path="/messages" element={<SchoolMessages />} />

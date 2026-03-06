@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
+import { parse } from "csv-parse/sync";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -232,6 +233,71 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
   }
 });
 
+// POST /api/beneficiaries/import-csv — bulk import community partners
+router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    let records: any[];
+    try {
+      records = parse(csvData, { columns: true, skip_empty_lines: true, trim: true });
+    } catch {
+      return res.status(400).json({ error: "Invalid CSV format" });
+    }
+    if (records.length === 0) return res.status(400).json({ error: "CSV has no data rows" });
+    if (records.length > 500) return res.status(400).json({ error: "CSV exceeds 500 row limit" });
+
+    const results = { added: 0, failed: 0, errors: [] as string[] };
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const name = (row.organization_name || "").trim();
+      if (!name) {
+        results.errors.push(`Row ${i + 2}: missing organization_name`);
+        results.failed++;
+        continue;
+      }
+      try {
+        const ben = await prisma.beneficiary.create({
+          data: {
+            name,
+            email: row.contact_email?.trim() || null,
+            phone: row.phone_number?.trim() || null,
+            address: row.address?.trim() || null,
+            city: row.city?.trim() || null,
+            state: row.state?.trim() || null,
+            zip: row.zip_code?.trim() || null,
+            website: row.website?.trim() || null,
+            description: row.description?.trim() || null,
+            visibility: "PRIVATE",
+            status: "ACTIVE",
+            createdBySchoolId: user.schoolId,
+          },
+        });
+        const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
+        await prisma.schoolBeneficiaryApproval.create({
+          data: {
+            schoolId: user.schoolId!,
+            beneficiaryId: ben.id,
+            status: approvalStatus,
+            ...(approvalStatus === "APPROVED" ? { approvedAt: new Date() } : {}),
+          },
+        });
+        results.added++;
+      } catch (err: any) {
+        results.errors.push(`Row ${i + 2}: ${err.message || "failed to create"}`);
+        results.failed++;
+      }
+    }
+    res.json(results);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Import CSV error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/beneficiaries/:id — get beneficiary details
 router.get("/:id", authenticate, async (req: Request, res: Response) => {
   try {
@@ -369,6 +435,33 @@ router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), async (req
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Invite beneficiary error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/:id/approve — approve a pending beneficiary for the school
+router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const updated = await prisma.schoolBeneficiaryApproval.updateMany({
+      where: { schoolId: user.schoolId, beneficiaryId: req.params.id },
+      data: { status: "APPROVED", approvedAt: new Date() },
+    });
+    if (updated.count === 0) return res.status(404).json({ error: "Approval record not found" });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "BENEFICIARY_APPROVED",
+        actorId: req.user!.userId,
+        details: JSON.stringify({ beneficiaryId: req.params.id, schoolId: user.schoolId }),
+      },
+    });
+
+    res.json({ message: "Beneficiary approved" });
+  } catch (err) {
+    console.error("Approve beneficiary error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -23,10 +23,21 @@ interface Beneficiary {
   approvalStatus: string;
 }
 
+interface StudentRow {
+  id: string;
+  name: string;
+  email: string;
+  cohortName: string;
+  approvedHours: number;
+  requiredHours: number;
+  status: "COMPLETED" | "ON_TRACK" | "AT_RISK";
+}
+
 export default function SchoolDashboard() {
   const { user } = useAuth();
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -38,12 +49,14 @@ export default function SchoolDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [c, b] = await Promise.all([
+      const [c, b, s] = await Promise.all([
         api.get<CohortSummary[]>("/cohorts"),
         api.get<Beneficiary[]>("/beneficiaries?status=APPROVED"),
+        api.get<StudentRow[]>("/cohorts/school-students").catch(() => []),
       ]);
       setCohorts(c);
       setBeneficiaries(b);
+      setStudents(s);
     } catch {
       setError("Failed to load dashboard. Please refresh.");
     } finally {
@@ -104,6 +117,19 @@ export default function SchoolDashboard() {
         </Link>
         <Link to="/submissions" className="px-4 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-md text-sm font-medium hover:bg-orange-100">
           Self-Submitted Hours
+        </Link>
+      </div>
+
+      {/* Student roster buttons */}
+      <div className="flex gap-3 mb-8 flex-wrap">
+        <Link to="/students" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
+          Student Roster ({students.length})
+        </Link>
+        <Link to="/students/on-track" className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
+          View On-Track Students ({students.filter(s => s.status !== "AT_RISK").length})
+        </Link>
+        <Link to="/students/off-track" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
+          View Off-Track Students ({students.filter(s => s.status === "AT_RISK").length})
         </Link>
       </div>
 
@@ -175,6 +201,50 @@ export default function SchoolDashboard() {
           </div>
         )}
       </div>
+
+      {/* Condensed student roster */}
+      {students.length > 0 && (
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Student Roster</h2>
+            <Link to="/students" className="text-sm text-blue-600 hover:underline">View All ({students.length}) →</Link>
+          </div>
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600 hidden sm:table-cell">Cohort</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Hours</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {[...students]
+                  .sort((a, b) => (a.approvedHours / a.requiredHours) - (b.approvedHours / b.requiredHours))
+                  .slice(0, 8)
+                  .map((s) => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{s.name}</td>
+                      <td className="px-4 py-2 text-gray-500 text-xs hidden sm:table-cell">{s.cohortName}</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="font-medium">{s.approvedHours.toFixed(1)}</span>
+                        <span className="text-gray-400 text-xs">/{s.requiredHours}h</span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          s.status === "COMPLETED" ? "bg-green-50 text-green-700" :
+                          s.status === "ON_TRACK" ? "bg-blue-50 text-blue-700" :
+                          "bg-red-50 text-red-600"
+                        }`}>{s.status.replace("_", " ")}</span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Partners */}
       {beneficiaries.length > 0 && (

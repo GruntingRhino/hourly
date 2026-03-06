@@ -125,6 +125,66 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
   }
 });
 
+// GET /api/cohorts/school-students — all students across all school cohorts with hours
+router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
+    const defaultRequired = school?.requiredHours ?? 40;
+
+    const cohorts = await prisma.cohort.findMany({
+      where: { schoolId: user.schoolId },
+      select: { id: true, name: true, requiredHours: true },
+    });
+
+    const result: any[] = [];
+    for (const cohort of cohorts) {
+      const students = await prisma.user.findMany({
+        where: { cohortId: cohort.id },
+        select: { id: true, name: true, email: true, grade: true },
+      });
+      const studentIds = students.map((s) => s.id);
+      if (studentIds.length === 0) continue;
+      const [benSignups, selfSubs] = await Promise.all([
+        prisma.beneficiarySignup.findMany({
+          where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
+          select: { studentId: true, totalHours: true },
+        }),
+        prisma.selfSubmittedRequest.findMany({
+          where: { studentId: { in: studentIds }, status: "APPROVED" },
+          select: { studentId: true, hours: true },
+        }),
+      ]);
+      const hoursMap = new Map<string, number>();
+      for (const bs of benSignups) hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
+      for (const ss of selfSubs) hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
+
+      const cohortRequired = cohort.requiredHours ?? defaultRequired;
+      for (const s of students) {
+        const hours = Math.round((hoursMap.get(s.id) || 0) * 100) / 100;
+        result.push({
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          grade: s.grade,
+          cohortId: cohort.id,
+          cohortName: cohort.name,
+          approvedHours: hours,
+          requiredHours: cohortRequired,
+          status: hours >= cohortRequired ? "COMPLETED" : hours >= cohortRequired * 0.5 ? "ON_TRACK" : "AT_RISK",
+        });
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("School students error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/cohorts/:id — cohort details
 router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
