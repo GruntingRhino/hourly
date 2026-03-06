@@ -13,13 +13,16 @@ const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/ap
 
 // GET /api/auth/google — returns redirect URL for Google OAuth
 // The client redirects to Google using this URL
-router.get("/url", (_req: Request, res: Response) => {
+// Optional ?state= query param is forwarded to Google and returned in callback
+router.get("/url", (req: Request, res: Response) => {
   if (!GOOGLE_CLIENT_ID) {
     return res.status(503).json({ error: "Google OAuth is not configured" });
   }
+  const state = (req.query.state as string | undefined) || "";
   const scope = encodeURIComponent("openid email profile");
   const redirectUri = encodeURIComponent(GOOGLE_CALLBACK_URL);
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+  const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account${stateParam}`;
   res.json({ url });
 });
 
@@ -68,10 +71,16 @@ router.post("/callback", async (req: Request, res: Response) => {
 
     if (!email) return res.status(400).json({ error: "Google account must have an email address" });
 
+    const userIncludes = {
+      school: true,
+      cohort: { include: { school: true } },
+      beneficiary: true,
+    };
+
     // Find existing user by googleId or email
     let user = await prisma.user.findFirst({
       where: { OR: [{ googleId }, { email }] },
-      include: { school: true },
+      include: userIncludes,
     });
 
     if (user) {
@@ -80,24 +89,27 @@ router.post("/callback", async (req: Request, res: Response) => {
         user = await prisma.user.update({
           where: { id: user.id },
           data: { googleId, emailVerified: true },
-          include: { school: true },
+          include: userIncludes,
         }) as any;
       }
 
-      if (user!.role !== "SCHOOL_ADMIN" && user!.role !== "TEACHER" && user!.role !== "DISTRICT_ADMIN") {
-        return res.status(403).json({ error: "Google Sign-In is only available for school administrators." });
-      }
-
-      const token = signToken({ userId: user!.id, email: user!.email, role: user!.role });
+      const u = user as any;
+      const studentSchool = u.school || u.cohort?.school || null;
+      const schoolId = u.schoolId || u.cohort?.school?.id || null;
+      const token = signToken({ userId: u.id, email: u.email, role: u.role });
       return res.json({
         token,
         user: {
-          id: user!.id,
-          email: user!.email,
-          name: user!.name,
-          role: user!.role,
-          schoolId: (user as any).schoolId,
-          school: (user as any).school,
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          schoolId,
+          school: studentSchool,
+          cohortId: u.cohortId,
+          cohort: u.cohort,
+          beneficiaryId: u.beneficiaryId,
+          beneficiary: u.beneficiary,
           emailVerified: true,
         },
       });

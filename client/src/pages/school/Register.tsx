@@ -51,6 +51,7 @@ export default function SchoolRegister() {
   }, []);
 
   const handleOAuthCallback = async (code: string) => {
+    const isLoginFlow = searchParams.get("state") === "login";
     try {
       const result = await api.post<any>("/auth/google/callback", { code });
       if (result.token && !result.requiresSchoolRegistration) {
@@ -60,6 +61,11 @@ export default function SchoolRegister() {
         return;
       }
       if (result.requiresSchoolRegistration) {
+        if (isLoginFlow) {
+          // Login flow: no account exists — show error instead of registration
+          setError("No GoodHours account found for this Google account. If you're a school administrator, please register your school first.");
+          return;
+        }
         setRegistrationToken(result.registrationToken);
         setUserEmail(result.email);
         setUserName(result.name);
