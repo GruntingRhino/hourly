@@ -1,7 +1,7 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -10,8 +10,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     logout();
     navigate("/");
   };
-
-  if (!user) return <>{children}</>;
 
   const navItems = getNavItems(user.role);
   const isActive = (path: string) =>
@@ -60,7 +58,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {children}
+        <Outlet />
       </main>
     </div>
   );

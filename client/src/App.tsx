@@ -49,9 +49,9 @@ function AppRoutes() {
     );
   }
 
-  // Public routes — always accessible (invitation flows, school registration)
-  const publicRoutes = (
-    <>
+  return (
+    <Routes>
+      {/* Public routes — always accessible */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
@@ -61,75 +61,57 @@ function AppRoutes() {
       <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
-    </>
-  );
 
-  if (!user) {
-    return (
-      <Routes>
-        {publicRoutes}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    );
-  }
+      {user ? (
+        /* Authenticated: routes wrapped in Layout (uses <Outlet />) */
+        <Route element={<Layout />}>
+          {/* Student routes */}
+          {user.role === "STUDENT" && (
+            <>
+              <Route path="/dashboard" element={<StudentDashboard />} />
+              <Route path="/browse" element={<StudentBrowse />} />
+              <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+              <Route path="/submit" element={<StudentSelfSubmit />} />
+              <Route path="/messages" element={<StudentMessages />} />
+              <Route path="/settings" element={<StudentSettings />} />
+            </>
+          )}
 
-  return (
-    <Routes>
-      {/* Public routes remain accessible even when logged in */}
-      <Route path="/school/register" element={<SchoolRegister />} />
-      <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
-      <Route path="/join/student" element={<JoinCohort />} />
-      <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
+          {/* School routes */}
+          {SCHOOL_ROLES.includes(user.role) && (
+            <>
+              <Route path="/dashboard" element={<SchoolDashboard />} />
+              <Route path="/cohorts" element={<SchoolCohorts />} />
+              <Route path="/cohorts/:id" element={<CohortDetail />} />
+              <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
+              <Route path="/submissions" element={<SchoolSelfSubmissions />} />
+              <Route path="/messages" element={<SchoolMessages />} />
+              <Route path="/settings" element={<SchoolSettings />} />
+            </>
+          )}
 
-      {/* Authenticated app */}
-      <Route path="*" element={
-        <Layout>
-          <Routes>
-            {/* Student routes */}
-            {user.role === "STUDENT" && (
-              <>
-                <Route path="/dashboard" element={<StudentDashboard />} />
-                <Route path="/browse" element={<StudentBrowse />} />
-                <Route path="/opportunity/:id" element={<OpportunityDetail />} />
-                <Route path="/submit" element={<StudentSelfSubmit />} />
-                <Route path="/messages" element={<StudentMessages />} />
-                <Route path="/settings" element={<StudentSettings />} />
-              </>
-            )}
+          {/* Beneficiary admin routes */}
+          {user.role === "BENEFICIARY_ADMIN" && (
+            <>
+              <Route path="/dashboard" element={<BeneficiaryDashboard />} />
+              <Route path="/opportunities" element={<BeneficiaryOpportunities />} />
+              <Route path="/settings" element={<StudentSettings />} />
+            </>
+          )}
 
-            {/* School routes (SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN) */}
-            {SCHOOL_ROLES.includes(user.role) && (
-              <>
-                <Route path="/dashboard" element={<SchoolDashboard />} />
-                <Route path="/cohorts" element={<SchoolCohorts />} />
-                <Route path="/cohorts/:id" element={<CohortDetail />} />
-                <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
-                <Route path="/submissions" element={<SchoolSelfSubmissions />} />
-                <Route path="/messages" element={<SchoolMessages />} />
-                <Route path="/settings" element={<SchoolSettings />} />
-              </>
-            )}
-
-            {/* Beneficiary admin routes */}
-            {user.role === "BENEFICIARY_ADMIN" && (
-              <>
-                <Route path="/dashboard" element={<BeneficiaryDashboard />} />
-                <Route path="/opportunities" element={<BeneficiaryOpportunities />} />
-                <Route path="/settings" element={<StudentSettings />} />
-              </>
-            )}
-
-            <Route path="*" element={<Navigate to="/dashboard" />} />
-          </Routes>
-        </Layout>
-      } />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+      ) : (
+        /* Not authenticated: redirect unknown paths to home */
+        <Route path="*" element={<Navigate to="/" replace />} />
+      )}
     </Routes>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
