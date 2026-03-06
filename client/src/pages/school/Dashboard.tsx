@@ -125,12 +125,6 @@ export default function SchoolDashboard() {
         <Link to="/students" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
           Student Roster ({students.length})
         </Link>
-        <Link to="/students/on-track" className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
-          View On-Track Students ({students.filter(s => s.status !== "AT_RISK").length})
-        </Link>
-        <Link to="/students/off-track" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
-          View Off-Track Students ({students.filter(s => s.status === "AT_RISK").length})
-        </Link>
       </div>
 
       {/* Pending invites alert */}

@@ -131,13 +131,17 @@ export default function JoinCohort() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Grade <span className="text-gray-400">(optional)</span>
               </label>
-              <input
-                type="text"
+              <select
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
-                placeholder="e.g. 10th, Junior, 2028"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">Select grade</option>
+                <option value="9th">9th</option>
+                <option value="10th">10th</option>
+                <option value="11th">11th</option>
+                <option value="12th">12th</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
