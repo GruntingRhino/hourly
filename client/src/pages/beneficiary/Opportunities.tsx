@@ -469,8 +469,17 @@ export default function BeneficiaryOpportunities() {
                       >
                         <div className="flex justify-between items-start gap-4">
                           <div>
-                            <div className="font-medium text-sm">{s.student.name}</div>
-                            <div className="text-xs text-gray-500">{s.student.email}</div>
+                            {s.checkedIn ? (
+                              <>
+                                <div className="font-medium text-sm">{s.student.name}</div>
+                                <div className="text-xs text-gray-500">{s.student.email}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-medium text-sm text-gray-400 italic">Anonymous volunteer</div>
+                                <div className="text-xs text-gray-400">Details revealed after check-in</div>
+                              </>
+                            )}
                             <div className="text-xs text-gray-600 mt-1">
                               {s.slot.opportunity.title} ·{" "}
                               {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })}{" "}
@@ -531,7 +540,9 @@ export default function BeneficiaryOpportunities() {
                         className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex justify-between items-center"
                       >
                         <div>
-                          <div className="font-medium text-sm">{s.student.name}</div>
+                          <div className="font-medium text-sm">
+                            {s.checkedIn ? s.student.name : <span className="italic text-gray-400">Anonymous volunteer</span>}
+                          </div>
                           <div className="text-xs text-gray-500">
                             {s.slot.opportunity.title} ·{" "}
                             {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })}{" "}

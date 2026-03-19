@@ -801,6 +801,107 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
   }
 });
 
+// GET /api/beneficiaries/:id/invitations — list school invitations for this beneficiary
+router.get("/:id/invitations", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const invitations = await prisma.beneficiaryInvitation.findMany({
+      where: { beneficiaryId: req.params.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Attach school names
+    const schoolIds = [...new Set(invitations.map((inv) => inv.schoolId))];
+    const schools = await prisma.school.findMany({
+      where: { id: { in: schoolIds } },
+      select: { id: true, name: true },
+    });
+    const schoolMap = new Map(schools.map((s) => [s.id, s.name]));
+
+    const result = invitations.map((inv) => ({
+      ...inv,
+      schoolName: schoolMap.get(inv.schoolId) ?? "Unknown School",
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("List invitations error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/invitations/:invId/respond — accept or decline an invitation
+router.post("/invitations/:invId/respond", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const { action } = z.object({ action: z.enum(["ACCEPTED", "DECLINED"]) }).parse(req.body);
+
+    const inv = await prisma.beneficiaryInvitation.findUnique({ where: { id: req.params.invId } });
+    if (!inv) return res.status(404).json({ error: "Invitation not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== inv.beneficiaryId) return res.status(403).json({ error: "Not your invitation" });
+
+    const updated = await prisma.beneficiaryInvitation.update({
+      where: { id: inv.id },
+      data: {
+        status: action,
+        respondedAt: new Date(),
+        ...(action === "ACCEPTED" ? { acceptedAt: new Date() } : {}),
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Respond invitation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/beneficiaries/:id/profile — beneficiary admin updates their profile
+router.patch("/:id/profile", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const schema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      email: z.string().email().optional().or(z.literal("")),
+      phone: z.string().max(20).optional(),
+      description: z.string().max(1000).optional(),
+      website: z.string().max(255).optional(),
+      address: z.string().max(255).optional(),
+      city: z.string().max(100).optional(),
+      state: z.string().max(50).optional(),
+      zip: z.string().regex(/^\d{5}$/).optional().or(z.literal("")),
+    });
+    const data = schema.parse(req.body);
+
+    const updated = await prisma.beneficiary.update({
+      where: { id: req.params.id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.email !== undefined ? { email: data.email || null } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone || null } : {}),
+        ...(data.description !== undefined ? { description: data.description || null } : {}),
+        ...(data.website !== undefined ? { website: data.website || null } : {}),
+        ...(data.address !== undefined ? { address: data.address || null } : {}),
+        ...(data.city !== undefined ? { city: data.city || null } : {}),
+        ...(data.state !== undefined ? { state: data.state || null } : {}),
+        ...(data.zip !== undefined ? { zip: data.zip || null } : {}),
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Update beneficiary profile error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/beneficiaries/signups/:signupId/reject — beneficiary admin rejects hours
 router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
   try {

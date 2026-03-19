@@ -38,6 +38,7 @@ import SchoolSettings from "./pages/school/Settings";
 // Beneficiary pages
 import BeneficiaryDashboard from "./pages/beneficiary/Dashboard";
 import BeneficiaryOpportunities from "./pages/beneficiary/Opportunities";
+import BeneficiarySettings from "./pages/beneficiary/Settings";
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
 
@@ -105,8 +106,20 @@ function AppRoutes() {
             <>
               <Route path="/dashboard" element={<BeneficiaryDashboard />} />
               <Route path="/opportunities" element={<BeneficiaryOpportunities />} />
-              <Route path="/settings" element={<StudentSettings />} />
+              <Route path="/settings" element={<BeneficiarySettings />} />
             </>
+          )}
+
+          {/* Legacy ORG_ADMIN — redirect to a graceful message */}
+          {user.role === "ORG_ADMIN" && (
+            <Route path="*" element={
+              <div className="text-center py-16">
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">Account Upgrade Required</h2>
+                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                  Your account type has been updated. Please contact support or sign up again as a Beneficiary Admin.
+                </p>
+              </div>
+            } />
           )}
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

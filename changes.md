@@ -1,10 +1,17 @@
 # Changes Required — Based on QA vs. spec.md
 
-This file lists features that are missing or broken in the app, derived from testing goodhours.app against spec.md.
+This file lists features that are missing or broken in the app.
+
+**Last verified: 2026-03-19 against goodhours.app**
+
+Items that were previously listed and are now confirmed working have been removed:
+- ~~Item 3: "+ Submit Hours" button~~ — ✅ FIXED (form opens with org name, date, hours, description)
+- ~~Item 5: Opportunity detail / sign-up page~~ — ✅ FIXED (cards navigate to `/opportunity/:id` with sign-up button)
+- ~~Item 8: Event reminders / notifications~~ — ✅ PRESENT (Notifications tab in student Settings has Event Reminders email + in-app toggles)
 
 ---
 
-## 1. Beneficiary Discover Page (HIGH PRIORITY)
+## **1. Beneficiary Discover Page (HIGH PRIORITY)**
 
 **Spec ref: §4.2.3**
 
@@ -28,108 +35,83 @@ The spec calls for a dedicated "Beneficiary Discover Page" as the school admin's
 
 ---
 
-## 2. Student Sign-Up Flow — Calendar UX (HIGH PRIORITY)
+## **2. Student Sign-Up Flow — Calendar UX (HIGH PRIORITY)**
 
 **Spec ref: §4.4.2**
 
-The spec requires a **calendar-based** sign-up UX for students browsing opportunities. Currently Browse is a flat list.
+The spec requires a **calendar-based** sign-up UX for students browsing opportunities. Currently Browse is a flat list only.
 
 **What to build:**
 - Add a calendar/month view toggle to the Browse page
 - Opportunities are shown as events on calendar dates
 - Clicking a date shows available opportunities that day
-- Clicking an opportunity opens a detail view with time slots and a "Sign Up" button
-- The opportunity card in list view should also be clickable → detail page
+- Clicking an opportunity opens a detail view with time slots and a "Sign Up" button (detail page now works, just needs calendar entry point)
 
 ---
 
-## 3. "+ Submit Hours" Button Broken (BUG — HIGH PRIORITY)
-
-**Spec ref: §4.4.2**
-
-Clicking the "+ Submit Hours" button on `/submit` does nothing — no modal, no navigation. Students cannot self-submit hours.
-
-**What to fix:**
-- The button should open a modal or navigate to a form with fields:
-  - Organization name
-  - Date of service
-  - Hours worked
-  - Description / type of work
-  - Supporting notes (optional)
-- On submit, creates a `SelfSubmittedRequest` pending school approval
-- After submission, item appears in the list on `/submit` with PENDING status
-
----
-
-## 4. School Registration Flow — Type-Ahead Search + Magic Link (MEDIUM PRIORITY)
+## **3. School Registration Flow — Type-Ahead Search + Magic Link (MEDIUM PRIORITY)**
 
 **Spec ref: §4.2.1**
 
-The public landing page just has a "Sign in with Google" button. The spec requires a proper registration flow:
+The `/school/register` page just has a "Continue with Google" button. The spec requires a proper flow before OAuth:
 
 **What to build:**
-- On the landing page (or a `/register` page), show a school search input with type-ahead
+- School search input with type-ahead on the register page
 - Search queries the schools database (Public_Schools.csv / Private_Schools.csv already imported)
 - If school is already registered: show message "This school is already registered. Contact [email] to get access."
-- If school is not registered: show "Register" button → trigger magic link email to the Google-authenticated user
-- The `/school/register` and `/school/verify-registration` routes may exist on the backend — wire up the frontend
+- If school is not registered: show "Register" button → trigger Google OAuth → then magic link email
+- The `/school/register` and `/school/verify-registration` routes exist on the backend — wire up the frontend search step
 
 ---
 
-## 5. Opportunity Detail / Sign-Up Page (MEDIUM PRIORITY)
+## **4. Beneficiary Admin Dashboard — BLANK PAGE (CRITICAL BUG — HIGH PRIORITY)**
 
-**Spec ref: §4.4.2**
+**Spec ref: §4.3**
 
-Clicking opportunity cards in Browse does nothing. Students need to be able to:
-- Click a card → navigate to `/opportunities/:id`
-- See: description, requirements, time slots, location, organization info
-- See capacity (already shown in list) and sign up for a specific time slot
-- After signing up, opportunity appears in "Upcoming Opportunities" on their dashboard
+**When logging in as a beneficiary admin (`volunteer@greenearth.org`), the entire dashboard is a blank white page.** Only the GoodHours logo and a "Log out" button are visible. There is no navigation, no content, no routes that render anything.
+
+This means the entire beneficiary admin role is non-functional in production. Items 5–7 below (opportunity creation, student signups, hour approval) cannot be reached at all.
+
+**What to fix:**
+- Identify why the BENEFICIARY_ADMIN role renders a blank layout
+- The `App.tsx` routing likely has no routes defined for `BENEFICIARY_ADMIN` role, or the layout component crashes silently
+- Restore/build the beneficiary admin nav and dashboard: should show pending school invitations, their opportunities, and student signups
 
 ---
 
-## 6. Beneficiary Admin Role — Opportunity Creation (MEDIUM PRIORITY)
+## **5. Beneficiary Admin Role — Opportunity Creation (MEDIUM PRIORITY)**
 
 **Spec ref: §4.3.2**
 
-Need to verify and complete the beneficiary admin experience:
+**Blocked by item 4 above (blank dashboard).** Once the dashboard is fixed, verify and complete:
 - Calendar-based opportunity creation UI (start date, end date, time slots, work type, requirements)
 - Student signup management: view count, reveal student details only after attendance
 - Define expectations for volunteers
 - Approve/reject hours submitted by students
+- Track school invitations: Received / Accepted / Declined
 
 ---
 
-## 7. Zip-Based Proximity Filter in Partner Directory (MEDIUM PRIORITY)
+## **6. Zip-Based Proximity Filter in Partner Directory (MEDIUM PRIORITY)**
 
 **Spec ref: §4.2.2**
 
-The "Add from Directory" search has a text input only. The spec calls for zip-based proximity browsing.
+The "Add from Directory" search has a text input only — no zip radius, no category filter, no auto-loading by proximity.
 
 **What to build:**
 - Auto-load results near the school's ZIP codes (from Settings) on page load
-- Add a "Within X miles" filter (already has server-side data with lat/lng from geocoding scripts)
+- Add a "Within X miles" filter (server-side geocoding data already exists via `server/scripts/geocode-directory.ts`)
 - Add a category filter dropdown (EO categories already in the database)
 
 ---
 
-## 8. Event Reminders / Notifications for Students (LOW PRIORITY)
-
-**Spec ref: §4.4.2**
-
-No visible reminder or notification UI. Once sign-up flow is working, add:
-- Email reminders for upcoming opportunities (day before, morning of)
-- In-app notification badge or list
-
----
-
-## 9. Beneficiary Invitation Flows (LOW PRIORITY)
+## **7. Beneficiary Invitation Flows (LOW PRIORITY)**
 
 **Spec ref: §4.3.1**
 
-Need to confirm/complete:
-- When school approves a beneficiary, email is sent with registration link
-- Existing beneficiaries in directory receive "new school wants to partner" notification with Accept/Decline
+**Blocked by item 4 above (blank beneficiary admin dashboard).** Once the dashboard is fixed, confirm:
+- When school clicks "Approve & Invite" in the directory, a registration email is sent to the beneficiary
+- Existing beneficiaries in the directory receive "new school wants to partner" notification with Accept/Decline
 - Beneficiary can update their pre-filled public profile data after registering
 
 ---
@@ -139,6 +121,7 @@ Need to confirm/complete:
 - Schools table already has ZIP codes stored (`School ZIP Codes` field in Settings)
 - Geocoding scripts exist at `server/scripts/geocode-directory.ts`
 - EO beneficiary data is already imported (eo1.csv through eo4.csv)
-- The `SelfSubmittedRequest` model exists in the Prisma schema — just wire up the frontend form
+- The `SelfSubmittedRequest` model exists in the Prisma schema and the frontend form now works
 - Leaflet.js is a good free option for the map (no API key needed)
-- The `server/src/routes/beneficiaries.ts` likely has proximity search endpoints already — check before building new ones
+- Check `server/src/routes/beneficiaries.ts` for proximity search endpoints before building new ones
+- **Item 4 (blank beneficiary admin) is likely a routing issue in `client/src/App.tsx` — check how `BENEFICIARY_ADMIN` role is handled**
