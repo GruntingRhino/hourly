@@ -140,6 +140,7 @@ router.post("/callback", async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/google/schools — search school directory (unauthenticated, for registration)
+// Returns results ranked: exact-prefix matches first, then word-boundary matches, then substring
 router.get("/schools", async (req: Request, res: Response) => {
   try {
     const search = (req.query.search as string || "").trim();
@@ -149,6 +150,7 @@ router.get("/schools", async (req: Request, res: Response) => {
       return res.json([]);
     }
 
+    // Fetch a broader pool and rank in JS for smarter ordering
     const schools = await prisma.schoolDirectory.findMany({
       where: {
         AND: [
@@ -156,16 +158,44 @@ router.get("/schools", async (req: Request, res: Response) => {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
               { city: { contains: search, mode: "insensitive" } },
+              { county: { contains: search, mode: "insensitive" } },
             ],
           },
           ...(state ? [{ state: { equals: state, mode: "insensitive" as any } }] : []),
         ],
       },
-      take: 20,
-      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        city: true,
+        state: true,
+        zip: true,
+        claimed: true,
+        gradeRange: true,
+        enrollment: true,
+      },
+      take: 200,
     });
 
-    res.json(schools);
+    const q = search.toLowerCase();
+
+    // Rank: 0 = name starts with query, 1 = name word starts with query, 2 = city match, 3 = other
+    const ranked = schools
+      .map((s) => {
+        const nameLower = s.name.toLowerCase();
+        const cityLower = (s.city ?? "").toLowerCase();
+        let rank = 3;
+        if (nameLower.startsWith(q)) rank = 0;
+        else if (nameLower.split(/\s+/).some((w) => w.startsWith(q))) rank = 1;
+        else if (cityLower.startsWith(q) || cityLower.includes(q)) rank = 2;
+        return { ...s, _rank: rank };
+      })
+      .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
+      .slice(0, 20)
+      .map(({ _rank: _r, ...s }) => s);
+
+    res.json(ranked);
   } catch (err) {
     console.error("School directory search error:", err);
     res.status(500).json({ error: "Internal server error" });
