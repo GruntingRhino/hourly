@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -11,9 +11,26 @@ interface SchoolEntry {
   state: string | null;
   zip: string | null;
   claimed: boolean;
+  gradeRange: string | null;
+  enrollment: number | null;
 }
 
 type Step = "google" | "search" | "contact" | "sent";
+
+const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-100 text-gray-900 rounded-sm">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
 
 export default function SchoolRegister() {
   const { loginWithToken } = useAuth();
@@ -26,28 +43,45 @@ export default function SchoolRegister() {
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
 
+  // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchState, setSearchState] = useState("");
   const [searchResults, setSearchResults] = useState<SchoolEntry[]>([]);
   const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
   const [selectedSchool, setSelectedSchool] = useState<SchoolEntry | null>(null);
   const [customSchoolName, setCustomSchoolName] = useState("");
+  const [alreadyClaimed, setAlreadyClaimed] = useState<SchoolEntry | null>(null);
 
+  // Contact step
   const [contactEmail, setContactEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState("");
 
-  // Handle OAuth callback — look for ?code= in URL
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const code = searchParams.get("code");
-    if (code) {
-      handleOAuthCallback(code);
-    }
-    // Fetch Google OAuth URL
-    api.get<{ url: string }>("/auth/google/url").then((data) => {
-      setGoogleUrl(data.url);
-    }).catch(() => {});
+    if (code) handleOAuthCallback(code);
+    api.get<{ url: string }>("/auth/google/url").then((d) => setGoogleUrl(d.url)).catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current && !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleOAuthCallback = async (code: string) => {
@@ -55,14 +89,12 @@ export default function SchoolRegister() {
     try {
       const result = await api.post<any>("/auth/google/callback", { code });
       if (result.token && !result.requiresSchoolRegistration) {
-        // Already registered — log them in
         loginWithToken(result.token, result.user);
         navigate("/dashboard");
         return;
       }
       if (result.requiresSchoolRegistration) {
         if (isLoginFlow) {
-          // Login flow: no account exists — show error instead of registration
           setError("No GoodHours account found for this Google account. If you're a school administrator, please register your school first.");
           return;
         }
@@ -76,38 +108,83 @@ export default function SchoolRegister() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    if (googleUrl) {
-      window.location.href = googleUrl;
+  const doSearch = useCallback(async (query: string, state: string) => {
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
     }
-  };
-
-  const handleSearch = async () => {
-    if (searchQuery.trim().length < 2) return;
     setSearching(true);
     try {
-      const results = await api.get<SchoolEntry[]>(`/auth/google/schools?search=${encodeURIComponent(searchQuery)}&state=${encodeURIComponent(searchState)}`);
+      const results = await api.get<SchoolEntry[]>(
+        `/auth/google/schools?search=${encodeURIComponent(query)}&state=${encodeURIComponent(state)}`
+      );
       setSearchResults(results);
+      setShowDropdown(results.length > 0);
+      setActiveIdx(-1);
     } catch {
-      setError("Search failed. Please try again.");
+      setSearchResults([]);
     } finally {
       setSearching(false);
     }
+  }, []);
+
+  const handleQueryChange = (value: string) => {
+    setSearchQuery(value);
+    setSelectedSchool(null);
+    setAlreadyClaimed(null);
+    setActiveIdx(-1);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void doSearch(value, searchState);
+    }, 280);
+  };
+
+  const handleStateChange = (value: string) => {
+    setSearchState(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void doSearch(searchQuery, value);
+    }, 280);
   };
 
   const handleSelectSchool = (school: SchoolEntry) => {
+    setShowDropdown(false);
+    setSearchQuery(school.name);
     if (school.claimed) {
-      setError(`This school is already registered on GoodHours. Contact your school's GoodHours administrator to get access.`);
-      return;
+      setAlreadyClaimed(school);
+      setSelectedSchool(null);
+    } else {
+      setSelectedSchool(school);
+      setAlreadyClaimed(null);
+      setContactEmail("");
+      setStep("contact");
     }
-    setSelectedSchool(school);
-    setContactEmail("");
-    setStep("contact");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || searchResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIdx >= 0 && searchResults[activeIdx]) {
+        handleSelectSchool(searchResults[activeIdx]);
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+    }
   };
 
   const handleCustomSchool = () => {
     if (!customSchoolName.trim()) return;
     setSelectedSchool(null);
+    setAlreadyClaimed(null);
+    setContactEmail("");
     setStep("contact");
   };
 
@@ -121,9 +198,7 @@ export default function SchoolRegister() {
         schoolName: selectedSchool?.name || customSchoolName,
         contactEmail,
       };
-      if (selectedSchool) {
-        payload.directorySchoolId = selectedSchool.id;
-      }
+      if (selectedSchool) payload.directorySchoolId = selectedSchool.id;
       const result = await api.post<any>("/auth/google/register-school", payload);
       setSentTo(result.sentTo || contactEmail);
       setStep("sent");
@@ -134,6 +209,7 @@ export default function SchoolRegister() {
     }
   };
 
+  // ─── Step: Google sign-in ────────────────────────────────────────────────────
   if (step === "google") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -148,10 +224,10 @@ export default function SchoolRegister() {
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
             )}
             <button
-              onClick={handleGoogleSignIn}
+              onClick={() => googleUrl && (window.location.href = googleUrl)}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border-2 border-gray-300 rounded-md font-medium hover:bg-gray-50 text-gray-800"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -169,83 +245,133 @@ export default function SchoolRegister() {
     );
   }
 
+  // ─── Step: Smart school search ───────────────────────────────────────────────
   if (step === "search") {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-8">
-        <div className="max-w-xl mx-auto">
+        <div className="max-w-lg mx-auto">
           <Link to="/" className="block text-center text-2xl font-bold italic mb-8">GoodHours</Link>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold mb-2">Find Your School</h2>
-            <p className="text-sm text-gray-600 mb-6">
-              Welcome, {userName || userEmail}. Search for your school in our directory.
+            <h2 className="text-xl font-bold mb-1">Find Your School</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Welcome, {userName || userEmail}. Start typing to search {"\u2014"} results update automatically.
             </p>
 
-            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+            )}
 
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-                placeholder="School name or city..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={searchState}
-                onChange={(e) => setSearchState(e.target.value)}
-                className="px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none"
-              >
-                <option value="">All States</option>
-                {["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleSearch}
-                disabled={searching}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
-              >
-                {searching ? "..." : "Search"}
-              </button>
-            </div>
-
-            {searchResults.length > 0 && (
-              <div className="mt-4 border border-gray-200 rounded-md divide-y">
-                {searchResults.map((school) => (
-                  <button
-                    key={school.id}
-                    onClick={() => handleSelectSchool(school)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex justify-between items-center"
-                  >
-                    <div>
-                      <div className="font-medium text-sm">{school.name}</div>
-                      <div className="text-xs text-gray-500">{[school.city, school.state].filter(Boolean).join(", ")} {school.type && `• ${school.type}`}</div>
-                    </div>
-                    {school.claimed && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Registered</span>}
-                  </button>
-                ))}
+            {/* Already-registered banner */}
+            {alreadyClaimed && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+                <strong>{alreadyClaimed.name}</strong> is already registered on GoodHours.
+                Contact your school's GoodHours administrator to get access.
               </div>
             )}
 
-            {searchResults.length === 0 && searchQuery.length >= 2 && !searching && (
-              <div className="mt-4 text-sm text-gray-500">No results found.</div>
+            {/* State filter + search input */}
+            <div className="flex gap-2 mb-1">
+              <select
+                value={searchState}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="px-2 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 shrink-0"
+              >
+                <option value="">All states</option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <div className="relative flex-1">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleQueryChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                  placeholder="School name or city..."
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                />
+                {searching && (
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">...</span>
+                )}
+                {!searching && searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(""); setSearchResults([]); setShowDropdown(false); setAlreadyClaimed(null); inputRef.current?.focus(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none"
+                    aria-label="Clear"
+                  >
+                    ✕
+                  </button>
+                )}
+
+                {/* Dropdown */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto"
+                  >
+                    {searchResults.map((school, idx) => (
+                      <button
+                        key={school.id}
+                        onMouseDown={(e) => { e.preventDefault(); handleSelectSchool(school); }}
+                        className={`w-full text-left px-3 py-2.5 flex items-start justify-between gap-2 transition-colors ${
+                          idx === activeIdx ? "bg-blue-50" : "hover:bg-gray-50"
+                        } ${idx > 0 ? "border-t border-gray-100" : ""}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {highlightMatch(school.name, searchQuery)}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {[school.city, school.state].filter(Boolean).join(", ")}
+                            {school.type ? ` · ${school.type}` : ""}
+                            {school.gradeRange ? ` · ${school.gradeRange}` : ""}
+                          </div>
+                        </div>
+                        {school.claimed ? (
+                          <span className="shrink-0 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
+                            Registered
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-xs text-blue-600">
+                            Select →
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1.5">No schools found for "{searchQuery}"</p>
             )}
 
-            <div className="mt-6 border-t pt-4">
-              <p className="text-sm text-gray-600 mb-3">Can't find your school?</p>
+            <p className="text-xs text-gray-400 mt-3">
+              Results from the National Center for Education Statistics school directory.
+            </p>
+
+            {/* Manual entry fallback */}
+            <div className="mt-6 pt-5 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700 mb-2">Can't find your school?</p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={customSchoolName}
                   onChange={(e) => setCustomSchoolName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCustomSchool(); }}}
                   placeholder="Enter school name manually"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   onClick={handleCustomSchool}
                   disabled={!customSchoolName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40"
                 >
                   Continue
                 </button>
@@ -257,6 +383,7 @@ export default function SchoolRegister() {
     );
   }
 
+  // ─── Step: Contact email ──────────────────────────────────────────────────────
   if (step === "contact") {
     const schoolName = selectedSchool?.name || customSchoolName;
     return (
@@ -264,19 +391,32 @@ export default function SchoolRegister() {
         <div className="w-full max-w-sm">
           <Link to="/" className="block text-center text-2xl font-bold italic mb-8">GoodHours</Link>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <button onClick={() => setStep("search")} className="text-sm text-blue-600 hover:underline mb-4 block">← Back to search</button>
+            <button
+              onClick={() => setStep("search")}
+              className="text-sm text-blue-600 hover:underline mb-4 block"
+            >
+              ← Back to search
+            </button>
             <h2 className="text-xl font-bold mb-2">Verify Your School</h2>
-            <p className="text-sm text-gray-600 mb-1">Registering: <strong>{schoolName}</strong></p>
-            <p className="text-sm text-gray-600 mb-6">
-              We'll send a verification link to the school's official email address to confirm this registration.
+            <p className="text-sm text-gray-600 mb-1">
+              Registering: <strong>{schoolName}</strong>
             </p>
-
-            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
-
+            {selectedSchool?.city && (
+              <p className="text-xs text-gray-400 mb-4">
+                {[selectedSchool.city, selectedSchool.state].filter(Boolean).join(", ")}
+                {selectedSchool.type ? ` · ${selectedSchool.type}` : ""}
+              </p>
+            )}
+            <p className="text-sm text-gray-600 mb-6">
+              We'll send a verification link to confirm this registration.
+            </p>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+            )}
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  School Contact Email
+                  Contact Email
                 </label>
                 <input
                   type="email"
@@ -286,7 +426,9 @@ export default function SchoolRegister() {
                   placeholder="principal@schoolname.edu"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">Enter any email address where you can receive the verification link (school email, Gmail, etc.).</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Any email where you can receive the verification link.
+                </p>
               </div>
               <button
                 type="submit"
@@ -302,7 +444,7 @@ export default function SchoolRegister() {
     );
   }
 
-  // Step: sent
+  // ─── Step: Sent ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm text-center">
@@ -315,14 +457,19 @@ export default function SchoolRegister() {
           </div>
           <h2 className="text-xl font-bold mb-2">Check Your Email</h2>
           <p className="text-sm text-gray-600 mb-4">
-            We've sent a verification link to <strong>{sentTo}</strong>. Click the link in that email to complete your school's registration.
+            We've sent a verification link to <strong>{sentTo}</strong>.
+            Click the link to complete your school's registration.
           </p>
           <p className="text-xs text-gray-400">
-            The link expires in 24 hours. Didn't receive it? Check your spam folder, or{" "}
-            <button onClick={() => setStep("contact")} className="text-blue-600 hover:underline">try again</button>.
+            The link expires in 24 hours. Didn't receive it?{" "}
+            <button onClick={() => setStep("contact")} className="text-blue-600 hover:underline">
+              Try again
+            </button>.
           </p>
           <div className="mt-6">
-            <Link to="/login" className="text-sm text-blue-600 hover:underline">Go to Sign In</Link>
+            <Link to="/login" className="text-sm text-blue-600 hover:underline">
+              Go to Sign In
+            </Link>
           </div>
         </div>
       </div>
