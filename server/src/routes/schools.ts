@@ -35,6 +35,34 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/schools/location — returns school lat/lng for map centering
+router.get("/location", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(404).json({ error: "No school found" });
+
+    const school = await prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        city: true,
+        state: true,
+        zip: true,
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    if (!school) return res.status(404).json({ error: "School not found" });
+    res.json(school);
+  } catch (err) {
+    console.error("School location error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/settings — current school-level settings for the authenticated school staff
 router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {

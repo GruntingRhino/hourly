@@ -1,5 +1,87 @@
-When a pending organization request is approved or rejected, it should dissapear from the "Pending organization request" list. Format for the organization requests description is a single line. The description should be in a paragraph form not just a single line.
-On school dashboard, the buttons "View on-track students," "View off-track students" and "student roster" are not working. They should bring up a page with a list of students in those categories. In addition, keep the student roster on the dashboard, however for the individual cohorts put the view off and on track students specific to cohorts.
-In community partners section, create a function to upload a csv file, with what parameters in what order should be there, and it uploads all partners there.
-For managing each cohort, put in useful statistics specific to the cohort. [Chatgpt put in the useful statistics examples here, like mean, median, something like that that would be useful for schools]
-Remove the classrooms feature and on the dashboard replace the classroom list with a list of all of the cohorts.
+# GoodHours — Required Fixes
+
+Apply the following updates to the GoodHours app.
+
+---
+
+## 1. Organization Requests
+
+- When an organization request is **approved or rejected**, remove it immediately from the **Pending Organization Requests** list.
+- Change the **description field** from a single-line input to a **multi-line paragraph field** and render it as paragraph text.
+
+---
+
+## 2. School Dashboard Buttons
+
+Fix the following buttons so they open pages with filtered student lists:
+
+- **View On-Track Students**
+- **View Off-Track Students**
+- **Student Roster**
+
+Requirements:
+- **Student Roster** → list of all students in the school.
+- **On-Track / Off-Track** → filtered lists based on hour progress.
+- Keep a **student roster preview table on the dashboard**.
+- On each **cohort management page**, add:
+  - **View On-Track Students (Cohort Only)**
+  - **View Off-Track Students (Cohort Only)**
+
+---
+
+## 3. Community Partners CSV Upload
+
+Add a **CSV upload function** in the Community Partners section.
+
+CSV columns (in this order):
+
+
+organization_name
+contact_name
+contact_email
+phone
+website
+address
+city
+state
+zip
+description
+approved
+
+
+Behavior:
+- Each row creates a partner record.
+- Skip rows missing required fields.
+- Return an **import summary (success + errors)**.
+
+---
+
+## 4. Cohort Analytics
+
+Add statistics to each **cohort management page**:
+
+- Total students
+- Students on track
+- Students off track
+- Mean hours completed
+- Median hours completed
+- Max hours
+- Min hours
+- Total verified hours
+- % on track
+- % off track
+- Pending hour verifications
+
+---
+
+## 5. Remove Classrooms
+
+Remove the **Classrooms feature** entirely.
+
+Replace the **classroom list on the dashboard** with a **cohort list** showing:
+- Cohort name
+- Total students
+- On-track students
+- Off-track students
+- Average hours
+- Link to **Manage Cohort**

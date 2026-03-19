@@ -20,7 +20,11 @@ interface DirEntry {
   category: string | null;
   city: string | null;
   state: string | null;
+  address: string | null;
+  zip: string | null;
+  description: string | null;
   claimed: boolean;
+  distanceMiles?: number;
 }
 
 export default function SchoolBeneficiaries() {
@@ -41,6 +45,10 @@ export default function SchoolBeneficiaries() {
   const [csvResult, setCsvResult] = useState<{ added: number; failed: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [proximityRadius, setProximityRadius] = useState(10);
+  const [proximityResults, setProximityResults] = useState<DirEntry[]>([]);
+  const [proximityLoading, setProximityLoading] = useState(false);
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
@@ -71,6 +79,47 @@ export default function SchoolBeneficiaries() {
     }
   };
 
+  const loadProximityResults = async (lat: number, lng: number, radius: number) => {
+    setProximityLoading(true);
+    try {
+      const results = await api.get<DirEntry[]>(
+        `/beneficiaries/directory/nearby?lat=${lat}&lng=${lng}&radius=${radius}`
+      );
+      setProximityResults(results);
+    } catch {
+      // Silently fail — proximity search is best-effort
+      setProximityResults([]);
+    } finally {
+      setProximityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "search" && isAdmin) {
+      if (!schoolLocation) {
+        // Fetch school location, then load proximity results
+        api.get<{ lat: number; lng: number } | null>("/schools/location")
+          .then((loc) => {
+            if (loc?.lat && loc?.lng) {
+              setSchoolLocation(loc);
+              void loadProximityResults(loc.lat, loc.lng, proximityRadius);
+            }
+          })
+          .catch(() => {
+            // No location available — proximity search won't show
+          });
+      } else {
+        void loadProximityResults(schoolLocation.lat, schoolLocation.lng, proximityRadius);
+      }
+    }
+  }, [tab, isAdmin]);
+
+  useEffect(() => {
+    if (tab === "search" && isAdmin && schoolLocation) {
+      void loadProximityResults(schoolLocation.lat, schoolLocation.lng, proximityRadius);
+    }
+  }, [proximityRadius]);
+
   const handleApproveFromDir = async (directoryId: string) => {
     try {
       await api.post("/beneficiaries/approve-from-directory", { directoryId });
@@ -98,21 +147,25 @@ export default function SchoolBeneficiaries() {
 
   const handleDrop = async (benId: string, name: string) => {
     if (!window.confirm(`Remove "${name}" from your approved list?`)) return;
+    // Optimistically remove
+    setBeneficiaries((prev) => prev.filter((b) => b.id !== benId));
     try {
       await api.post(`/beneficiaries/${benId}/drop`);
-      void load();
     } catch (err: any) {
       setError(err.message || "Failed to drop beneficiary.");
+      void load(); // reload on error to restore state
     }
   };
 
   const handleApprove = async (benId: string) => {
     setApprovingId(benId);
+    // Optimistically move from pending to approved
+    setBeneficiaries((prev) => prev.map((b) => b.id === benId ? { ...b, approvalStatus: "APPROVED" } : b));
     try {
       await api.post(`/beneficiaries/${benId}/approve`, {});
-      void load();
     } catch (err: any) {
       setError(err.message || "Failed to approve.");
+      void load(); // reload on error to restore state
     } finally {
       setApprovingId(null);
     }
@@ -160,6 +213,13 @@ export default function SchoolBeneficiaries() {
 
   const approved = beneficiaries.filter((b) => b.approvalStatus === "APPROVED");
   const pending = beneficiaries.filter((b) => b.approvalStatus === "PENDING");
+
+  // Auto-switch away from pending tab when no more pending items
+  useEffect(() => {
+    if (tab === "pending" && pending.length === 0 && !loading) {
+      setTab("approved");
+    }
+  }, [pending.length, tab, loading]);
 
   return (
     <div>
@@ -286,27 +346,92 @@ export default function SchoolBeneficiaries() {
             </button>
           </div>
 
-          {dirResults.length > 0 ? (
-            <div className="border border-gray-200 rounded-lg divide-y">
-              {dirResults.map((d) => (
-                <div key={d.id} className="px-4 py-3 flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-sm">{d.name}</div>
-                    <div className="text-xs text-gray-500">{[d.category, d.city, d.state].filter(Boolean).join(" · ")}</div>
-                  </div>
-                  {d.claimed ? (
-                    <span className="text-xs text-gray-400">Already registered</span>
-                  ) : (
-                    <button onClick={() => handleApproveFromDir(d.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
-                      Approve & Invite
-                    </button>
-                  )}
+          {/* Text search results */}
+          {dirSearch.length >= 2 && (
+            <>
+              {dirResults.length > 0 ? (
+                <div className="border border-gray-200 rounded-lg divide-y">
+                  {dirResults.map((d) => (
+                    <div key={d.id} className="px-4 py-3 flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-sm">{d.name}</div>
+                        <div className="text-xs text-gray-500">{[d.category, d.city, d.state].filter(Boolean).join(" · ")}</div>
+                      </div>
+                      {d.claimed ? (
+                        <span className="text-xs text-gray-400">Already registered</span>
+                      ) : (
+                        <button onClick={() => handleApproveFromDir(d.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                          Approve & Invite
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : !searching ? (
+                <div className="text-gray-500 text-sm">No results found. Try creating a custom partner instead.</div>
+              ) : null}
+            </>
+          )}
+
+          {/* Proximity results (shown when no search term) */}
+          {dirSearch.length < 2 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-medium text-gray-700">
+                  {schoolLocation ? "Nearby Organizations" : "Directory"}
+                </div>
+                {schoolLocation && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>Within</span>
+                    <select
+                      value={proximityRadius}
+                      onChange={(e) => setProximityRadius(Number(e.target.value))}
+                      className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    >
+                      <option value={5}>5 miles</option>
+                      <option value={10}>10 miles</option>
+                      <option value={15}>15 miles</option>
+                      <option value={25}>25 miles</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {proximityLoading ? (
+                <div className="text-gray-400 text-sm">Loading nearby organizations...</div>
+              ) : proximityResults.length > 0 ? (
+                <div className="border border-gray-200 rounded-lg divide-y">
+                  {proximityResults.map((d) => (
+                    <div key={d.id} className="px-4 py-3 flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-sm">{d.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {[d.category, d.city, d.state].filter(Boolean).join(" · ")}
+                          {d.distanceMiles != null && (
+                            <span className="ml-1 text-blue-500">{d.distanceMiles.toFixed(1)} mi</span>
+                          )}
+                        </div>
+                        {d.description && (
+                          <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{d.description}</div>
+                        )}
+                      </div>
+                      {d.claimed ? (
+                        <span className="text-xs text-gray-400">Already registered</span>
+                      ) : (
+                        <button onClick={() => handleApproveFromDir(d.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                          Approve & Invite
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : !proximityLoading && schoolLocation ? (
+                <div className="text-gray-500 text-sm">No organizations found within {proximityRadius} miles. Try a larger radius or search by name.</div>
+              ) : !schoolLocation ? (
+                <div className="text-gray-400 text-sm">Enter a search term to find organizations, or add your school address in Settings to see nearby suggestions.</div>
+              ) : null}
             </div>
-          ) : dirSearch.length >= 2 && !searching ? (
-            <div className="text-gray-500 text-sm">No results found. Try creating a custom partner instead.</div>
-          ) : null}
+          )}
         </div>
       )}
 
@@ -314,7 +439,7 @@ export default function SchoolBeneficiaries() {
         <div className="max-w-lg">
           <h2 className="font-semibold mb-2">Bulk Upload Community Partners</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Upload a CSV with columns: <code className="bg-gray-100 px-1 rounded text-xs">organization_name, contact_name, contact_email, phone_number, address, city, state, zip_code, website, description, approved</code>
+            Upload a CSV with columns: <code className="bg-gray-100 px-1 rounded text-xs">organization_name, contact_name, contact_email, phone, website, address, city, state, zip, description, approved</code>
           </p>
 
           {csvResult && (
@@ -346,7 +471,7 @@ export default function SchoolBeneficiaries() {
 
           <div className="mt-6 p-3 bg-gray-50 rounded text-xs text-gray-600">
             <p className="font-medium mb-1">CSV Format Example:</p>
-            <pre className="font-mono text-xs overflow-x-auto">organization_name,contact_name,contact_email,phone_number,address,city,state,zip_code,website,description,approved{"\n"}Green Earth,John Smith,john@greenearth.org,6175551234,123 Main St,Boston,MA,02110,https://greenearth.org,Environmental org,true</pre>
+            <pre className="font-mono text-xs overflow-x-auto">organization_name,contact_name,contact_email,phone,website,address,city,state,zip,description,approved{"\n"}Green Earth,John Smith,john@greenearth.org,6175551234,https://greenearth.org,123 Main St,Boston,MA,02110,Environmental org,true</pre>
           </div>
         </div>
       )}

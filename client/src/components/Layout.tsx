@@ -80,6 +80,7 @@ function getNavItems(role: string) {
         { path: "/dashboard", label: "Dashboard", icon: "⌂" },
         { path: "/cohorts", label: "Cohorts", icon: "★" },
         { path: "/beneficiaries", label: "Partners", icon: "♦" },
+        { path: "/discover", label: "Discover", icon: "⊕" },
         { path: "/submissions", label: "Submissions", icon: "✓" },
         { path: "/settings", label: "Settings", icon: "☰" },
       ];

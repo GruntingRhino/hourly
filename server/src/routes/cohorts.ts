@@ -226,7 +226,18 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRIC
       approvedHours: hoursMap.get(s.id) || 0,
     }));
 
-    res.json({ ...cohort, students: studentsWithHours, requiredHours });
+    // Count pending verifications for students in this cohort
+    const [pendingBenSignups, pendingSelfSubs] = await Promise.all([
+      prisma.beneficiarySignup.count({
+        where: { studentId: { in: studentIds }, verificationStatus: "PENDING" },
+      }),
+      prisma.selfSubmittedRequest.count({
+        where: { studentId: { in: studentIds }, status: "PENDING" },
+      }),
+    ]);
+    const pendingVerifications = pendingBenSignups + pendingSelfSubs;
+
+    res.json({ ...cohort, students: studentsWithHours, requiredHours, pendingVerifications });
   } catch (err) {
     console.error("Get cohort error:", err);
     res.status(500).json({ error: "Internal server error" });

@@ -125,6 +125,12 @@ export default function SchoolDashboard() {
         <Link to="/students" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
           Student Roster ({students.length})
         </Link>
+        <Link to="/students/on-track" className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
+          View On-Track Students
+        </Link>
+        <Link to="/students/off-track" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
+          View Off-Track Students
+        </Link>
       </div>
 
       {/* Pending invites alert */}
@@ -163,18 +169,22 @@ export default function SchoolDashboard() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                <div className="grid grid-cols-2 gap-2 text-center mb-3">
                   <div>
                     <div className="text-lg font-bold">{c.studentCount}</div>
                     <div className="text-xs text-gray-500">Students</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-green-600">{c.completedCount}</div>
-                    <div className="text-xs text-gray-500">Completed</div>
+                    <div className="text-lg font-bold text-blue-600">{c.studentCount > 0 ? (c.totalHours / c.studentCount).toFixed(1) : "0"}h</div>
+                    <div className="text-xs text-gray-500">Avg Hours</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-green-600">{c.studentCount - c.atRiskCount}</div>
+                    <div className="text-xs text-gray-500">On-Track</div>
                   </div>
                   <div>
                     <div className="text-lg font-bold text-red-500">{c.atRiskCount}</div>
-                    <div className="text-xs text-gray-500">At Risk</div>
+                    <div className="text-xs text-gray-500">Off-Track</div>
                   </div>
                 </div>
 

@@ -23,3 +23,9 @@ dist-ssr/
 .vercel
 .env*.local
 google_oAuth_secrets.json
+
+# Large data files (kept locally, not in git)
+server/data/*.zip
+server/data/eo2.csv
+server/data/eo3.csv
+server/data/data-download-pub78.txt

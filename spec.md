@@ -1,251 +1,280 @@
-# GoodHours — School-Orchestrated Volunteer Hours (Major Rework Spec)
+1. Summary
 
-## 0. Purpose
-Rework the existing GoodHours application into a **school-orchestrated** system for managing and verifying high-school volunteer hours required for graduation. This spec replaces the current “multi-role open signup + marketplace browsing” posture with **school-first onboarding**, **invitation-only enrollment**, and **approved beneficiary visibility**.
+This document proposes functional and user flow changes for the GoodHours application, aiming for a safe and growth-minded go-to-market strategy. The application is designed for High Schools to manage and track student volunteering hours required for graduation.
 
-This is a go-to-market safe version: **minimize friction for schools, minimize student data**, and avoid early monetization complexity.
+For the short to medium term:
 
----
+Focus on core functionality
 
-## 1. Core Tenets (Non-Negotiable)
-1) **Three-Way Relationship (Tripartite)**
-- School ↔ Beneficiary
-- School ↔ Student
-- Student ↔ Beneficiary
-School is always the orchestrator and gatekeeper.
+Revenue model is intentionally de-emphasized
 
-2) **School as Primary User & Custodian**
-- Schools are the system entry point and primary admin.
-- Student access only exists under school sponsorship (cohorts).
-- Treat student data as sensitive (minors). Store the minimum required.
+2. Core Tenets (Design Principles)
+2.1 Three-Way Relationship
 
-3) **Minimal Friction**
-- The product is free to schools for now.
-- Reduce signup/role selection complexity.
+The system is built around a tripartite relationship, with the School acting as the orchestrator:
 
-4) **Minimal Data Collection**
-- Students: **Name, Email, House** (optional “House” if a school doesn’t use houses; keep as a configurable field).
-- Avoid profile social links, public profile visibility, etc. unless explicitly required later.
+School
 
-5) **Simplified Onboarding**
-- **Only schools can start the system** (no public student/org signup).
-- Students must still join via cohort invitation (magic link or join code). Email domain only acts as an eligibility check.
-- Beneficiaries can register **only via school invitation**.
-- Students can enroll **only via cohort invitation**.
+Student
 
-6) **Delayed Monetization**
-- No subscription tiers, billing, etc. in this spec.
+Beneficiary
 
----
+(Relationship: School sits in the middle connecting Student and Beneficiary)
 
-## 2. Roles
-- **School Admin** (primary orchestrator / custodian)
-- **Student** (invited volunteer under a cohort)
-- **Beneficiary Admin** (invited entity offering opportunities and approving hours)
+2.2 School as Primary User and Custodian
 
-Terminology:
-- Replace “Organization” with **Beneficiary** across UI, DB labels, routes, and emails.
+School is the primary user and entry point
 
----
+School maintains control over the entire process
 
-## 3. System Directories (Data Foundation)
-### 3.1 Schools Directory
-Create/maintain a directory of all US high schools (public/charter/private).
-Store at minimum:
-- school_id (internal)
-- name
-- type (public/charter/private)
-- address / city / state / zip
-- geo metadata (lat/lng or zip centroid)
-- official email domain(s) if available (optional)
+Must implement end-to-end data encryption
 
-### 3.2 Beneficiaries Directory
-Create/maintain a directory of US beneficiaries (501c3s + relevant public institutions like libraries/schools).
-Store at minimum:
-- beneficiary_id (internal)
-- name
-- category
-- address / city / state / zip
-- geo metadata (lat/lng or zip centroid)
-- registered email (if known; else empty until discovered)
-- default profile fields (description/website/phone if public)
-- status: UNCLAIMED / CLAIMED (registered)
+2.3 Minimal Friction
 
-### 3.3 Categories
-Maintain beneficiary categories to support browsing for school admins.
+Application is free for schools
 
-Note: If building “all US beneficiaries” is too heavy for v1, implement a directory that can be incrementally expanded and supports custom beneficiaries (Section 5.2).
+2.4 Minimal Data Collection
 
----
+Collect the absolute minimum information required
 
-## 4. School Registration (Google OAuth + Magic Link Validation)
-### 4.1 Entry
-- Landing page only shows: **“Sign in as School”**
-- The app is published in Google Workspace Marketplace / Google Classroom Marketplace (where feasible).
-- Auth uses **Google OAuth** for the initiating admin identity.
+2.5 Simplified Onboarding
 
-### 4.2 School Claim / Register Flow
-1) User searches for their school via type-ahead.
-2) If school is already registered:
-   - Show message: “This school is already registered. Contact: <registered_email>.”
-3) If school not registered:
-   - Show “Register” button.
-   - Clicking sends an email **to the school’s registered email address** with a **magic link** to complete registration.
-   - Registration completes only when the magic link is used.
+All user registration is initiated through the School
 
-### 4.3 Post-Registration
-School admin lands on School Dashboard, then proceeds to:
-- Configure cohorts
-- Approve beneficiaries
-- Invite beneficiaries
-- Manage self-submitted volunteering requests
+2.6 Delayed Monetization
 
----
+Avoid setting up company + bank accounts early
 
-## 5. School Admin Functionality
-### 5.1 Beneficiary Management (School-Approved List)
-- View beneficiaries near the school (zip/geo-based) organized by category.
-- Select beneficiaries to approve for student access.
-- Add/drop approved beneficiaries anytime.
-- Approved beneficiaries define student visibility of opportunities.
+Monetization deferred
 
-### 5.2 Custom Beneficiary Creation
-School admin can create a beneficiary not in the directory:
-- Required: name, category, location (zip/address)
-- Optional: email
-- Visibility flag:
-  - **PUBLIC**: candidate for global directory after GoodHours approval workflow (admin review queue).
-  - **PRIVATE**: visible only to this school.
+3. User Roles
 
-### 5.3 Student Self-Submitted Volunteering Requests
-Students can submit a custom volunteering request (helping a neighbor/relative).
-School admin can:
-- view pending requests
-- approve / reject with reason
-- (if approved) convert into an hours record with verification status policy (see Section 8)
+Schools (School Admin)
 
-### 5.4 Cohorts (Bulk Student Management)
-School admin creates cohorts (ex: “Class of 2029”).
-Capabilities:
-- Bulk import students from spreadsheet (CSV) + atomic add/update/delete
-- Cohort settings:
-  - duration/period (default 4 years)
-  - required hours/credits for graduation
-- “Publish cohort” triggers invitations to students via email magic links.
+Students
 
----
+Beneficiaries (Beneficiary Admin)
 
-## 6. Beneficiary Registration & Operations
-### 6.1 Invitation-Only Registration
-- Beneficiary cannot self-register from landing page.
-- When a school approves a beneficiary, GoodHours sends an email to the registered beneficiary email:
-  - states: “<School Name> selected you for student volunteer hours”
-  - provides a registration/claim link
-- If beneficiary already claimed:
-  - send notification of new school interest
-  - beneficiary can Accept / Decline
-  - optional: “No current opportunities”
+4. Functional Requirements
+4.1 Data Collection and System Administration
 
-### 6.2 Beneficiary Dashboard
-- Invitation tracking: received/accepted/declined
-- Opportunity creation:
-  - calendar-based UX with date range + time slots
-  - type of work + requirements
-  - clear expectations/outcomes
-- Student signups:
-  - show signup counts
-  - reveal student details only after first attendance event (or first check-in), per policy
-- Approval of hours:
-  - approve completed work
-  - reject with reason
-  - override hours if needed (audit logged)
+Create list of all Public, Charter, Private High Schools (US)
 
----
+Public_Schools.csv
 
-## 7. Student Enrollment & Operations
-### 7.1 Invitation-Only Enrollment
-- Students cannot self-enroll from public signup.
-- Students receive cohort invitation email with magic link.
-- After registration, student sees:
-  - their cohort
-  - required hours
-  - approved beneficiaries
-  - opportunities from those beneficiaries
+Private_Schools.csv
 
-### 7.2 Student Actions
-- Browse opportunities (only from school-approved beneficiaries)
-- Sign up via calendar time slots
-- Receive reminders
-- Track progress toward requirement
-- Submit self-selected volunteering for school review
+Create list of all Beneficiaries (US)
 
----
+eo_ma.csv
 
-## 8. Verification & Compliance
-### 8.1 Verification States
-Sessions should support:
-- PLANNED / SIGNED_UP
-- CHECKED_IN / CHECKED_OUT (if used)
-- PENDING_VERIFICATION
-- VERIFIED
-- REJECTED
+Collect geographic metadata:
 
-### 8.2 Audit Trail
-Any approval/rejection/override must be audit logged with actor + timestamp + action + reason (if applicable).
+Street names
 
-### 8.3 Messaging & Notifications (Minimal)
-Keep messaging limited to necessary operational notifications:
-- invitations (students/beneficiaries)
-- reminders
-- verification approved/rejected
-Avoid “social messaging” features unless required.
+Location
 
----
+Map as points
 
-## 9. Major Changes vs Current App (De-scope / Replace)
-The following current behaviors are removed or replaced:
-- Public landing CTAs for student/org signup → **School-only**
-- Role picker signup → **School-first; invitations create student/beneficiary accounts**
-- “Organization” role and org-school request workflows → replaced by **School-approved beneficiary + beneficiary invitations**
-- Student classroom join code flow → replaced by **cohort invitation enrollment**
-- Student social profiles/privacy messaging settings → removed (minimal data)
-- Open browse of all orgs/opportunities → limited to **school-approved beneficiaries**
-- Any monetization/subscription scaffolding → omitted
+Organize Beneficiaries by categories
 
----
+Periodic refresh:
 
-## 10. Implementation Notes (Architecture)
-- Introduce entities:
-  - Cohort
-  - SchoolBeneficiaryApproval (school ↔ beneficiary mapping)
-  - BeneficiaryInvitation (school → beneficiary)
-  - StudentInvitation (cohort → student)
-  - SelfSubmittedRequest (student → school review queue)
-- Update naming everywhere: Org → Beneficiary
-- Provide migration strategy for existing data (map orgs → beneficiaries; map classrooms → cohorts if possible; otherwise archive).
+Add new
 
----
+Update
 
-## 11. Acceptance Criteria (Definition of Done)
-A) No public signup for student/beneficiary exists in UI.
-B) School registration works: search → register → email magic link → dashboard.
-C) School admin can:
-- create cohort
-- import students
-- publish cohort invitations
-- approve beneficiaries + invite them
-- manage custom beneficiaries (public/private)
-- approve/reject student self-submissions
-D) Beneficiary can:
-- register only from invitation
-- accept/decline school request
-- create opportunities (calendar/time slots)
-- view signup counts; reveal student identity only after first attendance event (policy)
-- approve/reject hours with audit
-E) Student can:
-- enroll only via cohort invitation
-- browse only approved beneficiaries’ opportunities
-- signup and see reminders
-- see progress
-- submit self-selected volunteering
-F) All flows are covered by automated checks + a manual QA checklist generated from this spec.
+Remove inactive
+
+4.2 School Administrator Functionality
+4.2.1 School Setup (Registration)
+
+Available in Google Classroom Marketplace
+
+Uses Google OAuth
+
+Landing Page Rules
+
+Only Schools can register
+
+Flow
+
+Search school (type-ahead UX)
+
+If registered:
+
+Show message → contact registered email
+
+If not registered:
+
+Show “Register” button
+
+Send magic link email
+
+4.2.2 School Admin Operations
+Beneficiary Management
+
+View nearby Beneficiaries (zip-based, categorized)
+
+Approve Beneficiaries
+
+Add/drop anytime
+
+Custom Beneficiary Creation
+
+Add if not found
+
+Flags:
+
+Public → can be added to global directory (after approval)
+
+Private → limited to that school
+
+Student Self-Submitted Volunteering
+
+View requests
+
+Approve/reject with reason
+
+4.2.3 School Admin Landing Page
+
+First visit:
+
+Map view of school + nearby Beneficiaries
+
+Zillow-style UI (map + list)
+
+Page name:
+
+Beneficiary Discover Page
+
+Function:
+
+Browse + approve Beneficiaries
+
+Blue-check style approval
+
+Persistent access
+
+4.3 Beneficiary Administrator Functionality
+4.3.1 Beneficiary Setup (Registration)
+
+Invitation-only
+
+Flow
+
+School approves Beneficiary
+
+Email sent
+
+Link to register
+
+Existing Beneficiaries
+
+Notify of new school
+
+Accept or decline (option: no opportunities)
+
+Profile Update
+
+Can edit pre-filled public data
+
+4.3.2 Beneficiary Admin Operations
+
+Track invitations:
+
+Received
+
+Accepted
+
+Declined
+
+Opportunity Creation
+
+Calendar-based UX
+
+Inputs:
+
+Start date
+
+End date
+
+Time slots
+
+Work type
+
+Requirements
+
+Student Signups
+
+View count
+
+Reveal details after first visit
+
+Expectations
+
+Define clear expectations
+
+Approval
+
+Approve hours
+
+4.4 Student Functionality
+4.4.1 Student Setup (Enrollment)
+Cohort Creation
+
+Created by School Admin
+
+Example: “Graduating 2029”
+
+Operations
+
+Bulk import
+
+Add/update/delete
+
+Student Data
+
+Name
+
+Email
+
+House
+
+Cohort Settings
+
+Duration
+
+Required hours
+
+Registration
+
+Invitation-only (magic link)
+
+4.4.2 Student Operations
+
+View cohort
+
+View required credits
+
+View approved Beneficiaries
+
+View opportunities
+
+Sign-Up
+
+Calendar-based
+
+Reminders
+
+Event notifications
+
+Progress Tracking
+
+Graduation progress
+
+Self-Selected Volunteering
+
+Submit custom work
+
+School approval required
