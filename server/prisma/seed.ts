@@ -13,13 +13,15 @@ async function main() {
   const plusDays = (days: number) => new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
   console.log("Cleaning up existing data...");
-  // Delete in dependency order, TRUNCATE CASCADE handles circular FKs
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "BeneficiaryAuditLog", "BeneficiarySignup", "BeneficiaryTimeSlot",
+      "BeneficiaryOpportunity", "BeneficiaryInvitation", "SchoolBeneficiaryApproval",
       "AuditLog", "Message", "Notification", "SavedOpportunity",
       "StudentGroupMember", "StudentGroup", "ServiceSession",
       "Signup", "SchoolOrganization", "Classroom", "Opportunity",
-      "User", "School", "Organization"
+      "SelfSubmittedRequest", "StudentInvitation", "Cohort", "VerifiedDomain",
+      "User", "School", "Organization", "Beneficiary"
     CASCADE
   `);
 
@@ -44,7 +46,7 @@ async function main() {
       verified: false,
       createdById: schoolAdmin.id,
       requiredHours: 40,
-      zipCodes: JSON.stringify(["10001"]), // Midtown Manhattan — reference point for distance sorting
+      zipCodes: JSON.stringify(["10001"]), // Midtown Manhattan
     },
   });
 
@@ -74,7 +76,211 @@ async function main() {
     },
   });
 
-  // Create organization
+  // ─── Create Beneficiaries (new architecture) ───────────────────────────────
+
+  const ben1 = await prisma.beneficiary.create({
+    data: {
+      name: "Green Earth Foundation",
+      email: "contact@greenearth.org",
+      phone: "(555) 987-6543",
+      description: "Environmental conservation and community cleanup organization",
+      website: "https://greenearth.org",
+      category: "Environment",
+      address: "150 E Houston St",
+      city: "New York",
+      state: "NY",
+      zip: "10002",
+      latitude: 40.7223,
+      longitude: -73.9874,
+      status: "ACTIVE",
+      visibility: "PUBLIC",
+    },
+  });
+
+  const ben2 = await prisma.beneficiary.create({
+    data: {
+      name: "Community Library",
+      email: "help@library.org",
+      phone: "(555) 222-3333",
+      description: "Local library tutoring and reading programs",
+      website: "https://communitylibrary.org",
+      category: "Education",
+      address: "90210 Rodeo Dr",
+      city: "Beverly Hills",
+      state: "CA",
+      zip: "90210",
+      latitude: 34.0696,
+      longitude: -118.4055,
+      status: "ACTIVE",
+      visibility: "PUBLIC",
+    },
+  });
+
+  // Create beneficiary admin users (linked to beneficiaries)
+  const ben1User = await prisma.user.create({
+    data: {
+      email: "volunteer@greenearth.org",
+      passwordHash: await bcrypt.hash("password123", 12),
+      name: "Sarah Mitchell",
+      role: "BENEFICIARY_ADMIN",
+      beneficiaryId: ben1.id,
+      emailVerified: true,
+    },
+  });
+
+  const ben2User = await prisma.user.create({
+    data: {
+      email: "staff@library.org",
+      passwordHash: await bcrypt.hash("password123", 12),
+      name: "Mike Chen",
+      role: "BENEFICIARY_ADMIN",
+      beneficiaryId: ben2.id,
+      emailVerified: true,
+    },
+  });
+
+  // School approves both beneficiaries
+  await prisma.schoolBeneficiaryApproval.create({
+    data: {
+      schoolId: school.id,
+      beneficiaryId: ben1.id,
+      status: "APPROVED",
+      approvedAt: new Date(),
+    },
+  });
+  await prisma.schoolBeneficiaryApproval.create({
+    data: {
+      schoolId: school.id,
+      beneficiaryId: ben2.id,
+      status: "APPROVED",
+      approvedAt: new Date(),
+    },
+  });
+
+  // Create a pending invitation record (school invited ben1 via directory)
+  await prisma.beneficiaryInvitation.create({
+    data: {
+      schoolId: school.id,
+      beneficiaryId: ben1.id,
+      token: crypto.randomBytes(32).toString("hex"),
+      expiresAt: plusDays(30),
+      sentTo: "contact@greenearth.org",
+      status: "ACCEPTED",
+      acceptedAt: new Date(),
+    },
+  });
+
+  // ─── BeneficiaryOpportunity + TimeSlots ────────────────────────────────────
+
+  const opp_ben1_a = await prisma.beneficiaryOpportunity.create({
+    data: {
+      title: "Park Cleanup Day",
+      description: "Help clean up Central Park trails and surrounding areas. Bring work gloves and water.",
+      beneficiaryId: ben1.id,
+      category: "Environment",
+      location: "Central Park, New York, NY",
+      requirementsNote: "Wear closed-toe shoes. Gloves provided.",
+      startDate: plusDays(5),
+      endDate: plusDays(30),
+      status: "ACTIVE",
+      timeSlots: {
+        create: [
+          {
+            date: plusDays(5),
+            startTime: "10:00 AM",
+            endTime: "2:00 PM",
+            durationHours: 4,
+            capacity: 10,
+          },
+          {
+            date: plusDays(12),
+            startTime: "10:00 AM",
+            endTime: "2:00 PM",
+            durationHours: 4,
+            capacity: 10,
+          },
+          {
+            date: plusDays(19),
+            startTime: "9:00 AM",
+            endTime: "1:00 PM",
+            durationHours: 4,
+            capacity: 8,
+          },
+        ],
+      },
+    },
+  });
+
+  const opp_ben1_b = await prisma.beneficiaryOpportunity.create({
+    data: {
+      title: "Community Garden Planting",
+      description: "Plant seasonal flowers and tend the vegetable garden in our community plot.",
+      beneficiaryId: ben1.id,
+      category: "Environment",
+      location: "145 Maple Street, New York, NY",
+      startDate: plusDays(7),
+      status: "ACTIVE",
+      timeSlots: {
+        create: [
+          {
+            date: plusDays(7),
+            startTime: "3:00 PM",
+            endTime: "6:00 PM",
+            durationHours: 3,
+            capacity: 10,
+          },
+          {
+            date: plusDays(14),
+            startTime: "3:00 PM",
+            endTime: "6:00 PM",
+            durationHours: 3,
+            capacity: 10,
+          },
+        ],
+      },
+    },
+  });
+
+  const opp_ben2_a = await prisma.beneficiaryOpportunity.create({
+    data: {
+      title: "After-School Tutoring",
+      description: "Tutor elementary school kids in reading and math at the community library.",
+      beneficiaryId: ben2.id,
+      category: "Education",
+      location: "210 River Street, Beverly Hills, CA",
+      requirementsNote: "Minimum 16 years old. Background check required.",
+      startDate: plusDays(3),
+      status: "ACTIVE",
+      timeSlots: {
+        create: [
+          {
+            date: plusDays(3),
+            startTime: "4:00 PM",
+            endTime: "5:30 PM",
+            durationHours: 1.5,
+            capacity: 6,
+          },
+          {
+            date: plusDays(10),
+            startTime: "4:00 PM",
+            endTime: "5:30 PM",
+            durationHours: 1.5,
+            capacity: 6,
+          },
+          {
+            date: plusDays(17),
+            startTime: "4:00 PM",
+            endTime: "5:30 PM",
+            durationHours: 1.5,
+            capacity: 6,
+          },
+        ],
+      },
+    },
+  });
+
+  // ─── Legacy Organization + Opportunities (kept for session history) ─────────
+
   const org = await prisma.organization.create({
     data: {
       name: "Green Earth Foundation",
@@ -83,22 +289,10 @@ async function main() {
       description: "Environmental conservation and community cleanup organization",
       website: "https://greenearth.org",
       status: "APPROVED",
-      zipCodes: JSON.stringify(["10002"]), // Lower East Side — close to school
+      zipCodes: JSON.stringify(["10002"]),
     },
   });
 
-  const orgUser = await prisma.user.create({
-    data: {
-      email: "volunteer@greenearth.org",
-      passwordHash: await bcrypt.hash("password123", 12),
-      name: "Sarah Mitchell",
-      role: "ORG_ADMIN",
-      organizationId: org.id,
-      emailVerified: true,
-    },
-  });
-
-  // Create a second org
   const org2 = await prisma.organization.create({
     data: {
       name: "Community Library",
@@ -106,22 +300,11 @@ async function main() {
       phone: "(555) 222-3333",
       description: "Local library tutoring and reading programs",
       status: "APPROVED",
-      zipCodes: JSON.stringify(["90210"]), // Beverly Hills — far from school (demonstrates distance sort)
+      zipCodes: JSON.stringify(["90210"]),
     },
   });
 
-  const org2User = await prisma.user.create({
-    data: {
-      email: "staff@library.org",
-      passwordHash: await bcrypt.hash("password123", 12),
-      name: "Mike Chen",
-      role: "ORG_ADMIN",
-      organizationId: org2.id,
-      emailVerified: true,
-    },
-  });
-
-  // Approve orgs for school
+  // Approve orgs for school (legacy)
   await prisma.schoolOrganization.create({
     data: { schoolId: school.id, organizationId: org.id, status: "APPROVED", approvedAt: new Date() },
   });
@@ -129,17 +312,16 @@ async function main() {
     data: { schoolId: school.id, organizationId: org2.id, status: "APPROVED", approvedAt: new Date() },
   });
 
-  // Create students — joined via classroom (implicitly associated with school)
+  // Create students
   const student1 = await prisma.user.create({
     data: {
       email: "john@student.edu",
       passwordHash: await bcrypt.hash("password123", 12),
       name: "John Collander",
       role: "STUDENT",
-      age: 16,
       grade: "11th",
       classroomId: generalClassroom.id,
-      schoolId: school.id, // denormalized from classroom
+      schoolId: school.id,
       emailVerified: true,
     },
   });
@@ -150,7 +332,6 @@ async function main() {
       passwordHash: await bcrypt.hash("password123", 12),
       name: "Jane Davis",
       role: "STUDENT",
-      age: 17,
       grade: "12th",
       classroomId: classroom2.id,
       schoolId: school.id,
@@ -164,7 +345,6 @@ async function main() {
       passwordHash: await bcrypt.hash("password123", 12),
       name: "Alex Rivera",
       role: "STUDENT",
-      age: 15,
       grade: "10th",
       classroomId: generalClassroom.id,
       schoolId: school.id,
@@ -172,7 +352,7 @@ async function main() {
     },
   });
 
-  // Reserve low-numbered qa-test inboxes so auth flow uses a fresher inbox.
+  // Reserve QA inboxes
   for (let i = 1; i <= 20; i += 1) {
     const suffix = String(i).padStart(2, "0");
     await prisma.user.create({
@@ -181,7 +361,6 @@ async function main() {
         passwordHash: await bcrypt.hash("Password1!", 12),
         name: `QA Reserved ${suffix}`,
         role: "STUDENT",
-        age: 16,
         emailVerified: false,
       },
     });
@@ -204,7 +383,8 @@ async function main() {
     ],
   });
 
-  // Create opportunities
+  // ─── Legacy Opportunities (for service session history) ─────────────────────
+
   const opp1 = await prisma.opportunity.create({
     data: {
       title: "Cleanup Soccer Field",
@@ -271,8 +451,6 @@ async function main() {
       description: "Deterministic waitlist seed opportunity for QA promotion flow.",
       tags: JSON.stringify(["food", "community", "indoor"]),
       location: "500 Oak Avenue",
-      // Place this early so it is the first sign-up candidate after seed data
-      // already-signed opportunities are skipped in popularity order.
       date: new Date("2025-08-28"),
       startTime: "1:00 PM",
       endTime: "4:00 PM",
@@ -282,7 +460,6 @@ async function main() {
     },
   });
 
-  // Future opportunity to guarantee Upcoming + Check-in/Check-out coverage.
   const opp6 = await prisma.opportunity.create({
     data: {
       title: "QA Upcoming Check-In Session",
@@ -315,7 +492,7 @@ async function main() {
       totalHours: 3.92,
       status: "VERIFIED",
       verificationStatus: "APPROVED",
-      verifiedBy: orgUser.id,
+      verifiedBy: ben1User.id,
       verifiedAt: new Date("2025-08-27T15:00:00"),
     },
   });
@@ -333,8 +510,6 @@ async function main() {
     },
   });
 
-  // Pre-sign John on additional opportunities so item 23 deterministically
-  // targets the waitlist probe and item 30 targets submit-verification flows.
   for (const opp of [opp3, opp4]) {
     await prisma.signup.create({
       data: { userId: student1.id, opportunityId: opp.id, status: "CONFIRMED" },
@@ -348,13 +523,12 @@ async function main() {
         totalHours: Math.max(0, opp.durationHours - 0.08),
         status: "VERIFIED",
         verificationStatus: "APPROVED",
-        verifiedBy: opp.organizationId === org2.id ? org2User.id : orgUser.id,
+        verifiedBy: opp.organizationId === org2.id ? ben2User.id : ben1User.id,
         verifiedAt: new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
       },
     });
   }
 
-  // Seed a deterministic upcoming session for check-in/out flow.
   await prisma.signup.create({
     data: { userId: student1.id, opportunityId: opp6.id, status: "CONFIRMED" },
   });
@@ -383,14 +557,12 @@ async function main() {
         totalHours: opp.durationHours - 0.08,
         status: orgQueuePending ? "CHECKED_OUT" : "VERIFIED",
         verificationStatus: orgQueuePending ? "PENDING" : "APPROVED",
-        verifiedBy: orgQueuePending ? null : orgUser.id,
+        verifiedBy: orgQueuePending ? null : ben1User.id,
         verifiedAt: orgQueuePending ? null : new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
       },
     });
   }
 
-  // Add a full-capacity seed signup to drive deterministic waitlist and
-  // provide an additional org-pending verification session.
   await prisma.signup.create({
     data: { userId: student3.id, opportunityId: opp5.id, status: "CONFIRMED" },
   });
@@ -406,7 +578,40 @@ async function main() {
     },
   });
 
-  // Audit logs
+  // ─── BeneficiarySignup samples (for beneficiary admin view) ─────────────────
+
+  // Get the first time slots
+  const slots = await prisma.beneficiaryTimeSlot.findMany({
+    where: { opportunity: { beneficiaryId: ben1.id } },
+    orderBy: { date: "asc" },
+    take: 2,
+  });
+
+  if (slots.length >= 1) {
+    // student1 signed up and checked in — details visible to beneficiary admin
+    await prisma.beneficiarySignup.create({
+      data: {
+        slotId: slots[0].id,
+        studentId: student1.id,
+        status: "CONFIRMED",
+        checkedIn: true,
+        checkedInAt: new Date(slots[0].date.getTime() - 5 * 60000),
+        verificationStatus: "PENDING",
+      },
+    });
+    // student2 signed up but NOT checked in — details masked
+    await prisma.beneficiarySignup.create({
+      data: {
+        slotId: slots[0].id,
+        studentId: student2.id,
+        status: "CONFIRMED",
+        checkedIn: false,
+        verificationStatus: "PENDING",
+      },
+    });
+  }
+
+  // Audit log
   await prisma.auditLog.create({
     data: {
       action: "CHECK_IN",
@@ -417,12 +622,12 @@ async function main() {
 
   console.log("Seed complete!");
   console.log("\nTest accounts:");
-  console.log("  Student: john@student.edu / password123");
-  console.log("  Student: jane@student.edu / password123");
-  console.log("  Student: alex@student.edu / password123");
-  console.log("  Organization: volunteer@greenearth.org / password123");
-  console.log("  Organization: staff@library.org / password123");
-  console.log("  School Admin: admin@lincoln.edu / password123");
+  console.log("  Student:            john@student.edu / password123");
+  console.log("  Student:            jane@student.edu / password123");
+  console.log("  Student:            alex@student.edu / password123");
+  console.log("  Beneficiary Admin:  volunteer@greenearth.org / password123");
+  console.log("  Beneficiary Admin:  staff@library.org / password123");
+  console.log("  School Admin:       admin@lincoln.edu / password123");
   console.log(`\nClassroom invite codes:`);
   console.log(`  General: ${generalClassroom.inviteCode}`);
   console.log(`  AP Community Service: ${classroom2.inviteCode}`);
