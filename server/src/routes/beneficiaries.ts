@@ -67,6 +67,97 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/beneficiaries/directory/nearby — geo-proximity search
+router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    const radius = parseFloat((req.query.radius as string) || "10");
+    const category = req.query.category as string | undefined;
+    const page = parseInt((req.query.page as string) || "1", 10);
+    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 200);
+    const offset = (page - 1) * limit;
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ error: "lat and lng query params required" });
+    }
+
+    // Build category filter clause
+    const categoryClause = category
+      ? `AND LOWER("category") LIKE LOWER('%' || $5 || '%')`
+      : "";
+
+    const haversineExpr = `(3959 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))))`;
+
+    const sql = `
+      SELECT *,
+        ${haversineExpr} AS distance_miles
+      FROM "BeneficiaryDirectory"
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        AND active = true
+        AND ${haversineExpr} < $3
+        ${categoryClause}
+      ORDER BY distance_miles ASC
+      LIMIT $4 OFFSET ${offset}
+    `;
+
+    const params: any[] = category
+      ? [lat, lng, radius, limit, category]
+      : [lat, lng, radius, limit];
+
+    const results: any[] = await prisma.$queryRawUnsafe(sql, ...params);
+
+    // Get school's existing approvals to annotate approvalStatus
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const schoolId = user?.schoolId;
+
+    let approvalMap = new Map<string, string>(); // directoryId -> approval status
+    if (schoolId) {
+      const dirIds = results.map((r: any) => r.id);
+      // Find beneficiaries linked to these directory entries that have school approval
+      const beneficiaries = await prisma.beneficiary.findMany({
+        where: { directoryId: { in: dirIds } },
+        include: {
+          schoolApprovals: {
+            where: { schoolId },
+            select: { status: true },
+          },
+        },
+      });
+      for (const ben of beneficiaries) {
+        if (ben.directoryId && ben.schoolApprovals.length > 0) {
+          approvalMap.set(ben.directoryId, ben.schoolApprovals[0].status);
+        }
+      }
+    }
+
+    const annotated = results.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      ein: r.ein,
+      category: r.category,
+      address: r.address,
+      city: r.city,
+      state: r.state,
+      zip: r.zip,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      email: r.email,
+      website: r.website,
+      phone: r.phone,
+      nteeCode: r.nteeCode,
+      claimed: r.claimed,
+      distanceMiles: Math.round(parseFloat(r.distance_miles) * 10) / 10,
+      approvalStatus: approvalMap.get(r.id) ?? null,
+    }));
+
+    res.json(annotated);
+  } catch (err) {
+    console.error("Nearby beneficiary directory error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/beneficiaries/directory — search beneficiary directory (school admin only)
 router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
@@ -263,11 +354,11 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
           data: {
             name,
             email: row.contact_email?.trim() || null,
-            phone: row.phone_number?.trim() || null,
+            phone: (row.phone || row.phone_number)?.trim() || null,
             address: row.address?.trim() || null,
             city: row.city?.trim() || null,
             state: row.state?.trim() || null,
-            zip: row.zip_code?.trim() || null,
+            zip: (row.zip || row.zip_code)?.trim() || null,
             website: row.website?.trim() || null,
             description: row.description?.trim() || null,
             visibility: "PRIVATE",
@@ -294,6 +385,40 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import CSV error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/slots/:slotId — get full slot details for student detail view
+router.get("/slots/:slotId", authenticate, async (req: Request, res: Response) => {
+  try {
+    const slot = await prisma.beneficiaryTimeSlot.findUnique({
+      where: { id: req.params.slotId },
+      include: {
+        opportunity: {
+          include: {
+            beneficiary: {
+              select: { id: true, name: true, category: true, address: true, city: true, state: true, description: true, website: true, phone: true },
+            },
+          },
+        },
+        _count: { select: { signups: true } },
+      },
+    });
+    if (!slot) return res.status(404).json({ error: "Slot not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    let mySignup = null;
+    if (user?.role === "STUDENT") {
+      mySignup = await prisma.beneficiarySignup.findUnique({
+        where: { slotId_studentId: { slotId: slot.id, studentId: req.user!.userId } },
+        select: { id: true, status: true, verificationStatus: true },
+      });
+    }
+
+    res.json({ ...slot, mySignup });
+  } catch (err) {
+    console.error("Get slot detail error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

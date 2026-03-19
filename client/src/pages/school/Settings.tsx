@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 
-type Tab = "profile" | "classrooms" | "security" | "notifications" | "privacy" | "data";
+type Tab = "profile" | "security" | "notifications" | "privacy" | "data";
 
 interface SchoolData {
   id: string;
@@ -14,15 +14,6 @@ interface SchoolData {
   zipCodes: string | null;
 }
 
-interface ClassroomData {
-  id: string;
-  name: string;
-  inviteCode: string;
-  isActive: boolean;
-  teacher: { id: string; name: string };
-  studentCount: number;
-}
-
 interface SchoolSettingsData {
   schoolId: string;
   allowJoinByCode: boolean;
@@ -32,7 +23,6 @@ export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
   const [tab, setTab] = useState<Tab>("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
-  const [classrooms, setClassrooms] = useState<ClassroomData[]>([]);
   const [schoolName, setSchoolName] = useState("");
   const [domain, setDomain] = useState("");
   const [requiredHours, setRequiredHours] = useState("40");
@@ -47,8 +37,6 @@ export default function SchoolSettings() {
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const [newClassroomName, setNewClassroomName] = useState("");
-  const [creatingClassroom, setCreatingClassroom] = useState(false);
 
   // Security
   const [currentPassword, setCurrentPassword] = useState("");
@@ -90,12 +78,11 @@ export default function SchoolSettings() {
     if (user?.schoolId) {
       Promise.all([
         api.get<SchoolData>(`/schools/${user.schoolId}`),
-        api.get<ClassroomData[]>("/classrooms"),
         api.get<SchoolSettingsData>("/schools/settings").catch(() => ({
           schoolId: user.schoolId!,
           allowJoinByCode: false,
         })),
-      ]).then(([schoolData, classroomData, schoolSettings]) => {
+      ]).then(([schoolData, schoolSettings]) => {
         setSchool(schoolData);
         setSchoolName(schoolData.name || "");
         setDomain(schoolData.domain || "");
@@ -107,7 +94,6 @@ export default function SchoolSettings() {
         } catch {
           setZipCodes("");
         }
-        setClassrooms(classroomData);
       }).finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -179,22 +165,6 @@ export default function SchoolSettings() {
       });
     } finally {
       setUpdatingJoinByCode(false);
-    }
-  };
-
-  const handleCreateClassroom = async () => {
-    if (!newClassroomName.trim()) return;
-    setCreatingClassroom(true);
-    try {
-      await api.post("/classrooms", { name: newClassroomName.trim() });
-      setNewClassroomName("");
-      const data = await api.get<ClassroomData[]>("/classrooms");
-      setClassrooms(data);
-    } catch (err: any) {
-      setMessage(err.message || "Failed to create classroom");
-      setIsError(true);
-    } finally {
-      setCreatingClassroom(false);
     }
   };
 
@@ -316,7 +286,7 @@ export default function SchoolSettings() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <div className="flex flex-wrap gap-2 mb-6">
-        {(["profile", "classrooms", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
+        {(["profile", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -415,7 +385,7 @@ export default function SchoolSettings() {
                       Allow students to join with invite code
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
-                      When off, students cannot join classrooms using a code.
+                      When off, students cannot join using an invite code.
                     </p>
                   </div>
                   <button
@@ -451,53 +421,6 @@ export default function SchoolSettings() {
           <div className="mt-8 pt-6 border-t border-gray-200">
             <button onClick={logout} className="text-red-600 text-sm hover:underline">
               Log Out
-            </button>
-          </div>
-        </div>
-      )}
-
-      {tab === "classrooms" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Classrooms</h3>
-
-          <div className="space-y-3 mb-6">
-            {classrooms.map((c) => (
-              <div key={c.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-sm text-gray-500">
-                      Teacher: {c.teacher.name} &middot; {c.studentCount} students
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                      {c.inviteCode}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">Invite Code</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {classrooms.length === 0 && (
-              <div className="text-gray-500 text-sm">No classrooms yet.</div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newClassroomName}
-              onChange={(e) => setNewClassroomName(e.target.value)}
-              placeholder="New classroom name"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-            />
-            <button
-              onClick={handleCreateClassroom}
-              disabled={creatingClassroom || !newClassroomName.trim()}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
-            >
-              {creatingClassroom ? "Creating..." : "Create"}
             </button>
           </div>
         </div>
@@ -560,7 +483,7 @@ export default function SchoolSettings() {
           <div className="mt-8 pt-6 border-t border-gray-200">
             <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
             <p className="text-sm text-gray-500 mb-3">
-              Permanently deletes your account and removes all associated school data, classrooms, and student associations. This cannot be undone.
+              Permanently deletes your account and removes all associated school data, cohorts, and student associations. This cannot be undone.
             </p>
             {!deleteConfirm ? (
               <button

@@ -118,6 +118,13 @@ model SchoolDirectory {
   emailDomain String? // known official email domain if any
   claimed  Boolean @default(false)
   claimedBySchoolId String?
+  ncessId   String?   @unique  // NCES school ID
+  gradeRange String?   // "PK-12", "9-12", etc.
+  enrollment Int?
+  phone     String?
+  county    String?
+  source    String?   // "NCES_CCD", "NCES_PSS"
+  updatedAt DateTime  @default(now()) @updatedAt
 
   schools  School[]
 }
@@ -218,6 +225,12 @@ model BeneficiaryDirectory {
   email    String?
   website  String?
   claimed  Boolean @default(false)
+  nteeCode  String?   // NTEE classification code (IRS)
+  phone     String?
+  source    String?   // "IRS", "NCES", "IMLS", "MANUAL"
+  county    String?
+  active    Boolean  @default(true)
+  updatedAt DateTime  @default(now()) @updatedAt
 
   beneficiaries Beneficiary[]
 }

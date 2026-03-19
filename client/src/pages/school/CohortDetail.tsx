@@ -31,6 +31,7 @@ interface CohortDetail {
   publishedAt: string | null;
   students: Student[];
   invitations: Invitation[];
+  pendingVerifications: number;
 }
 
 export default function CohortDetail() {
@@ -114,14 +115,10 @@ export default function CohortDetail() {
     }
   };
 
-  if (loading) return <div className="text-gray-500 py-8 text-center">Loading cohort...</div>;
-  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>;
-  if (!cohort) return null;
-
-  const requiredHours = cohort.requiredHours;
-  const pendingInvitations = cohort.invitations.filter((i) => i.status === "PENDING").length;
+  const requiredHours = cohort?.requiredHours ?? 0;
 
   const stats = useMemo(() => {
+    if (!cohort) return { total: 0, active: 0, onTrack: 0, offTrack: 0, totalHours: 0, mean: 0, median: 0, highest: 0, lowest: 0, avgPct: 0, offPct: 0, dist: { "0–10h": 0, "10–25h": 0, "25–50h": 0, "50+h": 0 } };
     const hours = cohort.students.map((s) => s.approvedHours);
     const total = cohort.students.length;
     const active = cohort.students.filter((s) => s.approvedHours > 0).length;
@@ -138,14 +135,21 @@ export default function CohortDetail() {
     const highest = sorted.length > 0 ? sorted[sorted.length - 1] : 0;
     const lowest = sorted.length > 0 ? sorted[0] : 0;
     const avgPct = total > 0 ? Math.round((onTrack / total) * 100) : 0;
+    const offPct = total > 0 ? Math.round((offTrack / total) * 100) : 0;
     const dist = {
       "0–10h": hours.filter((h) => h < 10).length,
       "10–25h": hours.filter((h) => h >= 10 && h < 25).length,
       "25–50h": hours.filter((h) => h >= 25 && h < 50).length,
       "50+h": hours.filter((h) => h >= 50).length,
     };
-    return { total, active, onTrack, offTrack, totalHours, mean, median, highest, lowest, avgPct, dist };
-  }, [cohort.students, requiredHours]);
+    return { total, active, onTrack, offTrack, totalHours, mean, median, highest, lowest, avgPct, offPct, dist };
+  }, [cohort, requiredHours]);
+
+  if (loading) return <div className="text-gray-500 py-8 text-center">Loading cohort...</div>;
+  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>;
+  if (!cohort) return null;
+
+  const pendingInvitations = cohort.invitations.filter((i) => i.status === "PENDING").length;
 
   return (
     <div>
@@ -261,13 +265,14 @@ export default function CohortDetail() {
               {/* Participation */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Participation</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: "Total Students", value: stats.total, color: "" },
-                    { label: "Active", value: stats.active, color: "text-blue-600" },
                     { label: "On Track", value: stats.onTrack, color: "text-green-600" },
                     { label: "Off Track", value: stats.offTrack, color: "text-red-500" },
-                    { label: "% On Track", value: `${stats.avgPct}%`, color: "text-purple-600" },
+                    { label: "% On Track", value: `${stats.avgPct}%`, color: "text-green-600" },
+                    { label: "% Off Track", value: `${stats.offPct}%`, color: "text-red-500" },
+                    { label: "Pending Verifications", value: cohort.pendingVerifications, color: "text-yellow-600" },
                   ].map((s) => (
                     <div key={s.label} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
                       <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -282,10 +287,11 @@ export default function CohortDetail() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Hours Metrics</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: "Mean Hours", value: stats.mean.toFixed(1) },
-                    { label: "Median Hours", value: stats.median.toFixed(1) },
-                    { label: "Highest", value: stats.highest.toFixed(1) },
-                    { label: "Lowest", value: stats.lowest.toFixed(1) },
+                    { label: "Total Verified Hours", value: stats.totalHours.toFixed(1) + "h" },
+                    { label: "Mean Hours", value: stats.mean.toFixed(1) + "h" },
+                    { label: "Median Hours", value: stats.median.toFixed(1) + "h" },
+                    { label: "Max Hours", value: stats.highest.toFixed(1) + "h" },
+                    { label: "Min Hours", value: stats.lowest.toFixed(1) + "h" },
                   ].map((s) => (
                     <div key={s.label} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
                       <div className="text-xl font-bold">{s.value}</div>
@@ -300,7 +306,6 @@ export default function CohortDetail() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Progress</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
-                    { label: "Total Hours Logged", value: stats.totalHours.toFixed(1) + "h" },
                     { label: "Avg Hours / Student", value: (stats.totalHours / stats.total).toFixed(1) + "h" },
                     { label: "Avg Completion", value: `${Math.round((stats.totalHours / (stats.total * requiredHours)) * 100)}%` },
                   ].map((s) => (

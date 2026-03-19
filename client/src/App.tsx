@@ -19,6 +19,7 @@ import SchoolVerifyRegistration from "./pages/school/VerifyRegistration";
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentBrowse from "./pages/student/Browse";
 import OpportunityDetail from "./pages/student/OpportunityDetail";
+import SlotDetail from "./pages/student/SlotDetail";
 import StudentMessages from "./pages/student/Messages";
 import StudentSettings from "./pages/student/Settings";
 import StudentSelfSubmit from "./pages/student/SelfSubmit";
@@ -29,6 +30,7 @@ import StudentList from "./pages/school/StudentList";
 import SchoolCohorts from "./pages/school/Cohorts";
 import CohortDetail from "./pages/school/CohortDetail";
 import SchoolBeneficiaries from "./pages/school/Beneficiaries";
+import BeneficiaryDiscover from "./pages/school/Discover";
 import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
@@ -72,6 +74,7 @@ function AppRoutes() {
               <Route path="/dashboard" element={<StudentDashboard />} />
               <Route path="/browse" element={<StudentBrowse />} />
               <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+              <Route path="/slot/:id" element={<SlotDetail />} />
               <Route path="/submit" element={<StudentSelfSubmit />} />
               <Route path="/messages" element={<StudentMessages />} />
               <Route path="/settings" element={<StudentSettings />} />
@@ -90,6 +93,7 @@ function AppRoutes() {
               <Route path="/cohorts/:id/on-track" element={<StudentList />} />
               <Route path="/cohorts/:id/off-track" element={<StudentList />} />
               <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
+              <Route path="/discover" element={<BeneficiaryDiscover />} />
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
               <Route path="/messages" element={<SchoolMessages />} />
               <Route path="/settings" element={<SchoolSettings />} />

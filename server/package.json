@@ -22,6 +22,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.1",
     "geolib": "^3.3.4",
