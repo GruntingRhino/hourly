@@ -34,7 +34,7 @@ interface StudentRow {
 }
 
 export default function SchoolDashboard() {
-  const { user } = useAuth();
+  useAuth();
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);

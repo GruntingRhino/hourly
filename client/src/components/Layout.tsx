@@ -11,7 +11,7 @@ export default function Layout() {
     navigate("/");
   };
 
-  const navItems = getNavItems(user.role);
+  const navItems = getNavItems(user?.role ?? "");
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -41,9 +41,9 @@ export default function Layout() {
             ))}
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200">
               <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium text-gray-600 hidden md:block">
-                {user.name?.charAt(0).toUpperCase()}
+                {user?.name?.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm text-gray-500 hidden md:inline">{user.name}</span>
+              <span className="text-sm text-gray-500 hidden md:inline">{user?.name}</span>
               <button
                 onClick={handleLogout}
                 className="text-sm text-gray-500 hover:text-gray-700"
