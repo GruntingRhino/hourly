@@ -82,12 +82,25 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       return res.status(400).json({ error: "lat and lng query params required" });
     }
 
-    // Build category filter clause
-    const categoryClause = category
-      ? `AND LOWER("category") LIKE LOWER('%' || $5 || '%')`
-      : "";
+    const q = (req.query.q as string | undefined)?.trim() || undefined;
 
     const haversineExpr = `(3959 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))))`;
+
+    const params: any[] = [lat, lng, radius, limit];
+    let nextParam = 5;
+
+    const categoryClause = category
+      ? `AND LOWER("category") LIKE LOWER('%' || $${nextParam++} || '%')`
+      : "";
+    if (category) params.push(category);
+
+    const qClause = q
+      ? `AND (LOWER(name) LIKE LOWER('%' || $${nextParam} || '%')
+             OR LOWER(COALESCE(category,'')) LIKE LOWER('%' || $${nextParam} || '%')
+             OR LOWER(COALESCE(city,'')) LIKE LOWER('%' || $${nextParam} || '%')
+             OR LOWER(COALESCE(county,'')) LIKE LOWER('%' || $${nextParam} || '%'))`
+      : "";
+    if (q) { params.push(q); nextParam++; }
 
     const sql = `
       SELECT *,
@@ -97,15 +110,27 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
         AND active = true
         AND ${haversineExpr} < $3
         ${categoryClause}
+        ${qClause}
       ORDER BY distance_miles ASC
       LIMIT $4 OFFSET ${offset}
     `;
 
-    const params: any[] = category
-      ? [lat, lng, radius, limit, category]
-      : [lat, lng, radius, limit];
-
     const results: any[] = await prisma.$queryRawUnsafe(sql, ...params);
+
+    if (q) {
+      const lq = q.toLowerCase();
+      results.sort((a: any, b: any) => {
+        const rank = (r: any) => {
+          const n = r.name.toLowerCase();
+          if (n.startsWith(lq)) return 0;
+          if (n.split(/\s+/).some((w: string) => w.startsWith(lq))) return 1;
+          if ((r.city || "").toLowerCase().includes(lq) || (r.category || "").toLowerCase().includes(lq)) return 2;
+          return 3;
+        };
+        const dr = rank(a) - rank(b);
+        return dr !== 0 ? dr : parseFloat(a.distance_miles) - parseFloat(b.distance_miles);
+      });
+    }
 
     // Get school's existing approvals to annotate approvalStatus
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });

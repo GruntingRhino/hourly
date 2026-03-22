@@ -17,7 +17,7 @@ interface Opportunity {
   description: string | null;
   location: string | null;
   status: string;
-  slots: TimeSlotBasic[];
+  timeSlots: TimeSlotBasic[];
 }
 
 interface SignupRecord {
@@ -419,9 +419,9 @@ export default function BeneficiaryOpportunities() {
                       {opp.status}
                     </span>
                   </div>
-                  {opp.slots.length > 0 && (
+                  {opp.timeSlots.length > 0 && (
                     <div className="mt-2 border-t pt-2 space-y-1">
-                      {opp.slots.map((slot) => (
+                      {opp.timeSlots.map((slot) => (
                         <div
                           key={slot.id}
                           className="flex justify-between text-xs text-gray-600"
