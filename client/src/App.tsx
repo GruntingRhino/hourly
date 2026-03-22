@@ -35,6 +35,9 @@ import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
 
+// Admin pages
+import ImpersonatePage from "./pages/admin/Impersonate";
+
 // Beneficiary pages
 import BeneficiaryDashboard from "./pages/beneficiary/Dashboard";
 import BeneficiaryOpportunities from "./pages/beneficiary/Opportunities";
@@ -98,6 +101,7 @@ function AppRoutes() {
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
               <Route path="/messages" element={<SchoolMessages />} />
               <Route path="/settings" element={<SchoolSettings />} />
+              <Route path="/admin/impersonate" element={<ImpersonatePage />} />
             </>
           )}
 

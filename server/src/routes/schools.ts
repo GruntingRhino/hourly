@@ -14,20 +14,47 @@ const schoolJoinSettingsSchema = z.object({
 // GET /api/schools — public search (for orgs to find schools)
 router.get("/", authenticate, async (req: Request, res: Response) => {
   try {
-    const search = req.query.search as string | undefined;
-    const schools = await prisma.school.findMany({
-      where: search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { domain: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
-      select: { id: true, name: true, domain: true, verified: true },
-      orderBy: { name: "asc" },
-      take: 20,
-    });
+    const search = (req.query.search as string | undefined)?.trim() || "";
+
+    let schools: any[];
+    if (!search) {
+      schools = await prisma.school.findMany({
+        select: { id: true, name: true, domain: true, verified: true, city: true, state: true },
+        orderBy: { name: "asc" },
+        take: 20,
+      });
+    } else {
+      // Fetch a broad pool matching any word in the query, then rank in JS
+      const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+      const wordConditions = words.map((w) => ({
+        OR: [
+          { name: { contains: w, mode: "insensitive" as any } },
+          { domain: { contains: w, mode: "insensitive" as any } },
+          { city: { contains: w, mode: "insensitive" as any } },
+        ],
+      }));
+      schools = await prisma.school.findMany({
+        where: { AND: wordConditions },
+        select: { id: true, name: true, domain: true, verified: true, city: true, state: true },
+        orderBy: { name: "asc" },
+        take: 100,
+      });
+
+      const q = search.toLowerCase();
+      schools = schools
+        .map((s: any) => {
+          const nameLower = s.name.toLowerCase();
+          let rank = 3;
+          if (nameLower.startsWith(q)) rank = 0;
+          else if (nameLower.split(/\s+/).some((w: string) => w.startsWith(q))) rank = 1;
+          else if ((s.city || "").toLowerCase().includes(q)) rank = 2;
+          return { ...s, _rank: rank };
+        })
+        .sort((a: any, b: any) => a._rank - b._rank || a.name.localeCompare(b.name))
+        .slice(0, 20)
+        .map(({ _rank: _r, ...s }: any) => s);
+    }
+
     res.json(schools);
   } catch (err) {
     console.error("List schools error:", err);
@@ -85,6 +112,24 @@ router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DI
     });
   } catch (err) {
     console.error("Get school settings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/schools/onboarding — mark onboarding as complete
+router.put("/onboarding", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    await prisma.school.update({
+      where: { id: user.schoolId },
+      data: { onboardingComplete: true } as any,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Onboarding complete error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

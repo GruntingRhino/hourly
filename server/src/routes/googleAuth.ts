@@ -11,6 +11,24 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/api/auth/google/callback`;
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+// Approved school email domains — enforced in production only.
+// Admins must register with an approved institutional email address.
+const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
+
+function isApprovedDomain(email: string): boolean {
+  if (!IS_PRODUCTION) return true; // No restriction in dev
+  if (APPROVED_DOMAINS.length === 0) return true; // No whitelist configured = open
+  const domain = email.split("@")[1]?.toLowerCase() || "";
+  return APPROVED_DOMAINS.some((allowed) =>
+    domain === allowed || domain.endsWith(`.${allowed}`)
+  );
+}
+
 // GET /api/auth/google — returns redirect URL for Google OAuth
 // The client redirects to Google using this URL
 // Optional ?state= query param is forwarded to Google and returned in callback
@@ -70,6 +88,14 @@ router.post("/callback", async (req: Request, res: Response) => {
     const { id: googleId, email, name } = googleUser;
 
     if (!email) return res.status(400).json({ error: "Google account must have an email address" });
+
+    // In production, enforce approved domain whitelist
+    if (!isApprovedDomain(email)) {
+      return res.status(403).json({
+        error: "Your email domain is not approved for GoodHours. Please use your institutional school email address.",
+        domain: email.split("@")[1],
+      });
+    }
 
     const userIncludes = {
       school: true,
@@ -227,6 +253,12 @@ router.post("/register-school", async (req: Request, res: Response) => {
 
     if (!googleProfile.pendingSchoolAdmin) {
       return res.status(400).json({ error: "Invalid registration token" });
+    }
+
+    if (!isApprovedDomain(googleProfile.email)) {
+      return res.status(403).json({
+        error: "Your email domain is not approved for GoodHours. Please use your institutional school email address.",
+      });
     }
 
     // Check if school directory entry exists and is already claimed
