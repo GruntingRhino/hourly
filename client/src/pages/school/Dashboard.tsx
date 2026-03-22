@@ -37,6 +37,7 @@ export default function SchoolDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0); // 0 = welcome, 1 = partners, 2 = cohorts
   const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? true;
   const showOnboarding = isAdmin && !schoolOnboardingComplete && !onboardingDismissed;
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
@@ -85,29 +86,70 @@ export default function SchoolDashboard() {
 
   return (
     <div>
-      {showOnboarding && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="font-semibold text-blue-900 mb-1">Welcome to GoodHours! Let's get set up.</div>
-              <p className="text-sm text-blue-800 mb-3">
-                Complete these steps to start tracking community service hours for your students.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link to="/beneficiaries" className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                  Add Community Partners →
-                </Link>
-                <Link to="/cohorts" className="px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded text-sm hover:bg-blue-50">
-                  Create a Cohort & Invite Students →
-                </Link>
-                <button onClick={handleDismissOnboarding} className="px-3 py-1.5 text-blue-600 text-sm hover:underline">
-                  Dismiss
+      {showOnboarding && (() => {
+        const STEPS = [
+          {
+            num: 1, title: "Welcome to GoodHours",
+            body: "You're almost ready to start tracking community service hours. Complete the setup steps below — takes less than 5 minutes.",
+            cta: null, ctaLabel: "", next: "Get Started →",
+          },
+          {
+            num: 2, title: "Add Community Partners",
+            body: "Search the directory for nonprofits near your school, or create a custom partner. Partners need approval before students can log hours with them.",
+            cta: "/beneficiaries", ctaLabel: "Go to Partners →", next: "Done, next step →",
+          },
+          {
+            num: 3, title: "Create a Cohort & Invite Students",
+            body: "Create a graduation cohort, set an hours goal, and invite students by email. Students will join and can start browsing approved opportunities.",
+            cta: "/cohorts", ctaLabel: "Go to Cohorts →", next: "Finish setup",
+          },
+        ];
+        const step = STEPS[onboardingStep];
+        const isLast = onboardingStep === STEPS.length - 1;
+        return (
+          <div className="mb-6 bg-white border border-blue-200 rounded-xl shadow-sm overflow-hidden">
+            {/* Progress bar */}
+            <div className="h-1 bg-blue-50">
+              <div className="h-1 bg-blue-600 transition-all duration-500"
+                style={{ width: `${((onboardingStep + 1) / STEPS.length) * 100}%` }} />
+            </div>
+            <div className="p-5">
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 mb-3">
+                {STEPS.map((s, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      i < onboardingStep ? "bg-blue-600 text-white" :
+                      i === onboardingStep ? "bg-blue-700 text-white ring-2 ring-blue-200" :
+                      "bg-gray-100 text-gray-400"
+                    }`}>{i < onboardingStep ? "✓" : s.num}</div>
+                    {i < STEPS.length - 1 && <div className={`w-8 h-0.5 ${i < onboardingStep ? "bg-blue-400" : "bg-gray-200"}`} />}
+                  </div>
+                ))}
+                <span className="ml-2 text-xs text-gray-400">Step {step.num} of {STEPS.length}</span>
+              </div>
+              <div className="font-semibold text-gray-900 mb-1">{step.title}</div>
+              <p className="text-sm text-gray-600 mb-4">{step.body}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                {step.cta && (
+                  <Link to={step.cta} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors">
+                    {step.ctaLabel}
+                  </Link>
+                )}
+                <button
+                  onClick={() => isLast ? handleDismissOnboarding() : setOnboardingStep(s => s + 1)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  {isLast ? "Finish setup" : step.cta ? "Skip this step →" : "Get Started →"}
+                </button>
+                <button onClick={handleDismissOnboarding} className="text-xs text-gray-400 hover:text-gray-600 ml-auto">
+                  Dismiss setup
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex gap-2">
