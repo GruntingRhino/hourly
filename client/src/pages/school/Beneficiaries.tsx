@@ -25,17 +25,38 @@ interface DirEntry {
   description: string | null;
   claimed: boolean;
   distanceMiles?: number;
+  approvalStatus: string | null;
+}
+
+const CATEGORIES = [
+  "", "Education", "Environment", "Food & Nutrition", "Health",
+  "Human Services", "Youth Development", "Animal Welfare",
+  "Community Improvement", "Arts & Culture", "Recreation & Sports",
+];
+
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-100 text-gray-900 rounded-sm">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
 }
 
 export default function SchoolBeneficiaries() {
   const { user } = useAuth();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
-  const [dirResults, setDirResults] = useState<DirEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"pending" | "approved" | "search" | "create" | "csv">("approved");
-  const [dirSearch, setDirSearch] = useState("");
-  const [searching, setSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [smartResults, setSmartResults] = useState<DirEntry[]>([]);
+  const [smartLoading, setSmartLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [inviteEmail, setInviteEmail] = useState<{ [id: string]: string }>({});
   const [inviting, setInviting] = useState<string | null>(null);
   const [newBen, setNewBen] = useState({ name: "", category: "", city: "", state: "", zip: "", email: "", description: "", visibility: "PRIVATE" as "PUBLIC" | "PRIVATE" });
@@ -47,8 +68,7 @@ export default function SchoolBeneficiaries() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [proximityRadius, setProximityRadius] = useState(10);
-  const [proximityResults, setProximityResults] = useState<DirEntry[]>([]);
-  const [proximityLoading, setProximityLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
@@ -66,68 +86,55 @@ export default function SchoolBeneficiaries() {
 
   useEffect(() => { void load(); }, []);
 
-  const handleDirSearch = async () => {
-    if (dirSearch.trim().length < 2) return;
-    setSearching(true);
+  const runSmartSearch = async (query: string, category: string, radius: number, loc: { lat: number; lng: number } | null) => {
+    setSmartLoading(true);
     try {
-      const results = await api.get<DirEntry[]>(`/beneficiaries/directory?search=${encodeURIComponent(dirSearch)}`);
-      setDirResults(results);
-    } catch {
-      setError("Directory search failed.");
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const loadProximityResults = async (lat: number, lng: number, radius: number) => {
-    setProximityLoading(true);
-    try {
-      const results = await api.get<DirEntry[]>(
-        `/beneficiaries/directory/nearby?lat=${lat}&lng=${lng}&radius=${radius}`
-      );
-      setProximityResults(results);
-    } catch {
-      // Silently fail — proximity search is best-effort
-      setProximityResults([]);
-    } finally {
-      setProximityLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (tab === "search" && isAdmin) {
-      if (!schoolLocation) {
-        // Fetch school location, then load proximity results
-        api.get<{ lat: number; lng: number } | null>("/schools/location")
-          .then((loc) => {
-            if (loc?.lat && loc?.lng) {
-              setSchoolLocation(loc);
-              void loadProximityResults(loc.lat, loc.lng, proximityRadius);
-            }
-          })
-          .catch(() => {
-            // No location available — proximity search won't show
-          });
+      if (loc) {
+        const p = new URLSearchParams({ lat: String(loc.lat), lng: String(loc.lng), radius: String(radius) });
+        if (query.trim().length >= 2) p.set("q", query.trim());
+        if (category) p.set("category", category);
+        setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory/nearby?${p}`));
+      } else if (query.trim().length >= 2) {
+        setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory?search=${encodeURIComponent(query.trim())}`));
       } else {
-        void loadProximityResults(schoolLocation.lat, schoolLocation.lng, proximityRadius);
+        setSmartResults([]);
       }
-    }
+    } catch { setSmartResults([]); }
+    finally { setSmartLoading(false); }
+  };
+
+  // Initial load when tab opens — fetch location then search
+  useEffect(() => {
+    if (tab !== "search" || !isAdmin) return;
+    const run = async () => {
+      let loc = schoolLocation;
+      if (!loc) {
+        try {
+          const fetched = await api.get<{ lat: number; lng: number } | null>("/schools/location");
+          if (fetched?.lat && fetched?.lng) { setSchoolLocation(fetched); loc = fetched; }
+        } catch {}
+      }
+      await runSmartSearch(searchQuery, selectedCategory, proximityRadius, loc);
+    };
+    void run();
   }, [tab, isAdmin]);
 
+  // Debounced re-search on any filter change
   useEffect(() => {
-    if (tab === "search" && isAdmin && schoolLocation) {
-      void loadProximityResults(schoolLocation.lat, schoolLocation.lng, proximityRadius);
-    }
-  }, [proximityRadius]);
+    if (tab !== "search" || !isAdmin) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void runSmartSearch(searchQuery, selectedCategory, proximityRadius, schoolLocation);
+    }, 280);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchQuery, selectedCategory, proximityRadius, schoolLocation]);
 
   const handleApproveFromDir = async (directoryId: string) => {
     try {
       await api.post("/beneficiaries/approve-from-directory", { directoryId });
       void load();
-      setDirResults((prev) => prev.filter((d) => d.id !== directoryId));
-    } catch (err: any) {
-      setError(err.message || "Failed to approve.");
-    }
+      setSmartResults(prev => prev.map(d => d.id === directoryId ? { ...d, approvalStatus: "APPROVED" } : d));
+    } catch (err: any) { setError(err.message || "Failed to approve."); }
   };
 
   const handleInvite = async (benId: string) => {
@@ -337,99 +344,80 @@ export default function SchoolBeneficiaries() {
 
       {tab === "search" && isAdmin && (
         <div>
-          <div className="flex gap-2 mb-4">
-            <input type="text" value={dirSearch} onChange={(e) => setDirSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleDirSearch(); }}
-              placeholder="Search by name, category, or city..." className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
-            <button onClick={handleDirSearch} disabled={searching} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
-              {searching ? "..." : "Search"}
-            </button>
+          {/* Search input + radius */}
+          <div className="flex gap-2 mb-3 items-center">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, category, or city..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm pr-8"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear">×</button>
+              )}
+            </div>
+            <select value={proximityRadius} onChange={(e) => setProximityRadius(Number(e.target.value))}
+              className="px-2 py-2 border border-gray-300 rounded-md text-sm">
+              <option value={5}>5 mi</option>
+              <option value={10}>10 mi</option>
+              <option value={15}>15 mi</option>
+              <option value={25}>25 mi</option>
+            </select>
           </div>
 
-          {/* Text search results */}
-          {dirSearch.length >= 2 && (
-            <>
-              {dirResults.length > 0 ? (
-                <div className="border border-gray-200 rounded-lg divide-y">
-                  {dirResults.map((d) => (
-                    <div key={d.id} className="px-4 py-3 flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-sm">{d.name}</div>
-                        <div className="text-xs text-gray-500">{[d.category, d.city, d.state].filter(Boolean).join(" · ")}</div>
-                      </div>
-                      {d.claimed ? (
-                        <span className="text-xs text-gray-400">Already registered</span>
-                      ) : (
-                        <button onClick={() => handleApproveFromDir(d.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
-                          Approve & Invite
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : !searching ? (
-                <div className="text-gray-500 text-sm">No results found. Try creating a custom partner instead.</div>
-              ) : null}
-            </>
-          )}
+          {/* Category pills */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {CATEGORIES.map((cat) => (
+              <button key={cat || "all"} onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  selectedCategory === cat
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"}`}>
+                {cat || "All"}
+              </button>
+            ))}
+          </div>
 
-          {/* Proximity results (shown when no search term) */}
-          {dirSearch.length < 2 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium text-gray-700">
-                  {schoolLocation ? "Nearby Organizations" : "Directory"}
-                </div>
-                {schoolLocation && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Within</span>
-                    <select
-                      value={proximityRadius}
-                      onChange={(e) => setProximityRadius(Number(e.target.value))}
-                      className="px-2 py-1 border border-gray-300 rounded text-sm"
-                    >
-                      <option value={5}>5 miles</option>
-                      <option value={10}>10 miles</option>
-                      <option value={15}>15 miles</option>
-                      <option value={25}>25 miles</option>
-                    </select>
+          {/* Results */}
+          {smartLoading ? (
+            <div className="text-gray-400 text-sm py-4">Searching...</div>
+          ) : smartResults.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg divide-y">
+              {smartResults.map((d) => (
+                <div key={d.id} className="px-4 py-3 flex justify-between items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{highlightMatch(d.name, searchQuery)}</div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {d.category && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{d.category}</span>}
+                      {d.distanceMiles != null && <span className="text-xs text-blue-500">{d.distanceMiles.toFixed(1)} mi</span>}
+                      <span className="text-xs text-gray-400">{[d.city, d.state].filter(Boolean).join(", ")}</span>
+                    </div>
+                    {d.description && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{d.description}</div>}
                   </div>
-                )}
-              </div>
-
-              {proximityLoading ? (
-                <div className="text-gray-400 text-sm">Loading nearby organizations...</div>
-              ) : proximityResults.length > 0 ? (
-                <div className="border border-gray-200 rounded-lg divide-y">
-                  {proximityResults.map((d) => (
-                    <div key={d.id} className="px-4 py-3 flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-sm">{d.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {[d.category, d.city, d.state].filter(Boolean).join(" · ")}
-                          {d.distanceMiles != null && (
-                            <span className="ml-1 text-blue-500">{d.distanceMiles.toFixed(1)} mi</span>
-                          )}
-                        </div>
-                        {d.description && (
-                          <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{d.description}</div>
-                        )}
-                      </div>
-                      {d.claimed ? (
-                        <span className="text-xs text-gray-400">Already registered</span>
-                      ) : (
-                        <button onClick={() => handleApproveFromDir(d.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
-                          Approve & Invite
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                  <div className="shrink-0">
+                    {d.approvalStatus === "APPROVED" ? (
+                      <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded font-medium">Approved ✓</span>
+                    ) : (
+                      <button onClick={() => handleApproveFromDir(d.id)}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                        Approve & Invite
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ) : !proximityLoading && schoolLocation ? (
-                <div className="text-gray-500 text-sm">No organizations found within {proximityRadius} miles. Try a larger radius or search by name.</div>
-              ) : !schoolLocation ? (
-                <div className="text-gray-400 text-sm">Enter a search term to find organizations, or add your school address in Settings to see nearby suggestions.</div>
-              ) : null}
+              ))}
+            </div>
+          ) : !schoolLocation ? (
+            <div className="text-gray-400 text-sm py-4">
+              Add your school address in Settings to see nearby suggestions, or type to search.
+            </div>
+          ) : (
+            <div className="text-gray-500 text-sm py-4">
+              No results. Try a larger radius, different category, or different search term.
             </div>
           )}
         </div>
