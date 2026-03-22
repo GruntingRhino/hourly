@@ -189,6 +189,7 @@ router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
     const zip = req.query.zip as string | undefined;
+    const city = req.query.city as string | undefined;
 
     const where: any = {};
     if (search) {
@@ -200,6 +201,7 @@ router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
     }
     if (category) where.category = { contains: category, mode: "insensitive" };
     if (zip) where.zip = zip;
+    if (city) where.city = { contains: city.trim(), mode: "insensitive" };
 
     const entries = await prisma.beneficiaryDirectory.findMany({
       where,

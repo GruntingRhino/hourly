@@ -657,4 +657,63 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   }
 });
 
+// POST /api/auth/impersonate — DEV ONLY — log in as any user without password
+// Guarded by env check. All impersonation actions are logged.
+router.post("/impersonate", authenticate, async (req: Request, res: Response) => {
+  // Hard block in production
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  try {
+    const { targetEmail } = z.object({ targetEmail: z.string().email() }).parse(req.body);
+
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!actor || actor.role !== "SCHOOL_ADMIN") {
+      return res.status(403).json({ error: "Only admins may impersonate users" });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { email: targetEmail },
+      include: {
+        school: true,
+        cohort: { include: { school: true } },
+        beneficiary: true,
+      },
+    });
+    if (!target) return res.status(404).json({ error: "User not found" });
+
+    // Log the impersonation
+    console.warn(`[IMPERSONATION] ${actor.email} (${actor.id}) impersonated ${target.email} (${target.id}) at ${new Date().toISOString()}`);
+
+    const token = signToken({ userId: target.id, email: target.email, role: target.role });
+
+    const studentSchool = target.school || target.cohort?.school || null;
+    const schoolId = target.schoolId || target.cohort?.school?.id || null;
+
+    res.json({
+      token,
+      impersonated: true,
+      actor: { id: actor.id, email: actor.email },
+      user: {
+        id: target.id,
+        email: target.email,
+        name: target.name,
+        role: target.role,
+        emailVerified: target.emailVerified,
+        schoolId,
+        school: studentSchool,
+        cohortId: target.cohortId,
+        cohort: target.cohort,
+        beneficiaryId: target.beneficiaryId,
+        beneficiary: target.beneficiary,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Impersonation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

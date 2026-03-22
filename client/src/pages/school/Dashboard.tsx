@@ -34,12 +34,21 @@ interface StudentRow {
 }
 
 export default function SchoolDashboard() {
-  useAuth();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "SCHOOL_ADMIN";
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? true;
+  const showOnboarding = isAdmin && !schoolOnboardingComplete && !onboardingDismissed;
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const handleDismissOnboarding = async () => {
+    setOnboardingDismissed(true);
+    try { await api.put("/schools/onboarding", {}); } catch {}
+  };
 
   useEffect(() => {
     void loadData();
@@ -76,6 +85,29 @@ export default function SchoolDashboard() {
 
   return (
     <div>
+      {showOnboarding && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="font-semibold text-blue-900 mb-1">Welcome to GoodHours! Let's get set up.</div>
+              <p className="text-sm text-blue-800 mb-3">
+                Complete these steps to start tracking community service hours for your students.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link to="/beneficiaries" className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                  Add Community Partners →
+                </Link>
+                <Link to="/cohorts" className="px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded text-sm hover:bg-blue-50">
+                  Create a Cohort & Invite Students →
+                </Link>
+                <button onClick={handleDismissOnboarding} className="px-3 py-1.5 text-blue-600 text-sm hover:underline">
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex gap-2">

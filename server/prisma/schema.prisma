@@ -89,6 +89,7 @@ model School {
   verificationStandard String @default("STANDARD")
   // Legacy
   allowJoinByCode  Boolean  @default(false)
+  onboardingComplete Boolean @default(false)
   zipCodes         String?  // JSON array of zip codes (service area)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
