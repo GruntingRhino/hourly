@@ -92,6 +92,15 @@ export default function SchoolRegister() {
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState("");
 
+  // DNS TXT verification state (Layer 3 — custom domains)
+  const [dnsState, setDnsState] = useState<"idle" | "fetching" | "waiting" | "checking" | "verified" | "failed">("idle");
+  const [dnsTxtRecord, setDnsTxtRecord] = useState(""); // the TXT value to display
+  const [dnsVerificationJwt, setDnsVerificationJwt] = useState(""); // challenge JWT
+  const [domainVerifiedToken, setDomainVerifiedToken] = useState(""); // proof JWT sent with registration
+  const [dnsError, setDnsError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const dnsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -220,6 +229,53 @@ export default function SchoolRegister() {
     setStep("contact");
   };
 
+  const resetDnsState = () => {
+    setDnsState("idle");
+    setDnsTxtRecord("");
+    setDnsVerificationJwt("");
+    setDomainVerifiedToken("");
+    setDnsError("");
+    setCopied(false);
+  };
+
+  const initDnsVerification = async (email: string) => {
+    setDnsState("fetching");
+    setDnsError("");
+    try {
+      const result = await api.post<{ domain: string; txtRecord: string; verificationJwt: string }>(
+        "/auth/google/init-domain-verify",
+        { email }
+      );
+      setDnsTxtRecord(result.txtRecord);
+      setDnsVerificationJwt(result.verificationJwt);
+      setDnsState("waiting");
+    } catch {
+      setDnsState("failed");
+      setDnsError("Could not initialize domain verification. Please try again.");
+    }
+  };
+
+  const checkDnsTxt = async () => {
+    setDnsState("checking");
+    setDnsError("");
+    try {
+      const result = await api.post<{ verified: boolean; verifiedToken?: string; message?: string }>(
+        "/auth/google/check-domain-txt",
+        { verificationJwt: dnsVerificationJwt }
+      );
+      if (result.verified && result.verifiedToken) {
+        setDomainVerifiedToken(result.verifiedToken);
+        setDnsState("verified");
+      } else {
+        setDnsState("failed");
+        setDnsError(result.message || "TXT record not found. DNS propagation can take a few minutes — please try again.");
+      }
+    } catch {
+      setDnsState("failed");
+      setDnsError("DNS check failed. Please try again.");
+    }
+  };
+
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -231,6 +287,7 @@ export default function SchoolRegister() {
         contactEmail,
       };
       if (selectedSchool) payload.directorySchoolId = selectedSchool.id;
+      if (domainVerifiedToken) payload.domainVerifiedToken = domainVerifiedToken;
       const result = await api.post<any>("/auth/google/register-school", payload);
       setSentTo(result.sentTo || contactEmail);
       setStep("sent");
@@ -456,21 +513,34 @@ export default function SchoolRegister() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setContactEmail(val);
-                    setDomainStatus(classifyEmailDomain(val));
+                    const status = classifyEmailDomain(val);
+                    setDomainStatus(status);
                     if (error) setError("");
+
+                    if (status !== "custom") {
+                      resetDnsState();
+                    } else {
+                      // Debounce init-domain-verify — wait until user finishes typing
+                      if (dnsDebounceRef.current) clearTimeout(dnsDebounceRef.current);
+                      resetDnsState();
+                      setDnsState("fetching");
+                      dnsDebounceRef.current = setTimeout(() => {
+                        void initDnsVerification(val);
+                      }, 700);
+                    }
                   }}
                   required
                   placeholder="principal@yourschool.edu"
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
                     domainStatus === "personal"
                       ? "border-red-300 focus:ring-red-400 bg-red-50"
-                      : domainStatus === "edu"
+                      : domainStatus === "edu" || dnsState === "verified"
                       ? "border-green-300 focus:ring-green-400"
                       : "border-gray-300 focus:ring-blue-500"
                   }`}
                 />
 
-                {/* Domain status feedback */}
+                {/* Layer 1 — Personal email blocked */}
                 {domainStatus === "personal" && (
                   <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md flex gap-2.5">
                     <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -487,25 +557,89 @@ export default function SchoolRegister() {
                   </div>
                 )}
 
+                {/* Layer 2 — .edu fast-track */}
                 {domainStatus === "edu" && (
                   <div className="mt-2 p-2.5 bg-green-50 border border-green-200 rounded-md flex gap-2 items-center">
                     <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <p className="text-sm text-green-700">Institutional .edu address verified.</p>
+                    <p className="text-sm text-green-700">Institutional .edu address — you're good to go.</p>
                   </div>
                 )}
 
+                {/* Layer 3 — Custom domain: DNS TXT verification required */}
                 {domainStatus === "custom" && (
-                  <div className="mt-2 p-2.5 bg-blue-50 border border-blue-200 rounded-md flex gap-2">
-                    <svg className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-xs text-blue-700">
-                      Custom domain detected. After registration you'll verify ownership of{" "}
-                      <span className="font-mono font-medium">{contactEmail.split("@")[1]}</span>{" "}
-                      by adding a DNS TXT record.
-                    </p>
+                  <div className="mt-2 border border-gray-200 rounded-md overflow-hidden">
+                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <p className="text-xs font-medium text-gray-700">Domain verification required</p>
+                    </div>
+
+                    <div className="p-3">
+                      {(dnsState === "idle" || dnsState === "fetching") && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                          Generating verification record…
+                        </p>
+                      )}
+
+                      {(dnsState === "waiting" || dnsState === "checking" || dnsState === "failed") && (
+                        <>
+                          <p className="text-xs text-gray-600 mb-2">
+                            Add this TXT record to{" "}
+                            <span className="font-mono font-medium text-gray-800">{contactEmail.split("@")[1]}</span>:
+                          </p>
+                          <div className="flex items-center gap-2 mb-3">
+                            <code className="flex-1 block bg-gray-900 text-green-400 text-xs px-3 py-2 rounded font-mono truncate">
+                              {dnsTxtRecord}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => { navigator.clipboard.writeText(dnsTxtRecord); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                              className="shrink-0 px-2.5 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                            >
+                              {copied ? "Copied!" : "Copy"}
+                            </button>
+                          </div>
+
+                          {dnsState === "failed" && dnsError && (
+                            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {dnsError}
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={checkDnsTxt}
+                            disabled={dnsState === "checking"}
+                            className="w-full py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            {dnsState === "checking" ? (
+                              <>
+                                <span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                Checking DNS…
+                              </>
+                            ) : (
+                              dnsState === "failed" ? "Try Again" : "Verify DNS Record"
+                            )}
+                          </button>
+                        </>
+                      )}
+
+                      {dnsState === "verified" && (
+                        <div className="flex items-center gap-2 text-green-700">
+                          <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <p className="text-sm font-medium">Domain ownership verified.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -517,7 +651,11 @@ export default function SchoolRegister() {
               </div>
               <button
                 type="submit"
-                disabled={submitting || domainStatus === "personal"}
+                disabled={
+                  submitting ||
+                  domainStatus === "personal" ||
+                  (domainStatus === "custom" && dnsState !== "verified")
+                }
                 className="w-full py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 {submitting ? "Sending..." : "Send Verification Link"}
