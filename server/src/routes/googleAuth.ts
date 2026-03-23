@@ -13,21 +13,128 @@ const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/ap
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
-// Approved school email domains — enforced in production only.
-// Admins must register with an approved institutional email address.
+// Legacy approved-domain whitelist (env-var override, rarely used).
 const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
   .split(",")
   .map((d) => d.trim().toLowerCase())
   .filter(Boolean);
 
 function isApprovedDomain(email: string): boolean {
-  if (!IS_PRODUCTION) return true; // No restriction in dev
-  if (APPROVED_DOMAINS.length === 0) return true; // No whitelist configured = open
+  if (!IS_PRODUCTION) return true;
+  if (APPROVED_DOMAINS.length === 0) return true;
   const domain = email.split("@")[1]?.toLowerCase() || "";
   return APPROVED_DOMAINS.some((allowed) =>
     domain === allowed || domain.endsWith(`.${allowed}`)
   );
 }
+
+// ─── Three-layer domain security ────────────────────────────────────────────
+
+// Layer 1 — personal / free-tier email providers that schools would never use.
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  // Google
+  "gmail.com", "googlemail.com",
+  // Yahoo
+  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
+  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
+  // Microsoft consumer
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
+  "live.co.uk", "live.fr",
+  // Apple
+  "icloud.com", "me.com", "mac.com",
+  // AOL / Verizon
+  "aol.com", "aim.com", "verizon.net",
+  // Privacy / encrypted
+  "protonmail.com", "pm.me", "proton.me",
+  "tutanota.com", "tuta.com",
+  // Other common consumer providers
+  "gmx.com", "gmx.net", "mail.com",
+  "zoho.com", "zohomail.com",
+  "yandex.com", "yandex.ru",
+  "qq.com", "163.com", "126.com",
+  "mail.ru", "inbox.com", "rediffmail.com",
+  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
+]);
+
+function getEmailDomain(email: string): string {
+  return email.split("@")[1]?.toLowerCase().trim() || "";
+}
+
+/** Layer 1: true if the domain is a known personal / consumer email provider. */
+function isPersonalEmailDomain(email: string): boolean {
+  return PERSONAL_EMAIL_DOMAINS.has(getEmailDomain(email));
+}
+
+/** Layer 2: true if the domain ends with .edu (US institutional fast-track). */
+function isEduDomain(email: string): boolean {
+  return getEmailDomain(email).endsWith(".edu");
+}
+
+/** Returns the expected DNS TXT record value for a school's domain verification. */
+function domainVerificationToken(schoolId: string): string {
+  return `goodhours-verify=${schoolId}`;
+}
+
+// GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
+// Returns: { status: "personal" | "edu" | "custom", blocked: boolean }
+router.get("/classify-domain", (req: Request, res: Response) => {
+  const email = ((req.query.email as string) || "").trim();
+  if (!email || !email.includes("@")) {
+    return res.json({ status: "unknown", blocked: false });
+  }
+  if (isPersonalEmailDomain(email)) {
+    return res.json({ status: "personal", blocked: true });
+  }
+  if (isEduDomain(email)) {
+    return res.json({ status: "edu", blocked: false });
+  }
+  return res.json({ status: "custom", blocked: false });
+});
+
+// GET /api/auth/google/verify-domain-txt?schoolId=xxx&domain=yyy — check DNS TXT record (Layer 3)
+// Returns: { verified: boolean, token: string }
+router.get("/verify-domain-txt", async (req: Request, res: Response) => {
+  try {
+    const schoolId = (req.query.schoolId as string | undefined)?.trim();
+    const domain = (req.query.domain as string | undefined)?.trim();
+
+    if (!schoolId || !domain) {
+      return res.status(400).json({ error: "schoolId and domain are required" });
+    }
+
+    const expectedToken = domainVerificationToken(schoolId);
+    const { resolveTxt } = await import("dns/promises");
+
+    let records: string[][] = [];
+    try {
+      records = await resolveTxt(domain);
+    } catch {
+      // Domain doesn't exist or DNS lookup failed — not verified
+      return res.json({ verified: false, token: expectedToken });
+    }
+
+    const flat = records.flat();
+    const verified = flat.includes(expectedToken);
+
+    if (verified) {
+      // Persist to VerifiedDomain table
+      const school = await prisma.school.findUnique({ where: { id: schoolId } });
+      if (school) {
+        await prisma.verifiedDomain.upsert({
+          where: { schoolId_domain: { schoolId, domain } },
+          create: { schoolId, domain },
+          update: {},
+        });
+      }
+    }
+
+    res.json({ verified, token: expectedToken });
+  } catch (err) {
+    console.error("Domain TXT verification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // GET /api/auth/google — returns redirect URL for Google OAuth
 // The client redirects to Google using this URL
@@ -166,7 +273,7 @@ router.post("/callback", async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/google/schools — search school directory (unauthenticated, for registration)
-// Returns results ranked: exact-prefix matches first, then word-boundary matches, then substring
+// Returns top 10 results ranked by fuzzy similarity (handles typos, partial names, reordered words)
 router.get("/schools", async (req: Request, res: Response) => {
   try {
     const search = (req.query.search as string || "").trim();
@@ -176,20 +283,19 @@ router.get("/schools", async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    // Fetch a broader pool and rank in JS for smarter ordering
-    const schools = await prisma.schoolDirectory.findMany({
-      where: {
-        AND: [
-          {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { city: { contains: search, mode: "insensitive" } },
-              { county: { contains: search, mode: "insensitive" } },
-            ],
-          },
-          ...(state ? [{ state: { equals: state, mode: "insensitive" as any } }] : []),
-        ],
-      },
+    // Build a broad pool: if state is known fetch all schools there;
+    // otherwise use the first 3 chars of the query as a loose prefix filter.
+    const firstChars = search.slice(0, 3);
+    const whereClause = state
+      ? { state: { equals: state, mode: "insensitive" as const } }
+      : {
+          OR: [
+            { name: { contains: firstChars, mode: "insensitive" as const } },
+            { city: { contains: search, mode: "insensitive" as const } },
+          ],
+        };
+    const pool = await prisma.schoolDirectory.findMany({
+      where: whereClause,
       select: {
         id: true,
         name: true,
@@ -201,25 +307,25 @@ router.get("/schools", async (req: Request, res: Response) => {
         gradeRange: true,
         enrollment: true,
       },
-      take: 200,
+      take: 2000,
     });
 
-    const q = search.toLowerCase();
+    const Fuse = (await import("fuse.js")).default;
+    const fuse = new Fuse(pool, {
+      keys: [
+        { name: "name", weight: 0.8 },
+        { name: "city", weight: 0.15 },
+        { name: "state", weight: 0.05 },
+      ],
+      threshold: 0.45,   // 0 = perfect match, 1 = match anything; 0.45 is comfortably fuzzy
+      distance: 200,     // allow matches far into the string
+      includeScore: true,
+      minMatchCharLength: 2,
+      ignoreLocation: true,
+    });
 
-    // Rank: 0 = name starts with query, 1 = name word starts with query, 2 = city match, 3 = other
-    const ranked = schools
-      .map((s) => {
-        const nameLower = s.name.toLowerCase();
-        const cityLower = (s.city ?? "").toLowerCase();
-        let rank = 3;
-        if (nameLower.startsWith(q)) rank = 0;
-        else if (nameLower.split(/\s+/).some((w) => w.startsWith(q))) rank = 1;
-        else if (cityLower.startsWith(q) || cityLower.includes(q)) rank = 2;
-        return { ...s, _rank: rank };
-      })
-      .sort((a, b) => a._rank - b._rank || a.name.localeCompare(b.name))
-      .slice(0, 20)
-      .map(({ _rank: _r, ...s }) => s);
+    const results = fuse.search(search, { limit: 10 });
+    const ranked = results.map((r) => r.item);
 
     res.json(ranked);
   } catch (err) {
@@ -253,6 +359,14 @@ router.post("/register-school", async (req: Request, res: Response) => {
 
     if (!googleProfile.pendingSchoolAdmin) {
       return res.status(400).json({ error: "Invalid registration token" });
+    }
+
+    // Layer 1: Block personal/consumer email providers on the contact email
+    if (isPersonalEmailDomain(data.contactEmail)) {
+      return res.status(400).json({
+        error: "Please use your school's official email address. Personal email providers like Gmail, Yahoo, and Outlook are not accepted.",
+        code: "PERSONAL_EMAIL",
+      });
     }
 
     if (!isApprovedDomain(googleProfile.email)) {

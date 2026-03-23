@@ -16,6 +16,37 @@ interface SchoolEntry {
 }
 
 type Step = "google" | "search" | "contact" | "sent";
+type DomainStatus = "personal" | "edu" | "custom" | null;
+
+// ─── Layer 1: personal email provider blocklist (mirrors server) ─────────────
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
+  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
+  "live.co.uk", "live.fr",
+  "icloud.com", "me.com", "mac.com",
+  "aol.com", "aim.com", "verizon.net",
+  "protonmail.com", "pm.me", "proton.me",
+  "tutanota.com", "tuta.com",
+  "gmx.com", "gmx.net", "mail.com",
+  "zoho.com", "zohomail.com",
+  "yandex.com", "yandex.ru",
+  "qq.com", "163.com", "126.com",
+  "mail.ru", "inbox.com", "rediffmail.com",
+  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
+]);
+
+function classifyEmailDomain(email: string): DomainStatus {
+  const atIdx = email.indexOf("@");
+  if (atIdx < 0) return null;
+  const domain = email.slice(atIdx + 1).toLowerCase().trim();
+  if (!domain || !domain.includes(".")) return null;
+  if (PERSONAL_EMAIL_DOMAINS.has(domain)) return "personal";
+  if (domain.endsWith(".edu")) return "edu";
+  return "custom";
+}
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -56,6 +87,7 @@ export default function SchoolRegister() {
 
   // Contact step
   const [contactEmail, setContactEmail] = useState("");
+  const [domainStatus, setDomainStatus] = useState<DomainStatus>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState("");
@@ -421,19 +453,72 @@ export default function SchoolRegister() {
                 <input
                   type="email"
                   value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setContactEmail(val);
+                    setDomainStatus(classifyEmailDomain(val));
+                    if (error) setError("");
+                  }}
                   required
-                  placeholder="principal@schoolname.edu"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="principal@yourschool.edu"
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
+                    domainStatus === "personal"
+                      ? "border-red-300 focus:ring-red-400 bg-red-50"
+                      : domainStatus === "edu"
+                      ? "border-green-300 focus:ring-green-400"
+                      : "border-gray-300 focus:ring-blue-500"
+                  }`}
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  Any email where you can receive the verification link.
-                </p>
+
+                {/* Domain status feedback */}
+                {domainStatus === "personal" && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md flex gap-2.5">
+                    <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-red-800">Personal email not accepted</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        Use your school's official email address (e.g.{" "}
+                        <span className="font-mono">principal@yourschool.edu</span>).
+                        Gmail, Yahoo, and Outlook are not permitted.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {domainStatus === "edu" && (
+                  <div className="mt-2 p-2.5 bg-green-50 border border-green-200 rounded-md flex gap-2 items-center">
+                    <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <p className="text-sm text-green-700">Institutional .edu address verified.</p>
+                  </div>
+                )}
+
+                {domainStatus === "custom" && (
+                  <div className="mt-2 p-2.5 bg-blue-50 border border-blue-200 rounded-md flex gap-2">
+                    <svg className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-xs text-blue-700">
+                      Custom domain detected. After registration you'll verify ownership of{" "}
+                      <span className="font-mono font-medium">{contactEmail.split("@")[1]}</span>{" "}
+                      by adding a DNS TXT record.
+                    </p>
+                  </div>
+                )}
+
+                {!domainStatus && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Use your school's official email address.
+                  </p>
+                )}
               </div>
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50 text-sm"
+                disabled={submitting || domainStatus === "personal"}
+                className="w-full py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 {submitting ? "Sending..." : "Send Verification Link"}
               </button>
