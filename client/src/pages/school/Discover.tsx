@@ -181,6 +181,8 @@ export default function BeneficiaryDiscover() {
 
   const [geocodingInProgress, setGeocodingInProgress] = useState(false);
 
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const [approving, setApproving] = useState<string | null>(null);
   const [approveConfirm, setApproveConfirm] = useState<string | null>(null);
 
@@ -273,9 +275,10 @@ export default function BeneficiaryDiscover() {
 
   const handleMarkerClick = (id: string) => {
     setHighlightedId(id);
+    setExpandedId(id);
     const card = cardRefs.current[id];
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
@@ -406,7 +409,7 @@ export default function BeneficiaryDiscover() {
                   }}
                 >
                   <Popup>
-                    <div className="min-w-[160px]">
+                    <div className="min-w-[180px]">
                       <div className="font-semibold text-sm">{b.name}</div>
                       {b.category && (
                         <div className="text-xs text-gray-500 mb-1">{b.category}</div>
@@ -416,8 +419,14 @@ export default function BeneficiaryDiscover() {
                       </div>
                       <div className="text-xs text-gray-400">{b.distanceMiles} mi away</div>
                       {b.approvalStatus === "APPROVED" && (
-                        <div className="text-xs text-blue-600 font-medium mt-1">Approved</div>
+                        <div className="text-xs text-blue-600 font-medium mt-1">✓ Approved</div>
                       )}
+                      <button
+                        className="mt-2 text-xs text-blue-600 font-medium hover:underline block"
+                        onClick={() => handleMarkerClick(b.id)}
+                      >
+                        View details →
+                      </button>
                     </div>
                   </Popup>
                 </Marker>
@@ -496,9 +505,14 @@ export default function BeneficiaryDiscover() {
                     onClick={() => {
                       setHighlightedId(b.id);
                       setMapTarget([b.latitude, b.longitude]);
+                      setExpandedId(expandedId === b.id ? null : b.id);
                     }}
                     className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${
-                      highlightedId === b.id ? "bg-blue-50" : "hover:bg-gray-50"
+                      expandedId === b.id
+                        ? "bg-blue-50 border-l-2 border-l-blue-500"
+                        : highlightedId === b.id
+                        ? "bg-blue-50"
+                        : "hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -525,8 +539,52 @@ export default function BeneficiaryDiscover() {
                           {b.distanceMiles != null && ` · ${b.distanceMiles} mi`}
                         </div>
 
-                        {b.email && (
+                        {b.email && expandedId !== b.id && (
                           <div className="text-xs text-gray-400 ml-4 truncate">{b.email}</div>
+                        )}
+
+                        {/* Expanded details */}
+                        {expandedId === b.id && (
+                          <div className="mt-2 ml-4 space-y-1">
+                            {b.address && (
+                              <div className="text-xs text-gray-600">
+                                {[b.address, b.city, b.state, b.zip].filter(Boolean).join(", ")}
+                              </div>
+                            )}
+                            {b.phone && (
+                              <div className="text-xs text-gray-600">
+                                <span className="text-gray-400">Phone: </span>{b.phone}
+                              </div>
+                            )}
+                            {b.email && (
+                              <div className="text-xs text-gray-600 truncate">
+                                <span className="text-gray-400">Email: </span>
+                                <a
+                                  href={`mailto:${b.email}`}
+                                  className="text-blue-600 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {b.email}
+                                </a>
+                              </div>
+                            )}
+                            {b.website && (
+                              <div className="text-xs truncate">
+                                <a
+                                  href={b.website.startsWith("http") ? b.website : `https://${b.website}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {b.website}
+                                </a>
+                              </div>
+                            )}
+                            {b.ein && (
+                              <div className="text-xs text-gray-400">EIN: {b.ein}</div>
+                            )}
+                          </div>
                         )}
                       </div>
 
