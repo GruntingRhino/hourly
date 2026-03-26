@@ -1,6 +1,7 @@
 import "./lib/env"; // Validate required env vars at startup
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
@@ -27,7 +28,36 @@ const PORT = process.env.PORT || 3001;
 // can identify real client IPs instead of always seeing the proxy IP.
 app.set("trust proxy", 1);
 
-app.use(cors());
+// Security headers — sets X-Content-Type-Options, X-Frame-Options,
+// Strict-Transport-Security, X-XSS-Protection, and others.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // allow /uploads assets
+}));
+
+// Lock CORS to known origins. In dev any localhost port is fine;
+// in production only the deployed frontend domain is permitted.
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:3000"];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no Origin (server-to-server, curl, mobile apps)
+    if (!origin) return callback(null, true);
+    if (
+      ALLOWED_ORIGINS.includes(origin) ||
+      origin.endsWith(".goodhours.app") ||
+      origin === "https://goodhours.app"
+    ) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: origin '${origin}' not allowed`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 

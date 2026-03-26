@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "goodhours-dev-secret-change-in-production";
+// JWT_SECRET must be set. env.ts calls process.exit(1) at startup if missing,
+// so this cast is safe — but we still refuse to fall back to any default.
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export interface AuthPayload {
   userId: string;
