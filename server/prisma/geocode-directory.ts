@@ -110,26 +110,29 @@ async function geocodeBatch(
 async function main() {
   console.log("Finding entries that need address-level geocoding...");
 
-  // Find entries with duplicate (city-center) coordinates — these need precise geocoding.
-  // We detect them by joining on entries that share exact lat/lng with 10+ others.
+  // Find entries that need precise geocoding:
+  //   1. Entries with NULL lat/lng (never geocoded)
+  //   2. Entries with city-center coordinates (shared with many others — geocoded at city level only)
   const whereClause = stateArg
     ? `AND state = '${stateArg.toUpperCase()}'`
     : "";
 
   const entries: any[] = await prisma.$queryRawUnsafe(`
-    SELECT id, address, city, state, zip, latitude, longitude
+    SELECT id, address, city, state, zip
     FROM "BeneficiaryDirectory"
-    WHERE latitude IS NOT NULL
-      AND address IS NOT NULL
-      AND address != ''
+    WHERE address IS NOT NULL AND address != ''
       ${whereClause}
-      AND (latitude, longitude) IN (
-        SELECT latitude, longitude
-        FROM "BeneficiaryDirectory"
-        WHERE latitude IS NOT NULL
-        GROUP BY latitude, longitude
-        HAVING COUNT(*) > 1
+      AND (
+        latitude IS NULL
+        OR (latitude, longitude) IN (
+          SELECT latitude, longitude
+          FROM "BeneficiaryDirectory"
+          WHERE latitude IS NOT NULL
+          GROUP BY latitude, longitude
+          HAVING COUNT(*) > 1
+        )
       )
+    ORDER BY id
     LIMIT ${limitArg}
   `);
 
