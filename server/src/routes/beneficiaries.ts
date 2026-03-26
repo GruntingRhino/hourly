@@ -6,8 +6,45 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
+import { geocodeAddress } from "../lib/geocode";
 
 const router = Router();
+
+// ─── Background city geocoding ────────────────────────────────────────────────
+// Tracks which US states currently have a background geocoding job running.
+// When a school in an ungeocoded state searches for nearby orgs, we kick off
+// a background job that geocodes every city in that state (city-center accuracy).
+// Subsequent searches in that state return real results.
+
+const geocodingStates = new Set<string>();
+
+async function geocodeStateBackground(state: string): Promise<void> {
+  try {
+    const cities = await prisma.$queryRawUnsafe<{ city: string; state: string }[]>(
+      `SELECT DISTINCT city, state FROM "BeneficiaryDirectory"
+       WHERE state = $1 AND active = true AND latitude IS NULL AND city IS NOT NULL
+       ORDER BY city`,
+      state
+    );
+    for (const { city, st } of cities.map(r => ({ city: r.city, st: r.state }))) {
+      if (!geocodingStates.has(state)) break; // cancelled / server restart
+      try {
+        const coords = await geocodeAddress(`${city}, ${st}`);
+        if (coords) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "BeneficiaryDirectory" SET latitude = $1, longitude = $2
+             WHERE city = $3 AND state = $4 AND latitude IS NULL`,
+            coords.lat, coords.lng, city, st
+          );
+        }
+      } catch { /* skip bad geocodes */ }
+      // Nominatim rate limit: max 1 req/sec
+      await new Promise(r => setTimeout(r, 1100));
+    }
+  } finally {
+    geocodingStates.delete(state);
+  }
+}
 
 // GET /api/beneficiaries — list beneficiaries
 // For school admin: all approved beneficiaries for their school
@@ -132,9 +169,27 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       });
     }
 
-    // Get school's existing approvals to annotate approvalStatus
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    // If no geocoded results, check if we need to kick off background geocoding
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { school: { select: { id: true, state: true } } },
+    });
     const schoolId = user?.schoolId;
+    const schoolState = (user as any)?.school?.state as string | null;
+
+    let geocodingInProgress = false;
+    if (results.length === 0 && schoolState && !geocodingStates.has(schoolState)) {
+      // Check if there are ungeocoded entries in this state
+      const [{ cnt }] = await prisma.$queryRawUnsafe<[{ cnt: string }]>(
+        `SELECT COUNT(*) as cnt FROM "BeneficiaryDirectory" WHERE state = $1 AND latitude IS NULL LIMIT 1`,
+        schoolState
+      );
+      if (parseInt(cnt) > 0) {
+        geocodingStates.add(schoolState);
+        geocodeStateBackground(schoolState); // fire and forget — no await
+        geocodingInProgress = true;
+      }
+    }
 
     let approvalMap = new Map<string, string>(); // directoryId -> approval status
     if (schoolId) {
@@ -176,7 +231,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       approvalStatus: approvalMap.get(r.id) ?? null,
     }));
 
-    res.json(annotated);
+    res.json({ items: annotated, geocodingInProgress });
   } catch (err) {
     console.error("Nearby beneficiary directory error:", err);
     res.status(500).json({ error: "Internal server error" });
