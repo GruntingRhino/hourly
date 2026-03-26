@@ -5,6 +5,7 @@ import { z } from "zod";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
+import { encryptField, decryptField } from "../lib/fieldEncryption";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -96,6 +97,15 @@ const resendVerificationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many resend requests from this IP. Please try again later." },
+});
+
+// Login: 10 attempts per IP per 15 minutes — prevents brute-force of passwords.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
 });
 
 const router = Router();
@@ -238,7 +248,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 });
 
 // POST /api/auth/login
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
 
@@ -326,6 +336,7 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      phone: decryptField(user.phone),
       grade: user.grade,
       house: user.house,
       status: user.status,
@@ -408,7 +419,7 @@ router.put("/profile", authenticate, async (req: Request, res: Response) => {
     const data = profileSchema.parse(req.body);
     const updateData: any = {
       name: data.name,
-      phone: data.phone,
+      phone: data.phone !== undefined ? encryptField(data.phone) : undefined,
       bio: data.bio,
       age: data.age,
       grade: data.grade,
@@ -424,8 +435,14 @@ router.put("/profile", authenticate, async (req: Request, res: Response) => {
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
       data: updateData,
+      select: {
+        id: true, email: true, name: true, role: true, phone: true,
+        grade: true, house: true, status: true, emailVerified: true,
+        schoolId: true, cohortId: true, beneficiaryId: true, organizationId: true,
+        createdAt: true, updatedAt: true,
+      },
     });
-    res.json(user);
+    res.json({ ...user, phone: decryptField(user.phone) });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: err.errors });
@@ -539,7 +556,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   try {
     const { token, password } = z.object({
       token: z.string(),
-      password: z.string().min(8).max(128),
+      password: passwordSchema,
     }).parse(req.body);
 
     const user = await prisma.user.findFirst({
@@ -645,6 +662,7 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
     const school = await prisma.school.update({
       where: { id: user.schoolId },
       data: { requiredHours },
+      select: { id: true, name: true, requiredHours: true },
     });
 
     res.json(school);

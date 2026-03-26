@@ -16,6 +16,8 @@ const OPTIONAL = [
   "APP_URL",
   "CLIENT_URL",
   "PORT",
+  "ALLOWED_ORIGINS",         // comma-separated list of allowed CORS origins
+  "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
