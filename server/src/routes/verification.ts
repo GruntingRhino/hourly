@@ -3,6 +3,7 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendHourApprovedEmail } from "../services/email";
+import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -25,6 +26,16 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEF
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (session.opportunity.organizationId !== user?.organizationId) {
         return res.status(403).json({ error: "Not your organization's session" });
+      }
+    }
+
+    // School staff may only approve sessions for students in their own school
+    if (req.user!.role === "SCHOOL_ADMIN" || req.user!.role === "TEACHER") {
+      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+      if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const studentSchoolId = await resolveStudentSchoolId(session.userId);
+      if (studentSchoolId !== actor.schoolId) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
     }
 
@@ -107,6 +118,16 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "BENEFI
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (session.opportunity.organizationId !== user?.organizationId) {
         return res.status(403).json({ error: "Not your organization's session" });
+      }
+    }
+
+    // School staff may only reject sessions for students in their own school
+    if (req.user!.role === "SCHOOL_ADMIN" || req.user!.role === "TEACHER") {
+      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+      if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const studentSchoolId = await resolveStudentSchoolId(session.userId);
+      if (studentSchoolId !== actor.schoolId) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
     }
 
@@ -193,7 +214,12 @@ router.get("/school-pending", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER
       where: {
         status: "PENDING_VERIFICATION",
         verificationStatus: "PENDING",
-        user: { classroom: { schoolId: user.schoolId } },
+        user: {
+          OR: [
+            { classroom: { schoolId: user.schoolId } },
+            { cohort: { schoolId: user.schoolId } },
+          ],
+        },
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
