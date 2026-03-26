@@ -3,8 +3,8 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
-// DEV-ONLY page: accessible only in non-production environments
-const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_ENV !== "production";
+// DEV-ONLY page: accessible only when Vite runs in dev mode (import.meta.env.DEV is set by Vite, never true in production builds)
+const IS_DEV = import.meta.env.DEV === true;
 
 export default function ImpersonatePage() {
   const { user, loginWithToken } = useAuth();

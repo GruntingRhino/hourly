@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
+import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -11,8 +12,28 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
   try {
     const userId = (req.query.studentId as string) || req.user!.userId;
 
-    if (userId !== req.user!.userId && !SCHOOL_ROLES.includes(req.user!.role)) {
-      return res.status(403).json({ error: "Cannot view this report" });
+    if (userId !== req.user!.userId) {
+      if (!SCHOOL_ROLES.includes(req.user!.role)) {
+        return res.status(403).json({ error: "Cannot view this report" });
+      }
+
+      // Enforce school scoping: school staff may only view students in their own school
+      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+      if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+
+      const studentSchoolId = await resolveStudentSchoolId(userId);
+      if (studentSchoolId !== actor.schoolId) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      }
+
+      // Audit: school staff accessing a student report
+      await logDataAccess({
+        actorId: req.user!.userId,
+        action: "VIEW_STUDENT_REPORT",
+        targetType: "student",
+        targetId: userId,
+        schoolId: actor.schoolId,
+      });
     }
 
     const sessions = await prisma.serviceSession.findMany({
@@ -34,16 +55,16 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const totalPendingHours = pending.reduce((sum, s) => sum + (s.totalHours || 0), 0);
     const totalCommittedHours = committed.reduce((sum, s) => sum + (s.totalHours || 0), 0);
 
-    // Get student's school requirements via classroom
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         classroom: { include: { school: true } },
+        cohort: { include: { school: true } },
         school: true,
       },
     });
 
-    const school = user?.classroom?.school || user?.school;
+    const school = user?.classroom?.school || user?.cohort?.school || user?.school;
 
     res.json({
       totalApprovedHours: Math.round(totalApprovedHours * 100) / 100,
@@ -111,10 +132,14 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
     const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
     if (!school) return res.status(400).json({ error: "School not found" });
 
+    // Include both legacy classroom students and new cohort students
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        classroom: { schoolId: school.id },
+        OR: [
+          { classroom: { schoolId: school.id } },
+          { cohort: { schoolId: school.id } },
+        ],
       },
       include: {
         serviceSessions: {
@@ -136,6 +161,15 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
         completed: hours >= school.requiredHours,
         percentComplete: Math.min(100, Math.round((hours / school.requiredHours) * 100)),
       };
+    });
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "VIEW_SCHOOL_REPORT",
+      targetType: "school",
+      targetId: school.id,
+      schoolId: school.id,
+      details: { studentCount: report.length },
     });
 
     res.json({
@@ -166,6 +200,14 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
         orderBy: { checkInTime: "asc" },
       });
 
+      await logDataAccess({
+        actorId: req.user!.userId,
+        action: "EXPORT_CSV",
+        targetType: "student",
+        targetId: req.user!.userId,
+        details: { type: "student", sessionCount: sessions.length },
+      });
+
       rows.push(["Date", "Opportunity", "Organization", "Hours", "Status"]);
       for (const s of sessions) {
         rows.push([
@@ -192,6 +234,42 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
 // GET /api/reports/audit/:sessionId — audit trail for a session
 router.get("/audit/:sessionId", authenticate, async (req: Request, res: Response) => {
   try {
+    const session = await prisma.serviceSession.findUnique({
+      where: { id: req.params.sessionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            classroom: { select: { schoolId: true } },
+            cohort: { select: { schoolId: true } },
+          },
+        },
+        opportunity: { select: { organizationId: true } },
+      },
+    });
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const actorId = req.user!.userId;
+    const actorRole = req.user!.role;
+
+    // Authorization: student owns the session, school staff of their school, or org admin of the opportunity
+    if (session.userId !== actorId) {
+      if (SCHOOL_ROLES.includes(actorRole)) {
+        const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { schoolId: true } });
+        const studentSchoolId = session.user.classroom?.schoolId ?? session.user.cohort?.schoolId ?? null;
+        if (!actor?.schoolId || studentSchoolId !== actor.schoolId) {
+          return res.status(403).json({ error: "Not authorized to view this audit log" });
+        }
+      } else if (actorRole === "ORG_ADMIN") {
+        const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { organizationId: true } });
+        if (session.opportunity.organizationId !== actor?.organizationId) {
+          return res.status(403).json({ error: "Not authorized to view this audit log" });
+        }
+      } else {
+        return res.status(403).json({ error: "Not authorized to view this audit log" });
+      }
+    }
+
     const logs = await prisma.auditLog.findMany({
       where: { sessionId: req.params.sessionId },
       include: {

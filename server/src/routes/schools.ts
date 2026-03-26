@@ -5,6 +5,8 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
+import { logDataAccess } from "../lib/dataAccessLog";
+import { geocodeAddress } from "../lib/geocode";
 
 const router = Router();
 const schoolJoinSettingsSchema = z.object({
@@ -204,6 +206,25 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
         : req.body.zipCodes;
     }
 
+    // Update address fields and geocode if provided
+    const hasAddress = req.body.address !== undefined || req.body.city !== undefined ||
+      req.body.state !== undefined || req.body.zip !== undefined;
+    if (hasAddress) {
+      if (req.body.address !== undefined) updateData.address = req.body.address || null;
+      if (req.body.city !== undefined) updateData.city = req.body.city || null;
+      if (req.body.state !== undefined) updateData.state = req.body.state || null;
+      if (req.body.zip !== undefined) updateData.zip = req.body.zip || null;
+
+      const addressParts = [req.body.address, req.body.city, req.body.state, req.body.zip].filter(Boolean);
+      if (addressParts.length >= 2) {
+        const coords = await geocodeAddress(addressParts.join(", "));
+        if (coords) {
+          updateData.latitude = coords.lat;
+          updateData.longitude = coords.lng;
+        }
+      }
+    }
+
     const updated = await prisma.school.update({
       where: { id: req.params.id },
       data: updateData,
@@ -245,6 +266,15 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
       approvedHours: s.serviceSessions.reduce((sum: number, ss: any) => sum + (ss.totalHours || 0), 0),
       serviceSessions: undefined,
     }));
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "VIEW_STUDENT_LIST",
+      targetType: "school",
+      targetId: req.params.id,
+      schoolId: req.params.id,
+      details: { studentCount: result.length },
+    });
 
     res.json(result);
   } catch (err) {
@@ -463,6 +493,17 @@ router.post("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
 // GET /api/schools/:id/groups/:groupId/students
 router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (actor?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    // Verify the group belongs to this school
+    const group = await prisma.studentGroup.findUnique({ where: { id: req.params.groupId } });
+    if (!group || group.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Group not found in this school" });
+    }
+
     const members = await prisma.studentGroupMember.findMany({
       where: { groupId: req.params.groupId },
     });
@@ -556,13 +597,17 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       });
     }
 
-    res.status(201).json({
+    const responseBody: Record<string, unknown> = {
       id: teacher.id,
       name: teacher.name,
       email: teacher.email,
       role: teacher.role,
-      tempPassword, // Dev only: return temp password for testing
-    });
+    };
+    // Only expose temp password outside production (dev/staging only)
+    if (process.env.NODE_ENV !== "production") {
+      responseBody.tempPassword = tempPassword;
+    }
+    res.status(201).json(responseBody);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: err.errors });
@@ -639,6 +684,152 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       return res.status(400).json({ error: "Validation failed" });
     }
     console.error("Remove hours error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/schools/:id/export — export all student data as CSV (SCHOOL_ADMIN only, FERPA data portability)
+router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    const students = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        OR: [
+          { classroom: { schoolId: req.params.id } },
+          { cohort: { schoolId: req.params.id } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        createdAt: true,
+        serviceSessions: {
+          where: { verificationStatus: "APPROVED" },
+          select: { totalHours: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "EXPORT_SCHOOL_DATA",
+      targetType: "school",
+      targetId: req.params.id,
+      schoolId: req.params.id,
+      details: { studentCount: students.length },
+    });
+
+    const rows: string[][] = [["Student ID", "Name", "Email", "Grade", "Approved Hours", "Enrolled At"]];
+    for (const s of students) {
+      const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+      rows.push([
+        s.id,
+        s.name,
+        s.email,
+        s.grade || "",
+        String(Math.round(hours * 100) / 100),
+        s.createdAt.toISOString().split("T")[0],
+      ]);
+    }
+
+    const csv = rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${school.name.replace(/[^a-z0-9]/gi, "_")}-students.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error("School export error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/schools/:id/students/:studentId — remove a student's account and data (SCHOOL_ADMIN only, FERPA right-to-delete)
+router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (actor?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const student = await prisma.user.findUnique({
+      where: { id: req.params.studentId },
+      select: {
+        id: true,
+        role: true,
+        classroom: { select: { schoolId: true } },
+        cohort: { select: { schoolId: true } },
+      },
+    });
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
+
+    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
+    if (studentSchoolId !== req.params.id) {
+      return res.status(403).json({ error: "Student is not enrolled in your school" });
+    }
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "DELETE_STUDENT",
+      targetType: "student",
+      targetId: req.params.studentId,
+      schoolId: req.params.id,
+    });
+
+    // Anonymize rather than hard-delete to preserve the integrity of audit logs and verified hours records
+    await prisma.user.update({
+      where: { id: req.params.studentId },
+      data: {
+        name: "[Deleted]",
+        email: `deleted-${req.params.studentId}@deleted.invalid`,
+        passwordHash: null,
+        phone: null,
+        grade: null,
+        house: null,
+        googleId: null,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        status: "REVOKED",
+        cohortId: null,
+        classroomId: null,
+      },
+    });
+
+    res.json({ message: "Student data removed" });
+  } catch (err) {
+    console.error("Delete student error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/schools/:id/data-access-logs — FERPA audit trail of who accessed student data (SCHOOL_ADMIN only)
+router.get("/:id/data-access-logs", authenticate, requireRole("SCHOOL_ADMIN", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const logs = await prisma.dataAccessLog.findMany({
+      where: { schoolId: req.params.id },
+      include: { actor: { select: { id: true, name: true, role: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error("Data access logs error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

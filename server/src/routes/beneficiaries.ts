@@ -72,7 +72,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
   try {
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
-    const radius = parseFloat((req.query.radius as string) || "10");
+    const radius = Math.min(parseFloat((req.query.radius as string) || "10"), 50);
     const category = req.query.category as string | undefined;
     const page = parseInt((req.query.page as string) || "1", 10);
     const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 200);
@@ -165,8 +165,8 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       city: r.city,
       state: r.state,
       zip: r.zip,
-      latitude: r.latitude,
-      longitude: r.longitude,
+      latitude: parseFloat(r.latitude),
+      longitude: parseFloat(r.longitude),
       email: r.email,
       website: r.website,
       phone: r.phone,

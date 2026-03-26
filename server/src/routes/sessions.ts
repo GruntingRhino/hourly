@@ -6,6 +6,7 @@ import crypto from "crypto";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -303,7 +304,23 @@ router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DIST
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
     const { studentId, verificationStatus } = req.query;
-    const where: any = { user: { classroom: { schoolId: user.schoolId } } };
+
+    // If viewing a specific student, verify they belong to this school first
+    if (studentId) {
+      const studentSchoolId = await resolveStudentSchoolId(studentId as string);
+      if (studentSchoolId !== user.schoolId) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      }
+    }
+
+    // Scope to students in this school — include both legacy classroom and new cohort students
+    const schoolScope = {
+      OR: [
+        { classroom: { schoolId: user.schoolId } },
+        { cohort: { schoolId: user.schoolId } },
+      ],
+    };
+    const where: any = { user: schoolScope };
     if (studentId) where.userId = studentId;
     if (verificationStatus) where.verificationStatus = verificationStatus;
 
@@ -317,6 +334,16 @@ router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DIST
       },
       orderBy: { createdAt: "desc" },
     });
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "VIEW_SESSIONS",
+      targetType: studentId ? "student" : "school",
+      targetId: (studentId as string | undefined) ?? user.schoolId,
+      schoolId: user.schoolId,
+      details: { sessionCount: sessions.length },
+    });
+
     res.json(sessions);
   } catch (err) {
     console.error("School sessions error:", err);

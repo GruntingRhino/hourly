@@ -158,7 +158,7 @@ function MapController({ target }: { target: [number, number] | null }) {
   const map = useMap();
   useEffect(() => {
     if (target) {
-      map.flyTo(target, Math.max(map.getZoom(), 14), { duration: 0.8 });
+      map.flyTo(target, Math.min(Math.max(map.getZoom(), 14), 16), { duration: 0.8 });
     }
   }, [target, map]);
   return null;
@@ -329,16 +329,20 @@ export default function BeneficiaryDiscover() {
 
       {noCoords ? (
         <div className="flex items-center justify-center flex-1 bg-gray-50">
-          <div className="text-center max-w-md p-8">
-            <div className="text-4xl mb-4">📍</div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">Set your school address</h2>
-            <p className="text-gray-500 mb-4">
-              Your school doesn't have coordinates set yet. Go to Settings to add your address so we
-              can show nearby community partners.
+          <div className="text-center max-w-sm p-8">
+            <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+              </svg>
+            </div>
+            <h2 className="text-base font-semibold text-gray-800 mb-2">Add your school address</h2>
+            <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+              Set your school's address in Settings to discover nearby community partners on the map.
             </p>
             <a
               href="/settings"
-              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+              className="inline-block px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 transition-colors"
             >
               Go to Settings
             </a>
@@ -351,6 +355,8 @@ export default function BeneficiaryDiscover() {
             <MapContainer
               center={defaultCenter}
               zoom={12}
+              minZoom={10}
+              maxZoom={18}
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer

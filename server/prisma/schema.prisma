@@ -56,6 +56,7 @@ model User {
   receivedMessages     Message[]        @relation("ReceivedMessages")
   notifications        Notification[]
   auditLogs            AuditLog[]       @relation("AuditActor")
+  dataAccessLogs       DataAccessLog[]  @relation("DataAccessActor")
   savedOpportunities   SavedOpportunity[]
   createdSchools       School[]         @relation("SchoolCreator")
   taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
@@ -548,6 +549,20 @@ model AuditLog {
 
   actor           User           @relation("AuditActor", fields: [actorId], references: [id])
   session         ServiceSession? @relation(fields: [sessionId], references: [id])
+}
+
+// ─── Data Access Log (FERPA compliance — read-access trail) ─────
+
+model DataAccessLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  actor       User     @relation("DataAccessActor", fields: [actorId], references: [id])
+  action      String   // VIEW_STUDENT_REPORT, VIEW_SCHOOL_REPORT, EXPORT_CSV, VIEW_SESSIONS, VIEW_STUDENT_LIST, EXPORT_SCHOOL_DATA, DELETE_STUDENT
+  targetType  String?  // "student", "school", "session"
+  targetId    String?  // ID of the accessed record
+  schoolId    String?  // school context of the access
+  details     String?  // JSON
+  createdAt   DateTime @default(now())
 }
 
 // ─── Messages ───────────────────────────────────────────────────

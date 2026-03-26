@@ -12,6 +12,12 @@ interface SchoolData {
   requiredHours: number;
   verificationStandard: string;
   zipCodes: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface SchoolSettingsData {
@@ -27,6 +33,10 @@ export default function SchoolSettings() {
   const [domain, setDomain] = useState("");
   const [requiredHours, setRequiredHours] = useState("40");
   const [zipCodes, setZipCodes] = useState("");
+  const [schoolAddress, setSchoolAddress] = useState("");
+  const [schoolCity, setSchoolCity] = useState("");
+  const [schoolState, setSchoolState] = useState("");
+  const [schoolZip, setSchoolZip] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -88,6 +98,10 @@ export default function SchoolSettings() {
         setDomain(schoolData.domain || "");
         setRequiredHours(String(schoolData.requiredHours));
         setAllowJoinByCode(Boolean(schoolSettings.allowJoinByCode));
+        setSchoolAddress(schoolData.address || "");
+        setSchoolCity(schoolData.city || "");
+        setSchoolState(schoolData.state || "");
+        setSchoolZip(schoolData.zip || "");
         try {
           const zips = schoolData.zipCodes ? JSON.parse(schoolData.zipCodes) : [];
           setZipCodes(Array.isArray(zips) ? zips.join(", ") : "");
@@ -125,6 +139,10 @@ export default function SchoolSettings() {
         domain: domain || null,
         requiredHours: parseFloat(requiredHours),
         zipCodes: zipArray,
+        address: schoolAddress || null,
+        city: schoolCity || null,
+        state: schoolState || null,
+        zip: schoolZip || null,
       });
       setMessage("Settings updated!");
       await refreshUser();
@@ -285,13 +303,15 @@ export default function SchoolSettings() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
         {(["profile", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-              tab === t ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100"
+            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
+              tab === t
+                ? "border-blue-700 text-blue-700"
+                : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
             {t}
@@ -302,8 +322,8 @@ export default function SchoolSettings() {
       {tab === "profile" && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-2xl text-gray-500">
-              {user?.name?.charAt(0).toUpperCase()}
+            <div className="w-16 h-16 bg-blue-700 rounded-full flex items-center justify-center text-xl font-semibold text-white select-none">
+              {user?.name ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() : "?"}
             </div>
             <div>
               <div className="font-semibold text-lg">{user?.name}</div>
@@ -377,6 +397,60 @@ export default function SchoolSettings() {
               />
             </div>
 
+            <div className="border-t border-gray-100 pt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                School Address{" "}
+                <span className="text-gray-400 font-normal">(used to show nearby partners on the map)</span>
+              </label>
+              <input
+                type="text"
+                value={schoolAddress}
+                onChange={(e) => setSchoolAddress(e.target.value)}
+                placeholder="123 Main St"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-1">
+                  <input
+                    type="text"
+                    value={schoolCity}
+                    onChange={(e) => setSchoolCity(e.target.value)}
+                    placeholder="City"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={schoolState}
+                    onChange={(e) => setSchoolState(e.target.value)}
+                    placeholder="State"
+                    maxLength={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm uppercase"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={schoolZip}
+                    onChange={(e) => setSchoolZip(e.target.value)}
+                    placeholder="ZIP"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+              </div>
+              {school?.latitude && school?.longitude && (
+                <p className="mt-1.5 text-xs text-green-600">
+                  Location set — map will center on your school.
+                </p>
+              )}
+              {school && !school.latitude && (schoolAddress || schoolCity) && (
+                <p className="mt-1.5 text-xs text-amber-600">
+                  Save to geocode your address and enable the Discover map.
+                </p>
+              )}
+            </div>
+
             {user?.role === "SCHOOL_ADMIN" && (
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between gap-4">
@@ -412,7 +486,7 @@ export default function SchoolSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -474,7 +548,7 @@ export default function SchoolSettings() {
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
             >
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
@@ -576,7 +650,7 @@ export default function SchoolSettings() {
           <button
             onClick={handleSaveNotifications}
             disabled={savingNotif}
-            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            className="mt-6 px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {savingNotif ? "Saving..." : "Save Preferences"}
           </button>
@@ -624,7 +698,7 @@ export default function SchoolSettings() {
           <button
             onClick={handleSavePrivacy}
             disabled={savingPrivacy}
-            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            className="mt-6 px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {savingPrivacy ? "Saving..." : "Save Settings"}
           </button>
@@ -639,7 +713,7 @@ export default function SchoolSettings() {
           </p>
           <button
             onClick={handleExportActivityLog}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
+            className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 transition-colors"
           >
             Export Activity Log (CSV)
           </button>

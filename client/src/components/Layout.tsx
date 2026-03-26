@@ -99,6 +99,9 @@ function getNavItems(role: string) {
         { path: "/discover", label: "Discover" },
         { path: "/submissions", label: "Submissions" },
         { path: "/settings", label: "Settings" },
+        ...(import.meta.env.DEV === true && role === "SCHOOL_ADMIN"
+          ? [{ path: "/admin/impersonate", label: "⚙ Dev: Impersonate" }]
+          : []),
       ];
     case "BENEFICIARY_ADMIN":
       return [
