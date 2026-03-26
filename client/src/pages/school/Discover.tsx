@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-markercluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "react-leaflet-markercluster/dist/styles.min.css";
 
 // Fix Leaflet default icon paths broken by Vite bundling
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -394,7 +396,13 @@ export default function BeneficiaryDiscover() {
                 </Marker>
               )}
 
-              {/* Beneficiary markers */}
+              {/* Beneficiary markers — clustered so city-center stacks show as bubbles */}
+              <MarkerClusterGroup
+                showCoverageOnHover={false}
+                zoomToBoundsOnClick={true}
+                spiderfyOnMaxZoom={true}
+                maxClusterRadius={40}
+              >
               {filtered.map((b) => (
                 <Marker
                   key={b.id}
@@ -431,6 +439,7 @@ export default function BeneficiaryDiscover() {
                   </Popup>
                 </Marker>
               ))}
+              </MarkerClusterGroup>
             </MapContainer>
           </div>
 
