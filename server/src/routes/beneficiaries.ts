@@ -123,13 +123,14 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     const haversineExpr = `(3959 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))))`;
 
-    const params: any[] = [lat, lng, radius, limit];
-    let nextParam = 5;
+    // Build base params (shared between count and main queries)
+    const baseParams: any[] = [lat, lng, radius];
+    let nextParam = 4;
 
     const categoryClause = category
       ? `AND LOWER("category") LIKE LOWER('%' || $${nextParam++} || '%')`
       : "";
-    if (category) params.push(category);
+    if (category) baseParams.push(category);
 
     const qClause = q
       ? `AND (LOWER(name) LIKE LOWER('%' || $${nextParam} || '%')
@@ -138,22 +139,34 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
              OR LOWER(COALESCE(county,'')) LIKE LOWER('%' || $${nextParam} || '%')
              OR LOWER(COALESCE(zip,'')) LIKE LOWER($${nextParam} || '%'))`
       : "";
-    if (q) { params.push(q); nextParam++; }
+    if (q) { baseParams.push(q); nextParam++; }
 
-    const sql = `
-      SELECT *,
-        ${haversineExpr} AS distance_miles
-      FROM "BeneficiaryDirectory"
+    const whereClause = `
       WHERE latitude IS NOT NULL AND longitude IS NOT NULL
         AND active = true
         AND ${haversineExpr} < $3
         ${categoryClause}
         ${qClause}
-      ORDER BY distance_miles ASC
-      LIMIT $4 OFFSET ${offset}
     `;
 
-    const results: any[] = await prisma.$queryRawUnsafe(sql, ...params);
+    // Get true total count (unaffected by LIMIT)
+    const countSql = `SELECT COUNT(*)::int as total FROM "BeneficiaryDirectory" ${whereClause}`;
+    const [countResult] = await prisma.$queryRawUnsafe<[{ total: number }]>(countSql, ...baseParams);
+    const total = Number(countResult.total);
+
+    // Main query with LIMIT/OFFSET
+    const limitParamIdx = nextParam;
+    const mainParams = [...baseParams, limit];
+    const sql = `
+      SELECT *,
+        ${haversineExpr} AS distance_miles
+      FROM "BeneficiaryDirectory"
+      ${whereClause}
+      ORDER BY distance_miles ASC
+      LIMIT $${limitParamIdx} OFFSET ${offset}
+    `;
+
+    const results: any[] = await prisma.$queryRawUnsafe(sql, ...mainParams);
 
     if (q) {
       const lq = q.toLowerCase();
@@ -236,7 +249,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       approvalStatus: approvalMap.get(r.id) ?? null,
     }));
 
-    res.json({ items: annotated, geocodingInProgress });
+    res.json({ items: annotated, total, geocodingInProgress });
   } catch (err) {
     console.error("Nearby beneficiary directory error:", err);
     res.status(500).json({ error: "Internal server error" });

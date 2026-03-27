@@ -183,6 +183,7 @@ export default function BeneficiaryDiscover() {
   const [mapTarget, setMapTarget] = useState<[number, number] | null>(null);
 
   const [geocodingInProgress, setGeocodingInProgress] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -199,10 +200,11 @@ export default function BeneficiaryDiscover() {
     try {
       const categoryParam =
         selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
-      const data = await api.get<{ items: NearbyBeneficiary[]; geocodingInProgress: boolean }>(
+      const data = await api.get<{ items: NearbyBeneficiary[]; total: number; geocodingInProgress: boolean }>(
         `/beneficiaries/directory/nearby?lat=${schoolData.latitude}&lng=${schoolData.longitude}&radius=${radius}&limit=100${categoryParam}`
       );
       setBeneficiaries(data.items);
+      setTotal(data.total ?? null);
       setGeocodingInProgress(data.geocodingInProgress ?? false);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -252,7 +254,8 @@ export default function BeneficiaryDiscover() {
     return (
       b.name.toLowerCase().includes(q) ||
       (b.category || "").toLowerCase().includes(q) ||
-      (b.city || "").toLowerCase().includes(q)
+      (b.city || "").toLowerCase().includes(q) ||
+      (b.zip || "").toLowerCase().includes(q)
     );
   });
 
@@ -331,7 +334,11 @@ export default function BeneficiaryDiscover() {
             <p className="text-sm text-gray-500">Find and approve organizations near your school</p>
           </div>
           <div className="text-sm text-gray-500">
-            {loading ? "Loading..." : `${filtered.length} partners within ${radius} miles`}
+            {loading
+              ? "Loading..."
+              : searchQuery
+              ? `${filtered.length} of ${total ?? beneficiaries.length} partners`
+              : `${total ?? beneficiaries.length} partners within ${radius} miles`}
           </div>
         </div>
       </div>
