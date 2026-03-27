@@ -112,7 +112,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     const radius = Math.min(parseFloat((req.query.radius as string) || "10"), 50);
     const category = req.query.category as string | undefined;
     const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 200);
+    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 500);
     const offset = (page - 1) * limit;
 
     if (isNaN(lat) || isNaN(lng)) {
