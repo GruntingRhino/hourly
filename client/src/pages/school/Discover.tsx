@@ -157,11 +157,20 @@ const SCHOOL_ICON = L.divIcon({
 
 // ─── Map Controller (fly to location) ────────────────────────────────────────
 
-function MapController({ target }: { target: [number, number] | null }) {
+interface MapTarget {
+  lat: number;
+  lng: number;
+  zoom?: number; // if omitted → keep current zoom (with soft minimum of 14)
+}
+
+function MapController({ target }: { target: MapTarget | null }) {
   const map = useMap();
   useEffect(() => {
     if (target) {
-      map.flyTo(target, Math.min(Math.max(map.getZoom(), 14), 16), { duration: 0.8 });
+      const zoom = target.zoom !== undefined
+        ? target.zoom
+        : Math.min(Math.max(map.getZoom(), 14), 15);
+      map.flyTo([target.lat, target.lng], zoom, { duration: 0.6 });
     }
   }, [target, map]);
   return null;
@@ -180,7 +189,7 @@ export default function BeneficiaryDiscover() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [mapTarget, setMapTarget] = useState<[number, number] | null>(null);
+  const [mapTarget, setMapTarget] = useState<MapTarget | null>(null);
 
   const [geocodingInProgress, setGeocodingInProgress] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
@@ -191,6 +200,7 @@ export default function BeneficiaryDiscover() {
   const [approveConfirm, setApproveConfirm] = useState<string | null>(null);
 
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Load data ─────────────────────────────────────────────────────────────
 
@@ -201,7 +211,7 @@ export default function BeneficiaryDiscover() {
       const categoryParam =
         selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
       const data = await api.get<{ items: NearbyBeneficiary[]; total: number; geocodingInProgress: boolean }>(
-        `/beneficiaries/directory/nearby?lat=${schoolData.latitude}&lng=${schoolData.longitude}&radius=${radius}&limit=100${categoryParam}`
+        `/beneficiaries/directory/nearby?lat=${schoolData.latitude}&lng=${schoolData.longitude}&radius=${radius}&limit=500${categoryParam}`
       );
       setBeneficiaries(data.items);
       setTotal(data.total ?? null);
@@ -277,22 +287,23 @@ export default function BeneficiaryDiscover() {
     }
   };
 
-  // ─── Marker click: scroll to card ─────────────────────────────────────────
+  // ─── Marker click: scroll to card + zoom to building level ────────────────
 
-  const handleMarkerClick = (id: string) => {
+  const handleMarkerClick = (id: string, lat: number, lng: number) => {
     setHighlightedId(id);
     setExpandedId(id);
+    setMapTarget({ lat, lng, zoom: 18 });
     const card = cardRefs.current[id];
     if (card) {
       card.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
-  // ─── Card hover: pan map ───────────────────────────────────────────────────
+  // ─── Card hover: highlight marker, pan map (no zoom change) ───────────────
 
   const handleCardHover = (b: NearbyBeneficiary) => {
     setHighlightedId(b.id);
-    setMapTarget([b.latitude, b.longitude]);
+    setMapTarget({ lat: b.latitude, lng: b.longitude });
   };
 
   const handleCardLeave = () => {
@@ -338,6 +349,8 @@ export default function BeneficiaryDiscover() {
               ? "Loading..."
               : searchQuery
               ? `${filtered.length} of ${total ?? beneficiaries.length} partners`
+              : total != null && beneficiaries.length < total
+              ? `Showing ${beneficiaries.length} of ${total} partners within ${radius} miles`
               : `${total ?? beneficiaries.length} partners within ${radius} miles`}
           </div>
         </div>
@@ -421,28 +434,54 @@ export default function BeneficiaryDiscover() {
                       : createBeneficiaryIcon(b.category, highlightedId === b.id)
                   }
                   eventHandlers={{
-                    click: () => handleMarkerClick(b.id),
+                    click: () => handleMarkerClick(b.id, b.latitude, b.longitude),
+                    mouseover: (e) => {
+                      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+                      e.target.openPopup();
+                      setHighlightedId(b.id);
+                    },
+                    mouseout: (e) => {
+                      hoverCloseTimerRef.current = setTimeout(() => {
+                        e.target.closePopup();
+                      }, 120);
+                    },
                   }}
                 >
-                  <Popup>
-                    <div className="min-w-[180px]">
-                      <div className="font-semibold text-sm">{b.name}</div>
-                      {b.category && (
-                        <div className="text-xs text-gray-500 mb-1">{b.category}</div>
-                      )}
-                      <div className="text-xs text-gray-600">
-                        {[b.city, b.state].filter(Boolean).join(", ")}
+                  <Popup closeButton={false} autoPan={false}>
+                    <div style={{ minWidth: "200px", maxWidth: "260px", fontFamily: "inherit" }}>
+                      <div style={{ fontWeight: 600, fontSize: "13px", lineHeight: "1.3", marginBottom: "4px" }}>
+                        {b.name}
                       </div>
-                      <div className="text-xs text-gray-400">{b.distanceMiles} mi away</div>
-                      {b.approvalStatus === "APPROVED" && (
-                        <div className="text-xs text-blue-600 font-medium mt-1">✓ Approved</div>
+                      {b.category && (
+                        <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "6px" }}>{b.category}</div>
                       )}
-                      <button
-                        className="mt-2 text-xs text-blue-600 font-medium hover:underline block"
-                        onClick={() => handleMarkerClick(b.id)}
-                      >
-                        View details →
-                      </button>
+                      {b.address && (
+                        <div style={{ fontSize: "11px", color: "#374151" }}>{b.address}</div>
+                      )}
+                      <div style={{ fontSize: "11px", color: "#374151" }}>
+                        {[b.city, b.state, b.zip].filter(Boolean).join(", ")}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
+                        {b.distanceMiles} mi away
+                      </div>
+                      {b.phone && (
+                        <div style={{ fontSize: "11px", color: "#374151", marginTop: "4px" }}>
+                          📞 {b.phone}
+                        </div>
+                      )}
+                      {b.email && (
+                        <div style={{ fontSize: "11px", color: "#374151" }}>
+                          ✉ {b.email}
+                        </div>
+                      )}
+                      {b.approvalStatus === "APPROVED" && (
+                        <div style={{ fontSize: "11px", color: "#2563eb", fontWeight: 600, marginTop: "6px" }}>
+                          ✓ Approved partner
+                        </div>
+                      )}
+                      <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "6px", borderTop: "1px solid #f3f4f6", paddingTop: "4px" }}>
+                        Click to view details
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -521,7 +560,7 @@ export default function BeneficiaryDiscover() {
                     onMouseLeave={handleCardLeave}
                     onClick={() => {
                       setHighlightedId(b.id);
-                      setMapTarget([b.latitude, b.longitude]);
+                      setMapTarget({ lat: b.latitude, lng: b.longitude, zoom: 18 });
                       setExpandedId(expandedId === b.id ? null : b.id);
                     }}
                     className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${
