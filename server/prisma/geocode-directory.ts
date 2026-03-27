@@ -18,10 +18,11 @@
 import "dotenv/config";
 import "../src/lib/env";  // validate env vars
 import prisma from "../src/lib/prisma";
-import FormData from "form-data";
-import fetch from "node-fetch";
+// Use native fetch + FormData (Node 18+) — proper AbortController support
+// node-fetch doesn't close the TCP socket on abort, causing infinite hangs
 
-const BATCH_SIZE = 9_500; // Census limit is 10,000; stay under
+const BATCH_SIZE = 2_000; // Smaller batches = faster responses, less timeout risk
+const FETCH_TIMEOUT_MS = 120_000; // 2 minutes per batch
 const CENSUS_URL =
   "https://geocoding.geo.census.gov/geocoder/locations/addressbatch";
 
@@ -64,25 +65,27 @@ async function geocodeBatch(
   );
   const csv = csvLines.join("\n");
 
+  // Native FormData with Blob — works with native fetch
   const form = new FormData();
-  form.append("addressFile", Buffer.from(csv), {
-    filename: "addresses.csv",
-    contentType: "text/csv",
-  });
+  form.append("addressFile", new Blob([csv], { type: "text/csv" }), "addresses.csv");
   form.append("benchmark", "Public_AR_Current");
   form.append("returntype", "locations");
 
-  const res = await (fetch as any)(CENSUS_URL, {
-    method: "POST",
-    body: form,
-    headers: form.getHeaders(),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  if (!(res as any).ok) {
-    throw new Error(`Census geocoder HTTP ${(res as any).status}: ${await (res as any).text()}`);
+  let text: string;
+  try {
+    const res = await fetch(CENSUS_URL, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Census geocoder HTTP ${res.status}: ${await res.text()}`);
+    text = await res.text();
+  } finally {
+    clearTimeout(timer);
   }
-
-  const text = await (res as any).text();
   const results = new Map<string, { lat: number; lng: number }>();
 
   // Census response: "ID","inputAddress","matchIndicator","matchType","matchedAddress","lng,lat","tigerLineId","side"
@@ -122,16 +125,10 @@ async function main() {
     FROM "BeneficiaryDirectory"
     WHERE address IS NOT NULL AND address != ''
       ${whereClause}
-      AND (
-        latitude IS NULL
-        OR (latitude, longitude) IN (
-          SELECT latitude, longitude
-          FROM "BeneficiaryDirectory"
-          WHERE latitude IS NOT NULL
-          GROUP BY latitude, longitude
-          HAVING COUNT(*) > 1
-        )
-      )
+      AND address NOT ILIKE 'PO BOX%'
+      AND address NOT ILIKE 'P.O. BOX%'
+      AND address NOT ILIKE 'P O BOX%'
+      AND latitude IS NULL
     ORDER BY id
     LIMIT ${limitArg}
   `);
@@ -146,8 +143,20 @@ async function main() {
     const batch = entries.slice(i, i + BATCH_SIZE);
     console.log(`\nBatch ${batchNum}: geocoding ${batch.length} entries...`);
 
+    let results: Map<string, { lat: number; lng: number }>;
     try {
-      const results = await geocodeBatch(batch);
+      results = await geocodeBatch(batch);
+    } catch (err: any) {
+      console.warn(`  Batch ${batchNum} failed (${err.message}), retrying in 10s...`);
+      await new Promise(r => setTimeout(r, 10_000));
+      try {
+        results = await geocodeBatch(batch);
+      } catch (err2: any) {
+        console.error(`  Batch ${batchNum} failed again, skipping: ${err2.message}`);
+        continue;
+      }
+    }
+    try {
       console.log(`  Matched: ${results.size} / ${batch.length}`);
 
       // Batch update with a VALUES clause

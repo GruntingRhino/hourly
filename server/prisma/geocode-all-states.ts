@@ -8,15 +8,17 @@
 import { spawn } from "child_process";
 import path from "path";
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 2; // Low concurrency keeps Census API happy
 
+// Ordered by ungeocoded count (states with geocoded=0 first, already-processed states last)
 const STATES = [
-  "CA","TX","NY","FL","PA","OH","GA","IL","NC","MI",
-  "NJ","VA","WA","MD","MN","IN","WI","TN","CO","MO",
-  "AZ","OR","SC","AL","LA","CT","IA","KY","OK","KS",
-  "AR","NV","UT","NE","MS","DC","WV","MT","ME","NM",
-  "HI","ID","NH","DE","VT","RI","SD","WY","AK","ND",
-  "PR","VI","GU","MA",
+  "OH","IL","GA","NC","MI","NJ","VA","MD","WA","MN",
+  "IN","TN","AZ","WI","MO","CO","OR","SC","AL","LA",
+  "CT","IA","KY","OK","KS","AR","NV","UT","NE","MS",
+  "DC","WV","MT","ME","NM","HI","ID","NH","DE","VT",
+  "RI","SD","WY","AK","ND","PR","VI","GU",
+  // Already partially processed — run last to clean up Census rejects
+  "PA","MA","NY","FL","TX","CA",
 ];
 
 function geocodeState(state: string): Promise<void> {

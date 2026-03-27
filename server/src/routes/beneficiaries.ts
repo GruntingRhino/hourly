@@ -135,7 +135,8 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       ? `AND (LOWER(name) LIKE LOWER('%' || $${nextParam} || '%')
              OR LOWER(COALESCE(category,'')) LIKE LOWER('%' || $${nextParam} || '%')
              OR LOWER(COALESCE(city,'')) LIKE LOWER('%' || $${nextParam} || '%')
-             OR LOWER(COALESCE(county,'')) LIKE LOWER('%' || $${nextParam} || '%'))`
+             OR LOWER(COALESCE(county,'')) LIKE LOWER('%' || $${nextParam} || '%')
+             OR LOWER(COALESCE(zip,'')) LIKE LOWER($${nextParam} || '%'))`
       : "";
     if (q) { params.push(q); nextParam++; }
 
@@ -156,12 +157,16 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     if (q) {
       const lq = q.toLowerCase();
+      const lqDigits = lq.replace(/\D/g, "");
       results.sort((a: any, b: any) => {
         const rank = (r: any) => {
           const n = r.name.toLowerCase();
           if (n.startsWith(lq)) return 0;
           if (n.split(/\s+/).some((w: string) => w.startsWith(lq))) return 1;
-          if ((r.city || "").toLowerCase().includes(lq) || (r.category || "").toLowerCase().includes(lq)) return 2;
+          const zip5 = (r.zip || "").replace(/\D/g, "").slice(0, 5);
+          if ((lqDigits && zip5 && zip5.startsWith(lqDigits)) ||
+              (r.city || "").toLowerCase().includes(lq) ||
+              (r.category || "").toLowerCase().includes(lq)) return 2;
           return 3;
         };
         const dr = rank(a) - rank(b);
@@ -246,12 +251,16 @@ router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
     const zip = req.query.zip as string | undefined;
     const city = req.query.city as string | undefined;
 
-    const where: any = {};
+    const where: any = { active: true };
     if (search) {
+      // Normalize zip-like queries (strip spaces, leading zeros preserved)
+      const normalizedSearch = search.trim();
       where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { category: { contains: search, mode: "insensitive" } },
-        { city: { contains: search, mode: "insensitive" } },
+        { name: { contains: normalizedSearch, mode: "insensitive" } },
+        { category: { contains: normalizedSearch, mode: "insensitive" } },
+        { city: { contains: normalizedSearch, mode: "insensitive" } },
+        { county: { contains: normalizedSearch, mode: "insensitive" } },
+        { zip: { contains: normalizedSearch, mode: "insensitive" } },
       ];
     }
     if (category) where.category = { contains: category, mode: "insensitive" };
@@ -263,6 +272,23 @@ router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
       take: 50,
       orderBy: { name: "asc" },
     });
+
+    // Re-rank when a search query is present: name matches first, then city/zip matches
+    if (search) {
+      const lq = search.trim().toLowerCase();
+      entries.sort((a, b) => {
+        const rank = (r: typeof a) => {
+          const n = r.name.toLowerCase();
+          if (n.startsWith(lq)) return 0;
+          if (n.split(/\s+/).some((w) => w.startsWith(lq))) return 1;
+          const zip5 = (r.zip || "").replace(/\D/g, "").slice(0, 5);
+          if (zip5 && zip5.startsWith(lq.replace(/\D/g, ""))) return 2;
+          if ((r.city || "").toLowerCase().includes(lq)) return 2;
+          return 3;
+        };
+        return rank(a) - rank(b) || a.name.localeCompare(b.name);
+      });
+    }
 
     res.json(entries);
   } catch (err) {
@@ -280,7 +306,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
       address: z.string().max(255).optional(),
       city: z.string().max(100).optional(),
       state: z.string().max(50).optional(),
-      zip: z.string().regex(/^\d{5}$/).optional(),
+      zip: z.string().regex(/^\d{5}$/).optional().or(z.literal("")),
       email: z.string().email().optional().or(z.literal("")),
       phone: z.string().max(20).optional(),
       website: z.string().max(255).optional(),

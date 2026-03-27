@@ -351,7 +351,7 @@ export default function SchoolBeneficiaries() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, category, or city..."
+                placeholder="Search by name, city, or zip code..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm pr-8"
               />
               {searchQuery && (
