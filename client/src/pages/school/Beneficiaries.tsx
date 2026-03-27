@@ -103,17 +103,19 @@ export default function SchoolBeneficiaries() {
     finally { setSmartLoading(false); }
   };
 
-  // Initial load when tab opens — fetch location then search
+  // Initial load when tab opens — always re-fetch location in case Settings were updated
   useEffect(() => {
     if (tab !== "search" || !isAdmin) return;
     const run = async () => {
       let loc = schoolLocation;
-      if (!loc) {
-        try {
-          const fetched = await api.get<{ lat: number; lng: number } | null>("/schools/location");
-          if (fetched?.lat && fetched?.lng) { setSchoolLocation(fetched); loc = fetched; }
-        } catch {}
-      }
+      try {
+        const fetched = await api.get<{ latitude: number; longitude: number } | null>("/schools/location");
+        if (fetched?.latitude && fetched?.longitude) {
+          const newLoc = { lat: fetched.latitude, lng: fetched.longitude };
+          setSchoolLocation(newLoc);
+          loc = newLoc;
+        }
+      } catch {}
       await runSmartSearch(searchQuery, selectedCategory, proximityRadius, loc);
     };
     void run();
