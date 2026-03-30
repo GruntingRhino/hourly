@@ -97,6 +97,7 @@ function AppRoutes() {
               <Route path="/cohorts/:id/on-track" element={<StudentList />} />
               <Route path="/cohorts/:id/off-track" element={<StudentList />} />
               <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
+              <Route path="/partners" element={<SchoolBeneficiaries />} />
               <Route path="/discover" element={<BeneficiaryDiscover />} />
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
               <Route path="/messages" element={<SchoolMessages />} />

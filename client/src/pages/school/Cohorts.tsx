@@ -31,6 +31,8 @@ export default function SchoolCohorts() {
   const [createHours, setCreateHours] = useState("");
   const [createStartYear, setCreateStartYear] = useState("");
   const [creating, setCreating] = useState(false);
+  const [publishConfirm, setPublishConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [publishToast, setPublishToast] = useState("");
 
   const loadCohorts = async () => {
     setLoading(true);
@@ -68,13 +70,15 @@ export default function SchoolCohorts() {
     }
   };
 
-  const handlePublish = async (cohortId: string, cohortName: string) => {
-    if (!window.confirm(`Send invitation emails to all imported students in "${cohortName}"?`)) return;
+  const handlePublish = async (cohortId: string) => {
     try {
       const result = await api.post<any>(`/cohorts/${cohortId}/publish`);
-      alert(`Sent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}. ${result.failed > 0 ? `${result.failed} failed.` : ""}`);
+      setPublishConfirm(null);
+      setPublishToast(`Sent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.${result.failed > 0 ? ` ${result.failed} failed.` : ""}`);
+      setTimeout(() => setPublishToast(""), 4000);
       void loadCohorts();
     } catch (err: any) {
+      setPublishConfirm(null);
       setError(err.message || "Failed to publish cohort.");
     }
   };
@@ -96,6 +100,16 @@ export default function SchoolCohorts() {
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+      {publishToast && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{publishToast}</div>}
+      {publishConfirm && (
+        <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+          <p className="text-sm text-gray-700 mb-3">Send invitation emails to all imported students in <strong>"{publishConfirm.name}"</strong>?</p>
+          <div className="flex gap-2">
+            <button onClick={() => handlePublish(publishConfirm.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Send Invites</button>
+            <button onClick={() => setPublishConfirm(null)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      )}
 
       {showCreateForm && (
         <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
@@ -161,7 +175,7 @@ export default function SchoolCohorts() {
                   </Link>
                   {cohort.status !== "PUBLISHED" && user?.role === "SCHOOL_ADMIN" && cohort.invitationsPending > 0 && (
                     <button
-                      onClick={() => handlePublish(cohort.id, cohort.name)}
+                      onClick={() => setPublishConfirm({ id: cohort.id, name: cohort.name })}
                       className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                     >
                       Publish & Send Invites

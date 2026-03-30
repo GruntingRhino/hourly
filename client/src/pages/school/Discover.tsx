@@ -87,6 +87,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Youth Development": "#a855f7",
 };
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 function categoryColor(category: string | null): string {
   if (!category) return "#6b7280";
   for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
@@ -541,6 +545,32 @@ export default function BeneficiaryDiscover() {
               </div>
             </div>
 
+            {/* Legend */}
+            <div className="flex-none px-3 py-2 border-b border-gray-100 bg-gray-50">
+              <div className="text-xs text-gray-400 mb-1.5 font-medium">Map legend</div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {Object.entries(CATEGORY_COLORS).slice(0, 8).map(([cat, color]) => (
+                  <div key={cat} className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: color }} />
+                    <span className="text-xs text-gray-500">{cat}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full flex-none bg-gray-400" />
+                  <span className="text-xs text-gray-500">Other</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mt-1.5">
+                <div className="flex items-center gap-1">
+                  <div className="relative w-4 h-4">
+                    <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-600 rounded-full flex items-center justify-center text-white text-[7px]">✓</div>
+                  </div>
+                  <span className="text-xs text-gray-500">Approved</span>
+                </div>
+              </div>
+            </div>
+
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
@@ -579,10 +609,10 @@ export default function BeneficiaryDiscover() {
                             style={{ backgroundColor: categoryColor(b.category) }}
                           />
                           <span className="font-medium text-sm text-gray-900 truncate">
-                            {b.name}
+                            {toTitleCase(b.name)}
                           </span>
                           {b.approvalStatus === "APPROVED" && (
-                            <span className="flex-none text-xs text-blue-600 font-semibold">✓</span>
+                            <span className="flex-none text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">✓ Partner</span>
                           )}
                         </div>
 

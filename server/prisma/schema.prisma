@@ -24,6 +24,8 @@ model User {
   passwordResetToken String?
   passwordResetExpires DateTime?
   googleId      String?   @unique
+  notificationPreferences String?  // JSON blob for notification prefs
+  messagePreferences      String?  // JSON blob for message/privacy prefs
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
