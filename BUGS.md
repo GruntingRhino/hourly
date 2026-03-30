@@ -6,42 +6,22 @@ Environment: https://goodhours.app (production), logged in as Principal Johnson 
 
 ---
 
-## BUG-001: Onboarding "Skip this step" navigates to wrong page
+## BUG-001: Onboarding "Skip this step" navigates to wrong page — NOT A BUG
 
-**Severity:** Medium
-**Page:** Dashboard onboarding wizard (step 2)
-**Steps to reproduce:**
-1. Log in as a school admin with incomplete onboarding
-2. Reach onboarding step 2 ("Add your school address")
-3. Click "Skip this step"
-
-**Expected:** Advance to step 3 within the onboarding flow
-**Actual:** Navigates to `/discover` — skips the rest of onboarding entirely
+**Status:** ~~NOT A BUG~~ — Verified working correctly via live testing 2026-03-27
+**Notes:** `Dashboard.tsx:140` calls `setOnboardingStep(s => s + 1)` which correctly advances step 2 → step 3 ("Create a Cohort & Invite Students"). The `/discover` navigation observed in the prior session was likely from a separate CTA click, not the "Skip this step" button. Confirmed not a bug.
 
 ---
 
-## BUG-002: /partners URL redirects to /dashboard instead of Partners page
+## BUG-002: /partners URL redirects to /dashboard instead of Partners page — FIXED
 
-**Severity:** Low
-**Steps to reproduce:**
-1. Navigate directly to `https://goodhours.app/partners`
-
-**Expected:** Load the Community Partners page (same as `/beneficiaries`)
-**Actual:** Redirects to `/dashboard`. The Partners nav link correctly uses `/beneficiaries`, but `/partners` is not an alias.
+**Status:** Fixed — `App.tsx` now includes `<Route path="/partners" element={<SchoolBeneficiaries />} />` as an alias for `/beneficiaries`.
 
 ---
 
-## BUG-003: "Send Invite" button shows no feedback when email is empty
+## BUG-003: "Send Invite" button shows no feedback when email is empty — FIXED
 
-**Severity:** Medium
-**Page:** Partners → Approved tab
-**Steps to reproduce:**
-1. Go to Community Partners → Approved
-2. Leave the "Email to send invitation" field empty
-3. Click "Send Invite"
-
-**Expected:** Validation error ("Please enter an email address") or toast notification
-**Actual:** Nothing happens — no error message, no toast, no visual change. Silent failure.
+**Status:** Fixed — `Beneficiaries.tsx` `handleInvite` now shows inline red error text below the email input when field is empty.
 
 ---
 
@@ -63,25 +43,40 @@ Environment: https://goodhours.app (production), logged in as Principal Johnson 
 
 ---
 
-## BUG-005: "Add from Directory" radius filter ignored when text search is active
+## BUG-005: "Add from Directory" radius filter ignored when text search is active — FIXED
 
-**Severity:** High
-**Page:** Partners → Add from Directory
-**Steps to reproduce:**
-1. Go to Partners → Add from Directory
-2. Set radius to "10 mi"
-3. Type "food bank" in the search field
-
-**Expected:** Results filtered to food banks within 10 miles of the school
-**Actual:** Results are returned nationally (e.g., food banks in Idaho, Montana, Nebraska, Colorado) — the radius filter has no effect when a text search query is present. The radius dropdown appears functional but does not constrain text search results.
+**Status:** Fixed — `Beneficiaries.tsx` `runSmartSearch` now always passes `lat/lng/radius` when school location is available, even with a text query. Also fixed blank state on tab open: when no location, falls back to global text search instead of showing empty.
 
 ---
 
-## BUG-006: "Send Invite" with empty email triggers no validation
+## BUG-006: "Send Invite" with empty email triggers no validation — FIXED (same as BUG-003)
 
-**Severity:** Medium
-**Page:** Partners → Approved
-**Details:** The email input has `type="email"` but browser native validation is not triggered (likely because the button is not inside a `<form>` element or the field lacks a `required` attribute). Clicking "Send Invite" with an empty field does nothing — no error, no toast, no feedback.
+---
+
+## BUG-007: Native browser dialogs (`alert`/`confirm`) used throughout — FIXED
+
+**Status:** Fixed — All `alert()`/`window.confirm()` calls replaced with in-UI React components:
+- `Beneficiaries.tsx`: toast banner on invite success, inline confirm panel on remove
+- `Cohorts.tsx`: inline confirm panel + toast banner on publish
+- `CohortDetail.tsx`: inline confirm panel + toast banner on publish
+
+---
+
+## BUG-008: Cohort invitation "Sent" column shows date before invitations are sent — FIXED
+
+**Status:** Fixed — Column renamed from "Sent" to "Added" in `CohortDetail.tsx`, accurately reflecting that it shows the record creation date, not when the email was dispatched.
+
+---
+
+## BUG-009: Notification and Privacy settings fail to save (HTTP 500) — FIXED
+
+**Status:** Fixed — Added `notificationPreferences String?` and `messagePreferences String?` to `User` model in `schema.prisma`. Ran `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS` migration directly on Neon production DB via MCP.
+
+---
+
+## BUG-010: Error messages in Settings Notifications/Privacy tabs use green (success) styling — FIXED
+
+**Status:** Fixed — Added `notifIsError` and `privacyIsError` state booleans to `Settings.tsx`. Message banners now use `bg-red-50` on error and `bg-green-50` on success.
 
 ---
 
@@ -92,3 +87,10 @@ Environment: https://goodhours.app (production), logged in as Principal Johnson 
 - Category filter chips (Add from Directory): Toggle and highlight correctly.
 - Directory text search: Returns results with highlighted matched terms.
 - Approved tab partner list: Renders all partners with invite flow and remove option.
+- Discover map: Radius filter works correctly; shows accurate partner counts by radius; distance calculations are accurate (verified via haversine).
+- Settings → Profile: School name, domain, required hours, zip codes, address fields — all save correctly.
+- Settings → Security: Change Password validates mismatched passwords inline (no browser dialogs). Delete Account shows proper React confirmation UI (type "DELETE" to confirm, "Cancel" button works).
+- Settings → Data: Export Activity Log (CSV) button renders correctly.
+- Submissions page: All three tabs (Pending, Approved, Rejected) render with correct empty-state messages.
+- Cohorts → Cohort detail: Students, Analytics, Invitations, and Import tabs all render correctly. Add Student: browser native required-field validation fires on empty email. Import tab shows CSV format instructions.
+- Onboarding wizard (Dashboard): "Skip this step →" correctly advances to next step (NOT a bug — see BUG-001 update).

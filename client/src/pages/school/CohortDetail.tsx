@@ -48,6 +48,8 @@ export default function CohortDetail() {
   const [addName, setAddName] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [publishToast, setPublishToast] = useState("");
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
@@ -105,10 +107,11 @@ export default function CohortDetail() {
   };
 
   const handlePublish = async () => {
-    if (!window.confirm("Send invitation emails to all pending students?")) return;
+    setPublishConfirm(false);
     try {
       const result = await api.post<any>(`/cohorts/${id}/publish`);
-      alert(`Sent ${result.sent} invitations.`);
+      setPublishToast(`Sent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.`);
+      setTimeout(() => setPublishToast(""), 4000);
       void load();
     } catch (err: any) {
       setError(err.message || "Failed to publish.");
@@ -162,10 +165,22 @@ export default function CohortDetail() {
         </span>
       </div>
 
-      {isAdmin && cohort.status !== "PUBLISHED" && pendingInvitations > 0 && (
+      {publishToast && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{publishToast}</div>
+      )}
+      {publishConfirm && (
+        <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+          <p className="text-sm text-gray-700 mb-3">Send invitation emails to all <strong>{pendingInvitations}</strong> pending student{pendingInvitations !== 1 ? "s" : ""} in this cohort?</p>
+          <div className="flex gap-2">
+            <button onClick={handlePublish} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Send Invites</button>
+            <button onClick={() => setPublishConfirm(false)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      )}
+      {isAdmin && cohort.status !== "PUBLISHED" && pendingInvitations > 0 && !publishConfirm && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
           <span className="text-sm text-blue-800">{pendingInvitations} student invitation{pendingInvitations !== 1 ? "s" : ""} ready to send.</span>
-          <button onClick={handlePublish} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+          <button onClick={() => setPublishConfirm(true)} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
             Publish & Send Invites
           </button>
         </div>
@@ -174,9 +189,9 @@ export default function CohortDetail() {
       {/* Tabs */}
       <div className="flex gap-4 border-b mb-6">
         {([
-          { key: "students", label: `Students (${cohort.students.length})` },
+          { key: "students", label: `Enrolled Students (${cohort.students.length})` },
           { key: "analytics", label: "Analytics" },
-          { key: "invitations", label: `Invitations (${cohort.invitations.length})` },
+          { key: "invitations", label: `Pending Invites (${pendingInvitations})` },
           ...(isAdmin ? [{ key: "import", label: "Import" }] : []),
         ] as { key: string; label: string }[]).map((t) => (
           <button
@@ -348,7 +363,7 @@ export default function CohortDetail() {
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Email</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Status</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Sent</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Added</th>
               </tr>
             </thead>
             <tbody className="divide-y">

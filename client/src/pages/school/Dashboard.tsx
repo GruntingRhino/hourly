@@ -167,43 +167,39 @@ export default function SchoolDashboard() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">Total Hours</div>
-          <div className="text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}</div>
+          <div className="text-2xl font-bold text-blue-600">{totalHours === 0 ? "0" : totalHours.toFixed(1)}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">Goal Reached</div>
-          <div className="text-2xl font-bold text-green-600">{totalCompleted}</div>
+          <div className={`text-2xl font-bold ${totalCompleted > 0 ? "text-green-600" : "text-gray-800"}`}>{totalCompleted}</div>
           <div className="text-xs text-gray-400">of {totalStudents} students</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">At Risk</div>
-          <div className="text-2xl font-bold text-red-600">{totalAtRisk}</div>
+          <div className={`text-2xl font-bold ${totalAtRisk > 0 ? "text-red-600" : "text-gray-800"}`}>{totalAtRisk}</div>
           <div className="text-xs text-gray-400">below 50% of goal</div>
         </div>
       </div>
 
       {/* Quick links */}
       <div className="flex gap-3 mb-8 flex-wrap">
-        <Link to="/cohorts" className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium hover:bg-blue-100">
+        <Link to="/cohorts" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
           View All Cohorts ({cohorts.length})
         </Link>
-        <Link to="/beneficiaries" className="px-4 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-sm font-medium hover:bg-purple-100">
+        <Link to="/beneficiaries" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
           Partners ({beneficiaries.length} approved)
         </Link>
-        <Link to="/submissions" className="px-4 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-md text-sm font-medium hover:bg-orange-100">
+        <Link to="/submissions" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
           Self-Submitted Hours
         </Link>
-      </div>
-
-      {/* Student roster buttons */}
-      <div className="flex gap-3 mb-8 flex-wrap">
-        <Link to="/students" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
+        <Link to="/students" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
           Student Roster ({students.length})
         </Link>
-        <Link to="/students/on-track" className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
-          View On-Track Students
+        <Link to="/students/on-track" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+          On-Track Students
         </Link>
-        <Link to="/students/off-track" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
-          View Off-Track Students
+        <Link to="/students/off-track" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+          Off-Track Students
         </Link>
       </div>
 

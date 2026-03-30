@@ -69,6 +69,9 @@ export default function SchoolBeneficiaries() {
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [proximityRadius, setProximityRadius] = useState(10);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [inviteEmailError, setInviteEmailError] = useState<{ [id: string]: string }>({});
+  const [toastMessage, setToastMessage] = useState("");
+  const [confirmDrop, setConfirmDrop] = useState<{ benId: string; name: string } | null>(null);
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
@@ -94,10 +97,11 @@ export default function SchoolBeneficiaries() {
         if (query.trim().length >= 2) p.set("q", query.trim());
         if (category) p.set("category", category);
         setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory/nearby?${p}`));
-      } else if (query.trim().length >= 2) {
-        setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory?search=${encodeURIComponent(query.trim())}`));
       } else {
-        setSmartResults([]);
+        const p = new URLSearchParams();
+        if (query.trim().length >= 2) p.set("search", query.trim());
+        if (category) p.set("category", category);
+        setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory?${p}`));
       }
     } catch { setSmartResults([]); }
     finally { setSmartLoading(false); }
@@ -139,14 +143,23 @@ export default function SchoolBeneficiaries() {
     } catch (err: any) { setError(err.message || "Failed to approve."); }
   };
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 3000);
+  };
+
   const handleInvite = async (benId: string) => {
     const email = inviteEmail[benId]?.trim();
-    if (!email) return;
+    if (!email) {
+      setInviteEmailError((prev) => ({ ...prev, [benId]: "Please enter an email address" }));
+      return;
+    }
+    setInviteEmailError((prev) => ({ ...prev, [benId]: "" }));
     setInviting(benId);
     try {
       await api.post(`/beneficiaries/${benId}/invite`, { email });
       setInviteEmail((prev) => ({ ...prev, [benId]: "" }));
-      alert("Invitation sent!");
+      showToast("Invitation sent!");
     } catch (err: any) {
       setError(err.message || "Failed to send invitation.");
     } finally {
@@ -155,7 +168,13 @@ export default function SchoolBeneficiaries() {
   };
 
   const handleDrop = async (benId: string, name: string) => {
-    if (!window.confirm(`Remove "${name}" from your approved list?`)) return;
+    setConfirmDrop({ benId, name });
+  };
+
+  const confirmDropAction = async () => {
+    if (!confirmDrop) return;
+    const { benId } = confirmDrop;
+    setConfirmDrop(null);
     // Optimistically remove
     setBeneficiaries((prev) => prev.filter((b) => b.id !== benId));
     try {
@@ -243,6 +262,18 @@ export default function SchoolBeneficiaries() {
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+      {toastMessage && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{toastMessage}</div>
+      )}
+      {confirmDrop && (
+        <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+          <p className="text-sm text-gray-700 mb-3">Remove <strong>"{confirmDrop.name}"</strong> from your approved list?</p>
+          <div className="flex gap-2">
+            <button onClick={confirmDropAction} className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700">Remove</button>
+            <button onClick={() => setConfirmDrop(null)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-4 border-b mb-6 flex-wrap">
@@ -328,13 +359,18 @@ export default function SchoolBeneficiaries() {
                     </div>
                   </div>
                   {isAdmin && !b.claimed && (
-                    <div className="mt-3 flex gap-2">
-                      <input type="email" value={inviteEmail[b.id] || ""} onChange={(e) => setInviteEmail((prev) => ({ ...prev, [b.id]: e.target.value }))}
-                        placeholder={b.email || "Email to send invitation"} className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-xs" />
-                      <button onClick={() => handleInvite(b.id)} disabled={inviting === b.id}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">
-                        {inviting === b.id ? "Sending..." : "Send Invite"}
-                      </button>
+                    <div className="mt-3">
+                      <div className="flex gap-2">
+                        <input type="email" value={inviteEmail[b.id] || ""}
+                          onChange={(e) => { setInviteEmail((prev) => ({ ...prev, [b.id]: e.target.value })); setInviteEmailError((prev) => ({ ...prev, [b.id]: "" })); }}
+                          placeholder={b.email || "Email to send invitation"}
+                          className={`flex-1 px-3 py-1.5 border rounded text-xs ${inviteEmailError[b.id] ? "border-red-400" : "border-gray-300"}`} />
+                        <button onClick={() => handleInvite(b.id)} disabled={inviting === b.id}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">
+                          {inviting === b.id ? "Sending..." : "Send Invite"}
+                        </button>
+                      </div>
+                      {inviteEmailError[b.id] && <p className="mt-1 text-xs text-red-500">{inviteEmailError[b.id]}</p>}
                     </div>
                   )}
                 </div>
@@ -413,13 +449,10 @@ export default function SchoolBeneficiaries() {
                 </div>
               ))}
             </div>
-          ) : !schoolLocation ? (
-            <div className="text-gray-400 text-sm py-4">
-              Add your school address in Settings to see nearby suggestions, or type to search.
-            </div>
           ) : (
             <div className="text-gray-500 text-sm py-4">
-              No results. Try a larger radius, different category, or different search term.
+              No results. Try a different category or search term.
+              {schoolLocation && " You can also try a larger radius."}
             </div>
           )}
         </div>

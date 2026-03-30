@@ -75,6 +75,7 @@ export default function SchoolSettings() {
   );
   const [savingNotif, setSavingNotif] = useState(false);
   const [notifMessage, setNotifMessage] = useState("");
+  const [notifIsError, setNotifIsError] = useState(false);
 
   // Privacy
   const defaultMsgPrefs = { allowFrom: "EVERYONE", profileVisibility: "EVERYONE" };
@@ -83,6 +84,7 @@ export default function SchoolSettings() {
   );
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState("");
+  const [privacyIsError, setPrivacyIsError] = useState(false);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -232,12 +234,14 @@ export default function SchoolSettings() {
   const handleSaveNotifications = async () => {
     setSavingNotif(true);
     setNotifMessage("");
+    setNotifIsError(false);
     try {
       await api.put("/auth/profile", { notificationPreferences: notifPrefs });
       void refreshUser();
       setNotifMessage("Notification preferences saved!");
     } catch {
       setNotifMessage("Failed to save preferences");
+      setNotifIsError(true);
     } finally {
       setSavingNotif(false);
     }
@@ -246,11 +250,13 @@ export default function SchoolSettings() {
   const handleSavePrivacy = async () => {
     setSavingPrivacy(true);
     setPrivacyMessage("");
+    setPrivacyIsError(false);
     try {
       await api.put("/auth/profile", { messagePreferences: msgPrefs });
       setPrivacyMessage("Privacy settings saved!");
     } catch {
       setPrivacyMessage("Failed to save settings");
+      setPrivacyIsError(true);
     } finally {
       setSavingPrivacy(false);
     }
@@ -605,7 +611,7 @@ export default function SchoolSettings() {
           <p className="text-sm text-gray-500 mb-6">Choose how you want to be notified.</p>
 
           {notifMessage && (
-            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+            <div className={`mb-4 p-3 rounded-md text-sm ${notifIsError ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
               {notifMessage}
             </div>
           )}
@@ -663,7 +669,7 @@ export default function SchoolSettings() {
           <p className="text-sm text-gray-500 mb-6">Control visibility and message restrictions.</p>
 
           {privacyMessage && (
-            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+            <div className={`mb-4 p-3 rounded-md text-sm ${privacyIsError ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
               {privacyMessage}
             </div>
           )}
