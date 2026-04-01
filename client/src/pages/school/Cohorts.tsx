@@ -194,11 +194,11 @@ export default function SchoolCohorts() {
                   <div className="text-xs text-gray-500">Pending Invites</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className="text-lg font-bold text-green-600">{cohort.completedCount}</div>
+                  <div className={`text-lg font-bold ${cohort.completedCount > 0 ? "text-green-600" : "text-gray-800"}`}>{cohort.completedCount}</div>
                   <div className="text-xs text-gray-500">Completed Goal</div>
                 </div>
                 <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className="text-lg font-bold text-red-500">{cohort.atRiskCount}</div>
+                  <div className={`text-lg font-bold ${cohort.atRiskCount > 0 ? "text-red-500" : "text-gray-800"}`}>{cohort.atRiskCount}</div>
                   <div className="text-xs text-gray-500">At Risk</div>
                 </div>
               </div>

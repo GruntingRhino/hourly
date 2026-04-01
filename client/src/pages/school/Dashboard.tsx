@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 interface CohortSummary {
   id: string;
   name: string;
@@ -245,15 +249,15 @@ export default function SchoolDashboard() {
                     <div className="text-xs text-gray-500">Students</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-blue-600">{c.studentCount > 0 ? (c.totalHours / c.studentCount).toFixed(1) : "0"}h</div>
+                    <div className={`text-lg font-bold ${c.totalHours > 0 ? "text-blue-600" : "text-gray-800"}`}>{c.studentCount > 0 ? (c.totalHours / c.studentCount).toFixed(1) : "0"}h</div>
                     <div className="text-xs text-gray-500">Avg Hours</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-green-600">{c.studentCount - c.atRiskCount}</div>
+                    <div className={`text-lg font-bold ${(c.studentCount - c.atRiskCount) > 0 ? "text-green-600" : "text-gray-800"}`}>{c.studentCount - c.atRiskCount}</div>
                     <div className="text-xs text-gray-500">On-Track</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-red-500">{c.atRiskCount}</div>
+                    <div className={`text-lg font-bold ${c.atRiskCount > 0 ? "text-red-500" : "text-gray-800"}`}>{c.atRiskCount}</div>
                     <div className="text-xs text-gray-500">Off-Track</div>
                   </div>
                 </div>
@@ -330,7 +334,7 @@ export default function SchoolDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {beneficiaries.slice(0, 6).map((b) => (
               <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-sm font-medium">{b.name}</div>
+                <div className="text-sm font-medium">{toTitleCase(b.name)}</div>
                 {b.category && <div className="text-xs text-gray-400 mt-0.5">{b.category}</div>}
               </div>
             ))}
