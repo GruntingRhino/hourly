@@ -2,6 +2,10 @@ import { useEffect, useState, useRef } from "react";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 interface Beneficiary {
   id: string;
   name: string;
@@ -267,7 +271,7 @@ export default function SchoolBeneficiaries() {
       )}
       {confirmDrop && (
         <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
-          <p className="text-sm text-gray-700 mb-3">Remove <strong>"{confirmDrop.name}"</strong> from your approved list?</p>
+          <p className="text-sm text-gray-700 mb-3">Remove <strong>"{toTitleCase(confirmDrop.name)}"</strong> from your approved list?</p>
           <div className="flex gap-2">
             <button onClick={confirmDropAction} className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700">Remove</button>
             <button onClick={() => setConfirmDrop(null)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
@@ -305,7 +309,7 @@ export default function SchoolBeneficiaries() {
                 <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 mr-4">
-                      <div className="font-medium">{b.name}</div>
+                      <div className="font-medium">{toTitleCase(b.name)}</div>
                       <div className="text-sm text-gray-500">{[b.category, b.city, b.state].filter(Boolean).join(" · ")}</div>
                       {b.description && (
                         <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{b.description}</p>
@@ -347,7 +351,7 @@ export default function SchoolBeneficiaries() {
                 <div key={b.id} className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium">{b.name}</div>
+                      <div className="font-medium">{toTitleCase(b.name)}</div>
                       <div className="text-sm text-gray-500">{[b.category, b.city, b.state].filter(Boolean).join(" · ")}</div>
                       {b.description && <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{b.description}</p>}
                     </div>
