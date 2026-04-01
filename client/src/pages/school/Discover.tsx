@@ -88,7 +88,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 function toTitleCase(str: string): string {
-  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
 }
 
 function categoryColor(category: string | null): string {
@@ -621,7 +621,7 @@ export default function BeneficiaryDiscover() {
                         )}
 
                         <div className="text-xs text-gray-400 mt-0.5 ml-4">
-                          {[b.city, b.state].filter(Boolean).join(", ")}
+                          {[b.city ? toTitleCase(b.city) : null, b.state].filter(Boolean).join(", ")}
                           {b.distanceMiles != null && ` · ${b.distanceMiles} mi`}
                         </div>
 
