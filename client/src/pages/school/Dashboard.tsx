@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 function toTitleCase(str: string): string {
-  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
 }
 
 interface CohortSummary {

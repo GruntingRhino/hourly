@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 function toTitleCase(str: string): string {
-  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
 }
 
 interface Beneficiary {
@@ -310,7 +310,7 @@ export default function SchoolBeneficiaries() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1 mr-4">
                       <div className="font-medium">{toTitleCase(b.name)}</div>
-                      <div className="text-sm text-gray-500">{[b.category, b.city, b.state].filter(Boolean).join(" · ")}</div>
+                      <div className="text-sm text-gray-500">{[b.category, b.city ? toTitleCase(b.city) : null, b.state].filter(Boolean).join(" · ")}</div>
                       {b.description && (
                         <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{b.description}</p>
                       )}
@@ -352,7 +352,7 @@ export default function SchoolBeneficiaries() {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-medium">{toTitleCase(b.name)}</div>
-                      <div className="text-sm text-gray-500">{[b.category, b.city, b.state].filter(Boolean).join(" · ")}</div>
+                      <div className="text-sm text-gray-500">{[b.category, b.city ? toTitleCase(b.city) : null, b.state].filter(Boolean).join(" · ")}</div>
                       {b.description && <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{b.description}</p>}
                     </div>
                     <div className="flex items-center gap-2">
