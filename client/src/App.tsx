@@ -8,6 +8,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
+import EmailVerificationRequired from "./pages/EmailVerificationRequired";
 
 // Invitation / onboarding flows (public, no auth required)
 import JoinCohort from "./pages/student/JoinCohort";
@@ -64,13 +66,18 @@ function AppRoutes() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/school/register" element={<SchoolRegister />} />
       <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
 
       {user ? (
-        /* Authenticated: routes wrapped in Layout (uses <Outlet />) */
+        <>
+        {/* Email verification gate — accessible when logged in but unverified */}
+        <Route path="/email-verification-required" element={<EmailVerificationRequired />} />
+
+        {/* Authenticated: routes wrapped in Layout (uses <Outlet />) */}
         <Route element={<Layout />}>
           {/* Student routes */}
           {user.role === "STUDENT" && (
@@ -129,6 +136,7 @@ function AppRoutes() {
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
+        </>
       ) : (
         /* Not authenticated: redirect unknown paths to home */
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -32,6 +32,7 @@ export interface User {
 interface SignupResult {
   token: string;
   user: User;
+  requiresEmailVerification?: boolean;
 }
 
 interface AuthContextType {
