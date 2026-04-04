@@ -310,6 +310,7 @@ model BeneficiaryOpportunity {
   status          String      @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
   requirementsNote String?
   customFields    String?     // JSON
+  schoolRestrictions String?  // JSON array of school IDs (null = all approved schools)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
