@@ -730,6 +730,24 @@ router.post("/:id/drop", authenticate, requireRole("SCHOOL_ADMIN"), async (req: 
   }
 });
 
+// GET /api/beneficiaries/:id/schools — list approved schools for a beneficiary (beneficiary admin only)
+router.get("/:id/schools", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const approvals = await prisma.schoolBeneficiaryApproval.findMany({
+      where: { beneficiaryId: req.params.id, status: "APPROVED" },
+      include: { school: { select: { id: true, name: true } } },
+    });
+
+    res.json(approvals.map((a) => ({ id: a.school.id, name: a.school.name })));
+  } catch (err) {
+    console.error("List beneficiary schools error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/beneficiaries/:id/opportunities — list opportunities for a beneficiary
 router.get("/:id/opportunities", authenticate, async (req: Request, res: Response) => {
   try {
@@ -765,6 +783,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
       startDate: z.string(), // ISO date string
       endDate: z.string().optional(),
       requirementsNote: z.string().max(1000).optional(),
+      schoolRestrictions: z.array(z.string()).optional(), // school IDs; null = all approved schools
       timeSlots: z.array(z.object({
         date: z.string(),
         startTime: z.string(),
@@ -786,6 +805,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
         startDate: new Date(data.startDate),
         endDate: data.endDate ? new Date(data.endDate) : null,
         requirementsNote: data.requirementsNote || null,
+        schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
         status: "ACTIVE",
         timeSlots: {
           create: data.timeSlots.map((ts) => ({

@@ -75,10 +75,10 @@ export default function Landing() {
                 title: "For Schools",
                 accent: "blue",
                 items: [
-                  "School-first registration with Google Sign-In",
-                  "Create cohorts and import student rosters via CSV",
+                  "School-first registration",
+                  "Create cohorts and bulk add students",
                   "Approve community service partners",
-                  "Full audit trail for all verification actions",
+                  "Full audit trail for all volunteering actions",
                   "Review student self-submitted volunteering requests",
                 ],
               },

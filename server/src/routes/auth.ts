@@ -211,6 +211,24 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         where: { id: user.id },
         data: { schoolId: school.id },
       });
+
+      // Auto-create a private beneficiary for this school so students can sign up for school-run opportunities
+      const schoolBeneficiary = await prisma.beneficiary.create({
+        data: {
+          name: school.name,
+          visibility: "PRIVATE",
+          status: "ACTIVE",
+          createdBySchoolId: school.id,
+        },
+      });
+      await prisma.schoolBeneficiaryApproval.create({
+        data: {
+          schoolId: school.id,
+          beneficiaryId: schoolBeneficiary.id,
+          status: "APPROVED",
+          approvedAt: new Date(),
+        },
+      });
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
