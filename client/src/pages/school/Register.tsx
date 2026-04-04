@@ -87,7 +87,6 @@ export default function SchoolRegister() {
   const [step, setStep] = useState<Step>("google");
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
   const [registrationToken, setRegistrationToken] = useState("");
-  const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
 
   // Search state
@@ -156,7 +155,6 @@ export default function SchoolRegister() {
           return;
         }
         setRegistrationToken(result.registrationToken);
-        setUserEmail(result.email);
         setUserName(result.name);
         setStep("search");
       }
