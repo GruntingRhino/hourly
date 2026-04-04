@@ -34,7 +34,7 @@ interface DirEntry {
 
 const CATEGORIES = [
   "", "Education", "Environment", "Food & Nutrition", "Health",
-  "Human Services", "Youth Development", "Animal Welfare",
+  "Housing & Shelter", "Human Services", "Youth Development", "Animal Welfare",
   "Community Improvement", "Arts & Culture", "Recreation & Sports",
 ];
 
