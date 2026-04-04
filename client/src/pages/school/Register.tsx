@@ -23,7 +23,7 @@ interface SchoolEntry {
   enrollment: number | null;
 }
 
-type Step = "google" | "search" | "contact" | "sent" | "email-signup";
+type Step = "google" | "email-collect" | "search" | "contact" | "sent";
 type DomainStatus = "personal" | "edu" | "custom" | null;
 
 // ─── Layer 1: personal email provider blocklist (mirrors server) ─────────────
@@ -71,191 +71,18 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
-function EmailSignupForm({ onBack }: { onBack: () => void }) {
-  const { signup } = useAuth();
-  const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [schoolName, setSchoolName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const passwordOk = PASSWORD_RULES.every((r) => r.test(password));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!passwordOk) {
-      setError("Password does not meet requirements.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await signup({ email, password, name, role: "SCHOOL_ADMIN", schoolName });
-      if (result.user.emailVerified === false) {
-        navigate("/email-verification-required");
-      } else {
-        navigate("/dashboard");
-      }
-    } catch (err: any) {
-      setError(err.message || "Signup failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
-        <Link to="/" className="flex justify-center mb-8">
-          <img
-            src="/logo-full.png"
-            alt="GoodHours"
-            className="h-10 w-auto"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-              (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
-            }}
-          />
-          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
-        </Link>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
-          <h2 className="text-xl font-bold mb-1 text-gray-900">Register Your School</h2>
-          <p className="text-sm text-gray-500 mb-6">Create an account with your school email.</p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoComplete="name"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="Jane Smith"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">School Name</label>
-              <input
-                type="text"
-                value={schoolName}
-                onChange={(e) => setSchoolName(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="Lincoln High School"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">School Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="admin@yourschool.edu"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              {password && (
-                <ul className="mt-2 space-y-1">
-                  {PASSWORD_RULES.map((rule) => (
-                    <li
-                      key={rule.label}
-                      className={`flex items-center gap-1.5 text-xs ${rule.test(password) ? "text-green-600" : "text-gray-400"}`}
-                    >
-                      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        {rule.test(password) ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 4h.01" />
-                        )}
-                      </svg>
-                      {rule.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !passwordOk}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Creating account…
-                </span>
-              ) : (
-                "Create School Account"
-              )}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Already have an account?{" "}
-            <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SchoolRegister() {
-  const { loginWithToken } = useAuth();
+  const { loginWithToken, signup } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // "google" = signed up via Google OAuth, "email" = email+password path
+  const [signupMode, setSignupMode] = useState<"google" | "email">("google");
+  // email-collect step state (email/password path only)
+  const [emailCollectName, setEmailCollectName] = useState("");
+  const [emailCollectPassword, setEmailCollectPassword] = useState("");
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const emailPasswordOk = PASSWORD_RULES.every((r) => r.test(emailCollectPassword));
 
   const [step, setStep] = useState<Step>("google");
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
@@ -470,16 +297,32 @@ export default function SchoolRegister() {
     setError("");
     setSubmitting(true);
     try {
-      const payload: any = {
-        registrationToken,
-        schoolName: selectedSchool?.name || customSchoolName,
-        contactEmail,
-      };
-      if (selectedSchool) payload.directorySchoolId = selectedSchool.id;
-      if (domainVerifiedToken) payload.domainVerifiedToken = domainVerifiedToken;
-      const result = await api.post<any>("/auth/google/register-school", payload);
-      setSentTo(result.sentTo || contactEmail);
-      setStep("sent");
+      const schoolName = selectedSchool?.name || customSchoolName;
+
+      if (signupMode === "email") {
+        // Email/password path: create account immediately, then redirect to verify email
+        const result = await signup({
+          email: contactEmail,
+          password: emailCollectPassword,
+          name: emailCollectName,
+          role: "SCHOOL_ADMIN",
+          schoolName,
+        });
+        loginWithToken(result.token, result.user);
+        navigate("/email-verification-required");
+      } else {
+        // Google OAuth path: send magic link to complete registration
+        const payload: any = {
+          registrationToken,
+          schoolName,
+          contactEmail,
+        };
+        if (selectedSchool) payload.directorySchoolId = selectedSchool.id;
+        if (domainVerifiedToken) payload.domainVerifiedToken = domainVerifiedToken;
+        const result = await api.post<any>("/auth/google/register-school", payload);
+        setSentTo(result.sentTo || contactEmail);
+        setStep("sent");
+      }
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {
@@ -533,7 +376,7 @@ export default function SchoolRegister() {
             </div>
 
             <button
-              onClick={() => setStep("email-signup")}
+              onClick={() => { setSignupMode("email"); setStep("email-collect"); }}
               className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors"
             >
               Register with email & password
@@ -549,9 +392,94 @@ export default function SchoolRegister() {
     );
   }
 
-  // ─── Step: Email/password signup ─────────────────────────────────────────────
-  if (step === "email-signup") {
-    return <EmailSignupForm onBack={() => setStep("google")} />;
+  // ─── Step: Email/password — collect name + password ─────────────────────────
+  if (step === "email-collect") {
+    const handleEmailCollectNext = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!emailPasswordOk) return;
+      setStep("search");
+    };
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-sm">
+          <Link to="/" className="flex justify-center mb-8">
+            <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+            <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          </Link>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
+            <button onClick={() => setStep("google")}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+            <h2 className="text-xl font-bold mb-1 text-gray-900">Create your account</h2>
+            <p className="text-sm text-gray-500 mb-6">Step 1 of 3 — Your credentials</p>
+
+            <form onSubmit={handleEmailCollectNext} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input type="text" value={emailCollectName}
+                  onChange={(e) => setEmailCollectName(e.target.value)}
+                  required autoComplete="name"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Jane Smith" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <div className="relative">
+                  <input type={showEmailPassword ? "text" : "password"}
+                    value={emailCollectPassword}
+                    onChange={(e) => setEmailCollectPassword(e.target.value)}
+                    required autoComplete="new-password"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-10" />
+                  <button type="button" onClick={() => setShowEmailPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" tabIndex={-1}>
+                    {showEmailPassword ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {emailCollectPassword && (
+                  <ul className="mt-2 space-y-1">
+                    {PASSWORD_RULES.map((rule) => (
+                      <li key={rule.label}
+                        className={`flex items-center gap-1.5 text-xs ${rule.test(emailCollectPassword) ? "text-green-600" : "text-gray-400"}`}>
+                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {rule.test(emailCollectPassword) ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 4h.01" />
+                          )}
+                        </svg>
+                        {rule.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button type="submit" disabled={!emailCollectName.trim() || !emailPasswordOk}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                Continue — Find Your School
+              </button>
+            </form>
+            <p className="mt-6 text-center text-sm text-gray-500">
+              Already have an account?{" "}
+              <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ─── Step: Smart school search ───────────────────────────────────────────────
@@ -559,11 +487,25 @@ export default function SchoolRegister() {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-8">
         <div className="max-w-lg mx-auto">
-          <Link to="/" className="block text-center text-2xl font-bold italic mb-8">GoodHours</Link>
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold mb-1">Find Your School</h2>
+          <Link to="/" className="flex justify-center mb-8">
+            <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+            <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          </Link>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
+            <button
+              onClick={() => setStep(signupMode === "email" ? "email-collect" : "google")}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+            <h2 className="text-xl font-bold mb-1 text-gray-900">Find Your School</h2>
             <p className="text-sm text-gray-500 mb-6">
-              Welcome, {userName || userEmail}. Start typing to search {"\u2014"} results update automatically.
+              {signupMode === "email" ? "Step 2 of 3 — " : "Step 1 of 2 — "}
+              Welcome{emailCollectName || userName ? `, ${emailCollectName || userName}` : ""}. Start typing to search.
             </p>
 
             {error && (
@@ -698,17 +640,24 @@ export default function SchoolRegister() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-sm">
-          <Link to="/" className="block text-center text-2xl font-bold italic mb-8">GoodHours</Link>
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <Link to="/" className="flex justify-center mb-8">
+            <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+            <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          </Link>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
             <button
               onClick={() => setStep("search")}
-              className="text-sm text-blue-600 hover:underline mb-4 block"
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5"
             >
-              ← Back to search
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to search
             </button>
-            <h2 className="text-xl font-bold mb-2">Verify Your School</h2>
-            <p className="text-sm text-gray-600 mb-1">
-              Registering: <strong>{schoolName}</strong>
+            <h2 className="text-xl font-bold mb-1 text-gray-900">Verify Your School</h2>
+            <p className="text-sm text-gray-500 mb-1">
+              {signupMode === "email" ? "Step 3 of 3" : "Step 2 of 2"} — Registering: <strong>{schoolName}</strong>
             </p>
             {selectedSchool?.city && (
               <p className="text-xs text-gray-400 mb-4">
@@ -716,16 +665,18 @@ export default function SchoolRegister() {
                 {selectedSchool.type ? ` · ${selectedSchool.type}` : ""}
               </p>
             )}
-            <p className="text-sm text-gray-600 mb-6">
-              We'll send a verification link to confirm this registration.
+            <p className="text-sm text-gray-500 mb-6">
+              {signupMode === "email"
+                ? "Enter your school email address. We'll verify the domain and send a confirmation."
+                : "We'll send a verification link to confirm this registration."}
             </p>
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
             )}
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Email
+                  {signupMode === "email" ? "Your School Email" : "Contact Email"}
                 </label>
                 <input
                   type="email"
@@ -876,9 +827,14 @@ export default function SchoolRegister() {
                   domainStatus === "personal" ||
                   (domainStatus === "custom" && dnsState !== "verified")
                 }
-                className="w-full py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
               >
-                {submitting ? "Sending..." : "Send Verification Link"}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    {signupMode === "email" ? "Creating account…" : "Sending…"}
+                  </span>
+                ) : signupMode === "email" ? "Create Account & Verify Email" : "Send Verification Link"}
               </button>
             </form>
           </div>
