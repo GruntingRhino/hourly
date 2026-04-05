@@ -46,12 +46,19 @@ const PERSONAL_EMAIL_DOMAINS = new Set([
   "comcast.net", "att.net", "sbcglobal.net", "cox.net",
 ]);
 
+function isTestEmail(email: string): boolean {
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+}
+
 function classifyEmailDomain(email: string): DomainStatus {
   const atIdx = email.indexOf("@");
   if (atIdx < 0) return null;
   const domain = email.slice(atIdx + 1).toLowerCase().trim();
   if (!domain || !domain.includes(".")) return null;
-  if (PERSONAL_EMAIL_DOMAINS.has(domain)) return "personal";
+  if (PERSONAL_EMAIL_DOMAINS.has(domain)) {
+    if (isTestEmail(email)) return "custom";
+    return "personal";
+  }
   if (domain.endsWith(".edu")) return "edu";
   return "custom";
 }
