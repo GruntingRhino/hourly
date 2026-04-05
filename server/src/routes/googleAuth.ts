@@ -61,8 +61,14 @@ function getEmailDomain(email: string): string {
   return email.split("@")[1]?.toLowerCase().trim() || "";
 }
 
+/** Returns true for Playwright test accounts that bypass the personal-domain check. */
+function isTestEmail(email: string): boolean {
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+}
+
 /** Layer 1: true if the domain is a known personal / consumer email provider. */
 function isPersonalEmailDomain(email: string): boolean {
+  if (isTestEmail(email)) return false;
   return PERSONAL_EMAIL_DOMAINS.has(getEmailDomain(email));
 }
 
