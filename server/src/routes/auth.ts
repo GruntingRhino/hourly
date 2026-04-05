@@ -151,10 +151,22 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+// Emails allowed to self-register in production (Playwright testing accounts).
+// Pattern: abhay.sivaram@gmail.com and abhay.sivaram+<anything>@gmail.com
+function isProductionAllowedEmail(email: string): boolean {
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+}
+
 // POST /api/auth/signup
 router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   try {
     const data = signupSchema.parse(req.body);
+
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+      if (!isProductionAllowedEmail(data.email)) {
+        return res.status(403).json({ error: "Self-registration is not available at this time." });
+      }
+    }
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {

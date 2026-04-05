@@ -606,23 +606,31 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
       });
     }
 
-    // Upsert approval record
+    // Create a PENDING approval — status becomes APPROVED only when the beneficiary accepts the invitation.
+    // This prevents unilateral approval: schools can only be considered approved once the beneficiary
+    // explicitly accepts their partnership invitation.
     const approval = await prisma.schoolBeneficiaryApproval.upsert({
       where: { schoolId_beneficiaryId: { schoolId: user.schoolId, beneficiaryId: beneficiary.id } },
-      update: { status: "APPROVED", approvedAt: new Date() },
-      create: { schoolId: user.schoolId, beneficiaryId: beneficiary.id, status: "APPROVED", approvedAt: new Date() },
+      update: {}, // don't downgrade an existing APPROVED record if they re-click
+      create: { schoolId: user.schoolId, beneficiaryId: beneficiary.id, status: "PENDING" },
     });
 
     await prisma.auditLog.create({
       data: {
-        action: "BENEFICIARY_APPROVED",
+        action: "BENEFICIARY_INVITED",
         actorId: req.user!.userId,
         details: JSON.stringify({ beneficiaryId: beneficiary.id, schoolId: user.schoolId }),
       },
     });
 
-    // Send invitation if beneficiary has email and is not yet claimed
-    if (beneficiary.email && !beneficiary.claimed) {
+    // Send invitation so the beneficiary can explicitly accept this school's partnership.
+    // For unclaimed beneficiaries: email the beneficiary's contact address.
+    // For claimed beneficiaries: email the existing admin account so they can accept the new partnership.
+    const inviteEmail = beneficiary.claimed
+      ? (await prisma.user.findFirst({ where: { beneficiaryId: beneficiary.id, role: "BENEFICIARY_ADMIN" }, select: { email: true } }))?.email ?? beneficiary.email
+      : beneficiary.email;
+
+    if (inviteEmail && approval.status === "PENDING") {
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await prisma.beneficiaryInvitation.create({
@@ -631,12 +639,12 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
           beneficiaryId: beneficiary.id,
           token,
           expiresAt,
-          sentTo: beneficiary.email,
+          sentTo: inviteEmail,
           status: "PENDING",
         },
       });
       const magicLink = `${CLIENT_URL}/join/beneficiary?token=${token}`;
-      sendBeneficiaryInvitationEmail(beneficiary.email, beneficiary.name, school?.name ?? "A school", magicLink).catch(() => {});
+      sendBeneficiaryInvitationEmail(inviteEmail, beneficiary.name, school?.name ?? "A school", magicLink).catch(() => {});
     }
 
     res.json({ beneficiary, approval });
