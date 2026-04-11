@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
+interface SchoolRules {
+  allowSelfSubmission: boolean;
+}
+
 interface SelfSubmission {
   id: string;
   status: string;
@@ -17,6 +21,7 @@ export default function StudentSelfSubmit() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [allowSelfSubmission, setAllowSelfSubmission] = useState<boolean | null>(null);
   const [form, setForm] = useState({
     organizationName: "",
     description: "",
@@ -30,8 +35,12 @@ export default function StudentSelfSubmit() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await api.get<SelfSubmission[]>("/self-submissions");
+      const [data, rules] = await Promise.all([
+        api.get<SelfSubmission[]>("/self-submissions"),
+        api.get<SchoolRules>("/schools/my-rules").catch(() => null),
+      ]);
       setSubmissions(data);
+      setAllowSelfSubmission(rules?.allowSelfSubmission ?? true);
     } catch {
       setError("Failed to load submissions.");
     } finally {
@@ -69,16 +78,24 @@ export default function StudentSelfSubmit() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Self-Submitted Hours</h1>
-        <button onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800">
-          + Submit Hours
-        </button>
+        {allowSelfSubmission !== false && (
+          <button onClick={() => setShowForm(true)}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800">
+            + Submit Hours
+          </button>
+        )}
       </div>
+
+      {allowSelfSubmission === false && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          Your school does not accept self-submitted hours. Only hours completed through school-organized beneficiary events will be counted.
+        </div>
+      )}
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
       {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{success}</div>}
 
-      {showForm && (
+      {showForm && allowSelfSubmission !== false && (
         <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5 max-w-lg">
           <h2 className="font-semibold mb-4">Report Volunteer Hours</h2>
           <p className="text-sm text-gray-600 mb-4">

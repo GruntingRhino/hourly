@@ -151,10 +151,28 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-// Emails allowed to self-register in production (Playwright testing accounts).
-// Pattern: abhay.sivaram@gmail.com and abhay.sivaram+<anything>@gmail.com
-function isProductionAllowedEmail(email: string): boolean {
-  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
+  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
+  "live.co.uk", "live.fr",
+  "icloud.com", "me.com", "mac.com",
+  "aol.com", "aim.com", "verizon.net",
+  "protonmail.com", "pm.me", "proton.me",
+  "tutanota.com", "tuta.com",
+  "gmx.com", "gmx.net", "mail.com",
+  "zoho.com", "zohomail.com",
+  "yandex.com", "yandex.ru",
+  "qq.com", "163.com", "126.com",
+  "mail.ru", "inbox.com", "rediffmail.com",
+  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
+]);
+
+function isPersonalEmailDomain(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase().trim() || "";
+  return PERSONAL_EMAIL_DOMAINS.has(domain);
 }
 
 // POST /api/auth/signup
@@ -163,8 +181,8 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     const data = signupSchema.parse(req.body);
 
     if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-      if (!isProductionAllowedEmail(data.email)) {
-        return res.status(403).json({ error: "Self-registration is not available at this time." });
+      if (isPersonalEmailDomain(data.email)) {
+        return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
     }
 
@@ -701,6 +719,25 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
       return res.status(400).json({ error: "Validation failed", details: err.errors });
     }
     console.error("Set graduation goal error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
+router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpires: null },
+    });
+
+    res.json({ message: "Email verification bypassed", emailVerified: true, userId: user.id });
+  } catch (err) {
+    console.error("Dev bypass verification error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -90,6 +90,11 @@ model School {
   createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
   requiredHours    Float    @default(40)
   verificationStandard String @default("STANDARD")
+  serviceStartDate       DateTime?
+  serviceEndDate         DateTime?
+  allowSelfSubmission    Boolean   @default(true)
+  requireOrgVerification Boolean   @default(false)
+  categoryHourCaps       String?   // JSON: { [category: string]: number }
   // Legacy
   allowJoinByCode  Boolean  @default(false)
   onboardingComplete Boolean @default(false)
@@ -153,6 +158,10 @@ model Cohort {
   schoolId      String
   school        School   @relation(fields: [schoolId], references: [id])
   requiredHours Float?   // override school default if set
+  serviceStartDate    DateTime?
+  serviceEndDate      DateTime?
+  allowSelfSubmission Boolean?   // null = inherit from school
+  categoryHourCaps    String?    // JSON override; null = inherit from school
   startYear     Int?
   endYear       Int?
   status        String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
@@ -288,6 +297,7 @@ model SelfSubmittedRequest {
   reviewedAt      DateTime?
   rejectionReason String?
   convertedSessionId String? // if approved → creates a ServiceSession
+  category        String?  // e.g. "environment", "education", "food", "health", "general"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
