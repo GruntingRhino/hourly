@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 
-type Tab = "profile" | "security" | "notifications" | "privacy" | "data";
+type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "data";
 
 interface SchoolData {
   id: string;
@@ -18,7 +18,14 @@ interface SchoolData {
   zip: string | null;
   latitude: number | null;
   longitude: number | null;
+  serviceStartDate: string | null;
+  serviceEndDate: string | null;
+  allowSelfSubmission: boolean;
+  requireOrgVerification: boolean;
+  categoryHourCaps: string | null;
 }
+
+type CapRow = { category: string; hours: string };
 
 interface SchoolSettingsData {
   schoolId: string;
@@ -47,6 +54,16 @@ export default function SchoolSettings() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Service rules
+  const [serviceStartDate, setServiceStartDate] = useState("");
+  const [serviceEndDate, setServiceEndDate] = useState("");
+  const [allowSelfSubmission, setAllowSelfSubmission] = useState(true);
+  const [requireOrgVerification, setRequireOrgVerification] = useState(false);
+  const [capRows, setCapRows] = useState<CapRow[]>([]);
+  const [savingRules, setSavingRules] = useState(false);
+  const [rulesMessage, setRulesMessage] = useState("");
+  const [rulesIsError, setRulesIsError] = useState(false);
 
   // Security
   const [currentPassword, setCurrentPassword] = useState("");
@@ -109,6 +126,17 @@ export default function SchoolSettings() {
           setZipCodes(Array.isArray(zips) ? zips.join(", ") : "");
         } catch {
           setZipCodes("");
+        }
+        // Service rules
+        setServiceStartDate(schoolData.serviceStartDate ? schoolData.serviceStartDate.split("T")[0] : "");
+        setServiceEndDate(schoolData.serviceEndDate ? schoolData.serviceEndDate.split("T")[0] : "");
+        setAllowSelfSubmission(schoolData.allowSelfSubmission ?? true);
+        setRequireOrgVerification(schoolData.requireOrgVerification ?? false);
+        try {
+          const caps = schoolData.categoryHourCaps ? JSON.parse(schoolData.categoryHourCaps) : {};
+          setCapRows(Object.entries(caps).map(([category, hours]) => ({ category, hours: String(hours) })));
+        } catch {
+          setCapRows([]);
         }
       }).finally(() => setLoading(false));
     } else {
@@ -185,6 +213,37 @@ export default function SchoolSettings() {
       });
     } finally {
       setUpdatingJoinByCode(false);
+    }
+  };
+
+  const handleSaveRules = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.schoolId) return;
+    setSavingRules(true);
+    setRulesMessage("");
+    setRulesIsError(false);
+    try {
+      if (serviceStartDate && serviceEndDate && new Date(serviceEndDate) <= new Date(serviceStartDate)) {
+        setRulesMessage("End date must be after start date.");
+        setRulesIsError(true);
+        return;
+      }
+      const categoryHourCaps: Record<string, number> | null = capRows.length > 0
+        ? Object.fromEntries(capRows.filter((r) => r.category.trim()).map((r) => [r.category.trim(), parseFloat(r.hours) || 0]))
+        : null;
+      await api.put(`/schools/${user.schoolId}`, {
+        serviceStartDate: serviceStartDate ? new Date(serviceStartDate).toISOString() : null,
+        serviceEndDate: serviceEndDate ? new Date(serviceEndDate).toISOString() : null,
+        allowSelfSubmission,
+        requireOrgVerification,
+        categoryHourCaps,
+      });
+      setRulesMessage("Service rules saved!");
+    } catch (err: any) {
+      setRulesMessage(err.message || "Failed to save rules");
+      setRulesIsError(true);
+    } finally {
+      setSavingRules(false);
     }
   };
 
@@ -310,7 +369,7 @@ export default function SchoolSettings() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
-        {(["profile", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
+        {(["profile", "rules", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -320,7 +379,7 @@ export default function SchoolSettings() {
                 : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
-            {t}
+            {t === "rules" ? "Service Rules" : t}
           </button>
         ))}
       </div>
@@ -503,6 +562,172 @@ export default function SchoolSettings() {
               Log Out
             </button>
           </div>
+        </div>
+      )}
+
+      {tab === "rules" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h2 className="font-semibold text-lg mb-1">Service Rules</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure requirements and restrictions for your school's service hours program.</p>
+
+          {rulesMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              rulesIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {rulesMessage}
+            </div>
+          )}
+
+          <form onSubmit={handleSaveRules} className="space-y-6">
+            {/* Section 1: Service Window */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">Service Window</h3>
+              <p className="text-xs text-gray-500 mb-3">Students cannot log hours outside this date range. Leave blank for no restriction.</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={serviceStartDate}
+                    onChange={(e) => setServiceStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Deadline)</label>
+                  <input
+                    type="date"
+                    value={serviceEndDate}
+                    onChange={(e) => setServiceEndDate(e.target.value)}
+                    min={serviceStartDate || undefined}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Self-Submission */}
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">Self-Submitted Hours</h3>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Allow students to self-submit hours</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    When off, students cannot submit hours from activities not organized by a beneficiary partner.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={allowSelfSubmission}
+                  onClick={() => setAllowSelfSubmission((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    allowSelfSubmission ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    allowSelfSubmission ? "translate-x-5" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Section 3: Verification */}
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">Verification Requirements</h3>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Require beneficiary organization verification before school approval</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    When on, school staff cannot approve legacy service sessions — organization must verify first.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={requireOrgVerification}
+                  onClick={() => setRequireOrgVerification((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    requireOrgVerification ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    requireOrgVerification ? "translate-x-5" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Section 4: Category Hour Caps */}
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">Category Hour Caps</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Limit how many hours per category count toward a student's total. Leave empty for no caps.
+              </p>
+              {capRows.length > 0 && (
+                <div className="mb-2 space-y-2">
+                  <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-xs font-medium text-gray-500 uppercase tracking-wide px-1">
+                    <div>Category</div>
+                    <div>Max Hours</div>
+                    <div />
+                  </div>
+                  {capRows.map((row, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_100px_32px] gap-2 items-center">
+                      <input
+                        type="text"
+                        value={row.category}
+                        onChange={(e) => {
+                          const next = [...capRows];
+                          next[i] = { ...next[i], category: e.target.value };
+                          setCapRows(next);
+                        }}
+                        placeholder="e.g. environment"
+                        className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      />
+                      <input
+                        type="number"
+                        value={row.hours}
+                        onChange={(e) => {
+                          const next = [...capRows];
+                          next[i] = { ...next[i], hours: e.target.value };
+                          setCapRows(next);
+                        }}
+                        min={1}
+                        step={1}
+                        placeholder="40"
+                        className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCapRows((rows) => rows.filter((_, j) => j !== i))}
+                        className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                        aria-label="Remove category"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setCapRows((rows) => [...rows, { category: "", hours: "" }])}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                + Add category cap
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingRules}
+              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+            >
+              {savingRules ? "Saving..." : "Save Service Rules"}
+            </button>
+          </form>
         </div>
       )}
 

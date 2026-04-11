@@ -252,14 +252,47 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
+    const cohortUpdateSchema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      requiredHours: z.number().min(1).max(10000).nullable().optional(),
+      startYear: z.number().int().nullable().optional(),
+      endYear: z.number().int().nullable().optional(),
+      serviceStartDate: z.string().datetime({ offset: true }).nullable().optional(),
+      serviceEndDate: z.string().datetime({ offset: true }).nullable().optional(),
+      allowSelfSubmission: z.boolean().nullable().optional(),
+      categoryHourCaps: z.record(z.string(), z.number().positive()).nullable().optional(),
+    });
+
+    let body: z.infer<typeof cohortUpdateSchema>;
+    try {
+      body = cohortUpdateSchema.parse(req.body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: err.errors });
+      }
+      throw err;
+    }
+
+    if (body.serviceStartDate && body.serviceEndDate) {
+      if (new Date(body.serviceEndDate) <= new Date(body.serviceStartDate)) {
+        return res.status(400).json({ error: "serviceEndDate must be after serviceStartDate" });
+      }
+    }
+
+    const data: any = {
+      name: body.name ?? cohort.name,
+      requiredHours: body.requiredHours !== undefined ? body.requiredHours : cohort.requiredHours,
+      startYear: body.startYear !== undefined ? body.startYear : cohort.startYear,
+      endYear: body.endYear !== undefined ? body.endYear : cohort.endYear,
+    };
+    if (body.serviceStartDate !== undefined) data.serviceStartDate = body.serviceStartDate ? new Date(body.serviceStartDate) : null;
+    if (body.serviceEndDate !== undefined) data.serviceEndDate = body.serviceEndDate ? new Date(body.serviceEndDate) : null;
+    if (body.allowSelfSubmission !== undefined) data.allowSelfSubmission = body.allowSelfSubmission;
+    if (body.categoryHourCaps !== undefined) data.categoryHourCaps = body.categoryHourCaps != null ? JSON.stringify(body.categoryHourCaps) : null;
+
     const updated = await prisma.cohort.update({
       where: { id: req.params.id },
-      data: {
-        name: req.body.name ?? cohort.name,
-        requiredHours: req.body.requiredHours ?? cohort.requiredHours,
-        startYear: req.body.startYear ?? cohort.startYear,
-        endYear: req.body.endYear ?? cohort.endYear,
-      },
+      data,
     });
     res.json(updated);
   } catch (err) {

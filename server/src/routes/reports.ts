@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { calculateStudentHours } from "../lib/hoursCalculator";
 
 const router = Router();
 
@@ -51,8 +52,11 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const committed = sessions.filter((s) => s.status === "COMMITTED" || s.status === "PENDING_VERIFICATION");
     const rejected = sessions.filter((s) => s.verificationStatus === "REJECTED");
 
-    const totalApprovedHours = approved.reduce((sum, s) => sum + (s.totalHours || 0), 0);
-    const totalPendingHours = pending.reduce((sum, s) => sum + (s.totalHours || 0), 0);
+    // Aggregate hours from all sources: BeneficiarySignup + SelfSubmittedRequest + ServiceSession (legacy)
+    const hoursMap = await calculateStudentHours([userId]);
+    const studentHours = hoursMap.get(userId) ?? { approved: 0, pending: 0 };
+
+    // totalCommittedHours remains ServiceSession-only (no equivalent concept in other models)
     const totalCommittedHours = committed.reduce((sum, s) => sum + (s.totalHours || 0), 0);
 
     const user = await prisma.user.findUnique({
@@ -67,8 +71,8 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const school = user?.classroom?.school || user?.cohort?.school || user?.school;
 
     res.json({
-      totalApprovedHours: Math.round(totalApprovedHours * 100) / 100,
-      totalPendingHours: Math.round(totalPendingHours * 100) / 100,
+      totalApprovedHours: Math.round(studentHours.approved * 100) / 100,
+      totalPendingHours: Math.round(studentHours.pending * 100) / 100,
       totalCommittedHours: Math.round(totalCommittedHours * 100) / 100,
       requiredHours: school?.requiredHours || 40,
       activitiesCompleted: approved.length,
@@ -141,16 +145,14 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
           { cohort: { schoolId: school.id } },
         ],
       },
-      include: {
-        serviceSessions: {
-          where: { verificationStatus: "APPROVED" },
-          select: { totalHours: true, opportunity: { select: { title: true, organizationId: true } } },
-        },
-      },
+      select: { id: true, name: true, email: true, grade: true },
     });
 
+    const studentIds = students.map((s) => s.id);
+    const hoursMap = await calculateStudentHours(studentIds);
+
     const report = students.map((s) => {
-      const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+      const hours = hoursMap.get(s.id)?.approved ?? 0;
       return {
         studentId: s.id,
         name: s.name,
@@ -194,29 +196,75 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     let filename = "goodhours-report.csv";
 
     if (type === "student" || req.user!.role === "STUDENT") {
-      const sessions = await prisma.serviceSession.findMany({
-        where: { userId: req.user!.userId, verificationStatus: "APPROVED" },
-        include: { opportunity: { include: { organization: { select: { name: true } } } } },
-        orderBy: { checkInTime: "asc" },
-      });
+      const userId = req.user!.userId;
+
+      const [sessions, benSignups, selfSubs] = await Promise.all([
+        prisma.serviceSession.findMany({
+          where: { userId, verificationStatus: "APPROVED" },
+          include: { opportunity: { include: { organization: { select: { name: true } } } } },
+          orderBy: { checkInTime: "asc" },
+        }),
+        prisma.beneficiarySignup.findMany({
+          where: { studentId: userId, verificationStatus: "APPROVED" },
+          include: {
+            slot: {
+              include: {
+                opportunity: {
+                  include: { beneficiary: { select: { name: true } } },
+                },
+              },
+            },
+          },
+          orderBy: { checkedInAt: "asc" },
+        }),
+        prisma.selfSubmittedRequest.findMany({
+          where: { studentId: userId, status: "APPROVED" },
+          orderBy: { date: "asc" },
+        }),
+      ]);
 
       await logDataAccess({
-        actorId: req.user!.userId,
+        actorId: userId,
         action: "EXPORT_CSV",
         targetType: "student",
-        targetId: req.user!.userId,
-        details: { type: "student", sessionCount: sessions.length },
+        targetId: userId,
+        details: { type: "student", sessionCount: sessions.length + benSignups.length + selfSubs.length },
       });
 
-      rows.push(["Date", "Opportunity", "Organization", "Hours", "Status"]);
+      // Combine all sources into uniform rows, sorted by date
+      type CsvRow = { date: string; activity: string; organization: string; hours: number };
+      const allRows: CsvRow[] = [];
+
       for (const s of sessions) {
-        rows.push([
-          s.checkInTime?.toISOString().split("T")[0] || "",
-          s.opportunity.title,
-          s.opportunity.organization.name,
-          String(s.totalHours || 0),
-          s.verificationStatus,
-        ]);
+        allRows.push({
+          date: s.checkInTime?.toISOString().split("T")[0] || "",
+          activity: s.opportunity.title,
+          organization: s.opportunity.organization.name,
+          hours: s.totalHours || 0,
+        });
+      }
+      for (const bs of benSignups) {
+        allRows.push({
+          date: bs.slot.date.toISOString().split("T")[0],
+          activity: bs.slot.opportunity.title,
+          organization: bs.slot.opportunity.beneficiary.name,
+          hours: bs.totalHours ?? bs.slot.durationHours,
+        });
+      }
+      for (const ss of selfSubs) {
+        allRows.push({
+          date: ss.date.toISOString().split("T")[0],
+          activity: ss.organizationName,
+          organization: ss.organizationName,
+          hours: ss.hours,
+        });
+      }
+
+      allRows.sort((a, b) => a.date.localeCompare(b.date));
+
+      rows.push(["Date", "Opportunity", "Organization", "Hours", "Status"]);
+      for (const r of allRows) {
+        rows.push([r.date, r.activity, r.organization, String(r.hours), "APPROVED"]);
       }
       filename = "my-service-hours.csv";
     }

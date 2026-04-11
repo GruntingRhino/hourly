@@ -4,6 +4,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendHourApprovedEmail } from "../services/email";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { resolveEffectiveRules } from "../lib/schoolRules";
 
 const router = Router();
 
@@ -36,6 +37,14 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEF
       const studentSchoolId = await resolveStudentSchoolId(session.userId);
       if (studentSchoolId !== actor.schoolId) {
         return res.status(403).json({ error: "Student is not enrolled in your school" });
+      }
+
+      // Enforce requireOrgVerification: school staff cannot be the first approver
+      const rules = await resolveEffectiveRules(session.userId);
+      if (rules?.requireOrgVerification) {
+        return res.status(403).json({
+          error: "Your school requires organization verification before school approval. Please ask the organization to verify this session first.",
+        });
       }
     }
 

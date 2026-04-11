@@ -7,6 +7,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
+import { checkCategoryCap } from "../lib/schoolRules";
 
 const router = Router();
 
@@ -921,8 +922,23 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
 
-    const { approvedHours } = req.body;
+    const { approvedHours, overrideCap } = req.body;
     const hours = approvedHours ?? signup.slot.durationHours;
+
+    // Category cap check
+    if (!overrideCap) {
+      const category = signup.slot.opportunity.category;
+      const capCheck = await checkCategoryCap(signup.studentId, category, hours);
+      if (capCheck.exceeded) {
+        return res.status(400).json({
+          error: `Approval would exceed the "${capCheck.category}" category cap of ${capCheck.cap} hours (current: ${capCheck.current.toFixed(1)}h, adding: ${hours}h). Pass overrideCap: true to bypass.`,
+          capExceeded: true,
+          cap: capCheck.cap,
+          current: capCheck.current,
+          category: capCheck.category,
+        });
+      }
+    }
 
     const updated = await prisma.beneficiarySignup.update({
       where: { id: req.params.signupId },
@@ -936,10 +952,14 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: "APPROVE",
+        action: overrideCap ? "CAP_OVERRIDE" : "APPROVE",
         actorId: req.user!.userId,
         signupId: signup.id,
-        details: JSON.stringify({ approvedHours: hours, originalHours: signup.slot.durationHours }),
+        details: JSON.stringify({
+          approvedHours: hours,
+          originalHours: signup.slot.durationHours,
+          ...(overrideCap ? { capOverride: true } : {}),
+        }),
       },
     });
 

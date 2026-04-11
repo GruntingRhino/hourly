@@ -77,11 +77,6 @@ function isEduDomain(email: string): boolean {
   return getEmailDomain(email).endsWith(".edu");
 }
 
-/** Returns the expected DNS TXT record value for a school's domain verification. */
-function domainVerificationToken(schoolId: string): string {
-  return `goodhours-verify=${schoolId}`;
-}
-
 // GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
 // Returns: { status: "personal" | "edu" | "custom", blocked: boolean }
 router.get("/classify-domain", (req: Request, res: Response) => {
@@ -89,146 +84,14 @@ router.get("/classify-domain", (req: Request, res: Response) => {
   if (!email || !email.includes("@")) {
     return res.json({ status: "unknown", blocked: false });
   }
-  if (isPersonalEmailDomain(email)) {
+  // Personal emails are only blocked in production
+  if (IS_PRODUCTION && isPersonalEmailDomain(email)) {
     return res.json({ status: "personal", blocked: true });
   }
   if (isEduDomain(email)) {
     return res.json({ status: "edu", blocked: false });
   }
   return res.json({ status: "custom", blocked: false });
-});
-
-// POST /api/auth/google/init-domain-verify — Layer 3: generate a DNS TXT challenge for a custom domain
-// Returns: { domain, txtRecord, verificationJwt }
-// No DB writes — purely issues a signed challenge token.
-router.post("/init-domain-verify", async (req: Request, res: Response) => {
-  try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
-
-    if (isPersonalEmailDomain(email)) {
-      return res.status(400).json({ error: "Personal email domains are not accepted." });
-    }
-    if (isEduDomain(email)) {
-      return res.status(400).json({ error: ".edu domains do not require DNS verification." });
-    }
-
-    const domain = getEmailDomain(email);
-    if (!domain) return res.status(400).json({ error: "Invalid email domain." });
-
-    const token = crypto.randomBytes(16).toString("hex");
-    const txtRecord = `goodhours-verify=${token}`;
-
-    const jwt = await import("jsonwebtoken");
-    const verificationJwt = jwt.default.sign(
-      { domain, token, purpose: "domain-verify" },
-      process.env.JWT_SECRET || "dev-secret",
-      { expiresIn: "2h" }
-    );
-
-    res.json({ domain, txtRecord, verificationJwt });
-  } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Invalid email address." });
-    console.error("init-domain-verify error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /api/auth/google/check-domain-txt — Layer 3: live DNS TXT lookup against the challenge
-// Returns: { verified: false } or { verified: true, verifiedToken }
-// verifiedToken is a short-lived JWT that must be sent with register-school for custom domains.
-router.post("/check-domain-txt", async (req: Request, res: Response) => {
-  try {
-    const { verificationJwt } = z.object({ verificationJwt: z.string() }).parse(req.body);
-
-    const jwt = await import("jsonwebtoken");
-    let payload: any;
-    try {
-      payload = jwt.default.verify(verificationJwt, process.env.JWT_SECRET || "dev-secret");
-    } catch {
-      return res.status(400).json({ error: "Verification token is invalid or expired. Please start over." });
-    }
-
-    if (payload.purpose !== "domain-verify" || !payload.domain || !payload.token) {
-      return res.status(400).json({ error: "Invalid verification token." });
-    }
-
-    const { domain, token } = payload;
-    const expectedTxt = `goodhours-verify=${token}`;
-
-    const { resolveTxt } = await import("dns/promises");
-    let records: string[][] = [];
-    try {
-      records = await resolveTxt(domain);
-    } catch {
-      return res.json({
-        verified: false,
-        message: "DNS lookup failed — the domain may not exist or the record hasn't propagated yet.",
-      });
-    }
-
-    const found = records.flat().includes(expectedTxt);
-    if (!found) {
-      return res.json({
-        verified: false,
-        message: "TXT record not found. DNS changes can take a few minutes to propagate — please try again shortly.",
-      });
-    }
-
-    // Issue a short-lived verified-domain token the client must include in register-school
-    const verifiedToken = jwt.default.sign(
-      { domain, purpose: "domain-verified" },
-      process.env.JWT_SECRET || "dev-secret",
-      { expiresIn: "1h" }
-    );
-
-    res.json({ verified: true, verifiedToken });
-  } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Missing verificationJwt." });
-    console.error("check-domain-txt error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// GET /api/auth/google/verify-domain-txt?schoolId=xxx&domain=yyy — post-registration DNS check (settings page)
-// Returns: { verified: boolean, token: string }
-router.get("/verify-domain-txt", async (req: Request, res: Response) => {
-  try {
-    const schoolId = (req.query.schoolId as string | undefined)?.trim();
-    const domain = (req.query.domain as string | undefined)?.trim();
-
-    if (!schoolId || !domain) {
-      return res.status(400).json({ error: "schoolId and domain are required" });
-    }
-
-    const expectedToken = domainVerificationToken(schoolId);
-    const { resolveTxt } = await import("dns/promises");
-
-    let records: string[][] = [];
-    try {
-      records = await resolveTxt(domain);
-    } catch {
-      return res.json({ verified: false, token: expectedToken });
-    }
-
-    const flat = records.flat();
-    const verified = flat.includes(expectedToken);
-
-    if (verified) {
-      const school = await prisma.school.findUnique({ where: { id: schoolId } });
-      if (school) {
-        await prisma.verifiedDomain.upsert({
-          where: { schoolId_domain: { schoolId, domain } },
-          create: { schoolId, domain },
-          update: {},
-        });
-      }
-    }
-
-    res.json({ verified, token: expectedToken });
-  } catch (err) {
-    console.error("Domain TXT verification error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
 });
 
 // GET /api/auth/google — returns redirect URL for Google OAuth
@@ -440,7 +303,6 @@ router.post("/register-school", async (req: Request, res: Response) => {
       schoolCity: z.string().max(100).optional(),
       schoolZip: z.string().regex(/^\d{5}$/).optional(),
       contactEmail: z.string().email(), // where to send magic link
-      domainVerifiedToken: z.string().optional(), // required for non-.edu custom domains
     });
     const data = schema.parse(req.body);
 
@@ -457,32 +319,12 @@ router.post("/register-school", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid registration token" });
     }
 
-    // Layer 1: Block personal/consumer email providers on the contact email
-    if (isPersonalEmailDomain(data.contactEmail)) {
+    // Block personal/consumer email providers on the contact email (production only)
+    if (IS_PRODUCTION && isPersonalEmailDomain(data.contactEmail)) {
       return res.status(400).json({
         error: "Please use your school's official email address. Personal email providers like Gmail, Yahoo, and Outlook are not accepted.",
         code: "PERSONAL_EMAIL",
       });
-    }
-
-    // Layer 3: Custom domains must present a valid verified-domain token (from check-domain-txt)
-    if (!isEduDomain(data.contactEmail)) {
-      if (!data.domainVerifiedToken) {
-        return res.status(400).json({
-          error: "Custom domains require DNS verification before registration. Please verify your domain first.",
-          code: "DOMAIN_VERIFICATION_REQUIRED",
-        });
-      }
-      const jwt = await import("jsonwebtoken");
-      let dvPayload: any;
-      try {
-        dvPayload = jwt.default.verify(data.domainVerifiedToken, process.env.JWT_SECRET || "dev-secret");
-      } catch {
-        return res.status(400).json({ error: "Domain verification token is invalid or expired. Please re-verify your domain." });
-      }
-      if (dvPayload.purpose !== "domain-verified" || dvPayload.domain !== getEmailDomain(data.contactEmail)) {
-        return res.status(400).json({ error: "Domain verification token does not match the contact email domain." });
-      }
     }
 
     if (!isApprovedDomain(googleProfile.email)) {

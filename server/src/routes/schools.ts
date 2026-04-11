@@ -6,6 +6,8 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
 import { logDataAccess } from "../lib/dataAccessLog";
+import { resolveEffectiveRules } from "../lib/schoolRules";
+import { calculateStudentHours } from "../lib/hoursCalculator";
 import { geocodeAddress } from "../lib/geocode";
 
 const router = Router();
@@ -164,6 +166,20 @@ router.patch("/settings", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
   }
 });
 
+// GET /api/schools/my-rules — effective service rules for the authenticated user
+router.get("/my-rules", authenticate, async (req: Request, res: Response) => {
+  try {
+    const rules = await resolveEffectiveRules(req.user!.userId);
+    if (!rules) {
+      return res.status(404).json({ error: "No school rules found" });
+    }
+    res.json(rules);
+  } catch (err) {
+    console.error("Get my rules error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/:id — school details (staff only)
 router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
   try {
@@ -194,6 +210,41 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       return res.status(403).json({ error: "Not your school" });
     }
 
+    // Validate and coerce new service rule fields
+    const rulesSchema = z.object({
+      serviceStartDate: z.string().datetime({ offset: true }).nullable().optional(),
+      serviceEndDate: z.string().datetime({ offset: true }).nullable().optional(),
+      allowSelfSubmission: z.boolean().optional(),
+      requireOrgVerification: z.boolean().optional(),
+      categoryHourCaps: z
+        .record(z.string(), z.number().positive())
+        .nullable()
+        .optional(),
+    });
+
+    let rulesData: z.infer<typeof rulesSchema> = {};
+    try {
+      rulesData = rulesSchema.parse({
+        serviceStartDate: req.body.serviceStartDate,
+        serviceEndDate: req.body.serviceEndDate,
+        allowSelfSubmission: req.body.allowSelfSubmission,
+        requireOrgVerification: req.body.requireOrgVerification,
+        categoryHourCaps: req.body.categoryHourCaps,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: err.errors });
+      }
+      throw err;
+    }
+
+    // Validate date ordering when both are set
+    if (rulesData.serviceStartDate && rulesData.serviceEndDate) {
+      if (new Date(rulesData.serviceEndDate) <= new Date(rulesData.serviceStartDate)) {
+        return res.status(400).json({ error: "serviceEndDate must be after serviceStartDate" });
+      }
+    }
+
     const updateData: any = {
       name: req.body.name,
       domain: req.body.domain,
@@ -204,6 +255,15 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       updateData.zipCodes = Array.isArray(req.body.zipCodes)
         ? JSON.stringify(req.body.zipCodes)
         : req.body.zipCodes;
+    }
+
+    // Apply service rules fields
+    if (rulesData.serviceStartDate !== undefined) updateData.serviceStartDate = rulesData.serviceStartDate ? new Date(rulesData.serviceStartDate) : null;
+    if (rulesData.serviceEndDate !== undefined) updateData.serviceEndDate = rulesData.serviceEndDate ? new Date(rulesData.serviceEndDate) : null;
+    if (rulesData.allowSelfSubmission !== undefined) updateData.allowSelfSubmission = rulesData.allowSelfSubmission;
+    if (rulesData.requireOrgVerification !== undefined) updateData.requireOrgVerification = rulesData.requireOrgVerification;
+    if (rulesData.categoryHourCaps !== undefined) {
+      updateData.categoryHourCaps = rulesData.categoryHourCaps != null ? JSON.stringify(rulesData.categoryHourCaps) : null;
     }
 
     // Update address fields and geocode if provided
@@ -247,24 +307,24 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        classroom: { schoolId: req.params.id },
+        OR: [
+          { classroom: { schoolId: req.params.id } },
+          { cohort: { schoolId: req.params.id } },
+        ],
       },
       select: {
         id: true, name: true, email: true, grade: true,
         classroomId: true,
         classroom: { select: { id: true, name: true } },
-        serviceSessions: {
-          where: { verificationStatus: "APPROVED" },
-          select: { totalHours: true },
-        },
       },
       orderBy: { name: "asc" },
     });
 
+    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
+
     const result = students.map((s) => ({
       ...s,
-      approvedHours: s.serviceSessions.reduce((sum: number, ss: any) => sum + (ss.totalHours || 0), 0),
-      serviceSessions: undefined,
+      approvedHours: Math.round((hoursMap.get(s.id)?.approved ?? 0) * 100) / 100,
     }));
 
     await logDataAccess({
@@ -297,15 +357,15 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        classroom: { schoolId: req.params.id },
+        OR: [
+          { classroom: { schoolId: req.params.id } },
+          { cohort: { schoolId: req.params.id } },
+        ],
       },
-      include: {
-        serviceSessions: {
-          where: { verificationStatus: "APPROVED" },
-          select: { totalHours: true },
-        },
-      },
+      select: { id: true },
     });
+
+    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
 
     const totalStudents = students.length;
     let totalHours = 0;
@@ -313,7 +373,7 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
     let atRisk = 0;
 
     for (const student of students) {
-      const hours = student.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+      const hours = hoursMap.get(student.id)?.approved ?? 0;
       totalHours += hours;
       if (hours >= school.requiredHours) completedGoal++;
       else if (hours < school.requiredHours * 0.5) atRisk++;
@@ -713,13 +773,11 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
         email: true,
         grade: true,
         createdAt: true,
-        serviceSessions: {
-          where: { verificationStatus: "APPROVED" },
-          select: { totalHours: true },
-        },
       },
       orderBy: { name: "asc" },
     });
+
+    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -732,7 +790,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
 
     const rows: string[][] = [["Student ID", "Name", "Email", "Grade", "Approved Hours", "Enrolled At"]];
     for (const s of students) {
-      const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+      const hours = hoursMap.get(s.id)?.approved ?? 0;
       rows.push([
         s.id,
         s.name,

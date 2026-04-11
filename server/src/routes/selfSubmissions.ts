@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { resolveEffectiveRules, checkCategoryCap } from "../lib/schoolRules";
 import {
   sendSelfSubmissionApprovedEmail,
   sendSelfSubmissionRejectedEmail,
@@ -19,19 +20,37 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       date: z.string(), // ISO date
       hours: z.number().positive().max(24),
       evidenceNote: z.string().max(1000).optional(),
+      category: z.string().max(100).optional(),
     });
     const data = schema.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Get school ID from cohort
-    let schoolId = user.schoolId;
+    // Resolve effective rules (covers allowSelfSubmission + date window)
+    const rules = await resolveEffectiveRules(user.id);
+
+    // Get school ID from rules or cohort fallback
+    let schoolId = rules?.schoolId ?? user.schoolId;
     if (!schoolId && user.cohortId) {
       const cohort = await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } });
       schoolId = cohort?.schoolId || null;
     }
     if (!schoolId) return res.status(400).json({ error: "You must be enrolled in a school cohort to submit hours." });
+
+    // Check self-submission is allowed
+    if (rules && !rules.allowSelfSubmission) {
+      return res.status(403).json({ error: "Your school does not accept self-submitted hours." });
+    }
+
+    // Check service date window
+    const serviceDate = new Date(data.date);
+    if (rules?.serviceStartDate && serviceDate < rules.serviceStartDate) {
+      return res.status(400).json({ error: `Service date must be on or after ${rules.serviceStartDate.toISOString().split("T")[0]}.` });
+    }
+    if (rules?.serviceEndDate && serviceDate > rules.serviceEndDate) {
+      return res.status(400).json({ error: `Service date must be on or before ${rules.serviceEndDate.toISOString().split("T")[0]}.` });
+    }
 
     const submission = await prisma.selfSubmittedRequest.create({
       data: {
@@ -39,9 +58,10 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
         schoolId,
         organizationName: data.organizationName,
         description: data.description,
-        date: new Date(data.date),
+        date: serviceDate,
         hours: data.hours,
         evidenceNote: data.evidenceNote || null,
+        category: data.category || "general",
         status: "PENDING",
       },
     });
@@ -106,8 +126,22 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
     if (submission.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
     if (submission.status !== "PENDING") return res.status(400).json({ error: "Submission is not pending" });
 
-    const { adjustedHours } = req.body;
+    const { adjustedHours, overrideCap } = req.body;
     const hours = adjustedHours ?? submission.hours;
+
+    // Category cap check
+    if (!overrideCap) {
+      const capCheck = await checkCategoryCap(submission.studentId, submission.category, hours);
+      if (capCheck.exceeded) {
+        return res.status(400).json({
+          error: `Approval would exceed the "${capCheck.category}" category cap of ${capCheck.cap} hours (current: ${capCheck.current.toFixed(1)}h, adding: ${hours}h). Pass overrideCap: true to bypass.`,
+          capExceeded: true,
+          cap: capCheck.cap,
+          current: capCheck.current,
+          category: capCheck.category,
+        });
+      }
+    }
 
     const updated = await prisma.selfSubmittedRequest.update({
       where: { id: req.params.id },
@@ -120,13 +154,14 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
 
     await prisma.auditLog.create({
       data: {
-        action: "SELF_SUBMISSION_APPROVED",
+        action: overrideCap ? "CAP_OVERRIDE" : "SELF_SUBMISSION_APPROVED",
         actorId: req.user!.userId,
         details: JSON.stringify({
           submissionId: submission.id,
           studentId: submission.studentId,
           hours,
           orgName: submission.organizationName,
+          ...(overrideCap ? { capOverride: true } : {}),
         }),
       },
     });

@@ -1,12 +1,29 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 
 export default function EmailVerificationRequired() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [bypassing, setBypassing] = useState(false);
   const [error, setError] = useState("");
+
+  const handleBypassVerification = async () => {
+    setBypassing(true);
+    setError("");
+    try {
+      await api.post("/auth/dev/bypass-email-verification", {});
+      await refreshUser();
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Bypass failed.");
+    } finally {
+      setBypassing(false);
+    }
+  };
 
   const handleResend = async () => {
     setResending(true);
@@ -51,6 +68,16 @@ export default function EmailVerificationRequired() {
           >
             {resending ? "Sending..." : "Resend verification email"}
           </button>
+
+          {import.meta.env.DEV && (
+            <button
+              onClick={handleBypassVerification}
+              disabled={bypassing}
+              className="w-full py-2 bg-yellow-500 text-white rounded-md font-medium hover:bg-yellow-600 disabled:opacity-50 mb-3 text-sm"
+            >
+              {bypassing ? "Bypassing..." : "[Dev] Skip email verification"}
+            </button>
+          )}
 
           <button onClick={logout} className="w-full py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
             Sign out
