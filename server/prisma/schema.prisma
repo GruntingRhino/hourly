@@ -132,6 +132,7 @@ model SchoolDirectory {
   enrollment Int?
   phone     String?
   county    String?
+  website   String?   // official school website
   source    String?   // "NCES_CCD", "NCES_PSS"
   updatedAt DateTime  @default(now()) @updatedAt
 
@@ -239,6 +240,7 @@ model BeneficiaryDirectory {
   website  String?
   claimed  Boolean @default(false)
   nteeCode  String?   // NTEE classification code (IRS)
+  ncessId   String?   @unique  // NCES school ID (for schools imported from NCES data)
   phone     String?
   source    String?   // "IRS", "NCES", "IMLS", "MANUAL"
   county    String?
