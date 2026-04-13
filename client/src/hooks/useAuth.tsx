@@ -52,6 +52,7 @@ export interface SignupData {
   role: string;
   schoolName?: string;
   schoolDomain?: string;
+  directorySchoolId?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

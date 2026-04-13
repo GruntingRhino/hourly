@@ -257,6 +257,7 @@ export default function SchoolRegister() {
           name: emailCollectName,
           role: "SCHOOL_ADMIN",
           schoolName,
+          directorySchoolId: selectedSchool?.id,
         });
         loginWithToken(result.token, result.user);
         navigate("/email-verification-required");

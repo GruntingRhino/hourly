@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
+import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 
 const router = Router();
 
@@ -425,6 +426,31 @@ router.post("/register-school", async (req: Request, res: Response) => {
         where: { id: data.directorySchoolId },
         data: { claimed: true, claimedBySchoolId: school.id },
       }).catch(() => {});
+    }
+
+    // Create the school's private beneficiary so it can post opportunities immediately
+    const schoolBeneficiary = await prisma.beneficiary.create({
+      data: {
+        name: school.name,
+        visibility: "PRIVATE",
+        status: "ACTIVE",
+        createdBySchoolId: school.id,
+      },
+    });
+    await prisma.schoolBeneficiaryApproval.create({
+      data: {
+        schoolId: school.id,
+        beneficiaryId: schoolBeneficiary.id,
+        status: "APPROVED",
+        approvedAt: new Date(),
+      },
+    });
+
+    // Link to BeneficiaryDirectory if a directory school was chosen
+    try {
+      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
+    } catch (err) {
+      console.error("[register-school] Failed to link school to BeneficiaryDirectory:", err);
     }
 
     // Send magic link to contact email

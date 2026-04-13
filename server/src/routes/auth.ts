@@ -6,6 +6,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
+import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -143,6 +144,7 @@ const signupSchema = z.object({
   role: z.enum(VALID_ROLES),
   schoolName: z.string().max(255).optional(),
   schoolDomain: z.string().max(255).optional(),
+  directorySchoolId: z.string().optional(), // SchoolDirectory.id if chosen from directory
   zipCodes: z.array(z.string().regex(/^\d{5}$/, "Invalid ZIP code")).optional(),
 });
 
@@ -218,6 +220,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         data: {
           name: data.schoolName || data.name,
           domain: data.schoolDomain || undefined,
+          directoryId: data.directorySchoolId || null,
           verified: false,
           createdById: user.id,
           zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
@@ -259,6 +262,13 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           approvedAt: new Date(),
         },
       });
+
+      // Link to BeneficiaryDirectory if a directory school was chosen
+      try {
+        await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
+      } catch (err) {
+        console.error("[signup] Failed to link school to BeneficiaryDirectory:", err);
+      }
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
