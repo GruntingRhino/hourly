@@ -177,6 +177,23 @@ function isPersonalEmailDomain(email: string): boolean {
   return PERSONAL_EMAIL_DOMAINS.has(domain);
 }
 
+/** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
+export function extractDomainFromWebsite(website: string): string | null {
+  if (!website?.trim()) return null;
+  try {
+    let url = website.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** Returns true if emailDomain matches or is a subdomain of websiteDomain. */
+function emailDomainMatchesWebsite(emailDomain: string, websiteDomain: string): boolean {
+  return emailDomain === websiteDomain || emailDomain.endsWith("." + websiteDomain);
+}
+
 // POST /api/auth/signup
 router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   try {
@@ -185,6 +202,25 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
       if (isPersonalEmailDomain(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
+      }
+    }
+
+    // If a directory school was selected, validate email domain against its known domain
+    if (data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
+      const dirEntry = await prisma.schoolDirectory.findUnique({
+        where: { id: data.directorySchoolId },
+        select: { emailDomain: true, website: true },
+      });
+      // Prefer the explicit emailDomain field; fall back to parsing the website URL
+      const schoolDomain = dirEntry?.emailDomain || (dirEntry?.website ? extractDomainFromWebsite(dirEntry.website) : null);
+      if (schoolDomain) {
+        const emailDomain = data.email.split("@")[1]?.toLowerCase().trim() || "";
+        const isEdu = emailDomain.endsWith(".edu");
+        if (!isEdu && !emailDomainMatchesWebsite(emailDomain, schoolDomain)) {
+          return res.status(403).json({
+            error: `Email domain does not match the school's domain (${schoolDomain}). Please use your school email address.`,
+          });
+        }
       }
     }
 

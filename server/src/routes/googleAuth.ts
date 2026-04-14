@@ -5,6 +5,7 @@ import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
+import { extractDomainFromWebsite } from "./auth";
 
 const router = Router();
 
@@ -60,6 +61,11 @@ const PERSONAL_EMAIL_DOMAINS = new Set([
 
 function getEmailDomain(email: string): string {
   return email.split("@")[1]?.toLowerCase().trim() || "";
+}
+
+/** Returns true if emailDomain matches or is a subdomain of schoolDomain. */
+function emailDomainMatchesSchool(emailDomain: string, schoolDomain: string): boolean {
+  return emailDomain === schoolDomain || emailDomain.endsWith("." + schoolDomain);
 }
 
 /** Returns true for Playwright test accounts that bypass the personal-domain check. */
@@ -265,6 +271,7 @@ router.get("/schools", async (req: Request, res: Response) => {
         claimed: true,
         gradeRange: true,
         enrollment: true,
+        website: true,
       },
       take: 2000,
     });
@@ -334,7 +341,7 @@ router.post("/register-school", async (req: Request, res: Response) => {
       });
     }
 
-    // Check if school directory entry exists and is already claimed
+    // Check if school directory entry exists and is already claimed; also validate contact email domain
     if (data.directorySchoolId) {
       const dirEntry = await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } });
       if (dirEntry?.claimed) {
@@ -347,6 +354,20 @@ router.post("/register-school", async (req: Request, res: Response) => {
           error: "This school is already registered.",
           contactEmail: existingSchool?.registrationEmail || existingSchool?.createdBy?.email || null,
         });
+      }
+
+      // Validate contact email domain against the school's known domain.
+      // Prefer the explicit emailDomain field; fall back to parsing the website URL.
+      const schoolDomain = dirEntry?.emailDomain || (dirEntry?.website ? extractDomainFromWebsite(dirEntry.website) : null);
+      if (schoolDomain) {
+        const contactDomain = getEmailDomain(data.contactEmail);
+        const isEdu = contactDomain.endsWith(".edu");
+        if (!isEdu && !emailDomainMatchesSchool(contactDomain, schoolDomain)) {
+          return res.status(400).json({
+            error: `Contact email domain does not match the school's domain (${schoolDomain}). Please use your school's official email address.`,
+            code: "DOMAIN_MISMATCH",
+          });
+        }
       }
     }
 
