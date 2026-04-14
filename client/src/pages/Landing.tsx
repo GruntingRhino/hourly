@@ -84,7 +84,7 @@ export default function Landing() {
               },
               {
                 title: "For Students",
-                accent: "amber",
+                accent: "blue",
                 items: [
                   "Invited directly by your school cohort",
                   "Browse only school-approved opportunities",
