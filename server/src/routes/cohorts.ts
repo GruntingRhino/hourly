@@ -457,6 +457,27 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
   }
 });
 
+// DELETE /api/cohorts/:id — delete cohort (must be empty of students)
+router.delete("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const cohort = await prisma.cohort.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { students: true } } },
+    });
+    if (!cohort) return res.status(404).json({ error: "Cohort not found" });
+    if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
+
+    // Remove all students from cohort first, then delete
+    await prisma.user.updateMany({ where: { cohortId: cohort.id }, data: { cohortId: null } });
+    await prisma.cohort.delete({ where: { id: cohort.id } });
+    res.status(204).send();
+  } catch (err) {
+    console.error("Delete cohort error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // DELETE /api/cohorts/:id/students/:studentId — remove student from cohort
 router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
