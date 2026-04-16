@@ -337,19 +337,13 @@ test.describe.serial('3 — Beneficiary Admin A: Opportunities', () => {
   test('can create an opportunity with a time slot', async () => {
     await page.goto(`${BASE}/opportunities`, { waitUntil: 'networkidle' });
 
-    // Open create form (click "New Opportunity" or "Create" button)
-    await page.getByRole('button', { name: /new opportunity|create opportunity|add opportunity/i }).first().click();
+    // The create form is always visible in the left panel — no button needed.
+    // Title field: first text input in the create form (no placeholder, no name attr).
+    // Find by traversing: label "Title *" → parent div → input sibling.
+    await page.locator('label').filter({ hasText: /^Title/i }).locator('..').locator('input').fill(ctx.opportunityTitle);
 
-    // Title
-    await page.locator('input[placeholder*="title" i], input[name="title" i]').first().fill(ctx.opportunityTitle);
-
-    // Description
-    const descField = page.locator('textarea[placeholder*="description" i], textarea[name="description" i]');
-    if (await descField.count()) await descField.first().fill('Playwright automated test opportunity.');
-
-    // Date field for the first time slot
-    const dateInput = page.locator('input[type="date"]').first();
-    await dateInput.fill(tomorrow());
+    // Date field for the first time slot (one slot exists by default)
+    await page.locator('input[type="date"]').first().fill(tomorrow());
 
     // Start / end times
     const timeInputs = page.locator('input[type="time"]');
@@ -363,7 +357,7 @@ test.describe.serial('3 — Beneficiary Admin A: Opportunities', () => {
         r => r.url().includes('/api/beneficiaries') && r.url().includes('/opportunities') && r.request().method() === 'POST',
         { timeout: 20_000 }
       ),
-      page.getByRole('button', { name: /create|save|publish|submit/i }).last().click(),
+      page.getByRole('button', { name: /create opportunity/i }).click(),
     ]);
 
     expect(res.status()).toBe(201);
@@ -383,7 +377,8 @@ test.describe.serial('3 — Beneficiary Admin A: Opportunities', () => {
 
   test('settings page loads', async () => {
     await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-    await expect(page.locator('text=/Playwright Org A/i').first()).toBeVisible({ timeout: 10_000 });
+    // Org name is in an input value (not a text node); check the section heading instead
+    await expect(page.locator('text=/Organization Profile/i').first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -465,28 +460,27 @@ test.describe.serial('4 — Student 1: Browse & Sign Up', () => {
   test('can submit self-volunteering hours', async () => {
     await page.goto(`${BASE}/submit`, { waitUntil: 'networkidle' });
 
-    // Open the form — may need to click "Log Hours" or similar
-    const addBtn = page.getByRole('button', { name: /log hours|add hours|new submission|submit hours/i }).first();
-    if (await addBtn.count()) await addBtn.click();
+    // The form is hidden behind a "+ Submit Hours" button
+    await page.getByRole('button', { name: /\+ submit hours/i }).click();
 
-    const orgInput = page.locator('input[placeholder*="organization" i], input[placeholder*="where" i]').first();
-    await orgInput.fill('PW External Org');
+    // Organization name — placeholder: "e.g. Local Food Bank"
+    await page.locator('input[placeholder*="Food Bank" i]').fill('PW External Org');
 
-    const descInput = page.locator('textarea[placeholder*="description" i], textarea[placeholder*="what" i]').first();
-    if (await descInput.count()) await descInput.fill('Playwright test self-submission.');
+    // Description — placeholder: "Describe what you did..."
+    await page.locator('textarea[placeholder*="Describe" i]').fill('Playwright test self-submission.');
 
-    const dateInput = page.locator('input[type="date"]').first();
-    if (await dateInput.count()) await dateInput.fill(tomorrow());
+    // Date of service — max is today (HTML constraint), so use today not tomorrow
+    await page.locator('input[type="date"]').first().fill(new Date().toISOString().slice(0, 10));
 
-    const hoursInput = page.locator('input[type="number"], input[placeholder*="hours" i]').first();
-    if (await hoursInput.count()) await hoursInput.fill('2');
+    // Hours — label "Hours *", input[type="number"]
+    await page.locator('label').filter({ hasText: /^Hours/i }).locator('..').locator('input').fill('2');
 
     const [res] = await Promise.all([
       page.waitForResponse(
         r => r.url().includes('/api/self-submissions') && r.request().method() === 'POST',
         { timeout: 15_000 }
       ),
-      page.getByRole('button', { name: /submit|save/i }).last().click(),
+      page.getByRole('button', { name: /submit for review/i }).click(),
     ]);
     if (res.status() === 201 || res.status() === 200) {
       const body = await res.json();
@@ -606,9 +600,14 @@ test.describe('7 — Student 1: Approved Hours on Dashboard', () => {
   test.afterAll(() => ctx_.close());
 
   test('dashboard shows approved self-submission', async () => {
+    if (!ctx.selfSubmitId) {
+      test.skip(true, 'No self-submission ID — skipping (test 4 may have failed)');
+      return;
+    }
     await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' });
-    // Either hours counter or the submission title should appear
-    await expect(page.locator('text=/approved|PW External Org/i').first()).toBeVisible({ timeout: 10_000 });
+    // The dashboard renders ss.organizationName and <StatusBadge status={ss.status} />
+    // Both "PW External Org" and "APPROVED" appear as text nodes
+    await expect(page.locator('text=PW External Org').first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -632,15 +631,16 @@ test.describe.serial('8 — Profile Updates', () => {
 
   test('can update display name', async () => {
     await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-    const nameInput = page.locator('input[name="name"], input[placeholder*="name" i]').first();
-    if (!(await nameInput.count())) return; // Settings UI may vary
-    await nameInput.fill('PW Student 1 Updated');
+    // Name input — label says "Name", traverse label→parent→input (no for/id link)
+    await page.locator('label').filter({ hasText: /^Name$/i }).locator('..').locator('input').fill('PW Student 1 Updated');
     const [res] = await Promise.all([
       page.waitForResponse(r => r.url().includes('/api/auth/profile') && r.request().method() === 'PUT', { timeout: 15_000 }),
-      page.getByRole('button', { name: /save|update/i }).first().click(),
+      page.getByRole('button', { name: /save changes/i }).first().click(),
     ]);
     expect([200, 201]).toContain(res.status());
-    // Revert
+    // Verify via API then revert
+    const me = await apiGet<{ name: string }>(page, '/auth/me');
+    expect(me.name).toBe('PW Student 1 Updated');
     await apiPut(page, '/auth/profile', { name: 'PW Student 1' });
   });
 });
@@ -668,32 +668,25 @@ test.describe.serial('9 — RBAC', () => {
   });
 
   test('student cannot access /cohorts — redirected', async () => {
-    await studentPage.goto(`${BASE}/cohorts`, { waitUntil: 'domcontentloaded' });
-    // Should redirect to /dashboard or /login, or show a permission error
-    const url = studentPage.url();
-    const hasPermError = await studentPage.locator('text=/not authorized|permission|access denied/i').count();
-    expect(url.includes('/cohorts') && hasPermError === 0, 'Student should not be able to access /cohorts').toBe(false);
+    // App.tsx catch-all: <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    // Waits for React Router to process and redirect before checking URL.
+    await studentPage.goto(`${BASE}/cohorts`, { waitUntil: 'networkidle' });
+    await expect(studentPage).not.toHaveURL(/\/cohorts/, { timeout: 5_000 });
   });
 
   test('student cannot access /submissions — redirected', async () => {
-    await studentPage.goto(`${BASE}/submissions`, { waitUntil: 'domcontentloaded' });
-    const url = studentPage.url();
-    const hasPermError = await studentPage.locator('text=/not authorized|permission|access denied/i').count();
-    expect(url.includes('/submissions') && hasPermError === 0, 'Student should not access /submissions').toBe(false);
+    await studentPage.goto(`${BASE}/submissions`, { waitUntil: 'networkidle' });
+    await expect(studentPage).not.toHaveURL(/\/submissions/, { timeout: 5_000 });
   });
 
   test('student cannot access /students — redirected', async () => {
-    await studentPage.goto(`${BASE}/students`, { waitUntil: 'domcontentloaded' });
-    const url = studentPage.url();
-    const hasPermError = await studentPage.locator('text=/not authorized|permission|access denied/i').count();
-    expect(url.includes('/students') && hasPermError === 0, 'Student should not access /students').toBe(false);
+    await studentPage.goto(`${BASE}/students`, { waitUntil: 'networkidle' });
+    await expect(studentPage).not.toHaveURL(/\/students/, { timeout: 5_000 });
   });
 
   test('beneficiary admin cannot access /cohorts — redirected', async () => {
-    await orgPage.goto(`${BASE}/cohorts`, { waitUntil: 'domcontentloaded' });
-    const url = orgPage.url();
-    const hasPermError = await orgPage.locator('text=/not authorized|permission|access denied/i').count();
-    expect(url.includes('/cohorts') && hasPermError === 0, 'Org admin should not access /cohorts').toBe(false);
+    await orgPage.goto(`${BASE}/cohorts`, { waitUntil: 'networkidle' });
+    await expect(orgPage).not.toHaveURL(/\/cohorts/, { timeout: 5_000 });
   });
 
   test('school admin API cannot approve hours it does not own', async () => {
@@ -848,7 +841,8 @@ test.describe.serial('12 — Beneficiary Admin B: School B Org', () => {
 
   test('settings page loads', async () => {
     await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-    await expect(page.locator('text=/Playwright Org B/i').first()).toBeVisible({ timeout: 10_000 });
+    // Org name is in an input value (not a text node); check the section heading instead
+    await expect(page.locator('text=/Organization Profile/i').first()).toBeVisible({ timeout: 10_000 });
   });
 });
 

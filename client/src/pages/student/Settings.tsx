@@ -128,11 +128,17 @@ export default function StudentSettings() {
     try {
       await api.put("/auth/profile", {
         name,
-        phone,
-        bio,
-        grade,
-        avatarUrl,
-        socialLinks: { instagram, tiktok, twitter, youtube },
+        // Send undefined for empty strings so the server skips encryption on blank fields
+        phone: phone.trim() || undefined,
+        bio: bio.trim() || undefined,
+        grade: grade || undefined,
+        avatarUrl: avatarUrl || undefined,
+        socialLinks: {
+          instagram: instagram.trim() || undefined,
+          tiktok: tiktok.trim() || undefined,
+          twitter: twitter.trim() || undefined,
+          youtube: youtube.trim() || undefined,
+        },
       });
       await refreshUser();
       setMessage("Profile updated!");
