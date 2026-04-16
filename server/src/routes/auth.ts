@@ -107,6 +107,13 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  // Skip rate limiting for Playwright test accounts (abhay.sivaram+N@gmail.com).
+  // These are seeded test-only accounts with no real data; rate limiting them
+  // prevents the E2E test suite from completing within a single 15-minute window.
+  skip: (req) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    return /^abhay\.sivaram\+\d+@gmail\.com$/.test(email);
+  },
 });
 
 const router = Router();
@@ -177,6 +184,11 @@ function isPersonalEmailDomain(email: string): boolean {
   return PERSONAL_EMAIL_DOMAINS.has(domain);
 }
 
+/** Playwright/QA test accounts — bypass all domain restrictions. */
+function isTestEmail(email: string): boolean {
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+}
+
 /** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
 export function extractDomainFromWebsite(website: string): string | null {
   if (!website?.trim()) return null;
@@ -200,13 +212,13 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     const data = signupSchema.parse(req.body);
 
     if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-      if (isPersonalEmailDomain(data.email)) {
+      if (isPersonalEmailDomain(data.email) && !isTestEmail(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
     }
 
     // If a directory school was selected, validate email domain against its known domain
-    if (data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
+    if (data.role === "SCHOOL_ADMIN" && data.directorySchoolId && !isTestEmail(data.email)) {
       const dirEntry = await prisma.schoolDirectory.findUnique({
         where: { id: data.directorySchoolId },
         select: { emailDomain: true, website: true },
