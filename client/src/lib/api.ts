@@ -19,7 +19,7 @@ function getTimeoutMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function fetchWithAuth(path: string, options?: RequestInit): Promise<Response> {
   const token = localStorage.getItem("goodhours_token");
   const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -51,6 +51,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     clearTimeout(timeoutId);
   }
 
+  return res;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetchWithAuth(path, options);
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     const message =
@@ -65,6 +71,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   return res.json();
+}
+
+async function requestBlob(path: string, options?: RequestInit): Promise<Blob> {
+  const res = await fetchWithAuth(path, options);
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    const message =
+      typeof body === "object" && body !== null && "error" in body
+        ? String((body as any).error)
+        : `Request failed: ${res.status}`;
+    throw new ApiError(message, res.status, body);
+  }
+
+  return res.blob();
 }
 
 export const api = {
@@ -100,4 +121,5 @@ export const api = {
           : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  download: (path: string) => requestBlob(path),
 };

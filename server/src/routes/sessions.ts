@@ -298,7 +298,7 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
 });
 
 // GET /api/sessions/school — school sees all student sessions
-router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });

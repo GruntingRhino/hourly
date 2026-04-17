@@ -5,6 +5,7 @@ export interface EffectiveRules {
   serviceStartDate: Date | null;
   serviceEndDate: Date | null;
   allowSelfSubmission: boolean;
+  verificationStandard: string;
   requireOrgVerification: boolean;
   categoryHourCaps: Record<string, number> | null;
 }
@@ -16,6 +17,10 @@ function parseCaps(json: string | null | undefined): Record<string, number> | nu
   } catch {
     return null;
   }
+}
+
+function requiresOrgVerification(verificationStandard: string | null | undefined, requireOrgVerification: boolean): boolean {
+  return requireOrgVerification || verificationStandard === "BENEFICIARY_REQUIRED";
 }
 
 /**
@@ -55,6 +60,7 @@ export async function resolveEffectiveRules(userId: string): Promise<EffectiveRu
       serviceStartDate: true,
       serviceEndDate: true,
       allowSelfSubmission: true,
+      verificationStandard: true,
       requireOrgVerification: true,
       categoryHourCaps: true,
     },
@@ -68,7 +74,8 @@ export async function resolveEffectiveRules(userId: string): Promise<EffectiveRu
     serviceStartDate: cohort?.serviceStartDate ?? school.serviceStartDate,
     serviceEndDate: cohort?.serviceEndDate ?? school.serviceEndDate,
     allowSelfSubmission: cohort?.allowSelfSubmission ?? school.allowSelfSubmission,
-    requireOrgVerification: school.requireOrgVerification,
+    verificationStandard: school.verificationStandard,
+    requireOrgVerification: requiresOrgVerification(school.verificationStandard, school.requireOrgVerification),
     categoryHourCaps: parseCaps(cohort?.categoryHourCaps) ?? parseCaps(school.categoryHourCaps),
   };
 }

@@ -91,7 +91,6 @@ function getNavItems(role: string) {
       ];
     case "SCHOOL_ADMIN":
     case "TEACHER":
-    case "DISTRICT_ADMIN":
       return [
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },

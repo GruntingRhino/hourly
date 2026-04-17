@@ -1,12 +1,39 @@
 import { Router, Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
 import { calculateStudentHours } from "../lib/hoursCalculator";
+import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { signToken } from "../middleware/auth";
+import { CLIENT_URL } from "../services/email";
 
 const router = Router();
 
-const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
+const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
+
+function resolveParentProgressBaseUrl(req: Request): string {
+  const origin = typeof req.headers.origin === "string" ? req.headers.origin.trim() : "";
+  const referer = typeof req.headers.referer === "string" ? req.headers.referer.trim() : "";
+
+  const refererOrigin = (() => {
+    if (!referer) return "";
+    try {
+      return new URL(referer).origin;
+    } catch {
+      return "";
+    }
+  })();
+
+  const requestOrigin = origin || refererOrigin;
+  const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
+
+  if (process.env.NODE_ENV !== "production" && isLocalDevOrigin) {
+    return requestOrigin;
+  }
+
+  return CLIENT_URL;
+}
 
 // GET /api/reports/student — student's hour summary
 router.get("/student", authenticate, async (req: Request, res: Response) => {
@@ -74,7 +101,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       totalApprovedHours: Math.round(studentHours.approved * 100) / 100,
       totalPendingHours: Math.round(studentHours.pending * 100) / 100,
       totalCommittedHours: Math.round(totalCommittedHours * 100) / 100,
-      requiredHours: school?.requiredHours || 40,
+      requiredHours: user?.cohort?.requiredHours ?? school?.requiredHours ?? 40,
       activitiesCompleted: approved.length,
       sessions,
       approved,
@@ -145,25 +172,47 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
           { cohort: { schoolId: school.id } },
         ],
       },
-      select: { id: true, name: true, email: true, grade: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+      },
     });
 
-    const studentIds = students.map((s) => s.id);
-    const hoursMap = await calculateStudentHours(studentIds);
-
-    const report = students.map((s) => {
-      const hours = hoursMap.get(s.id)?.approved ?? 0;
-      return {
-        studentId: s.id,
-        name: s.name,
-        email: s.email,
-        grade: s.grade,
-        approvedHours: Math.round(hours * 100) / 100,
-        requiredHours: school.requiredHours,
-        completed: hours >= school.requiredHours,
-        percentComplete: Math.min(100, Math.round((hours / school.requiredHours) * 100)),
-      };
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
     });
+
+    const report = progress.map((student) => ({
+      studentId: student.id,
+      name: student.name,
+      email: student.email,
+      grade: student.grade,
+      cohortName: student.cohortName,
+      approvedHours: student.approvedHours,
+      pendingHours: student.pendingHours,
+      requiredHours: student.requiredHours,
+      completed: student.status === "COMPLETED",
+      percentComplete: student.percentComplete,
+      status: student.status,
+      riskLevel: student.riskLevel,
+      riskReasons: student.riskReasons,
+      noShowCount: student.noShowCount,
+      daysToDeadline: student.daysToDeadline,
+    }));
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -276,6 +325,79 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
   } catch (err) {
     console.error("CSV export error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/reports/parent-link — generate a shareable parent progress link for the current student
+router.post("/parent-link", authenticate, async (req: Request, res: Response) => {
+  try {
+    if (req.user!.role !== "STUDENT") {
+      return res.status(403).json({ error: "Student role required" });
+    }
+
+    const token = signToken(
+      { studentId: req.user!.userId, purpose: "PARENT_PROGRESS" },
+      { expiresIn: "30d" }
+    );
+    const baseUrl = resolveParentProgressBaseUrl(req);
+
+    res.json({
+      token,
+      url: `${baseUrl}/parent-progress?token=${encodeURIComponent(token)}`,
+    });
+  } catch (err) {
+    console.error("Parent link error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/parent-progress?token=... — read-only parent progress view
+router.get("/parent-progress", async (req: Request, res: Response) => {
+  try {
+    const token = String(req.query.token || "").trim();
+    if (!token) return res.status(400).json({ error: "token query param is required" });
+
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { studentId?: string; purpose?: string };
+    if (payload.purpose !== "PARENT_PROGRESS" || !payload.studentId) {
+      return res.status(400).json({ error: "Invalid parent progress token" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.studentId },
+      include: {
+        classroom: { include: { school: true } },
+        cohort: { include: { school: true } },
+        school: true,
+      },
+    });
+    if (!user || user.role !== "STUDENT") {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    const school = user.classroom?.school || user.cohort?.school || user.school;
+    const hours = (await calculateStudentHours([user.id])).get(user.id) ?? { approved: 0, pending: 0 };
+    const requiredHours = user.cohort?.requiredHours ?? school?.requiredHours ?? 40;
+    const deadline = user.cohort?.serviceEndDate ?? school?.serviceEndDate ?? null;
+    const remainingHours = Math.max(0, Math.round((requiredHours - hours.approved) * 100) / 100);
+
+    res.json({
+      student: {
+        id: user.id,
+        name: user.name,
+        grade: user.grade,
+      },
+      school: school ? { id: school.id, name: school.name } : null,
+      cohort: user.cohort ? { id: user.cohort.id, name: user.cohort.name } : null,
+      approvedHours: Math.round(hours.approved * 100) / 100,
+      pendingHours: Math.round(hours.pending * 100) / 100,
+      requiredHours,
+      remainingHours,
+      percentComplete: Math.min(100, Math.round((hours.approved / requiredHours) * 100)),
+      deadline,
+    });
+  } catch (err) {
+    console.error("Parent progress error:", err);
+    res.status(400).json({ error: "Invalid or expired parent progress token" });
   }
 });
 

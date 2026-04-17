@@ -213,12 +213,20 @@ router.post("/callback", async (req: Request, res: Response) => {
       });
     }
 
-    // New user — they need to complete school registration
-    // Return a temporary token containing their Google profile for the frontend
-    // to use in the school search + registration flow
-    const tempToken = crypto.randomBytes(32).toString("hex");
-    // Store temp registration state in a short-lived token record
-    // We encode data in the temp token itself (signed with JWT secret)
+    // New user — look up schools matching their email domain before returning
+    const emailDomain = getEmailDomain(email);
+    let domainSuggestions: any[] = [];
+    if (emailDomain && !isPersonalEmailDomain(email)) {
+      domainSuggestions = await prisma.schoolDirectory.findMany({
+        where: { emailDomain: { equals: emailDomain, mode: "insensitive" } },
+        select: {
+          id: true, name: true, type: true, city: true, state: true,
+          zip: true, claimed: true, gradeRange: true, enrollment: true, website: true,
+        },
+        take: 5,
+      });
+    }
+
     const regToken = signToken(
       { googleId, email, name: name || email, pendingSchoolAdmin: true },
       { expiresIn: "1h" }
@@ -229,6 +237,7 @@ router.post("/callback", async (req: Request, res: Response) => {
       registrationToken: regToken,
       email,
       name: name || "",
+      domainSuggestions,
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
@@ -238,11 +247,25 @@ router.post("/callback", async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/google/schools — search school directory (unauthenticated, for registration)
-// Returns top 10 results ranked by fuzzy similarity (handles typos, partial names, reordered words)
+// Supports ?search= (fuzzy name match) and/or ?domain= (exact email domain match)
 router.get("/schools", async (req: Request, res: Response) => {
   try {
     const search = (req.query.search as string || "").trim();
     const state = (req.query.state as string || "").trim();
+    const domain = (req.query.domain as string || "").trim().toLowerCase();
+
+    // Domain-only lookup — return schools whose emailDomain matches
+    if (domain && !search) {
+      const results = await prisma.schoolDirectory.findMany({
+        where: { emailDomain: { equals: domain, mode: "insensitive" } },
+        select: {
+          id: true, name: true, type: true, city: true, state: true,
+          zip: true, claimed: true, gradeRange: true, enrollment: true, website: true,
+        },
+        take: 5,
+      });
+      return res.json(results);
+    }
 
     if (search.length < 2) {
       return res.json([]);
@@ -509,6 +532,10 @@ router.get("/verify-school", async (req: Request, res: Response) => {
 
     if (!school) {
       return res.status(400).json({ error: "Invalid or expired registration link. Please restart registration." });
+    }
+
+    if (!school.createdBy) {
+      return res.status(400).json({ error: "School registration is incomplete. Please restart registration." });
     }
 
     // Mark school as verified

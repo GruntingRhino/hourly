@@ -27,7 +27,7 @@ const SENDER_ROLE_MAP: Record<SenderFilter, string[]> = {
   all: [],
   students: ["STUDENT"],
   organizations: ["ORG_ADMIN"],
-  schools: ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"],
+  schools: ["SCHOOL_ADMIN", "TEACHER"],
 };
 
 export default function StudentMessages() {

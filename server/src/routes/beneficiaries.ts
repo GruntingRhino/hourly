@@ -8,6 +8,7 @@ import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap } from "../lib/schoolRules";
+import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -106,7 +107,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 });
 
 // GET /api/beneficiaries/directory/nearby — geo-proximity search
-router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
@@ -258,7 +259,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 });
 
 // GET /api/beneficiaries/directory — search beneficiary directory (school admin only)
-router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/directory", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
@@ -837,6 +838,80 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
   }
 });
 
+// PATCH /api/beneficiaries/:id/opportunities/:oppId — edit opportunity metadata
+router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const opp = await prisma.beneficiaryOpportunity.findUnique({ where: { id: req.params.oppId } });
+    if (!opp || opp.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Opportunity not found" });
+    if (opp.status === "CANCELLED") return res.status(400).json({ error: "Cannot edit a cancelled opportunity" });
+
+    const schema = z.object({
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().max(2000).optional(),
+      location: z.string().max(255).nullable().optional(),
+      requirementsNote: z.string().max(1000).nullable().optional(),
+      schoolRestrictions: z.array(z.string()).nullable().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const updated = await prisma.beneficiaryOpportunity.update({
+      where: { id: req.params.oppId },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.location !== undefined && { location: data.location }),
+        ...(data.requirementsNote !== undefined && { requirementsNote: data.requirementsNote }),
+        ...(data.schoolRestrictions !== undefined && {
+          schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
+        }),
+      },
+      include: { timeSlots: { include: { _count: { select: { signups: true } } }, orderBy: { date: "asc" } } },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Update opportunity error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/beneficiaries/:id/opportunities/:oppId — soft-delete (CANCELLED)
+router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+
+    const opp = await prisma.beneficiaryOpportunity.findUnique({
+      where: { id: req.params.oppId },
+      include: {
+        timeSlots: {
+          include: { signups: { where: { status: { in: ["CONFIRMED", "WAITLISTED"] } }, select: { id: true } } },
+        },
+      },
+    });
+    if (!opp || opp.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Opportunity not found" });
+
+    const hasActiveSignups = opp.timeSlots.some((slot) => slot.signups.length > 0);
+    if (hasActiveSignups) {
+      return res.status(400).json({ error: "Cannot delete an opportunity that has confirmed student signups." });
+    }
+
+    await prisma.beneficiaryOpportunity.update({
+      where: { id: req.params.oppId },
+      data: { status: "CANCELLED" },
+    });
+
+    res.json({ message: "Opportunity deleted" });
+  } catch (err) {
+    console.error("Delete opportunity error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/beneficiaries/slots/:slotId/signup — student signs up for a time slot
 router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -1110,6 +1185,198 @@ router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Reject signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/signups/:signupId/history — verification history for a beneficiary signup
+router.get("/signups/:signupId/history", authenticate, async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, role: true, schoolId: true, beneficiaryId: true },
+    });
+    if (!actor) return res.status(404).json({ error: "User not found" });
+
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { id: req.params.signupId },
+      include: {
+        slot: {
+          include: {
+            opportunity: {
+              include: {
+                beneficiary: { select: { id: true, name: true, category: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!signup) return res.status(404).json({ error: "Signup not found" });
+
+    if (actor.role === "BENEFICIARY_ADMIN") {
+      if (actor.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+        return res.status(403).json({ error: "Not your beneficiary's signup" });
+      }
+    } else if (["SCHOOL_ADMIN", "TEACHER"].includes(actor.role)) {
+      const studentSchoolId = await resolveStudentSchoolId(signup.studentId);
+      if (!actor.schoolId || studentSchoolId !== actor.schoolId) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      }
+    } else if (actor.role === "STUDENT") {
+      if (signup.studentId !== actor.id) {
+        return res.status(403).json({ error: "Not your verification history" });
+      }
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const [student, history] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: signup.studentId },
+        select: { id: true, name: true, email: true },
+      }),
+      prisma.beneficiaryAuditLog.findMany({
+        where: { signupId: signup.id },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+    const actorIds = [...new Set(history.map((entry) => entry.actorId))];
+    const actors = actorIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true, role: true },
+        })
+      : [];
+    const actorMap = new Map(actors.map((actor) => [actor.id, actor]));
+
+    res.json({
+      signup: {
+        id: signup.id,
+        status: signup.status,
+        verificationStatus: signup.verificationStatus,
+        totalHours: signup.totalHours,
+        rejectionReason: signup.rejectionReason,
+        checkedIn: signup.checkedIn,
+        checkedOut: signup.checkedOut,
+        verifiedAt: signup.verifiedAt,
+        student,
+        slot: {
+          id: signup.slot.id,
+          date: signup.slot.date,
+          startTime: signup.slot.startTime,
+          endTime: signup.slot.endTime,
+          durationHours: signup.slot.durationHours,
+          opportunity: {
+            title: signup.slot.opportunity.title,
+            category: signup.slot.opportunity.category,
+            beneficiary: signup.slot.opportunity.beneficiary,
+          },
+        },
+      },
+      history: history.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        details: entry.details,
+        createdAt: entry.createdAt,
+        actor: actorMap.get(entry.actorId) ?? { id: entry.actorId, name: "Unknown", role: "UNKNOWN" },
+      })),
+    });
+  } catch (err) {
+    console.error("Beneficiary signup history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/signups/:signupId/cancel — student cancels their signup (promotes next waitlisted)
+router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { id: req.params.signupId },
+      include: { slot: true },
+    });
+    if (!signup) return res.status(404).json({ error: "Signup not found" });
+    if (signup.studentId !== req.user!.userId) return res.status(403).json({ error: "Not your signup" });
+    if (signup.status === "CANCELLED") return res.status(400).json({ error: "Already cancelled" });
+    if (signup.verificationStatus === "APPROVED") return res.status(400).json({ error: "Cannot cancel an already-approved signup" });
+
+    await prisma.beneficiarySignup.update({
+      where: { id: signup.id },
+      data: { status: "CANCELLED" },
+    });
+
+    // Promote the earliest waitlisted student if this was a CONFIRMED slot
+    if (signup.status === "CONFIRMED") {
+      const nextWaitlisted = await prisma.beneficiarySignup.findFirst({
+        where: { slotId: signup.slotId, status: "WAITLISTED" },
+        orderBy: { createdAt: "asc" },
+      });
+      if (nextWaitlisted) {
+        await prisma.beneficiarySignup.update({
+          where: { id: nextWaitlisted.id },
+          data: { status: "CONFIRMED" },
+        });
+        // Notify the promoted student
+        await prisma.notification.create({
+          data: {
+            userId: nextWaitlisted.studentId,
+            type: "SIGNUP_CONFIRMED",
+            title: "You're off the waitlist!",
+            body: `A spot opened up and you're now confirmed for "${signup.slot.startTime}–${signup.slot.endTime}" on ${new Date(signup.slot.date).toLocaleDateString()}.`,
+          },
+        });
+      }
+    }
+
+    res.json({ message: "Signup cancelled" });
+  } catch (err) {
+    console.error("Cancel signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/signups/:signupId/no-show — beneficiary admin marks student as no-show
+router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { id: req.params.signupId },
+      include: { slot: { include: { opportunity: true } } },
+    });
+    if (!signup) return res.status(404).json({ error: "Signup not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+      return res.status(403).json({ error: "Not your beneficiary's signup" });
+    }
+    if (signup.status === "CANCELLED") return res.status(400).json({ error: "Cannot mark a cancelled signup as no-show" });
+    if (signup.status === "WAITLISTED") return res.status(400).json({ error: "Waitlisted signups cannot be marked as no-show" });
+    if (signup.status === "NO_SHOW") return res.status(400).json({ error: "Student is already marked as a no-show" });
+    if (signup.verificationStatus === "APPROVED") {
+      return res.status(400).json({ error: "Approved hours cannot be converted to a no-show" });
+    }
+
+    const updated = await prisma.beneficiarySignup.update({
+      where: { id: signup.id },
+      data: {
+        status: "NO_SHOW",
+        checkedOut: false,
+        checkedOutAt: null,
+        totalHours: null,
+      },
+    });
+
+    await prisma.beneficiaryAuditLog.create({
+      data: {
+        action: "NO_SHOW",
+        actorId: req.user!.userId,
+        signupId: signup.id,
+        details: JSON.stringify({ studentId: signup.studentId }),
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("No-show error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

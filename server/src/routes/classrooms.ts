@@ -56,7 +56,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"),
+  requireRole("SCHOOL_ADMIN", "TEACHER"),
   async (req: Request, res: Response) => {
     try {
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
@@ -129,7 +129,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"),
+  requireRole("SCHOOL_ADMIN", "TEACHER"),
   async (req: Request, res: Response) => {
     try {
       const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
