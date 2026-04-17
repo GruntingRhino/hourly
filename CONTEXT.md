@@ -1,307 +1,885 @@
-# GoodHours — AI Context Document
-
-## What is GoodHours?
-
-GoodHours is a **school-orchestrated community service tracking platform** — the system of record for student volunteer hours. It connects students, beneficiary organizations (nonprofits/service orgs), and schools in a trusted, verified workflow for logging, approving, and reporting community service.
-
-**Core priorities (in order):** Legitimacy > Verification > Compliance > Adoption
-
-**Live URL:** https://goodhours.app
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React 19 + Vite + TypeScript + Tailwind CSS + React Router v6 |
-| Backend | Express 4 + TypeScript |
-| ORM | Prisma 6 + Neon serverless adapter |
-| Database | PostgreSQL (Neon) |
-| Auth | JWT (jsonwebtoken) + bcryptjs |
-| Validation | Zod (server-side) |
-| Email | Resend (`notifications.goodhours.app`) |
-| Deployment | Vercel (SPA + serverless function) |
-| Maps | Leaflet + React Leaflet |
-| PDF | jsPDF + jsPDF-AutoTable |
-
----
-
-## Architecture Overview
-
-```
-/
-├── api/index.ts               # Vercel serverless entry (re-exports Express app)
-├── server/src/                # Express backend
-│   ├── index.ts               # App bootstrap, route mounting
-│   ├── routes/                # API route handlers (~18 files)
-│   ├── middleware/auth.ts     # JWT verification
-│   ├── middleware/rbac.ts     # requireRole() middleware
-│   ├── lib/prisma.ts          # Prisma client singleton
-│   └── services/              # Email service
-├── server/prisma/schema.prisma # Full database schema
-├── client/src/                # React frontend
-│   ├── App.tsx                # Router (role-gated routes)
-│   ├── hooks/useAuth.tsx      # Auth context (login/signup/logout)
-│   ├── lib/api.ts             # API client (injects JWT header)
-│   ├── components/Layout.tsx  # Authenticated shell with nav
-│   └── pages/                 # Page components by role
-└── vercel.json                # Build + rewrite config
-```
-
-**Deployment:** Client builds to `client/dist/` (static SPA). All `/api/*` routes proxied to the Express serverless function at `api/index.ts`. Database uses Neon serverless PostgreSQL.
-
----
-
-## Roles & Permissions
-
-| Role | Description |
-|---|---|
-| `SCHOOL_ADMIN` | Creates cohorts, manages students, approves beneficiaries, reviews self-submitted hours |
-| `TEACHER` | Read access to school data; same view as school admin (limited write) |
-| `DISTRICT_ADMIN` | Cross-school visibility |
-| `STUDENT` | Browses opportunities, signs up for time slots, self-submits hours |
-| `BENEFICIARY_ADMIN` | Creates volunteer opportunities/time slots, approves student attendance |
-| `ORG_ADMIN` | Legacy role (backward compatibility) |
-
-Permissions are enforced **server-side** via `requireRole()` middleware on every route.
-
----
-
-## Domain Model
-
-### Key Entities (Current Architecture)
-
-**School**
-- Central security boundary; all student/beneficiary data is scoped to a school
-- Has `requiredHours`, verified email domains, service area zip codes
-- Registers via Google OAuth or email/password; domain verified via TXT DNS record
-
-**Cohort**
-- A class/group of students within a school (replaces legacy `Classroom`)
-- States: DRAFT → PUBLISHED → ARCHIVED
-- Students join via invitation tokens (`StudentInvitation`)
-
-**Beneficiary**
-- Volunteer organizations/nonprofits (replaces legacy `Organization`)
-- Can be from IRS 501c3 directory (`BeneficiaryDirectory`) or manually created
-- Must be approved by a school (`SchoolBeneficiaryApproval`) to partner
-- Join via invitation tokens (`BeneficiaryInvitation`)
-
-**BeneficiaryOpportunity + BeneficiaryTimeSlot**
-- Opportunities have date ranges, locations, custom fields
-- Time slots are specific sessions with date/time/capacity
-- Students sign up for time slots (`BeneficiarySignup`)
-
-**BeneficiarySignup**
-- The attendance record: student ↔ time slot
-- States: PENDING → CHECKED_IN → CHECKED_OUT → APPROVED / REJECTED
-- Beneficiary admin approves + sets actual hours worked
-
-**SelfSubmittedRequest**
-- Student self-reports hours for volunteering not in the system
-- School admin approves or rejects with a reason
-
-**ServiceSession** (legacy)
-- Attendance record for legacy `Opportunity` / `Signup` flow
-- Verification state machine: PENDING_CHECKIN → CHECKED_IN → CHECKED_OUT → VERIFIED / REJECTED
-
-**AuditLog / BeneficiaryAuditLog / DataAccessLog**
-- Immutable append-only logs for all verification actions and FERPA compliance
-
----
-
-## API Routes Summary
-
-All routes are under `/api/`.
-
-### Auth (`/api/auth/`)
-- `POST /signup` — Create account
-- `POST /login` — JWT login
-- `GET /me` — Current user profile
-- `PUT /password` — Change password
-- `GET /verify-email` — Email verification
-- `POST /forgot-password` / `POST /reset-password` — Password reset
-- `POST /google/callback` — Google OAuth
-- `POST /google/register-school` — School registration via Google
-
-### Cohorts (`/api/cohorts/`)
-- `GET /` — List cohorts with student counts + hour summaries
-- `POST /` — Create cohort (SCHOOL_ADMIN)
-- `GET /:id` — Cohort detail with roster
-- `POST /:id/import` — CSV import students
-- `POST /:id/publish` — Publish for enrollment
-- `POST /:id/add-student` — Add individual student
-
-### Beneficiaries (`/api/beneficiaries/`)
-- `GET /directory` — Browse IRS/public beneficiary directory
-- `GET /directory/nearby` — Nearby beneficiaries (geocoded)
-- `POST /:id/invite` — School invites beneficiary to partner
-- `POST /:id/approve` — School approves beneficiary
-- `POST /:id/opportunities` — Beneficiary creates opportunity
-- `POST /slots/:slotId/signup` — Student signs up for time slot (STUDENT)
-- `POST /signups/:signupId/approve` — Beneficiary approves attendance + hours
-- `POST /signups/:signupId/reject` — Beneficiary rejects signup
-
-### Self-Submitted Hours (`/api/self-submissions/`)
-- `POST /` — Student submits hours (STUDENT)
-- `GET /` — List submissions (role-filtered)
-- `PATCH /:id/approve` / `PATCH /:id/reject` — School reviews
-
-### Invitations (`/api/invitations/`)
-- `GET /student?token=` / `POST /student/accept` — Student joins cohort
-- `GET /beneficiary?token=` / `POST /beneficiary/accept` — Beneficiary joins school
-
-### Schools (`/api/schools/`)
-- `GET /settings` / `PUT /settings` — School configuration
-- Domain verification endpoints
-
-### Reports (`/api/reports/`)
-- `GET /student` — Student hour summary (FERPA-logged)
-- `GET /school` — School-wide aggregated report
-- `GET /school/csv` — CSV export
-
-### Other
-- `GET /api/geocode?address=` — Server-side Nominatim proxy
-- `GET /api/health` — Health check
-
----
-
-## Client Routing
-
-### Public Routes
-- `/` — Landing
-- `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`
-- `/school/register`, `/school/verify-registration`
-- `/join/student?token=` — Accept student invitation
-- `/join/beneficiary?token=` — Accept beneficiary invitation
-
-### Student Routes
-- `/dashboard` — Hours progress, upcoming slots
-- `/browse` — Search available opportunities
-- `/opportunity/:id` — Opportunity detail
-- `/slot/:id` — Time slot detail + signup
-- `/submit` — Self-submit hours form
-- `/messages`, `/settings`
-
-### School Admin Routes
-- `/dashboard` — Cohort stats, student progress summary
-- `/students` — Full student roster
-- `/cohorts`, `/cohorts/:id` — Cohort management
-- `/beneficiaries` (alias `/partners`) — Approved partners
-- `/discover` — Browse beneficiary directory
-- `/submissions` — Review self-submitted hours
-- `/messages`, `/settings`
-
-### Beneficiary Admin Routes
-- `/dashboard` — Signup stats, opportunity summary
-- `/opportunities` — Create/manage opportunities + time slots
-- `/settings` — Profile, partner schools, invitations
-
----
-
-## Auth System
-
-**Server:** `authenticate` middleware validates Bearer JWT on every protected route. Token payload: `{ userId, email, role }`. Default expiry: 7 days.
-
-**Client:** `useAuth` React context. Token stored in `localStorage` as `goodhours_token`. User profile cached as `goodhours_user`. On app load, validates token via `GET /api/auth/me`. Exported: `login()`, `signup()`, `logout()`, `refreshUser()`, `loginWithToken()`.
-
----
-
-## Key Workflows
-
-### School Onboarding
-1. School admin registers via `/school/register` (Google OAuth or email/password)
-2. Verifies domain via magic link or DNS TXT record
-3. Creates cohorts, imports student CSV
-4. Students receive invitation emails → accept via `/join/student?token=`
-
-### Beneficiary Onboarding
-1. School discovers beneficiary in directory (`/discover`) or adds manually
-2. School sends invitation → beneficiary receives email
-3. Beneficiary accepts via `/join/beneficiary?token=` → creates account
-4. School approves partnership
-
-### Student Service Hours
-**Path A — Structured (Beneficiary-created):**
-1. Student browses opportunities, signs up for a time slot
-2. Student checks in/out (tracked by beneficiary)
-3. Beneficiary admin approves hours
-
-**Path B — Self-Submitted:**
-1. Student submits hours form with org name, date, description, evidence
-2. School admin reviews and approves/rejects
-
-### Verification State Machine
-`PENDING → CHECKED_IN → CHECKED_OUT → APPROVED / REJECTED`
-Hours are immutable once approved. All actions logged in audit trail.
-
----
-
-## Compliance & Security
-
-- **FERPA:** All student data access is logged in `DataAccessLog`
-- **Rate limiting:** Signup (5/hr), login (5/15min), password reset (5/15min), resend verification (3/hr)
-- **RBAC:** Every API route enforces role via `requireRole()` middleware
-- **Audit trail:** `AuditLog` and `BeneficiaryAuditLog` are append-only
-- **Immutability:** Verified hours cannot be edited by students
-- **Domain verification:** Schools must verify email domain ownership
-
----
-
-## Development
-
-### Commands
-```bash
-# Server (port 3001)
-cd server && npm run dev       # tsx watch
-npx prisma db push             # Apply schema
-npx tsx prisma/seed.ts         # Seed test data
-npx tsc --noEmit               # Type check
-
-# Client (port 5173, proxies /api to 3001)
-cd client && npm run dev
-npx tsc --noEmit
-npx vite build
-```
-
-### Test Accounts (after seeding)
-| Role | Email | Password |
-|---|---|---|
-| Student | john@student.edu | password123 |
-| School Admin | admin@lincoln.edu | password123 |
-| Beneficiary Admin | volunteer@greenearth.org | password123 |
-
-### Environment Variables
-- `DATABASE_URL` — Neon PostgreSQL connection string
-- `JWT_SECRET` — Token signing secret
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth (from `google_oAuth_secrets.json` in dev)
-- `RESEND_API_KEY` — Email sending
-- `EMAIL_FROM` — `GoodHours <noreply@notifications.goodhours.app>`
-
----
-
-## File Map (Key Files)
-
-```
-server/prisma/schema.prisma              # Full data model
-server/src/index.ts                      # Express app, route mounting
-server/src/middleware/auth.ts            # JWT authentication
-server/src/middleware/rbac.ts            # requireRole() RBAC
-server/src/routes/auth.ts               # Auth endpoints
-server/src/routes/cohorts.ts            # Cohort management
-server/src/routes/beneficiaries.ts      # Beneficiary + opportunities + signups
-server/src/routes/schools.ts            # School settings + domain verification
-server/src/routes/self-submissions.ts   # Self-submitted hours
-server/src/routes/sessions.ts           # Legacy check-in/out
-server/src/routes/reports.ts            # Reporting + CSV export
-server/src/routes/messages.ts           # Messaging + notifications
-client/src/App.tsx                       # React Router (all routes)
-client/src/hooks/useAuth.tsx            # Auth context
-client/src/lib/api.ts                   # API client (JWT injection)
-client/src/pages/student/               # Student UI (8 pages)
-client/src/pages/school/                # School admin UI (11 pages)
-client/src/pages/beneficiary/           # Beneficiary UI (4 pages)
-vercel.json                             # Deployment config
-api/index.ts                            # Serverless entry point
-```
+# GoodHours Context
+
+This document describes the current development codebase in `/Users/abhay/Hourly`. It is the authoritative context document for the app as it exists in dev, including current functionality, route surface, architecture, and known caveats. It does not assume that production already matches this state.
+
+## What GoodHours Is
+
+GoodHours is a school-controlled community service tracking and verification platform.
+
+The product is built around one core idea: schools need a system of record for student volunteer hours that is harder to fake, easier to audit, and easier to manage than spreadsheets, email, or paper forms.
+
+The platform connects four actors:
+
+- schools, which set graduation/service rules and supervise compliance
+- students, who complete hours and track progress
+- beneficiary organizations, which create opportunities and verify attendance
+- parents/guardians, who can receive a read-only progress link
+
+The app supports two primary hour sources:
+
+- beneficiary-managed hours, where a beneficiary publishes opportunities and verifies attendance
+- student self-submitted hours, where the school reviews outside service that happened off-platform
+
+The app also still carries a legacy organizations/classrooms/service-sessions stack for backward compatibility while the newer school/cohort/beneficiary architecture is the primary system.
+
+## Product Goals
+
+- make student hour totals trustworthy
+- let schools define and enforce service policies
+- reduce manual review load with reminders, exports, and dashboards
+- give beneficiaries a structured way to publish opportunities and approve attendance
+- preserve auditability for compliance and dispute resolution
+
+## Stack
+
+| Layer | Current implementation |
+| --- | --- |
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS, React Router |
+| Backend | Express 4, TypeScript |
+| Database | PostgreSQL via Prisma |
+| Auth | JWT bearer auth, bcrypt password auth, Google OAuth for school flows |
+| Email | Resend-backed email service |
+| Reports | CSV exports, student-side PDF generation with `jsPDF` + `jspdf-autotable` |
+| Maps | Leaflet / React Leaflet + server-side geocode proxy |
+| Deployment shape | Vite static frontend + Vercel `/api` serverless entrypoint re-exporting Express |
+
+## Runtime Shape
+
+### Development
+
+- frontend runs through Vite on `localhost:5173`
+- API runs as a long-lived Express server on `localhost:3001`
+- Vite proxies `/api` to the backend
+- the in-process reminder scheduler can run because the Node process stays alive
+
+### Production-shaped deployment in repo
+
+- `client/dist` is deployed as the static frontend
+- `/api/*` is rewritten to `api/index.ts`, which re-exports the Express app
+- this is a serverless shape on Vercel
+
+### Important runtime caveat
+
+Automatic reminders currently rely on an in-process scheduler started from `server/src/index.ts`. That works in a long-lived dev server, but it is not a durable production scheduling model on serverless infrastructure without an external cron/worker trigger.
+
+## High-Level Architecture
+
+### Frontend
+
+- `client/src/App.tsx` defines public routes plus role-gated student, school, and beneficiary routes
+- `client/src/hooks/useAuth.tsx` provides the auth context and cached current-user state
+- `client/src/lib/api.ts` handles authenticated JSON requests plus authenticated blob downloads
+- page components are grouped by audience: `student`, `school`, `beneficiary`, `admin`, plus public pages
+
+### Backend
+
+- `server/src/index.ts` mounts route groups under `/api`
+- auth is enforced through JWT middleware plus `requireRole(...)`
+- Prisma is the persistence layer for all application data
+- service rules, hour aggregation, risk calculation, reminders, audit logging, and field encryption live under `server/src/lib`
+
+### Primary route groups
+
+- `/api/auth` and `/api/auth/google`
+- `/api/cohorts`
+- `/api/beneficiaries`
+- `/api/invitations`
+- `/api/self-submissions`
+- `/api/schools`
+- `/api/messages`
+- `/api/reports`
+- legacy: `/api/opportunities`, `/api/signups`, `/api/sessions`, `/api/verification`, `/api/organizations`, `/api/saved`, `/api/classrooms`
+
+## Roles
+
+### `STUDENT`
+
+- views progress toward required hours
+- browses opportunities and time slots
+- signs up, cancels, and sees status history
+- submits outside hours for school review
+- exports personal data and generates parent links
+
+### `SCHOOL_ADMIN`
+
+- configures school rules
+- manages cohorts, students, and staff
+- approves beneficiary relationships
+- reviews self-submissions
+- runs exports, reports, reminders, and bulk messaging
+
+### `TEACHER`
+
+- has access to most school dashboards and student views for the associated school
+- can review self-submissions, send school messages, and run reminder cycles
+- some actions remain admin-only, such as certain settings changes and some export paths
+
+### `DISTRICT_ADMIN`
+
+- currently behaves as a school-scoped staff role in most of the app
+- can access many school dashboards and reports for the associated school
+- true multi-school district tenancy is not implemented yet
+
+### `BENEFICIARY_ADMIN`
+
+- manages a beneficiary profile
+- accepts or declines school partnership invitations
+- creates opportunities and time slots
+- approves, rejects, or marks no-shows for student signups
+- can inspect verification history for signups owned by the beneficiary
+
+### `ORG_ADMIN` (legacy)
+
+- legacy role from the old organization/opportunity/session model
+- backend support still exists
+- current primary frontend treats this role as sunset and asks the user to upgrade/re-register
+
+## Core Data Model
+
+### School
+
+The school is the main administrative boundary for the new architecture.
+
+Current school-level rule fields include:
+
+- `requiredHours`
+- `verificationStandard`
+- `serviceStartDate`
+- `serviceEndDate`
+- `allowSelfSubmission`
+- `requireOrgVerification`
+- `categoryHourCaps`
+- `allowJoinByCode`
+- `onboardingComplete`
+- service-area zip codes and location metadata
+
+### Cohort
+
+A cohort is the main student grouping model. It replaces the legacy classroom model for new flows.
+
+Cohorts support:
+
+- `requiredHours` override
+- `serviceStartDate` override
+- `serviceEndDate` override
+- `allowSelfSubmission` override
+- `categoryHourCaps` override
+- publish state and invitation-based enrollment
+
+### Beneficiary
+
+Beneficiaries are nonprofit/public-service entities that partner with schools.
+
+They support:
+
+- directory-backed discovery
+- school approval / invitation workflows
+- organization profiles
+- opportunities and time slots
+- student signup verification and audit history
+
+### Student hour records
+
+Hours can come from three sources:
+
+- `BeneficiarySignup`
+- `SelfSubmittedRequest`
+- legacy `ServiceSession`
+
+The hour calculator aggregates approved and pending totals across all three.
+
+### Audit and compliance records
+
+- `AuditLog` for school-side verification/admin actions
+- `BeneficiaryAuditLog` for beneficiary signup verification actions
+- `DataAccessLog` for FERPA-style access auditing
+
+### Other notable models
+
+- `StudentInvitation`
+- `BeneficiaryInvitation`
+- `SchoolBeneficiaryApproval`
+- `BeneficiaryOpportunity`
+- `BeneficiaryTimeSlot`
+- `Notification`
+- `Message`
+- `SavedOpportunity`
+- `StudentGroup` and `StudentGroupMember`
+- `VerifiedDomain`
+- `SchoolDirectory`
+- `BeneficiaryDirectory`
+
+## Functional Inventory
+
+## Public and Authentication Features
+
+### Public pages and routes
+
+- landing page
+- login
+- signup
+- forgot/reset password
+- email verification page
+- school registration
+- school registration verification page
+- student invitation acceptance
+- beneficiary invitation acceptance
+- parent progress page at `/parent-progress`
+
+### Account/auth features
+
+- email/password signup and login
+- JWT session handling
+- password change
+- forgot password and reset password
+- current-user profile fetch through `/api/auth/me`
+- email verification and resend verification
+- account deletion endpoint
+- profile update endpoint
+
+### Google and school registration flows
+
+- Google OAuth callback flow
+- school discovery by domain
+- domain classification endpoint
+- school registration initiated from a Google identity token
+- school registration completion via verification link
+- production-only personal-email blocking for school registration flows
+
+### Dev-only auth utilities
+
+- dev email-test endpoint
+- dev email-verification bypass endpoint
+- impersonation endpoint and UI
+
+## Student Features
+
+### Student dashboard
+
+The student dashboard is a full progress surface, not just a count of hours.
+
+Current behavior includes:
+
+- total verified hours
+- total pending hours
+- total hours remaining
+- required hours from cohort override or school default
+- deadline banner using cohort end date first, then school end date
+- overdue messaging when the service period is past
+- revision-needed alert for self-submissions sent back for edits
+- cohort info card
+- upcoming confirmed signups
+- recent activity
+- recommended opportunities based on remaining hours, category history, open spots, and proximity in time
+
+### Opportunity browsing
+
+- browse available beneficiary slots
+- search/filter available opportunities and slots
+- view opportunity detail
+- view slot detail
+- sign up for slots
+- see whether a slot is full or waitlisted
+
+### Signup lifecycle
+
+- create beneficiary-based signups
+- cancel a signup as a student
+- automatic promotion of the next waitlisted student when a confirmed student cancels
+- student visibility into current signup statuses
+
+### Progress and status accounting
+
+Student approved and pending totals include:
+
+- beneficiary-approved or beneficiary-pending signups
+- school-approved or pending self-submissions
+- legacy approved/pending service sessions
+
+### Self-submitted hour workflow
+
+- submit outside volunteer hours
+- include organization name, description, date, hours, evidence note, and category
+- school-rule enforcement on submission
+- reject submissions outside the service date window
+- reject submissions when self-submission is disabled
+- resubmit after revision request
+- re-run rule checks on revision resubmission
+
+### Student settings
+
+- edit profile, phone, bio, grade, avatar, and social links
+- change password
+- manage notification preferences
+- manage privacy/message preferences
+- export student CSV
+- export student PDF
+- generate a time-limited read-only parent progress link
+- copy parent link to clipboard
+- legacy classroom join/leave UI remains present
+
+### Saved opportunities
+
+Backend support exists for student-saved opportunities through `/api/saved`:
+
+- save an opportunity
+- list saved opportunities
+- remove a saved opportunity
+
+This support exists in the API layer even though it is not currently a major dedicated top-level UI surface.
+
+### Student messaging
+
+- inbox and sent folder
+- send direct messages
+- mark messages as read
+- view notifications
+
+## School Features
+
+### School dashboard and reporting surfaces
+
+School staff can access:
+
+- school dashboard with high-level totals
+- full student list
+- on-track and off-track filtered list routes
+- cohort list
+- cohort detail pages
+- approved beneficiary/partner list
+- beneficiary discovery flow
+- self-submission review queue
+- school messaging center
+- school settings
+
+### School settings and service rules
+
+School settings currently support:
+
+- school profile fields
+- domain and verification status display
+- required hours
+- service-area zip codes
+- school address and location data
+- service start date
+- service end date
+- allow/disallow self-submission
+- `verificationStandard`
+- `requireOrgVerification`
+- per-category hour caps
+- allow join-by-code toggle
+- password change
+- notification preferences
+- privacy preferences
+- account deletion flow
+
+### Service-rule enforcement
+
+The school rule system is not just cosmetic.
+
+Current enforcement includes:
+
+- self-submission enable/disable
+- service date window checks
+- category cap checks during self-submission approval
+- cohort overrides taking precedence over school defaults
+- `verificationStandard === BENEFICIARY_REQUIRED` acting as org-verification-required behavior in the effective rules resolver
+
+### Cohort management
+
+Current cohort functionality includes:
+
+- create cohort
+- edit cohort
+- delete cohort
+- publish cohort
+- add students
+- import students via CSV
+- remove students
+- list school students eligible for cohort assignment
+- cohort-specific required hours and service-rule overrides
+- cohort-scoped CSV export
+- cohort-scoped at-risk CSV export
+
+### Student oversight
+
+School staff can:
+
+- list all students for the school
+- see approved hours, pending hours, required hours, status, risk reasons, no-show count, and deadline proximity
+- inspect beneficiary verification history for a specific student
+- remove verified legacy hours with an audit trail
+- anonymize/delete a student account for right-to-delete scenarios
+- view FERPA-style data access logs
+
+### At-risk logic
+
+The at-risk system uses `buildStudentProgressRecords(...)`.
+
+Current risk inputs include:
+
+- low percent completion
+- large pending hour backlog
+- no-shows
+- being behind expected pace across the service window
+- near deadline with insufficient progress
+- overdue service deadline
+
+Each progress record includes:
+
+- approved hours
+- pending hours
+- required hours
+- remaining hours
+- percent complete
+- service start and end dates
+- days to deadline
+- no-show count
+- status: `COMPLETED`, `ON_TRACK`, or `AT_RISK`
+- risk level: `NONE`, `LOW`, `MEDIUM`, `HIGH`
+- human-readable risk reasons
+
+### At-risk exports
+
+School staff can fetch at-risk students as:
+
+- JSON
+- CSV
+- optionally cohort-filtered CSV
+
+### Beneficiary discovery and partnership management
+
+Schools can:
+
+- browse the beneficiary directory
+- browse nearby directory results
+- create a custom beneficiary
+- import beneficiaries via CSV
+- invite a beneficiary to partner
+- approve a beneficiary
+- drop a beneficiary relationship
+- see linked beneficiaries/partners
+
+### Staff and group management
+
+Current school-side admin surfaces also include:
+
+- create teacher accounts
+- assign a teacher to a classroom in the legacy stack
+- create student groups
+- list groups
+- view group members
+- add students to groups
+
+### Self-submission review workflow
+
+School staff can:
+
+- list self-submissions
+- filter by status
+- approve a submission
+- approve with adjusted hours
+- enforce or explicitly override category caps
+- reject with reason
+- request revision with note
+- send in-app notifications and email hooks for approval, rejection, revision, and new pending submissions
+
+## Beneficiary Features
+
+### Beneficiary onboarding and partnerships
+
+Beneficiary admins can:
+
+- accept beneficiary invitations
+- decline beneficiary invitations
+- view invited/linked schools
+- manage the beneficiary profile
+
+### Opportunity and slot management
+
+Beneficiary admins can:
+
+- create opportunities
+- create slots under opportunities
+- see opportunities for a beneficiary
+- see signups for a beneficiary
+
+### Attendance verification workflow
+
+Beneficiary admins can:
+
+- approve signups and assign final hours
+- reject signups with a reason
+- mark a signup as a no-show
+- record verification events into `BeneficiaryAuditLog`
+
+### Verification history visibility
+
+Verification history is visible to:
+
+- the beneficiary that owns the signup
+- the student who owns the signup
+- school staff for students in their school
+
+The history payload includes:
+
+- signup status
+- verification status
+- hours
+- rejection reason
+- check-in/check-out state
+- slot + opportunity context
+- chronological audit history with actor attribution
+
+## Messaging and Notifications
+
+### Direct messaging
+
+Current messaging features include:
+
+- user-to-user messaging
+- inbox
+- sent folder
+- priority messages
+- mark-as-read
+- notification creation on receipt
+
+### Bulk school messaging
+
+School staff can send announcements to:
+
+- all students
+- at-risk students
+- one cohort
+
+Bulk sends create both:
+
+- `Message` rows
+- `Notification` rows
+
+### Reminder system
+
+Current reminder logic can generate:
+
+- deadline reminders for students near the service deadline
+- behind-schedule alerts for at-risk students
+- pending-review alerts for school admins/district admins
+
+Manual reminder execution exists at:
+
+- `/api/messages/reminders/run`
+
+Reminder summaries include:
+
+- school id and name
+- deadline reminder count
+- behind-alert count
+- admin-alert count
+- pending review count
+- at-risk student count
+
+## Reports, Exports, and Parent Visibility
+
+### Student report
+
+`/api/reports/student` returns a student-facing report with:
+
+- total approved hours
+- total pending hours
+- total committed legacy hours
+- required hours
+- completed activity count
+- legacy service session lists split by approved/pending/committed/rejected
+
+### School report
+
+`/api/reports/school` returns:
+
+- school name
+- required hours
+- total students
+- total students completed
+- per-student status and risk information
+
+### CSV exports
+
+Current exports include:
+
+- student CSV export
+- school-wide student CSV export
+- cohort-specific student CSV export
+- at-risk student CSV export
+- cohort-specific at-risk CSV export
+
+The frontend uses authenticated blob downloads for school/cohort CSV actions.
+
+### Student PDF export
+
+Student settings can generate a PDF report in the browser using `jsPDF`.
+
+### Parent progress sharing
+
+Students can generate a read-only parent link from settings.
+
+Current behavior:
+
+- link is generated through `/api/reports/parent-link`
+- public page is `/parent-progress?token=...`
+- page shows student name, school, cohort, grade, approved hours, pending hours, required hours, remaining hours, percent complete, and deadline
+- in dev, link generation preserves `localhost` / `127.0.0.1` origin when appropriate
+
+### Audit endpoints
+
+The reporting layer also contains:
+
+- session audit endpoint for legacy verification review
+
+## Compliance, Security, and Auditability
+
+### Access control
+
+- protected routes require JWT auth
+- role checks are enforced server-side
+- school data is generally scoped by `schoolId`
+
+### Audit logging
+
+- school/admin actions write to `AuditLog`
+- beneficiary verification actions write to `BeneficiaryAuditLog`
+- school report/list/export access writes to `DataAccessLog`
+
+### Security controls
+
+- Helmet is enabled
+- CORS is restricted to allowed origins plus local dev origins in non-production
+- rate limiting exists on auth-sensitive routes
+- field encryption support exists for selected profile fields when the encryption key is configured
+
+### Data governance
+
+- student right-to-delete flow anonymizes rather than hard-deletes the user
+- audit data is preserved for traceability
+
+## Legacy Compatibility Layer
+
+The old architecture still exists in the codebase and is still mounted:
+
+- organizations
+- opportunities
+- signups
+- service sessions
+- verification routes
+- classrooms
+
+This legacy layer still matters because:
+
+- some students and staff data may still reference `classroom`
+- legacy `ServiceSession` hours are still included in progress calculations and reports
+- some teacher-scoped permission logic still references the classroom model
+
+The system is therefore hybrid: new school/cohort/beneficiary flows are primary, but the legacy model remains active for compatibility.
+
+## Client Route Surface
+
+### Public
+
+- `/`
+- `/login`
+- `/signup`
+- `/forgot-password`
+- `/reset-password`
+- `/verify-email`
+- `/school/register`
+- `/school/verify-registration`
+- `/join/student`
+- `/join/beneficiary`
+- `/parent-progress`
+
+### Authenticated utility
+
+- `/email-verification-required`
+
+### Student
+
+- `/dashboard`
+- `/browse`
+- `/opportunity/:id`
+- `/slot/:id`
+- `/submit`
+- `/messages`
+- `/settings`
+
+### School staff
+
+- `/dashboard`
+- `/students`
+- `/students/on-track`
+- `/students/off-track`
+- `/cohorts`
+- `/cohorts/:id`
+- `/cohorts/:id/on-track`
+- `/cohorts/:id/off-track`
+- `/beneficiaries`
+- `/partners`
+- `/discover`
+- `/submissions`
+- `/messages`
+- `/settings`
+- `/admin/impersonate`
+
+### Beneficiary
+
+- `/dashboard`
+- `/opportunities`
+- `/settings`
+
+## Backend Route Surface
+
+### Auth
+
+- signup, login, me, password update, profile update
+- email verification, resend verification
+- forgot/reset password
+- account deletion
+- graduation goal setter
+- dev bypass email verification
+- impersonation
+
+### Google auth
+
+- domain classification
+- Google auth URL
+- Google callback
+- school search
+- register school
+- verify school
+
+### Cohorts
+
+- list
+- create
+- school-students helper
+- detail
+- update
+- CSV import
+- publish
+- add student
+- delete cohort
+- remove student from cohort
+
+### Beneficiaries
+
+- list
+- nearby directory lookup
+- directory browse
+- create custom beneficiary
+- student my-signups
+- available slots
+- slot detail
+- beneficiary detail
+- approve from directory
+- invite
+- approve
+- drop
+- linked schools
+- opportunities list/create
+- slot signup
+- signups list
+- approve signup
+- reject signup
+- signup history
+- cancel signup
+- mark no-show
+- invitation list/respond
+- profile update
+
+### Self-submissions
+
+- create
+- list
+- approve
+- reject
+- request revision
+- student update/resubmit
+
+### Schools
+
+- list current school records
+- school location/settings helpers
+- onboarding update
+- settings patch
+- effective rules helper
+- school detail/update
+- students list
+- student verification history
+- school stats
+- organization approve/reject/list/block in legacy flow
+- groups CRUD-lite
+- staff creation
+- remove hours
+- student export CSV
+- student delete/anonymize
+- data access log view
+- at-risk JSON/CSV
+
+### Messages
+
+- direct message list/create
+- mark message read
+- notification list/read
+- bulk school messaging
+- manual reminder run
+
+### Reports
+
+- student report
+- organization report
+- school report
+- export CSV
+- parent-link creation
+- parent-progress read-only view
+- session audit lookup
+
+### Platform utility endpoints
+
+- `/api/geocode`
+- `/api/health`
+
+## Known Caveats
+
+### `DISTRICT_ADMIN` is only partially implemented
+
+Current reality:
+
+- the data model gives a staff user only one `schoolId`
+- true district-wide multi-school tenancy is not modeled
+- several endpoints still exclude `DISTRICT_ADMIN`, especially some approval/export flows
+
+Treat this role as school-scoped for now.
+
+### Reminder scheduling is not production-ready by architecture
+
+The reminder logic exists and works in a long-lived dev server, but the scheduler is started with `setInterval(...)` inside the Node process. That is not a durable scheduling mechanism for a Vercel serverless deployment.
+
+### Some school UI surfaces are broader than backend permissions
+
+The frontend exposes some school actions to `SCHOOL_ADMIN`, `TEACHER`, and `DISTRICT_ADMIN`, but a few backend routes still remain admin-only. Export paths are the clearest example.
+
+## Current State Summary
+
+GoodHours in dev is a large, hybrid service-hours platform with:
+
+- school rule configuration and enforcement
+- cohort-based student management
+- beneficiary discovery, approval, and opportunity publishing
+- verified beneficiary attendance workflows
+- school-reviewed self-submitted hours
+- direct messaging and school-wide announcements
+- automated reminder logic
+- at-risk detection and exports
+- student CSV/PDF export
+- public parent progress sharing
+- audit logging and FERPA-style access tracking
+- legacy compatibility for the earlier organization/classroom/session stack
+
+This is the state that should be treated as current context before any production promotion work.

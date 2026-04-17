@@ -59,6 +59,7 @@ export default function SchoolSettings() {
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [serviceEndDate, setServiceEndDate] = useState("");
   const [allowSelfSubmission, setAllowSelfSubmission] = useState(true);
+  const [verificationStandard, setVerificationStandard] = useState("STANDARD");
   const [requireOrgVerification, setRequireOrgVerification] = useState(false);
   const [capRows, setCapRows] = useState<CapRow[]>([]);
   const [savingRules, setSavingRules] = useState(false);
@@ -131,6 +132,7 @@ export default function SchoolSettings() {
         setServiceStartDate(schoolData.serviceStartDate ? schoolData.serviceStartDate.split("T")[0] : "");
         setServiceEndDate(schoolData.serviceEndDate ? schoolData.serviceEndDate.split("T")[0] : "");
         setAllowSelfSubmission(schoolData.allowSelfSubmission ?? true);
+        setVerificationStandard(schoolData.verificationStandard || "STANDARD");
         setRequireOrgVerification(schoolData.requireOrgVerification ?? false);
         try {
           const caps = schoolData.categoryHourCaps ? JSON.parse(schoolData.categoryHourCaps) : {};
@@ -235,6 +237,7 @@ export default function SchoolSettings() {
         serviceStartDate: serviceStartDate ? new Date(serviceStartDate).toISOString() : null,
         serviceEndDate: serviceEndDate ? new Date(serviceEndDate).toISOString() : null,
         allowSelfSubmission,
+        verificationStandard,
         requireOrgVerification,
         categoryHourCaps,
       });
@@ -637,6 +640,26 @@ export default function SchoolSettings() {
             {/* Section 3: Verification */}
             <div className="border-t border-gray-100 pt-5">
               <h3 className="text-sm font-semibold text-gray-800 mb-1">Verification Requirements</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Verification Workflow</label>
+                <select
+                  value={verificationStandard}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setVerificationStandard(next);
+                    if (next === "BENEFICIARY_REQUIRED") {
+                      setRequireOrgVerification(true);
+                    }
+                  }}
+                  className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="STANDARD">Standard: school staff can review immediately</option>
+                  <option value="BENEFICIARY_REQUIRED">Beneficiary-first: partner verification required first</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  This setting now affects actual approval flow for pending verifications.
+                </p>
+              </div>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Require beneficiary organization verification before school approval</p>
@@ -648,6 +671,7 @@ export default function SchoolSettings() {
                   type="button"
                   role="switch"
                   aria-checked={requireOrgVerification}
+                  disabled={verificationStandard === "BENEFICIARY_REQUIRED"}
                   onClick={() => setRequireOrgVerification((v) => !v)}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     requireOrgVerification ? "bg-blue-600" : "bg-gray-300"

@@ -21,21 +21,51 @@ interface Notification {
   createdAt: string;
 }
 
+interface CohortSummary {
+  id: string;
+  name: string;
+}
+
+interface ReminderSummary {
+  schoolId: string;
+  schoolName: string;
+  deadlineReminders: number;
+  behindAlerts: number;
+  adminAlerts: number;
+  pendingReviewCount: number;
+  atRiskStudents: number;
+}
+
 export default function SchoolMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">("inbox");
   const [showCompose, setShowCompose] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [broadcastAudience, setBroadcastAudience] = useState<"ALL_STUDENTS" | "AT_RISK_STUDENTS" | "COHORT_STUDENTS">("ALL_STUDENTS");
+  const [broadcastCohortId, setBroadcastCohortId] = useState("");
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [broadcastPriority, setBroadcastPriority] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [runningReminders, setRunningReminders] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState("");
   const [sendError, setSendError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [reminderSummary, setReminderSummary] = useState<ReminderSummary | null>(null);
 
   useEffect(() => {
     loadMessages();
   }, [folder]);
+
+  useEffect(() => {
+    api.get<CohortSummary[]>("/cohorts").then(setCohorts).catch(() => {});
+  }, []);
 
   const loadMessages = async () => {
     setLoading(true);
@@ -56,6 +86,7 @@ export default function SchoolMessages() {
     e.preventDefault();
     setSending(true);
     setSendError("");
+    setBroadcastMessage("");
     try {
       await api.post("/messages", { receiverEmail: to, subject, body });
       setShowCompose(false);
@@ -70,26 +101,89 @@ export default function SchoolMessages() {
     }
   };
 
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSendingBroadcast(true);
+    setSendError("");
+    setBroadcastMessage("");
+    try {
+      const result = await api.post<{ recipientCount: number }>("/messages/bulk", {
+        audience: broadcastAudience,
+        cohortId: broadcastAudience === "COHORT_STUDENTS" ? broadcastCohortId : undefined,
+        subject: broadcastSubject || undefined,
+        body: broadcastBody,
+        priority: broadcastPriority,
+      });
+      setBroadcastMessage(`Sent to ${result.recipientCount} recipient${result.recipientCount === 1 ? "" : "s"}.`);
+      setShowBroadcast(false);
+      setBroadcastSubject("");
+      setBroadcastBody("");
+      setBroadcastCohortId("");
+      setBroadcastPriority(false);
+      loadMessages();
+    } catch (err: any) {
+      setSendError(err.message || "Failed to send announcement");
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const handleRunReminders = async () => {
+    setRunningReminders(true);
+    setSendError("");
+    setBroadcastMessage("");
+    try {
+      const summary = await api.post<ReminderSummary | null>("/messages/reminders/run", {});
+      setReminderSummary(summary);
+      setBroadcastMessage("Reminder cycle completed.");
+    } catch (err: any) {
+      setSendError(err.message || "Failed to run reminders");
+    } finally {
+      setRunningReminders(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Messages</h1>
-        <button
-          onClick={() => setShowCompose(!showCompose)}
-          className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
-        >
-          {showCompose ? "Cancel" : "New Message"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRunReminders}
+            disabled={runningReminders}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {runningReminders ? "Running..." : "Run Reminders"}
+          </button>
+          <button
+            onClick={() => { setShowBroadcast((v) => !v); setShowCompose(false); setSendError(""); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+          >
+            {showBroadcast ? "Cancel" : "Announcement"}
+          </button>
+          <button
+            onClick={() => { setShowCompose((v) => !v); setShowBroadcast(false); setSendError(""); }}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+          >
+            {showCompose ? "Cancel" : "New Message"}
+          </button>
+        </div>
       </div>
+
+      {broadcastMessage && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+          {broadcastMessage}
+        </div>
+      )}
+      {sendError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+          {sendError}
+        </div>
+      )}
 
       {showCompose && (
         <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
           <h3 className="font-semibold mb-3">Compose Message</h3>
-          {sendError && (
-            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-              {sendError}
-            </div>
-          )}
           <form onSubmit={handleSend} className="space-y-3">
             <input
               type="email"
@@ -122,6 +216,112 @@ export default function SchoolMessages() {
               {sending ? "Sending..." : "Send"}
             </button>
           </form>
+        </div>
+      )}
+
+      {showBroadcast && (
+        <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold">School Announcement / Mass Reminder</h3>
+              <p className="text-sm text-gray-500">
+                Send one message to all students, only at-risk students, or a single cohort.
+              </p>
+            </div>
+            <div className="text-xs text-gray-400 text-right">
+              Reminder automation also posts admin alerts for pending reviews.
+            </div>
+          </div>
+          <form onSubmit={handleBroadcast} className="space-y-3">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Audience</label>
+                <select
+                  value={broadcastAudience}
+                  onChange={(e) => setBroadcastAudience(e.target.value as typeof broadcastAudience)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="ALL_STUDENTS">All students</option>
+                  <option value="AT_RISK_STUDENTS">At-risk students</option>
+                  <option value="COHORT_STUDENTS">Single cohort</option>
+                </select>
+              </div>
+              {broadcastAudience === "COHORT_STUDENTS" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cohort</label>
+                  <select
+                    value={broadcastCohortId}
+                    onChange={(e) => setBroadcastCohortId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">Select a cohort</option>
+                    {cohorts.map((cohort) => (
+                      <option key={cohort.id} value={cohort.id}>{cohort.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <input
+              type="text"
+              placeholder="Subject"
+              value={broadcastSubject}
+              onChange={(e) => setBroadcastSubject(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <textarea
+              placeholder="Write the announcement or reminder..."
+              value={broadcastBody}
+              onChange={(e) => setBroadcastBody(e.target.value)}
+              required
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={broadcastPriority}
+                onChange={(e) => setBroadcastPriority(e.target.checked)}
+              />
+              Mark as priority
+            </label>
+            <button
+              type="submit"
+              disabled={sendingBroadcast}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              {sendingBroadcast ? "Sending..." : "Send Announcement"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {reminderSummary && (
+        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
+          <div className="font-medium text-gray-800 mb-2">Latest Reminder Run</div>
+          <div className="grid sm:grid-cols-5 gap-3 text-center">
+            <div>
+              <div className="text-lg font-semibold">{reminderSummary.deadlineReminders}</div>
+              <div className="text-xs text-gray-500">Deadline reminders</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{reminderSummary.behindAlerts}</div>
+              <div className="text-xs text-gray-500">Behind alerts</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{reminderSummary.adminAlerts}</div>
+              <div className="text-xs text-gray-500">Admin alerts</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{reminderSummary.pendingReviewCount}</div>
+              <div className="text-xs text-gray-500">Pending reviews</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold">{reminderSummary.atRiskStudents}</div>
+              <div className="text-xs text-gray-500">At-risk students</div>
+            </div>
+          </div>
         </div>
       )}
 

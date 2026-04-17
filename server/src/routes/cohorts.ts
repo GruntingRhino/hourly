@@ -6,11 +6,12 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendStudentInvitationEmail, CLIENT_URL } from "../services/email";
+import { buildStudentProgressRecords } from "../lib/studentProgress";
 
 const router = Router();
 
 // GET /api/cohorts — list cohorts for school
-router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
@@ -30,39 +31,33 @@ router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_A
 
     const result = await Promise.all(
       cohorts.map(async (c) => {
-        // fetch students with hour data
         const students = await prisma.user.findMany({
           where: { cohortId: c.id },
-          select: { id: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            grade: true,
+            cohortId: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
+          },
         });
-        const studentIds = students.map((s) => s.id);
-        const [benSignups, selfSubs] = await Promise.all([
-          prisma.beneficiarySignup.findMany({
-            where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
-            select: { studentId: true, totalHours: true },
-          }),
-          prisma.selfSubmittedRequest.findMany({
-            where: { studentId: { in: studentIds }, status: "APPROVED" },
-            select: { studentId: true, hours: true },
-          }),
-        ]);
-        const hoursMap = new Map<string, number>();
-        for (const bs of benSignups) {
-          hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
-        }
-        for (const ss of selfSubs) {
-          hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
-        }
-        let totalHours = 0;
-        let completedCount = 0;
-        let atRiskCount = 0;
-        for (const s of students) {
-          const h = hoursMap.get(s.id) || 0;
-          totalHours += h;
-          const req = c.requiredHours ?? requiredHours;
-          if (h >= req) completedCount++;
-          else if (h < req * 0.5) atRiskCount++;
-        }
+        const progress = await buildStudentProgressRecords(students, {
+          requiredHours,
+          serviceStartDate: school?.serviceStartDate ?? null,
+          serviceEndDate: school?.serviceEndDate ?? null,
+        });
+        const totalHours = progress.reduce((sum, student) => sum + student.approvedHours, 0);
+        const completedCount = progress.filter((student) => student.status === "COMPLETED").length;
+        const atRiskCount = progress.filter((student) => student.status === "AT_RISK").length;
         const invAccepted = c.invitations.filter((i) => i.status === "ACCEPTED").length;
         const invPending = c.invitations.filter((i) => i.status === "PENDING").length;
         return {
@@ -126,59 +121,55 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
 });
 
 // GET /api/cohorts/school-students — all students across all school cohorts with hours
-router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
     const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
     const defaultRequired = school?.requiredHours ?? 40;
-
-    const cohorts = await prisma.cohort.findMany({
-      where: { schoolId: user.schoolId },
-      select: { id: true, name: true, requiredHours: true },
+    const students = await prisma.user.findMany({
+      where: { role: "STUDENT", cohort: { schoolId: user.schoolId } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+      },
+      orderBy: [{ cohort: { name: "asc" } }, { name: "asc" }],
     });
 
-    const result: any[] = [];
-    for (const cohort of cohorts) {
-      const students = await prisma.user.findMany({
-        where: { cohortId: cohort.id },
-        select: { id: true, name: true, email: true, grade: true },
-      });
-      const studentIds = students.map((s) => s.id);
-      if (studentIds.length === 0) continue;
-      const [benSignups, selfSubs] = await Promise.all([
-        prisma.beneficiarySignup.findMany({
-          where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
-          select: { studentId: true, totalHours: true },
-        }),
-        prisma.selfSubmittedRequest.findMany({
-          where: { studentId: { in: studentIds }, status: "APPROVED" },
-          select: { studentId: true, hours: true },
-        }),
-      ]);
-      const hoursMap = new Map<string, number>();
-      for (const bs of benSignups) hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
-      for (const ss of selfSubs) hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: defaultRequired,
+      serviceStartDate: school?.serviceStartDate ?? null,
+      serviceEndDate: school?.serviceEndDate ?? null,
+    });
 
-      const cohortRequired = cohort.requiredHours ?? defaultRequired;
-      for (const s of students) {
-        const hours = Math.round((hoursMap.get(s.id) || 0) * 100) / 100;
-        result.push({
-          id: s.id,
-          name: s.name,
-          email: s.email,
-          grade: s.grade,
-          cohortId: cohort.id,
-          cohortName: cohort.name,
-          approvedHours: hours,
-          requiredHours: cohortRequired,
-          status: hours >= cohortRequired ? "COMPLETED" : hours >= cohortRequired * 0.5 ? "ON_TRACK" : "AT_RISK",
-        });
-      }
-    }
-
-    res.json(result);
+    res.json(progress.map((student) => ({
+      id: student.id,
+      name: student.name,
+      email: student.email,
+      grade: student.grade,
+      cohortId: student.cohortId,
+      cohortName: student.cohortName,
+      approvedHours: student.approvedHours,
+      pendingHours: student.pendingHours,
+      requiredHours: student.requiredHours,
+      status: student.status,
+      riskReasons: student.riskReasons,
+      noShowCount: student.noShowCount,
+      daysToDeadline: student.daysToDeadline,
+    })));
   } catch (err) {
     console.error("School students error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -186,7 +177,7 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
 });
 
 // GET /api/cohorts/:id — cohort details
-router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     const cohort = await prisma.cohort.findUnique({
@@ -196,34 +187,39 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRIC
           select: { id: true, name: true, email: true, grade: true, house: true },
         },
         invitations: { orderBy: { createdAt: "desc" } },
-        school: { select: { requiredHours: true } },
+        school: { select: { requiredHours: true, serviceStartDate: true, serviceEndDate: true } },
       },
     });
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
     const requiredHours = cohort.requiredHours ?? cohort.school.requiredHours ?? 40;
-    const studentIds = cohort.students.map((s) => s.id);
-    const [benSignups, selfSubs] = await Promise.all([
-      prisma.beneficiarySignup.findMany({
-        where: { studentId: { in: studentIds }, verificationStatus: "APPROVED" },
-        select: { studentId: true, totalHours: true },
-      }),
-      prisma.selfSubmittedRequest.findMany({
-        where: { studentId: { in: studentIds }, status: "APPROVED" },
-        select: { studentId: true, hours: true },
-      }),
-    ]);
-    const hoursMap = new Map<string, number>();
-    for (const bs of benSignups) {
-      hoursMap.set(bs.studentId, (hoursMap.get(bs.studentId) || 0) + (bs.totalHours ?? 0));
-    }
-    for (const ss of selfSubs) {
-      hoursMap.set(ss.studentId, (hoursMap.get(ss.studentId) || 0) + ss.hours);
-    }
-    const studentsWithHours = cohort.students.map((s) => ({
-      ...s,
-      approvedHours: hoursMap.get(s.id) || 0,
+    const studentsForProgress = cohort.students.map((student) => ({
+      ...student,
+      cohortId: cohort.id,
+      cohort: {
+        id: cohort.id,
+        name: cohort.name,
+        requiredHours: cohort.requiredHours,
+        serviceStartDate: cohort.serviceStartDate ?? null,
+        serviceEndDate: cohort.serviceEndDate ?? null,
+      },
+    }));
+    const progress = await buildStudentProgressRecords(studentsForProgress, {
+      requiredHours: cohort.school.requiredHours ?? 40,
+      serviceStartDate: cohort.school.serviceStartDate ?? null,
+      serviceEndDate: cohort.school.serviceEndDate ?? null,
+    });
+    const progressMap = new Map(progress.map((student) => [student.id, student]));
+    const studentIds = cohort.students.map((student) => student.id);
+    const studentsWithHours = cohort.students.map((student) => ({
+      ...student,
+      approvedHours: progressMap.get(student.id)?.approvedHours ?? 0,
+      pendingHours: progressMap.get(student.id)?.pendingHours ?? 0,
+      status: progressMap.get(student.id)?.status ?? "ON_TRACK",
+      riskReasons: progressMap.get(student.id)?.riskReasons ?? [],
+      noShowCount: progressMap.get(student.id)?.noShowCount ?? 0,
+      daysToDeadline: progressMap.get(student.id)?.daysToDeadline ?? null,
     }));
 
     // Count pending verifications for students in this cohort

@@ -88,9 +88,13 @@ export default function SchoolRegister() {
   const [signupMode, setSignupMode] = useState<"google" | "email">("google");
   // email-collect step state (email/password path only)
   const [emailCollectName, setEmailCollectName] = useState("");
+  const [emailCollectEmail, setEmailCollectEmail] = useState("");
   const [emailCollectPassword, setEmailCollectPassword] = useState("");
   const [showEmailPassword, setShowEmailPassword] = useState(false);
   const emailPasswordOk = PASSWORD_RULES.every((r) => r.test(emailCollectPassword));
+
+  // Domain-matched school suggestions (from Google email or email-collect step)
+  const [domainSuggestions, setDomainSuggestions] = useState<SchoolEntry[]>([]);
 
   const [step, setStep] = useState<Step>("google");
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
@@ -155,6 +159,11 @@ export default function SchoolRegister() {
         }
         setRegistrationToken(result.registrationToken);
         setUserName(result.name);
+        if (result.domainSuggestions?.length) {
+          setDomainSuggestions(result.domainSuggestions);
+        }
+        // Pre-fill contact email with the Google account email
+        setContactEmail(result.email || "");
         setStep("search");
       }
     } catch (err: any) {
@@ -252,7 +261,7 @@ export default function SchoolRegister() {
       if (signupMode === "email") {
         // Email/password path: create account immediately, then redirect to verify email
         const result = await signup({
-          email: contactEmail,
+          email: emailCollectEmail || contactEmail,
           password: emailCollectPassword,
           name: emailCollectName,
           role: "SCHOOL_ADMIN",
@@ -344,9 +353,18 @@ export default function SchoolRegister() {
 
   // ─── Step: Email/password — collect name + password ─────────────────────────
   if (step === "email-collect") {
-    const handleEmailCollectNext = (e: React.FormEvent) => {
+    const handleEmailCollectNext = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!emailPasswordOk) return;
+      // Pre-fill contact email and fetch domain suggestions
+      setContactEmail(emailCollectEmail);
+      const domain = emailCollectEmail.split("@")[1]?.toLowerCase().trim();
+      if (domain) {
+        try {
+          const results = await api.get<SchoolEntry[]>(`/auth/google/schools?domain=${encodeURIComponent(domain)}`);
+          if (results.length) setDomainSuggestions(results);
+        } catch {}
+      }
       setStep("search");
     };
     return (
@@ -376,6 +394,14 @@ export default function SchoolRegister() {
                   required autoComplete="name"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="Jane Smith" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">School Email</label>
+                <input type="email" value={emailCollectEmail}
+                  onChange={(e) => setEmailCollectEmail(e.target.value)}
+                  required autoComplete="email"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="you@yourschool.edu" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -417,7 +443,7 @@ export default function SchoolRegister() {
                   </ul>
                 )}
               </div>
-              <button type="submit" disabled={!emailCollectName.trim() || !emailPasswordOk}
+              <button type="submit" disabled={!emailCollectName.trim() || !emailCollectEmail.trim() || !emailPasswordOk}
                 className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 Continue — Find Your School
               </button>
@@ -460,6 +486,40 @@ export default function SchoolRegister() {
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+            )}
+
+            {/* Domain-matched suggestions */}
+            {domainSuggestions.length > 0 && !selectedSchool && !alreadyClaimed && (
+              <div className="mb-5">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
+                  Suggested for your domain
+                </p>
+                <div className="space-y-1.5">
+                  {domainSuggestions.map((school) => (
+                    <button
+                      key={school.id}
+                      type="button"
+                      onClick={() => handleSelectSchool(school)}
+                      className="w-full text-left px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{school.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {[school.city, school.state].filter(Boolean).join(", ")}
+                          {school.type ? ` · ${school.type}` : ""}
+                          {school.gradeRange ? ` · ${school.gradeRange}` : ""}
+                        </div>
+                      </div>
+                      {school.claimed ? (
+                        <span className="shrink-0 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Registered</span>
+                      ) : (
+                        <span className="shrink-0 text-xs text-blue-600 font-medium">Select →</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Or search below for a different school.</p>
+              </div>
             )}
 
             {/* Already-registered banner */}

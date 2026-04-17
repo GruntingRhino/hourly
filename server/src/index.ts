@@ -20,9 +20,11 @@ import cohortRoutes from "./routes/cohorts";
 import beneficiaryRoutes from "./routes/beneficiaries";
 import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
+import { startReminderScheduler } from "./lib/reminders";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Trust Vercel/reverse-proxy X-Forwarded-For so express-rate-limit
 // can identify real client IPs instead of always seeing the proxy IP.
@@ -36,16 +38,21 @@ app.use(helmet({
 
 // Lock CORS to known origins. In dev any localhost port is fine;
 // in production only the deployed frontend domain is permitted.
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+const EXPLICIT_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:5173", "http://localhost:3000"];
+
+function isLocalDevOrigin(origin: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no Origin (server-to-server, curl, mobile apps)
     if (!origin) return callback(null, true);
     if (
-      ALLOWED_ORIGINS.includes(origin) ||
+      EXPLICIT_ALLOWED_ORIGINS.includes(origin) ||
+      (!IS_PRODUCTION && isLocalDevOrigin(origin)) ||
       origin.endsWith(".goodhours.app") ||
       origin === "https://goodhours.app"
     ) {
@@ -103,6 +110,7 @@ app.get("/api/health", (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`GoodHours API running on http://localhost:${PORT}`);
+  startReminderScheduler();
 });
 
 export default app;

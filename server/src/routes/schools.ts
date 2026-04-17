@@ -7,8 +7,9 @@ import { requireRole } from "../middleware/rbac";
 import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { resolveEffectiveRules } from "../lib/schoolRules";
-import { calculateStudentHours } from "../lib/hoursCalculator";
 import { geocodeAddress } from "../lib/geocode";
+import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { calculateStudentHours } from "../lib/hoursCalculator";
 
 const router = Router();
 const schoolJoinSettingsSchema = z.object({
@@ -67,7 +68,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 });
 
 // GET /api/schools/location — returns school lat/lng for map centering
-router.get("/location", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/location", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(404).json({ error: "No school found" });
@@ -95,7 +96,7 @@ router.get("/location", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DI
 });
 
 // GET /api/schools/settings — current school-level settings for the authenticated school staff
-router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) {
@@ -181,7 +182,7 @@ router.get("/my-rules", authenticate, async (req: Request, res: Response) => {
 });
 
 // GET /api/schools/:id — school details (staff only)
-router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -215,6 +216,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       serviceStartDate: z.string().datetime({ offset: true }).nullable().optional(),
       serviceEndDate: z.string().datetime({ offset: true }).nullable().optional(),
       allowSelfSubmission: z.boolean().optional(),
+      verificationStandard: z.enum(["STANDARD", "BENEFICIARY_REQUIRED"]).optional(),
       requireOrgVerification: z.boolean().optional(),
       categoryHourCaps: z
         .record(z.string(), z.number().positive())
@@ -228,6 +230,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
         serviceStartDate: req.body.serviceStartDate,
         serviceEndDate: req.body.serviceEndDate,
         allowSelfSubmission: req.body.allowSelfSubmission,
+        verificationStandard: req.body.verificationStandard,
         requireOrgVerification: req.body.requireOrgVerification,
         categoryHourCaps: req.body.categoryHourCaps,
       });
@@ -261,7 +264,11 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
     if (rulesData.serviceStartDate !== undefined) updateData.serviceStartDate = rulesData.serviceStartDate ? new Date(rulesData.serviceStartDate) : null;
     if (rulesData.serviceEndDate !== undefined) updateData.serviceEndDate = rulesData.serviceEndDate ? new Date(rulesData.serviceEndDate) : null;
     if (rulesData.allowSelfSubmission !== undefined) updateData.allowSelfSubmission = rulesData.allowSelfSubmission;
+    if (rulesData.verificationStandard !== undefined) updateData.verificationStandard = rulesData.verificationStandard;
     if (rulesData.requireOrgVerification !== undefined) updateData.requireOrgVerification = rulesData.requireOrgVerification;
+    if (rulesData.verificationStandard === "BENEFICIARY_REQUIRED") {
+      updateData.requireOrgVerification = true;
+    }
     if (rulesData.categoryHourCaps !== undefined) {
       updateData.categoryHourCaps = rulesData.categoryHourCaps != null ? JSON.stringify(rulesData.categoryHourCaps) : null;
     }
@@ -297,7 +304,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
 });
 
 // GET /api/schools/:id/students — list students (via classrooms)
-router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -314,17 +321,44 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
       },
       select: {
         id: true, name: true, email: true, grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
         classroomId: true,
         classroom: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
     });
 
-    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: { requiredHours: true, serviceStartDate: true, serviceEndDate: true },
+    });
+    if (!school) return res.status(404).json({ error: "School not found" });
 
-    const result = students.map((s) => ({
-      ...s,
-      approvedHours: Math.round((hoursMap.get(s.id)?.approved ?? 0) * 100) / 100,
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
+    });
+    const progressMap = new Map(progress.map((student) => [student.id, student]));
+
+    const result = students.map((student) => ({
+      ...student,
+      approvedHours: progressMap.get(student.id)?.approvedHours ?? 0,
+      pendingHours: progressMap.get(student.id)?.pendingHours ?? 0,
+      requiredHours: progressMap.get(student.id)?.requiredHours ?? school.requiredHours,
+      status: progressMap.get(student.id)?.status ?? "ON_TRACK",
+      riskReasons: progressMap.get(student.id)?.riskReasons ?? [],
+      noShowCount: progressMap.get(student.id)?.noShowCount ?? 0,
+      daysToDeadline: progressMap.get(student.id)?.daysToDeadline ?? null,
     }));
 
     await logDataAccess({
@@ -343,8 +377,101 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER",
   }
 });
 
+// GET /api/schools/:id/students/:studentId/verification-history — beneficiary verification audit trail for one student
+router.get("/:id/students/:studentId/verification-history", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (actor?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const student = await prisma.user.findUnique({
+      where: { id: req.params.studentId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        classroom: { select: { schoolId: true } },
+        cohort: { select: { schoolId: true, name: true } },
+      },
+    });
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
+
+    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
+    if (studentSchoolId !== req.params.id) {
+      return res.status(403).json({ error: "Student is not enrolled in your school" });
+    }
+
+    const signups = await prisma.beneficiarySignup.findMany({
+      where: { studentId: student.id },
+      include: {
+        slot: {
+          include: {
+            opportunity: {
+              include: {
+                beneficiary: { select: { id: true, name: true, category: true } },
+              },
+            },
+          },
+        },
+        auditLogs: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: [{ slot: { date: "desc" } }, { createdAt: "desc" }],
+    });
+    const actorIds = [...new Set(signups.flatMap((signup) => signup.auditLogs.map((entry) => entry.actorId)))];
+    const actors = actorIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true, role: true },
+        })
+      : [];
+    const actorMap = new Map(actors.map((actor) => [actor.id, actor]));
+
+    res.json({
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        cohortName: student.cohort?.name ?? null,
+      },
+      signups: signups.map((signup) => ({
+        id: signup.id,
+        status: signup.status,
+        verificationStatus: signup.verificationStatus,
+        totalHours: signup.totalHours,
+        rejectionReason: signup.rejectionReason,
+        checkedIn: signup.checkedIn,
+        checkedOut: signup.checkedOut,
+        slot: {
+          date: signup.slot.date,
+          startTime: signup.slot.startTime,
+          endTime: signup.slot.endTime,
+          durationHours: signup.slot.durationHours,
+          opportunity: {
+            title: signup.slot.opportunity.title,
+            category: signup.slot.opportunity.category,
+            beneficiary: signup.slot.opportunity.beneficiary,
+          },
+        },
+        history: signup.auditLogs.map((entry) => ({
+          id: entry.id,
+          action: entry.action,
+          details: entry.details,
+          createdAt: entry.createdAt,
+          actor: actorMap.get(entry.actorId) ?? { id: entry.actorId, name: "Unknown", role: "UNKNOWN" },
+        })),
+      })),
+    });
+  } catch (err) {
+    console.error("Student verification history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/:id/stats — school-wide stats
-router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -362,22 +489,34 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "D
           { cohort: { schoolId: req.params.id } },
         ],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+      },
     });
 
-    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
+    });
 
-    const totalStudents = students.length;
-    let totalHours = 0;
-    let completedGoal = 0;
-    let atRisk = 0;
-
-    for (const student of students) {
-      const hours = hoursMap.get(student.id)?.approved ?? 0;
-      totalHours += hours;
-      if (hours >= school.requiredHours) completedGoal++;
-      else if (hours < school.requiredHours * 0.5) atRisk++;
-    }
+    const totalStudents = progress.length;
+    const totalHours = progress.reduce((sum, student) => sum + student.approvedHours, 0);
+    const completedGoal = progress.filter((student) => student.status === "COMPLETED").length;
+    const atRisk = progress.filter((student) => student.status === "AT_RISK").length;
 
     res.json({
       totalStudents,
@@ -470,7 +609,7 @@ router.post("/:id/organizations/:orgId/reject", authenticate, requireRole("SCHOO
 });
 
 // GET /api/schools/:id/organizations
-router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -513,7 +652,7 @@ router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
 // ─── Student Groups ─────────────────────────────────────────────
 
 // GET /api/schools/:id/groups
-router.get("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -551,7 +690,7 @@ router.post("/:id/groups", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
 });
 
 // GET /api/schools/:id/groups/:groupId/students
-router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (actor?.schoolId !== req.params.id) {
@@ -569,29 +708,29 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
     });
 
     const studentIds = members.map((m) => m.studentId);
-    const students = await prisma.user.findMany({
-      where: { id: { in: studentIds } },
-      select: {
-        id: true, name: true, email: true, grade: true,
-        serviceSessions: {
-          where: { verificationStatus: "APPROVED" },
-          select: { totalHours: true },
+    const [students, school, hoursMap] = await Promise.all([
+      prisma.user.findMany({
+        where: { id: { in: studentIds } },
+        select: {
+          id: true, name: true, email: true, grade: true,
+          cohort: { select: { requiredHours: true } },
         },
-      },
-    });
-
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+      }),
+      prisma.school.findUnique({ where: { id: req.params.id } }),
+      calculateStudentHours(studentIds),
+    ]);
 
     const result = students.map((s) => {
-      const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
+      const hours = hoursMap.get(s.id)?.approved ?? 0;
+      const required = s.cohort?.requiredHours ?? school?.requiredHours ?? 40;
       return {
         id: s.id,
         name: s.name,
         email: s.email,
         grade: s.grade,
         approvedHours: hours,
-        requiredHours: school?.requiredHours || 40,
-        status: hours >= (school?.requiredHours || 40) ? "COMPLETED" : hours >= (school?.requiredHours || 40) * 0.5 ? "ON_TRACK" : "AT_RISK",
+        requiredHours: required,
+        status: hours >= required ? "COMPLETED" : hours >= required * 0.5 ? "ON_TRACK" : "AT_RISK",
       };
     });
 
@@ -748,7 +887,7 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
   }
 });
 
-// GET /api/schools/:id/export — export all student data as CSV (SCHOOL_ADMIN only, FERPA data portability)
+// GET /api/schools/:id/export — export student data as CSV; optional ?cohortId= filter
 router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
@@ -756,28 +895,73 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       return res.status(403).json({ error: "Not your school" });
     }
 
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        requiredHours: true,
+        serviceStartDate: true,
+        serviceEndDate: true,
+      },
+    });
     if (!school) return res.status(404).json({ error: "School not found" });
 
+    const cohortId = (req.query.cohortId as string | undefined) || undefined;
+    let cohortLabel: string | null = null;
+
+    if (cohortId) {
+      const cohort = await prisma.cohort.findFirst({
+        where: { id: cohortId, schoolId: req.params.id },
+        select: { name: true },
+      });
+      if (!cohort) {
+        return res.status(404).json({ error: "Cohort not found for this school" });
+      }
+      cohortLabel = cohort.name;
+    }
+
+    // Build where clause: optional cohort filter
+    const whereClause: any = {
+      role: "STUDENT",
+    };
+    if (cohortId) {
+      whereClause.cohortId = cohortId;
+    } else {
+      whereClause.OR = [
+        { classroom: { schoolId: req.params.id } },
+        { cohort: { schoolId: req.params.id } },
+      ];
+    }
+
     const students = await prisma.user.findMany({
-      where: {
-        role: "STUDENT",
-        OR: [
-          { classroom: { schoolId: req.params.id } },
-          { cohort: { schoolId: req.params.id } },
-        ],
-      },
+      where: whereClause,
       select: {
         id: true,
         name: true,
         email: true,
         grade: true,
         createdAt: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
       },
       orderBy: { name: "asc" },
     });
 
-    const hoursMap = await calculateStudentHours(students.map((s) => s.id));
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
+    });
+    const progressMap = new Map(progress.map((student) => [student.id, student]));
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -785,25 +969,32 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       targetType: "school",
       targetId: req.params.id,
       schoolId: req.params.id,
-      details: { studentCount: students.length },
+      details: { studentCount: students.length, cohortId: cohortId ?? null },
     });
 
-    const rows: string[][] = [["Student ID", "Name", "Email", "Grade", "Approved Hours", "Enrolled At"]];
+    const rows: string[][] = [["Student ID", "Name", "Email", "Grade", "Cohort", "Approved Hours", "Required Hours", "% Complete", "Enrolled At"]];
     for (const s of students) {
-      const hours = hoursMap.get(s.id)?.approved ?? 0;
+      const student = progressMap.get(s.id);
+      const hours = student?.approvedHours ?? 0;
+      const required = student?.requiredHours ?? school.requiredHours;
+      const pct = student?.percentComplete ?? Math.min(100, Math.round((hours / required) * 100));
       rows.push([
         s.id,
         s.name,
         s.email,
         s.grade || "",
+        s.cohort?.name || "",
         String(Math.round(hours * 100) / 100),
+        String(required),
+        `${pct}%`,
         s.createdAt.toISOString().split("T")[0],
       ]);
     }
 
+    const label = (cohortLabel ?? school.name).replace(/[^a-z0-9]/gi, "_");
     const csv = rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${school.name.replace(/[^a-z0-9]/gi, "_")}-students.csv"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${label}-students.csv"`);
     res.send(csv);
   } catch (err) {
     console.error("School export error:", err);
@@ -871,7 +1062,7 @@ router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMI
 });
 
 // GET /api/schools/:id/data-access-logs — FERPA audit trail of who accessed student data (SCHOOL_ADMIN only)
-router.get("/:id/data-access-logs", authenticate, requireRole("SCHOOL_ADMIN", "DISTRICT_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/data-access-logs", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {
@@ -909,6 +1100,141 @@ router.post("/:id/organizations/:orgId/block", authenticate, requireRole("SCHOOL
     res.json({ message: "Organization blocked" });
   } catch (err) {
     console.error("Block org error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/schools/:id/students/at-risk — JSON list of at-risk students (optionally exportable)
+router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        requiredHours: true,
+        serviceStartDate: true,
+        serviceEndDate: true,
+      },
+    });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    const cohortId = req.query.cohortId as string | undefined;
+
+    if (cohortId) {
+      const cohort = await prisma.cohort.findFirst({
+        where: { id: cohortId, schoolId: req.params.id },
+        select: { id: true },
+      });
+      if (!cohort) {
+        return res.status(404).json({ error: "Cohort not found for this school" });
+      }
+    }
+
+    const whereClause: any = { role: "STUDENT" };
+    if (cohortId) {
+      whereClause.cohortId = cohortId;
+    } else {
+      whereClause.OR = [
+        { classroom: { schoolId: req.params.id } },
+        { cohort: { schoolId: req.params.id } },
+      ];
+    }
+
+    const students = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
+    });
+
+    const atRisk = progress
+      .filter((student) => student.status === "AT_RISK")
+      .map((student) => ({
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        grade: student.grade,
+        cohort: student.cohortName,
+        approvedHours: student.approvedHours,
+        pendingHours: student.pendingHours,
+        requiredHours: student.requiredHours,
+        remainingHours: student.remainingHours,
+        percentComplete: student.percentComplete,
+        riskLevel: student.riskLevel,
+        riskReasons: student.riskReasons,
+        noShowCount: student.noShowCount,
+        daysToDeadline: student.daysToDeadline,
+        deadline: student.serviceEndDate?.toISOString() ?? null,
+      }));
+
+    // CSV export if requested
+    if (req.query.format === "csv") {
+      const rows = [[
+        "Name",
+        "Email",
+        "Grade",
+        "Cohort",
+        "Approved Hours",
+        "Pending Hours",
+        "Required Hours",
+        "Remaining Hours",
+        "% Complete",
+        "Risk Level",
+        "Risk Reasons",
+        "No-Shows",
+        "Deadline",
+      ]];
+      for (const s of atRisk) {
+        rows.push([
+          s.name,
+          s.email,
+          s.grade ?? "",
+          s.cohort ?? "",
+          String(s.approvedHours),
+          String(s.pendingHours),
+          String(s.requiredHours),
+          String(s.remainingHours),
+          `${s.percentComplete}%`,
+          s.riskLevel,
+          s.riskReasons.join("; "),
+          String(s.noShowCount),
+          s.deadline ? s.deadline.split("T")[0] : "",
+        ]);
+      }
+      const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="at-risk-students.csv"`);
+      return res.send(csv);
+    }
+
+    res.json({ total: atRisk.length, students: atRisk });
+  } catch (err) {
+    console.error("At-risk students error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

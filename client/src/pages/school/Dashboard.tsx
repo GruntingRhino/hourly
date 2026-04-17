@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
@@ -35,6 +37,26 @@ interface StudentRow {
   approvedHours: number;
   requiredHours: number;
   status: "COMPLETED" | "ON_TRACK" | "AT_RISK";
+}
+
+interface SchoolReportStudent {
+  name: string;
+  email: string;
+  cohortName?: string | null;
+  approvedHours: number;
+  pendingHours: number;
+  requiredHours: number;
+  percentComplete: number;
+  status: string;
+  riskReasons?: string[];
+}
+
+interface SchoolReportResponse {
+  schoolName: string;
+  requiredHours: number;
+  totalStudents: number;
+  studentsCompleted: number;
+  students: SchoolReportStudent[];
 }
 
 export default function SchoolDashboard() {
@@ -75,6 +97,42 @@ export default function SchoolDashboard() {
       setError("Failed to load dashboard. Please refresh.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const report = await api.get<SchoolReportResponse>("/reports/school");
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`${report.schoolName} Service Report`, 14, 18);
+      doc.setFontSize(11);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 27);
+      doc.text(`Students: ${report.totalStudents}`, 14, 34);
+      doc.text(`Completed: ${report.studentsCompleted}`, 70, 34);
+      doc.text(`Default Goal: ${report.requiredHours}h`, 120, 34);
+
+      autoTable(doc, {
+        startY: 42,
+        head: [["Student", "Cohort", "Approved", "Pending", "Required", "%", "Status", "Risk Factors"]],
+        body: report.students.map((student) => [
+          student.name,
+          student.cohortName || "—",
+          student.approvedHours.toFixed(1),
+          student.pendingHours.toFixed(1),
+          student.requiredHours.toFixed(1),
+          `${student.percentComplete}%`,
+          student.status,
+          student.riskReasons?.join("; ") || "—",
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [31, 41, 55] },
+      });
+
+      doc.save(`${report.schoolName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-service-report.pdf`);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to export PDF report.");
     }
   };
 
@@ -157,6 +215,9 @@ export default function SchoolDashboard() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex gap-2">
+          <button onClick={handleExportPdf} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Export PDF
+          </button>
           <Link to="/cohorts" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
             Manage Cohorts
           </Link>
@@ -181,7 +242,7 @@ export default function SchoolDashboard() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">At Risk</div>
           <div className={`text-2xl font-bold ${totalAtRisk > 0 ? "text-red-600" : "text-gray-800"}`}>{totalAtRisk}</div>
-          <div className="text-xs text-gray-400">below 50% of goal</div>
+          <div className="text-xs text-gray-400">deadline, pace, or attendance risk</div>
         </div>
       </div>
 

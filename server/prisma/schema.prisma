@@ -16,7 +16,7 @@ model User {
   passwordHash  String?   // nullable — Google-OAuth users may not have a password initially
   name          String
   phone         String?
-  role          String    // SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN, STUDENT, BENEFICIARY_ADMIN
+  role          String    // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
   emailVerificationToken String?
@@ -24,6 +24,7 @@ model User {
   passwordResetToken String?
   passwordResetExpires DateTime?
   googleId      String?   @unique
+  isTestAccount Boolean   @default(false) // true = Playwright/QA account, hidden from all lists
   notificationPreferences String?  // JSON blob for notification prefs
   messagePreferences      String?  // JSON blob for message/privacy prefs
   createdAt     DateTime  @default(now())
@@ -39,7 +40,7 @@ model User {
   classroomId   String?
   classroom     Classroom? @relation("ClassroomStudents", fields: [classroomId], references: [id])
 
-  // Staff school association (SCHOOL_ADMIN, TEACHER, DISTRICT_ADMIN)
+  // Staff school association (SCHOOL_ADMIN, TEACHER)
   schoolId      String?
   school        School?   @relation("SchoolStaff", fields: [schoolId], references: [id])
 
@@ -86,8 +87,8 @@ model School {
   registrationToken      String?   @unique
   registrationTokenExpires DateTime?
   registrationEmail      String?   // email to which the magic link was sent
-  createdById      String
-  createdBy        User     @relation("SchoolCreator", fields: [createdById], references: [id])
+  createdById      String?
+  createdBy        User?    @relation("SchoolCreator", fields: [createdById], references: [id])
   requiredHours    Float    @default(40)
   verificationStandard String @default("STANDARD")
   serviceStartDate       DateTime?
@@ -294,10 +295,11 @@ model SelfSubmittedRequest {
   date            DateTime
   hours           Float
   evidenceNote    String?  // optional description/link
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED, REVISION_REQUESTED
   reviewedBy      String?
   reviewedAt      DateTime?
   rejectionReason String?
+  revisionNote    String?  // admin note when requesting revision
   convertedSessionId String? // if approved → creates a ServiceSession
   category        String?  // e.g. "environment", "education", "food", "health", "general"
   createdAt       DateTime @default(now())

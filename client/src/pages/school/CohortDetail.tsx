@@ -10,6 +10,9 @@ interface Student {
   grade: string | null;
   house: string | null;
   approvedHours: number;
+  pendingHours?: number;
+  status?: "COMPLETED" | "ON_TRACK" | "AT_RISK";
+  riskReasons?: string[];
 }
 
 interface Invitation {
@@ -47,6 +50,7 @@ export default function CohortDetail() {
   const [addEmail, setAddEmail] = useState("");
   const [addName, setAddName] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [publishConfirm, setPublishConfirm] = useState(false);
   const [publishToast, setPublishToast] = useState("");
@@ -118,6 +122,24 @@ export default function CohortDetail() {
     }
   };
 
+  const handleDownload = async (path: string, filename: string, label: string) => {
+    setDownloadingReport(label);
+    setError("");
+    try {
+      const blob = await api.download(path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || "Failed to export cohort report.");
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
+
   const requiredHours = cohort?.requiredHours ?? 0;
 
   const stats = useMemo(() => {
@@ -125,8 +147,8 @@ export default function CohortDetail() {
     const hours = cohort.students.map((s) => s.approvedHours);
     const total = cohort.students.length;
     const active = cohort.students.filter((s) => s.approvedHours > 0).length;
-    const onTrack = cohort.students.filter((s) => s.approvedHours >= requiredHours * 0.5).length;
-    const offTrack = total - onTrack;
+    const onTrack = cohort.students.filter((s) => (s.status ?? (s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK")) !== "AT_RISK").length;
+    const offTrack = cohort.students.filter((s) => (s.status ?? (s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK")) === "AT_RISK").length;
     const totalHours = hours.reduce((a, b) => a + b, 0);
     const mean = total > 0 ? totalHours / total : 0;
     const sorted = [...hours].sort((a, b) => a - b);
@@ -153,16 +175,39 @@ export default function CohortDetail() {
   if (!cohort) return null;
 
   const pendingInvitations = cohort.invitations.filter((i) => i.status === "PENDING").length;
+  const cohortFilename = cohort.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <Link to="/cohorts" className="text-gray-500 hover:text-gray-800 text-sm">← Cohorts</Link>
         <span className="text-gray-300">/</span>
         <h1 className="text-2xl font-bold">{cohort.name}</h1>
         <span className={`text-xs px-2 py-0.5 rounded-full ${cohort.status === "PUBLISHED" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
           {cohort.status}
         </span>
+        <div className="ml-auto flex gap-2">
+          {user?.schoolId && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleDownload(`/schools/${user.schoolId}/students/at-risk?cohortId=${id}&format=csv`, `${cohortFilename}-at-risk.csv`, "at-risk")}
+                disabled={downloadingReport !== null}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
+              >
+                {downloadingReport === "at-risk" ? "Exporting..." : "At-Risk CSV"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownload(`/schools/${user.schoolId}/export?cohortId=${id}`, `${cohortFilename}-students.csv`, "students")}
+                disabled={downloadingReport !== null}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
+              >
+                {downloadingReport === "students" ? "Exporting..." : "Export CSV"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {publishToast && (
@@ -209,11 +254,11 @@ export default function CohortDetail() {
           <div className="flex gap-2 mb-4">
             <Link to={`/cohorts/${id}/on-track`}
               className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded text-xs font-medium hover:bg-green-100">
-              View On-Track ({cohort.students.filter(s => s.approvedHours >= requiredHours * 0.5).length})
+              View On-Track ({cohort.students.filter((s) => (s.status ?? (s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK")) !== "AT_RISK").length})
             </Link>
             <Link to={`/cohorts/${id}/off-track`}
               className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded text-xs font-medium hover:bg-red-100">
-              View Off-Track ({cohort.students.filter(s => s.approvedHours < requiredHours * 0.5).length})
+              View Off-Track ({cohort.students.filter((s) => (s.status ?? (s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK")) === "AT_RISK").length})
             </Link>
           </div>
           {isAdmin && (
@@ -244,7 +289,7 @@ export default function CohortDetail() {
                 </thead>
                 <tbody className="divide-y">
                   {cohort.students.map((s) => {
-                    const status = s.approvedHours >= requiredHours ? "COMPLETED" : s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK";
+                    const status = s.status ?? (s.approvedHours >= requiredHours ? "COMPLETED" : s.approvedHours >= requiredHours * 0.5 ? "ON_TRACK" : "AT_RISK");
                     return (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2">{s.name}</td>

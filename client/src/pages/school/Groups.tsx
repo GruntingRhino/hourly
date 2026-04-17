@@ -31,6 +31,7 @@ interface AllStudent {
   email: string;
   grade: string | null;
   approvedHours: number;
+  requiredHours: number;
   classroom: { id: string; name: string } | null;
 }
 
@@ -65,8 +66,7 @@ export default function SchoolGroups() {
         const cls = all.filter((s) => s.classroom?.id === selectedClassroom);
         setStudents(cls.map((s) => ({
           ...s,
-          requiredHours,
-          status: calcStatus(s.approvedHours, requiredHours),
+          status: calcStatus(s.approvedHours, s.requiredHours),
         })));
       }).catch(() => setStudents([]));
     }
@@ -130,8 +130,8 @@ export default function SchoolGroups() {
     email: s.email,
     grade: s.grade,
     approvedHours: s.approvedHours,
-    requiredHours,
-    status: calcStatus(s.approvedHours, requiredHours),
+    requiredHours: s.requiredHours,
+    status: calcStatus(s.approvedHours, s.requiredHours),
   }));
 
   const displayStudents = selectedClassroom ? students : enrichedAll;
@@ -355,7 +355,7 @@ export default function SchoolGroups() {
           {selectedStudent && (
             <StudentDetail
               student={selectedStudent as StudentInfo}
-              requiredHours={requiredHours}
+              requiredHours={(selectedStudent as StudentInfo).requiredHours}
               onRemoveHours={handleRemoveHours}
               removing={removing}
               statusColors={statusColors}

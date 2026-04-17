@@ -10,6 +10,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmailVerificationRequired from "./pages/EmailVerificationRequired";
+import ParentProgress from "./pages/ParentProgress";
 
 // Invitation / onboarding flows (public, no auth required)
 import JoinCohort from "./pages/student/JoinCohort";
@@ -45,7 +46,7 @@ import BeneficiaryDashboard from "./pages/beneficiary/Dashboard";
 import BeneficiaryOpportunities from "./pages/beneficiary/Opportunities";
 import BeneficiarySettings from "./pages/beneficiary/Settings";
 
-const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER", "DISTRICT_ADMIN"];
+const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -71,6 +72,7 @@ function AppRoutes() {
       <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
+      <Route path="/parent-progress" element={<ParentProgress />} />
 
       {user ? (
         <>

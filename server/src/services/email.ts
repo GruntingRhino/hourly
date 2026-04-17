@@ -481,4 +481,96 @@ export async function sendSelfSubmissionRejectedEmail(
   );
 }
 
+export async function sendNewSubmissionAlertEmail(
+  to: string,
+  adminName: string,
+  studentName: string,
+  orgName: string,
+  hours: number
+): Promise<void> {
+  await send(
+    to,
+    `New self-submitted hours pending review — ${studentName}`,
+    base(
+      "New submission to review",
+      `Hi ${adminName},<br><br><strong>${studentName}</strong> submitted <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> at <strong>${orgName}</strong> for your review.`,
+      { label: "Review Submissions", url: `${CLIENT_URL}/submissions` }
+    )
+  );
+}
+
+export async function sendSubmissionRevisionEmail(
+  to: string,
+  studentName: string,
+  orgName: string,
+  note: string
+): Promise<void> {
+  await send(
+    to,
+    "Your submission needs revision",
+    base(
+      "Revision requested",
+      `Hi ${studentName},<br><br>Your submission for <strong>${orgName}</strong> has been sent back for revision by your school.<br><br><strong>Note from reviewer:</strong><br>${note}<br><br>Please update your submission and resubmit.`,
+      { label: "View Submission", url: `${CLIENT_URL}/submit` }
+    )
+  );
+}
+
+export async function sendServiceDeadlineReminderEmail(
+  to: string,
+  studentName: string,
+  schoolName: string,
+  remainingHours: number,
+  daysToDeadline: number,
+  deadline: Date | null
+): Promise<void> {
+  const dueText = deadline ? deadline.toLocaleDateString() : "your service deadline";
+  await send(
+    to,
+    `${schoolName} service deadline reminder`,
+    base(
+      "Service deadline reminder",
+      `Hi ${studentName},<br><br>You still have <strong>${remainingHours.toFixed(1)} hour${remainingHours === 1 ? "" : "s"}</strong> remaining for <strong>${schoolName}</strong>.<br><br>${daysToDeadline < 0 ? "The deadline has passed." : `There ${daysToDeadline === 1 ? "is" : "are"} <strong>${Math.max(daysToDeadline, 0)}</strong> day${daysToDeadline === 1 ? "" : "s"} left before <strong>${dueText}</strong>.`}`,
+      { label: "Open Dashboard", url: `${CLIENT_URL}/dashboard` }
+    )
+  );
+}
+
+export async function sendBehindScheduleEmail(
+  to: string,
+  studentName: string,
+  schoolName: string,
+  approvedHours: number,
+  requiredHours: number,
+  reasons: string[]
+): Promise<void> {
+  await send(
+    to,
+    "You are behind on service hours",
+    base(
+      "Behind on service progress",
+      `Hi ${studentName},<br><br>You currently have <strong>${approvedHours.toFixed(1)} of ${requiredHours.toFixed(1)} required hours</strong> for <strong>${schoolName}</strong>.<br><br>${reasons.length ? `Current risk factors:<br>${reasons.map((reason) => `• ${reason}`).join("<br>")}<br><br>` : ""}Please review your dashboard and make a plan to get back on track.`,
+      { label: "Review Progress", url: `${CLIENT_URL}/dashboard` }
+    )
+  );
+}
+
+export async function sendAdminPendingReviewAlertEmail(
+  to: string,
+  adminName: string,
+  schoolName: string,
+  pendingReviewCount: number,
+  atRiskStudentCount: number
+): Promise<void> {
+  await send(
+    to,
+    `${schoolName} has items waiting for review`,
+    base(
+      "Pending review alert",
+      `Hi ${adminName},<br><br><strong>${pendingReviewCount}</strong> item${pendingReviewCount === 1 ? "" : "s"} are currently waiting for review in <strong>${schoolName}</strong>.<br><br><strong>${atRiskStudentCount}</strong> student${atRiskStudentCount === 1 ? "" : "s"} are currently flagged at risk.`,
+      { label: "Open Review Queue", url: `${CLIENT_URL}/submissions` }
+    )
+  );
+}
+
 export { CLIENT_URL };

@@ -1,6 +1,10 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
+import { requireRole } from "../middleware/rbac";
+import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { runReminderCycle } from "../lib/reminders";
 
 const router = Router();
 
@@ -119,6 +123,152 @@ router.put("/notifications/:id/read", authenticate, async (req: Request, res: Re
     res.json(updated);
   } catch (err) {
     console.error("Read notification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/messages/bulk — school-wide announcements and mass reminders
+router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const body = z.object({
+      audience: z.enum(["ALL_STUDENTS", "AT_RISK_STUDENTS", "COHORT_STUDENTS"]),
+      cohortId: z.string().optional(),
+      subject: z.string().max(255).optional(),
+      body: z.string().min(1).max(5000),
+      priority: z.boolean().optional(),
+    }).parse(req.body);
+
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, schoolId: true, name: true },
+    });
+    if (!actor?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: actor.schoolId },
+      select: {
+        id: true,
+        name: true,
+        requiredHours: true,
+        serviceStartDate: true,
+        serviceEndDate: true,
+      },
+    });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    if (body.audience === "COHORT_STUDENTS" && !body.cohortId) {
+      return res.status(400).json({ error: "cohortId is required for cohort announcements" });
+    }
+
+    if (body.cohortId) {
+      const cohort = await prisma.cohort.findFirst({
+        where: { id: body.cohortId, schoolId: school.id },
+        select: { id: true },
+      });
+      if (!cohort) {
+        return res.status(404).json({ error: "Cohort not found for this school" });
+      }
+    }
+
+    const students = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        OR: [
+          { classroom: { schoolId: school.id } },
+          { cohort: { schoolId: school.id } },
+        ],
+        ...(body.cohortId ? { cohortId: body.cohortId } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const recipients = body.audience === "AT_RISK_STUDENTS"
+      ? (await buildStudentProgressRecords(students, {
+          requiredHours: school.requiredHours,
+          serviceStartDate: school.serviceStartDate,
+          serviceEndDate: school.serviceEndDate,
+        }))
+          .filter((student) => student.status === "AT_RISK")
+          .map((student) => ({ id: student.id }))
+      : students.map((student) => ({ id: student.id }));
+
+    if (recipients.length === 0) {
+      return res.json({ recipientCount: 0, message: "No matching recipients found" });
+    }
+
+    const subject = body.subject?.trim() || (
+      body.audience === "AT_RISK_STUDENTS"
+        ? `${school.name}: reminder to review your service hours`
+        : `${school.name} announcement`
+    );
+
+    await prisma.message.createMany({
+      data: recipients.map((recipient) => ({
+        senderId: actor.id,
+        receiverId: recipient.id,
+        subject,
+        body: body.body,
+        priority: Boolean(body.priority),
+      })),
+    });
+
+    await prisma.notification.createMany({
+      data: recipients.map((recipient) => ({
+        userId: recipient.id,
+        type: "SCHOOL_ANNOUNCEMENT",
+        title: subject,
+        body: body.body,
+      })),
+    });
+
+    res.status(201).json({
+      recipientCount: recipients.length,
+      subject,
+      audience: body.audience,
+      sender: actor.name,
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Bulk message error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/messages/reminders/run — manually run the reminder cycle for the caller's school
+router.post("/reminders/run", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!actor?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const summaries = await runReminderCycle(actor.schoolId);
+    res.json(summaries[0] ?? null);
+  } catch (err) {
+    console.error("Reminder run error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
