@@ -20,6 +20,7 @@ import cohortRoutes from "./routes/cohorts";
 import beneficiaryRoutes from "./routes/beneficiaries";
 import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
+import classroomRoutes from "./routes/classrooms";
 import { startReminderScheduler } from "./lib/reminders";
 
 const app = express();
@@ -77,6 +78,7 @@ app.use("/api/cohorts", cohortRoutes);
 app.use("/api/beneficiaries", beneficiaryRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/self-submissions", selfSubmissionRoutes);
+app.use("/api/classrooms", classroomRoutes);
 
 // Legacy routes (kept for backward compat)
 app.use("/api/opportunities", opportunityRoutes);
