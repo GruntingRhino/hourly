@@ -244,6 +244,10 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     let rows: string[][] = [];
     let filename = "goodhours-report.csv";
 
+    if (req.user!.role !== "STUDENT" && type !== "student") {
+      return res.status(403).json({ error: "Student role required for CSV export" });
+    }
+
     if (type === "student" || req.user!.role === "STUDENT") {
       const userId = req.user!.userId;
 
@@ -318,7 +322,9 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
       filename = "my-service-hours.csv";
     }
 
-    const csv = rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+    const csv = rows.length > 0
+      ? rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
+      : '"Date","Opportunity","Organization","Hours","Status"';
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(csv);
