@@ -110,10 +110,11 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
-  // Skip rate limiting for Playwright test accounts (abhay.sivaram+N@gmail.com).
-  // These are seeded test-only accounts with no real data; rate limiting them
-  // prevents the E2E test suite from completing within a single 15-minute window.
+  // Skip rate limiting for Playwright test accounts in non-production only.
+  // These are seeded test-only accounts; rate limiting them prevents the E2E
+  // suite from completing within a single 15-minute window.
   skip: (req) => {
+    if (IS_PROD_LIKE) return false;
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     return /^abhay\.sivaram\+\d+@gmail\.com$/.test(email);
   },

@@ -56,8 +56,12 @@ router.get("/", authenticate, requireRole("STUDENT"), async (req: Request, res: 
 });
 
 // DELETE /api/saved/:id
-router.delete("/:id", authenticate, async (req: Request, res: Response) => {
+router.delete("/:id", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
+    const saved = await prisma.savedOpportunity.findUnique({ where: { id: req.params.id } });
+    if (!saved || saved.userId !== req.user!.userId) {
+      return res.status(403).json({ error: "Cannot delete this saved opportunity" });
+    }
     await prisma.savedOpportunity.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {

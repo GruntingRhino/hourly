@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -7,6 +8,16 @@ import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { runReminderCycle } from "../lib/reminders";
 
 const router = Router();
+
+// 20 messages per user per hour — prevents inbox-flooding another user
+const sendMessageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => `msg-send:${(req as any).user?.userId ?? req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many messages sent. Please wait before sending more." },
+});
 
 // GET /api/messages — get user's messages
 router.get("/", authenticate, async (req: Request, res: Response) => {
@@ -32,7 +43,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /api/messages — send a message
-router.post("/", authenticate, async (req: Request, res: Response) => {
+router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Response) => {
   try {
     const { receiverId, receiverEmail, subject, body, priority } = req.body;
     if ((!receiverId && !receiverEmail) || !body) {
@@ -116,6 +127,10 @@ router.get("/notifications", authenticate, async (req: Request, res: Response) =
 // PUT /api/notifications/:id/read
 router.put("/notifications/:id/read", authenticate, async (req: Request, res: Response) => {
   try {
+    const notification = await prisma.notification.findUnique({ where: { id: req.params.id } });
+    if (!notification || notification.userId !== req.user!.userId) {
+      return res.status(403).json({ error: "Cannot modify this notification" });
+    }
     const updated = await prisma.notification.update({
       where: { id: req.params.id },
       data: { read: true },
