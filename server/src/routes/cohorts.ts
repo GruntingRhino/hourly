@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -9,6 +10,16 @@ import { sendStudentInvitationEmail, CLIENT_URL } from "../services/email";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 
 const router = Router();
+
+// 5 publishes per school per hour — prevents bulk re-sending invitations to all students
+const publishCohortLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => `cohort-publish:${(req as any).user?.userId ?? req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many publish attempts. Please wait before resending invitations." },
+});
 
 // GET /api/cohorts — list cohorts for school
 router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
@@ -401,7 +412,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
 });
 
 // POST /api/cohorts/:id/publish — send student invitations
-router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), publishCohortLimiter, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     const cohort = await prisma.cohort.findUnique({
