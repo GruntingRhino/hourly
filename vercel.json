@@ -5,6 +5,9 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" }
   ],
+  "crons": [
+    { "path": "/api/internal/reminders/run", "schedule": "0 * * * *" }
+  ],
   "functions": {
     "api/index.ts": {
       "includeFiles": "node_modules/.prisma/client/**"

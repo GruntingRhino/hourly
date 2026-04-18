@@ -23,6 +23,7 @@ interface Cohort {
 
 export default function SchoolCohorts() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,7 +90,7 @@ export default function SchoolCohorts() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Cohorts</h1>
-        {user?.role === "SCHOOL_ADMIN" && (
+        {isAdmin && (
           <button
             onClick={() => setShowCreateForm(true)}
             className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
@@ -173,7 +174,7 @@ export default function SchoolCohorts() {
                   >
                     Manage
                   </Link>
-                  {cohort.status !== "PUBLISHED" && user?.role === "SCHOOL_ADMIN" && cohort.invitationsPending > 0 && (
+                  {cohort.status !== "PUBLISHED" && isAdmin && cohort.invitationsPending > 0 && (
                     <button
                       onClick={() => setPublishConfirm({ id: cohort.id, name: cohort.name })}
                       className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"

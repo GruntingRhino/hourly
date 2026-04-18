@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -7,6 +8,19 @@ export default function SchoolOnboarding() {
   const [requiredHours, setRequiredHours] = useState("40");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const goalAlreadyConfigured = useMemo(() => {
+    const current = user?.school?.requiredHours;
+    return typeof current === "number" && current > 0;
+  }, [user?.school?.requiredHours]);
+  const isSchoolAdminLike = user?.role === "SCHOOL_ADMIN";
+
+  if (!isSchoolAdminLike) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (user?.school?.onboardingComplete) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +38,7 @@ export default function SchoolOnboarding() {
         localStorage.setItem(`school_onboarding_${user.schoolId}`, "done");
       }
       await api.post("/auth/set-graduation-goal", { requiredHours: hours });
+      await api.put("/schools/onboarding", {});
       await refreshUser();
     } catch (err: any) {
       setError(err.message || "Failed to save hours goal");
@@ -41,11 +56,14 @@ export default function SchoolOnboarding() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-8">
-          <h2 className="text-xl font-semibold mb-2">Set Graduation Hours Goal</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            This is the number of community service hours students must complete to graduate.
-            You can change this later in Settings.
-          </p>
+          <div className="mb-6">
+            <div className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">Activation Checklist</div>
+            <h2 className="text-xl font-semibold mb-2">Finish Initial School Setup</h2>
+            <p className="text-sm text-gray-500">
+              This gets a new school from account creation to a usable dashboard. Keep it minimal:
+              set the hours goal now, then add partners and import or invite students from the dashboard.
+            </p>
+          </div>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
@@ -71,14 +89,35 @@ export default function SchoolOnboarding() {
               <div className="text-xs text-gray-400 text-center mt-1">hours</div>
             </div>
 
+            {goalAlreadyConfigured && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                A school goal is already configured at <strong>{user?.school?.requiredHours}</strong> hours.
+                Saving here will overwrite it and complete onboarding.
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={saving}
               className="w-full py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Continue to Dashboard"}
+              {saving ? "Saving..." : "Save Goal and Continue"}
             </button>
           </form>
+
+          <div className="mt-6 border-t border-gray-100 pt-4">
+            <div className="text-xs font-medium text-gray-500 mb-2">What happens next</div>
+            <div className="space-y-2 text-sm text-gray-600">
+              <div>1. Add or approve community partners.</div>
+              <div>2. Create a cohort and import students by CSV.</div>
+              <div>3. Publish invitations and confirm the dashboard shows live student data.</div>
+            </div>
+            <div className="mt-4">
+              <Link to="/settings" className="text-sm text-blue-600 hover:underline">
+                Review school settings instead
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

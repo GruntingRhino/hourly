@@ -31,7 +31,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEF
     }
 
     // School staff may only approve sessions for students in their own school
-    if (req.user!.role === "SCHOOL_ADMIN" || req.user!.role === "TEACHER") {
+    if (["SCHOOL_ADMIN", "TEACHER"].includes(req.user!.role)) {
       const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
       if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
       const studentSchoolId = await resolveStudentSchoolId(session.userId);
@@ -131,7 +131,7 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "BENEFI
     }
 
     // School staff may only reject sessions for students in their own school
-    if (req.user!.role === "SCHOOL_ADMIN" || req.user!.role === "TEACHER") {
+    if (["SCHOOL_ADMIN", "TEACHER"].includes(req.user!.role)) {
       const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
       if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
       const studentSchoolId = await resolveStudentSchoolId(session.userId);

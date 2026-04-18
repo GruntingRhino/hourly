@@ -32,8 +32,24 @@ interface SchoolSettingsData {
   allowJoinByCode: boolean;
 }
 
+interface DataAccessLogEntry {
+  id: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: string | null;
+  createdAt: string;
+  actor: {
+    id: string;
+    name: string;
+    role: string;
+    email: string;
+  };
+}
+
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
+  const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [tab, setTab] = useState<Tab>("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
   const [schoolName, setSchoolName] = useState("");
@@ -103,6 +119,9 @@ export default function SchoolSettings() {
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState("");
   const [privacyIsError, setPrivacyIsError] = useState(false);
+  const [dataAccessLogs, setDataAccessLogs] = useState<DataAccessLogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState("");
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -156,6 +175,16 @@ export default function SchoolSettings() {
     return () => window.clearTimeout(timeoutId);
   }, [joinByCodeToast]);
 
+  useEffect(() => {
+    if (tab !== "data" || !isAdmin || !user?.schoolId) return;
+    setLogsLoading(true);
+    setLogsError("");
+    api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
+      .then(setDataAccessLogs)
+      .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
+      .finally(() => setLogsLoading(false));
+  }, [tab, isAdmin, user?.schoolId]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.schoolId) return;
@@ -187,7 +216,7 @@ export default function SchoolSettings() {
   };
 
   const handleToggleAllowJoinByCode = async () => {
-    if (user?.role !== "SCHOOL_ADMIN") return;
+    if (!isAdmin) return;
 
     const previousValue = allowJoinByCode;
     const nextValue = !previousValue;
@@ -334,7 +363,7 @@ export default function SchoolSettings() {
   const handleExportActivityLog = async () => {
     if (!user?.schoolId) return;
     try {
-      const sessions = await api.get<any[]>(`/schools/${user.schoolId}/sessions`).catch(() => [] as any[]);
+      const sessions = await api.get<any[]>(`/sessions/school`).catch(() => [] as any[]);
       const rows = [
         ["Student", "Opportunity", "Date", "Hours", "Status"],
         ...sessions.map((s: any) => [
@@ -356,6 +385,18 @@ export default function SchoolSettings() {
     } catch (err: any) {
       setMessage(err.message || "Failed to export");
       setIsError(true);
+    }
+  };
+
+  const formatAccessDetails = (raw: string | null) => {
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      return Object.entries(parsed)
+        .map(([key, value]) => `${key}: ${String(value)}`)
+        .join(" | ");
+    } catch {
+      return raw;
     }
   };
 
@@ -519,7 +560,7 @@ export default function SchoolSettings() {
               )}
             </div>
 
-            {user?.role === "SCHOOL_ADMIN" && (
+            {isAdmin && (
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -972,6 +1013,73 @@ export default function SchoolSettings() {
           >
             Export Activity Log (CSV)
           </button>
+
+          {isAdmin && (
+            <div className="mt-8 border-t border-gray-100 pt-6">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Recent Data Access</h3>
+                  <p className="text-sm text-gray-500">
+                    FERPA audit trail for staff access to student reporting and hour data.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!user?.schoolId) return;
+                    setLogsLoading(true);
+                    setLogsError("");
+                    api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
+                      .then(setDataAccessLogs)
+                      .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
+                      .finally(() => setLogsLoading(false));
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {logsError && (
+                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {logsError}
+                </div>
+              )}
+
+              {logsLoading ? (
+                <div className="text-sm text-gray-500">Loading access logs...</div>
+              ) : dataAccessLogs.length === 0 ? (
+                <div className="text-sm text-gray-500">No access events recorded yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {dataAccessLogs.slice(0, 50).map((entry) => (
+                    <div key={entry.id} className="rounded-lg border border-gray-200 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {entry.actor.name} · {entry.actor.role}
+                          </div>
+                          <div className="text-xs text-gray-500">{entry.actor.email}</div>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(entry.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-700">
+                        {entry.action.replaceAll("_", " ")}
+                        {entry.targetType ? ` · ${entry.targetType}` : ""}
+                        {entry.targetId ? ` · ${entry.targetId}` : ""}
+                      </div>
+                      {entry.details && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          {formatAccessDetails(entry.details)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

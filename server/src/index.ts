@@ -21,6 +21,7 @@ import beneficiaryRoutes from "./routes/beneficiaries";
 import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
 import classroomRoutes from "./routes/classrooms";
+import internalRoutes from "./routes/internal";
 import { startReminderScheduler } from "./lib/reminders";
 
 const app = express();
@@ -72,6 +73,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
+app.use("/api/internal", internalRoutes);
 
 // New architecture routes
 app.use("/api/cohorts", cohortRoutes);
@@ -110,9 +112,11 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`GoodHours API running on http://localhost:${PORT}`);
-  startReminderScheduler();
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`GoodHours API running on http://localhost:${PORT}`);
+    startReminderScheduler();
+  });
+}
 
 export default app;

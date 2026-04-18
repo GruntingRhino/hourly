@@ -32,6 +32,10 @@ interface DirEntry {
   approvalStatus: string | null;
 }
 
+interface NearbyDirectoryResponse {
+  items: DirEntry[];
+}
+
 const CATEGORIES = [
   "", "Education", "Environment", "Food & Nutrition", "Health",
   "Housing & Shelter", "Human Services", "Youth Development", "Animal Welfare",
@@ -100,7 +104,8 @@ export default function SchoolBeneficiaries() {
         const p = new URLSearchParams({ lat: String(loc.lat), lng: String(loc.lng), radius: String(radius) });
         if (query.trim().length >= 2) p.set("q", query.trim());
         if (category) p.set("category", category);
-        setSmartResults(await api.get<DirEntry[]>(`/beneficiaries/directory/nearby?${p}`));
+        const response = await api.get<NearbyDirectoryResponse>(`/beneficiaries/directory/nearby?${p}`);
+        setSmartResults(response.items);
       } else {
         const p = new URLSearchParams();
         if (query.trim().length >= 2) p.set("search", query.trim());

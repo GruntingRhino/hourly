@@ -64,7 +64,7 @@ export default function SchoolDashboard() {
   const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0); // 0 = welcome, 1 = partners, 2 = cohorts
-  const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? true;
+  const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? false;
   const showOnboarding = isAdmin && !schoolOnboardingComplete && !onboardingDismissed;
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
@@ -245,6 +245,29 @@ export default function SchoolDashboard() {
           <div className="text-xs text-gray-400">deadline, pace, or attendance risk</div>
         </div>
       </div>
+
+      {totalStudents === 0 && (
+        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
+          <div className="font-semibold text-amber-900 mb-2">This school is not activated yet</div>
+          <div className="text-sm text-amber-800 mb-4">
+            The account is live, but there are no student records yet. Finish these steps before treating the product as production-ready for this school.
+          </div>
+          <div className="grid md:grid-cols-3 gap-3 text-sm">
+            <Link to="/settings" className="rounded-lg border border-amber-200 bg-white p-3 hover:border-amber-300">
+              <div className="font-medium text-gray-900">1. Confirm service rules</div>
+              <div className="text-gray-600 mt-1">Required hours, dates, self-submission policy, and category caps.</div>
+            </Link>
+            <Link to="/beneficiaries" className="rounded-lg border border-amber-200 bg-white p-3 hover:border-amber-300">
+              <div className="font-medium text-gray-900">2. Add partners</div>
+              <div className="text-gray-600 mt-1">Approve at least one beneficiary so students have valid places to earn hours.</div>
+            </Link>
+            <Link to="/cohorts" className="rounded-lg border border-amber-200 bg-white p-3 hover:border-amber-300">
+              <div className="font-medium text-gray-900">3. Import students</div>
+              <div className="text-gray-600 mt-1">Create a cohort, import a CSV, then publish invitations and verify the roster.</div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Quick links */}
       <div className="flex gap-3 mb-8 flex-wrap">
