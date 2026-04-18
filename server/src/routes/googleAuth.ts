@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
@@ -8,6 +9,15 @@ import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import { extractDomainFromWebsite } from "./auth";
 
 const router = Router();
+
+// 3 registration attempts per IP per hour — prevents email-bombing the contact address
+const registerSchoolLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many registration attempts from this IP. Please try again later." },
+});
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -324,7 +334,7 @@ router.get("/schools", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/google/register-school — initiate school registration via magic link
-router.post("/register-school", async (req: Request, res: Response) => {
+router.post("/register-school", registerSchoolLimiter, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       registrationToken: z.string(), // JWT with Google profile
@@ -424,12 +434,41 @@ router.post("/register-school", async (req: Request, res: Response) => {
     // Check if this user already has a school
     if (adminUser.schoolId) {
       const school = await prisma.school.findUnique({ where: { id: adminUser.schoolId } });
-      const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+
+      // If onboarding is already complete, just return the existing session — no email needed
+      if (school?.onboardingComplete) {
+        const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+        return res.json({
+          alreadyRegistered: true,
+          token,
+          user: { id: adminUser.id, email: adminUser.email, name: adminUser.name, role: adminUser.role, schoolId: adminUser.schoolId },
+          school,
+        });
+      }
+
+      // School exists but onboarding is incomplete — regenerate the magic link and resend.
+      // This handles the case where the previous send failed or the token expired.
+      const magicToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const contactEmail = data.contactEmail || school?.registrationEmail;
+
+      if (!contactEmail) {
+        return res.status(400).json({ error: "Cannot resend: no contact email on file. Please restart registration." });
+      }
+
+      await prisma.school.update({
+        where: { id: school!.id },
+        data: { registrationToken: magicToken, registrationTokenExpires: expiresAt, registrationEmail: contactEmail },
+      });
+
+      const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
+      await sendSchoolRegistrationMagicLink(contactEmail, school!.name, magicLink);
+
       return res.json({
-        alreadyRegistered: true,
-        token,
-        user: { id: adminUser.id, email: adminUser.email, name: adminUser.name, role: adminUser.role, schoolId: adminUser.schoolId },
-        school,
+        message: "A new registration link has been sent. Please check your inbox.",
+        schoolId: school!.id,
+        schoolName: school!.name,
+        sentTo: contactEmail,
       });
     }
 

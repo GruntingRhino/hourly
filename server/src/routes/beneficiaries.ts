@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -9,6 +10,16 @@ import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap } from "../lib/schoolRules";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+
+// 10 invitations per school admin per hour — prevents inbox-bombing a beneficiary contact
+const beneficiaryInviteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => `ben-invite:${(req as any).user?.userId ?? req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many invitation attempts. Please wait before sending more invitations." },
+});
 
 const router = Router();
 
@@ -658,7 +669,7 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
 });
 
 // POST /api/beneficiaries/:id/invite — send/resend invitation to an already-approved beneficiary
-router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), beneficiaryInviteLimiter, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
