@@ -222,6 +222,10 @@ let reminderTimer: NodeJS.Timeout | null = null;
 export function startReminderScheduler(): void {
   if (reminderTimer) return;
   if (process.env.NODE_ENV === "test" || process.env.DISABLE_REMINDER_SCHEDULER === "true") return;
+  if (process.env.VERCEL === "1" || process.env.VERCEL_ENV) {
+    console.info("Reminder scheduler disabled in serverless/runtime-managed environment.");
+    return;
+  }
 
   const intervalMinutes = Math.max(15, Number(process.env.REMINDER_INTERVAL_MINUTES || 60));
 

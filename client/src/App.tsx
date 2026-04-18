@@ -37,6 +37,7 @@ import BeneficiaryDiscover from "./pages/school/Discover";
 import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
+import SchoolOnboarding from "./pages/school/Onboarding";
 
 // Admin pages
 import ImpersonatePage from "./pages/admin/Impersonate";
@@ -50,6 +51,9 @@ const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const isSchoolAdminLike = user?.role === "SCHOOL_ADMIN";
+  const needsSchoolOnboarding =
+    isSchoolAdminLike && user.school?.onboardingComplete === false;
 
   if (loading) {
     return (
@@ -94,10 +98,11 @@ function AppRoutes() {
             </>
           )}
 
-          {/* School routes */}
+              {/* School routes */}
           {SCHOOL_ROLES.includes(user.role) && (
             <>
-              <Route path="/dashboard" element={<SchoolDashboard />} />
+              <Route path="/dashboard" element={needsSchoolOnboarding ? <Navigate to="/onboarding" replace /> : <SchoolDashboard />} />
+              <Route path="/onboarding" element={isSchoolAdminLike ? <SchoolOnboarding /> : <Navigate to="/dashboard" replace />} />
               <Route path="/students" element={<StudentList />} />
               <Route path="/students/on-track" element={<StudentList />} />
               <Route path="/students/off-track" element={<StudentList />} />

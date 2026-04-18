@@ -14,6 +14,9 @@ import {
   getCapturedMailinatorInbox,
 } from "../services/email";
 
+const IS_PROD_LIKE =
+  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
 // Limits for endpoints that trigger outbound email — the primary DDOS surface.
 // Each limit is per IP address and resets on a rolling window.
 
@@ -118,19 +121,17 @@ const loginLimiter = rateLimit({
 
 const router = Router();
 
-router.get("/__test-email", (req: Request, res: Response) => {
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-    return res.status(404).json({ error: "Not found" });
-  }
+if (!IS_PROD_LIKE) {
+  router.get("/__test-email", (req: Request, res: Response) => {
+    const inbox = String(req.query.inbox || "").trim().toLowerCase();
+    if (!/^[a-z0-9._-]+$/.test(inbox)) {
+      return res.status(400).json({ error: "Valid inbox query param is required" });
+    }
 
-  const inbox = String(req.query.inbox || "").trim().toLowerCase();
-  if (!/^[a-z0-9._-]+$/.test(inbox)) {
-    return res.status(400).json({ error: "Valid inbox query param is required" });
-  }
-
-  const messages = getCapturedMailinatorInbox(inbox);
-  res.json({ inbox, messages });
-});
+    const messages = getCapturedMailinatorInbox(inbox);
+    res.json({ inbox, messages });
+  });
+}
 
 // Only SCHOOL_ADMIN can self-register. Students and Beneficiary admins must use invitation flows.
 const VALID_ROLES = ["SCHOOL_ADMIN"] as const;
@@ -211,7 +212,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
   try {
     const data = signupSchema.parse(req.body);
 
-    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    if (IS_PROD_LIKE) {
       if (isPersonalEmailDomain(data.email) && !isTestEmail(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
@@ -761,7 +762,9 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
-    if (user.role !== "SCHOOL_ADMIN") return res.status(403).json({ error: "Not a school admin" });
+    if (!["SCHOOL_ADMIN"].includes(user.role)) {
+      return res.status(403).json({ error: "Not a school admin" });
+    }
 
     const { requiredHours } = z.object({ requiredHours: z.number().min(1).max(1000) }).parse(req.body);
 
@@ -781,82 +784,73 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   }
 });
 
-// POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
-router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-    return res.status(404).json({ error: "Not found" });
-  }
+if (!IS_PROD_LIKE) {
+  // POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
+  router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
+    try {
+      const user = await prisma.user.update({
+        where: { id: req.user!.userId },
+        data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpires: null },
+      });
 
-  try {
-    const user = await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpires: null },
-    });
-
-    res.json({ message: "Email verification bypassed", emailVerified: true, userId: user.id });
-  } catch (err) {
-    console.error("Dev bypass verification error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /api/auth/impersonate — DEV ONLY — log in as any user without password
-// Guarded by env check. All impersonation actions are logged.
-router.post("/impersonate", authenticate, async (req: Request, res: Response) => {
-  // Hard block in production
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-    return res.status(404).json({ error: "Not found" });
-  }
-
-  try {
-    const { targetEmail } = z.object({ targetEmail: z.string().email() }).parse(req.body);
-
-    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!actor || actor.role !== "SCHOOL_ADMIN") {
-      return res.status(403).json({ error: "Only admins may impersonate users" });
+      res.json({ message: "Email verification bypassed", emailVerified: true, userId: user.id });
+    } catch (err) {
+      console.error("Dev bypass verification error:", err);
+      res.status(500).json({ error: "Internal server error" });
     }
+  });
 
-    const target = await prisma.user.findUnique({
-      where: { email: targetEmail },
-      include: {
-        school: true,
-        cohort: { include: { school: true } },
-        beneficiary: true,
-      },
-    });
-    if (!target) return res.status(404).json({ error: "User not found" });
+  // POST /api/auth/impersonate — DEV ONLY — log in as any user without password
+  router.post("/impersonate", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { targetEmail } = z.object({ targetEmail: z.string().email() }).parse(req.body);
 
-    // Log the impersonation
-    console.warn(`[IMPERSONATION] ${actor.email} (${actor.id}) impersonated ${target.email} (${target.id}) at ${new Date().toISOString()}`);
+      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+      if (!actor || actor.role !== "SCHOOL_ADMIN") {
+        return res.status(403).json({ error: "Only admins may impersonate users" });
+      }
 
-    const token = signToken({ userId: target.id, email: target.email, role: target.role });
+      const target = await prisma.user.findUnique({
+        where: { email: targetEmail },
+        include: {
+          school: true,
+          cohort: { include: { school: true } },
+          beneficiary: true,
+        },
+      });
+      if (!target) return res.status(404).json({ error: "User not found" });
 
-    const studentSchool = target.school || target.cohort?.school || null;
-    const schoolId = target.schoolId || target.cohort?.school?.id || null;
+      console.warn(`[IMPERSONATION] ${actor.email} (${actor.id}) impersonated ${target.email} (${target.id}) at ${new Date().toISOString()}`);
 
-    res.json({
-      token,
-      impersonated: true,
-      actor: { id: actor.id, email: actor.email },
-      user: {
-        id: target.id,
-        email: target.email,
-        name: target.name,
-        role: target.role,
-        emailVerified: target.emailVerified,
-        schoolId,
-        school: studentSchool,
-        cohortId: target.cohortId,
-        cohort: target.cohort,
-        beneficiaryId: target.beneficiaryId,
-        beneficiary: target.beneficiary,
-      },
-    });
-  } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
-    console.error("Impersonation error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+      const token = signToken({ userId: target.id, email: target.email, role: target.role });
+
+      const studentSchool = target.school || target.cohort?.school || null;
+      const schoolId = target.schoolId || target.cohort?.school?.id || null;
+
+      res.json({
+        token,
+        impersonated: true,
+        actor: { id: actor.id, email: actor.email },
+        user: {
+          id: target.id,
+          email: target.email,
+          name: target.name,
+          role: target.role,
+          emailVerified: target.emailVerified,
+          schoolId,
+          school: studentSchool,
+          cohortId: target.cohortId,
+          cohort: target.cohort,
+          beneficiaryId: target.beneficiaryId,
+          beneficiary: target.beneficiary,
+        },
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+      console.error("Impersonation error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+}
 
 export default router;

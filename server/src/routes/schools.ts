@@ -16,6 +16,10 @@ const schoolJoinSettingsSchema = z.object({
   allowJoinByCode: z.boolean(),
 });
 
+function roundHours(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 // GET /api/schools — public search (for orgs to find schools)
 router.get("/", authenticate, async (req: Request, res: Response) => {
   try {
@@ -470,6 +474,241 @@ router.get("/:id/students/:studentId/verification-history", authenticate, requir
   }
 });
 
+// GET /api/schools/:id/students/:studentId/hour-breakdown — per-student source-of-truth view
+router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (actor?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const student = await prisma.user.findUnique({
+      where: { id: req.params.studentId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        role: true,
+        classroom: { select: { schoolId: true, name: true } },
+        cohort: { select: { schoolId: true, name: true } },
+      },
+    });
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
+
+    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
+    if (studentSchoolId !== req.params.id) {
+      return res.status(403).json({ error: "Student is not enrolled in your school" });
+    }
+
+    const [beneficiarySignups, selfSubmissions, legacySessions, totalsMap] = await Promise.all([
+      prisma.beneficiarySignup.findMany({
+        where: { studentId: student.id },
+        include: {
+          slot: {
+            include: {
+              opportunity: {
+                include: {
+                  beneficiary: { select: { id: true, name: true, category: true } },
+                },
+              },
+            },
+          },
+          auditLogs: { orderBy: { createdAt: "asc" } },
+        },
+        orderBy: [{ slot: { date: "desc" } }, { createdAt: "desc" }],
+      }),
+      prisma.selfSubmittedRequest.findMany({
+        where: { studentId: student.id },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      }),
+      prisma.serviceSession.findMany({
+        where: { userId: student.id },
+        include: {
+          opportunity: {
+            include: {
+              organization: { select: { id: true, name: true } },
+            },
+          },
+          auditLogs: { orderBy: { createdAt: "asc" } },
+        },
+        orderBy: [{ createdAt: "desc" }],
+      }),
+      calculateStudentHours([student.id]),
+    ]);
+
+    const actorIds = [
+      ...beneficiarySignups.flatMap((signup) => signup.auditLogs.map((entry) => entry.actorId)),
+      ...legacySessions.flatMap((session) => session.auditLogs.map((entry) => entry.actorId)),
+      ...selfSubmissions.map((submission) => submission.reviewedBy).filter((value): value is string => Boolean(value)),
+    ];
+
+    const auditActors = actorIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: [...new Set(actorIds)] } },
+          select: { id: true, name: true, role: true },
+        })
+      : [];
+    const auditActorMap = new Map(auditActors.map((auditActor) => [auditActor.id, auditActor]));
+
+    let beneficiaryApproved = 0;
+    let beneficiaryPending = 0;
+    let selfApproved = 0;
+    let selfPending = 0;
+    let legacyApproved = 0;
+    let legacyPending = 0;
+
+    const beneficiaryRecords = beneficiarySignups.map((signup) => {
+      const displayHours = signup.totalHours ?? signup.slot.durationHours;
+      const approvedHours = signup.verificationStatus === "APPROVED" ? displayHours : 0;
+      const pendingHours =
+        signup.verificationStatus === "PENDING" && signup.status !== "CANCELLED"
+          ? signup.slot.durationHours
+          : 0;
+      beneficiaryApproved += approvedHours;
+      beneficiaryPending += pendingHours;
+
+      return {
+        id: signup.id,
+        source: "BENEFICIARY",
+        title: signup.slot.opportunity.title,
+        organizationName: signup.slot.opportunity.beneficiary.name,
+        category: signup.slot.opportunity.category ?? signup.slot.opportunity.beneficiary.category ?? null,
+        date: signup.slot.date,
+        status: signup.status,
+        verificationStatus: signup.verificationStatus,
+        displayHours: roundHours(displayHours),
+        approvedHours: roundHours(approvedHours),
+        pendingHours: roundHours(pendingHours),
+        rejectionReason: signup.rejectionReason,
+        auditTrail: signup.auditLogs.map((entry) => ({
+          id: entry.id,
+          action: entry.action,
+          details: entry.details,
+          createdAt: entry.createdAt,
+          actor: auditActorMap.get(entry.actorId) ?? { id: entry.actorId, name: "Unknown", role: "UNKNOWN" },
+        })),
+      };
+    });
+
+    const selfSubmissionRecords = selfSubmissions.map((submission) => {
+      const approvedHours = submission.status === "APPROVED" ? submission.hours : 0;
+      const pendingHours = submission.status === "PENDING" ? submission.hours : 0;
+      selfApproved += approvedHours;
+      selfPending += pendingHours;
+
+      return {
+        id: submission.id,
+        source: "SELF_SUBMISSION",
+        title: submission.organizationName,
+        organizationName: submission.organizationName,
+        category: submission.category ?? "general",
+        date: submission.date,
+        status: submission.status,
+        displayHours: roundHours(submission.hours),
+        approvedHours: roundHours(approvedHours),
+        pendingHours: roundHours(pendingHours),
+        description: submission.description,
+        evidenceNote: submission.evidenceNote,
+        rejectionReason: submission.rejectionReason,
+        revisionNote: submission.revisionNote,
+        reviewedAt: submission.reviewedAt,
+        reviewer: submission.reviewedBy
+          ? auditActorMap.get(submission.reviewedBy) ?? { id: submission.reviewedBy, name: "Unknown", role: "UNKNOWN" }
+          : null,
+      };
+    });
+
+    const legacyRecords = legacySessions.map((session) => {
+      const displayHours = session.totalHours ?? 0;
+      const approvedHours = session.verificationStatus === "APPROVED" ? displayHours : 0;
+      const pendingHours = session.verificationStatus === "PENDING" ? displayHours : 0;
+      legacyApproved += approvedHours;
+      legacyPending += pendingHours;
+
+      return {
+        id: session.id,
+        source: "LEGACY_SESSION",
+        title: session.opportunity.title,
+        organizationName: session.opportunity.organization.name,
+        date: session.opportunity.date,
+        status: session.status,
+        verificationStatus: session.verificationStatus,
+        displayHours: roundHours(displayHours),
+        approvedHours: roundHours(approvedHours),
+        pendingHours: roundHours(pendingHours),
+        rejectionReason: session.rejectionReason,
+        auditTrail: session.auditLogs.map((entry) => ({
+          id: entry.id,
+          action: entry.action,
+          details: entry.details,
+          createdAt: entry.createdAt,
+          actor: auditActorMap.get(entry.actorId) ?? { id: entry.actorId, name: "Unknown", role: "UNKNOWN" },
+        })),
+      };
+    });
+
+    const expectedTotals = totalsMap.get(student.id) ?? { approved: 0, pending: 0 };
+    const approved = roundHours(beneficiaryApproved + selfApproved + legacyApproved);
+    const pending = roundHours(beneficiaryPending + selfPending + legacyPending);
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "VIEW_STUDENT_HOUR_BREAKDOWN",
+      targetType: "student",
+      targetId: student.id,
+      schoolId: req.params.id,
+      details: { approved, pending },
+    });
+
+    res.json({
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        grade: student.grade,
+        cohortName: student.cohort?.name ?? null,
+        classroomName: student.classroom?.name ?? null,
+      },
+      totals: {
+        approved,
+        pending,
+        bySource: {
+          beneficiary: {
+            approved: roundHours(beneficiaryApproved),
+            pending: roundHours(beneficiaryPending),
+            count: beneficiaryRecords.length,
+          },
+          selfSubmission: {
+            approved: roundHours(selfApproved),
+            pending: roundHours(selfPending),
+            count: selfSubmissionRecords.length,
+          },
+          legacy: {
+            approved: roundHours(legacyApproved),
+            pending: roundHours(legacyPending),
+            count: legacyRecords.length,
+          },
+        },
+        reconciliation: {
+          expectedApproved: roundHours(expectedTotals.approved),
+          expectedPending: roundHours(expectedTotals.pending),
+          reconciled: approved === roundHours(expectedTotals.approved) && pending === roundHours(expectedTotals.pending),
+        },
+      },
+      records: {
+        beneficiary: beneficiaryRecords,
+        selfSubmission: selfSubmissionRecords,
+        legacy: legacyRecords,
+      },
+    });
+  } catch (err) {
+    console.error("Student hour breakdown error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/:id/stats — school-wide stats
 router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
@@ -888,7 +1127,7 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
 });
 
 // GET /api/schools/:id/export — export student data as CSV; optional ?cohortId= filter
-router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.schoolId !== req.params.id) {

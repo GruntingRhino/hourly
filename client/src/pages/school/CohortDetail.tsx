@@ -37,6 +37,17 @@ interface CohortDetail {
   pendingVerifications: number;
 }
 
+interface ImportResult {
+  added: number;
+  skipped: number;
+  errors: Array<{ row: number; email: string | null; reason: string }>;
+  preview?: {
+    totalRows: number;
+    importedRows: number;
+    skippedRows: number;
+  };
+}
+
 export default function CohortDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -46,7 +57,7 @@ export default function CohortDetail() {
   const [tab, setTab] = useState<"students" | "invitations" | "import" | "analytics">("students");
   const [csvData, setCsvData] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<any>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [addEmail, setAddEmail] = useState("");
   const [addName, setAddName] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
@@ -84,7 +95,7 @@ export default function CohortDetail() {
     setImporting(true);
     setImportResult(null);
     try {
-      const result = await api.post<any>(`/cohorts/${id}/import`, { csvData });
+      const result = await api.post<ImportResult>(`/cohorts/${id}/import`, { csvData });
       setImportResult(result);
       setCsvData("");
       void load();
@@ -93,6 +104,17 @@ export default function CohortDetail() {
     } finally {
       setImporting(false);
     }
+  };
+
+  const downloadTemplate = () => {
+    const template = "name,email,grade,house\nJohn Smith,john@school.edu,10th,Red\nJane Doe,jane@school.edu,11th,Blue\n";
+    const blob = new Blob([template], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${cohortFilename || "cohort"}-import-template.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleAddStudent = async (e: React.FormEvent) => {
@@ -442,10 +464,29 @@ export default function CohortDetail() {
           </p>
 
           {importResult && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
-              Import complete: <strong>{importResult.added}</strong> added, <strong>{importResult.skipped}</strong> skipped.
+            <div className={`mb-4 p-3 rounded text-sm border ${importResult.errors?.length ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"}`}>
+              <div>
+                Import complete: <strong>{importResult.added}</strong> added, <strong>{importResult.skipped}</strong> skipped.
+                {importResult.preview && (
+                  <span className="text-gray-500"> ({importResult.preview.totalRows} rows processed)</span>
+                )}
+              </div>
               {importResult.errors?.length > 0 && (
-                <ul className="mt-1 text-xs text-red-600">{importResult.errors.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>
+                <div className="mt-3">
+                  <div className="text-xs font-semibold text-amber-800 mb-1">Rows that need attention</div>
+                  <ul className="space-y-1 text-xs text-amber-900">
+                    {importResult.errors.slice(0, 10).map((entry) => (
+                      <li key={`${entry.row}-${entry.email ?? "missing"}`}>
+                        Row {entry.row}{entry.email ? ` (${entry.email})` : ""}: {entry.reason}
+                      </li>
+                    ))}
+                  </ul>
+                  {importResult.errors.length > 10 && (
+                    <div className="mt-2 text-xs text-amber-700">
+                      Showing first 10 issues of {importResult.errors.length}.
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -453,9 +494,14 @@ export default function CohortDetail() {
           <div className="space-y-3">
             <div>
               <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-                Choose CSV File
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
+                  Choose CSV File
+                </button>
+                <button onClick={downloadTemplate} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
+                  Download Template
+                </button>
+              </div>
             </div>
             {csvData && (
               <div>

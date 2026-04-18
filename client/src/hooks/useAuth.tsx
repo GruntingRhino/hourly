@@ -13,9 +13,27 @@ export interface User {
   grade?: string;
   house?: string;
   schoolId?: string;
-  school?: { id: string; name: string; domain?: string | null; verified: boolean; requiredHours?: number; zipCodes?: string | null };
+  school?: {
+    id: string;
+    name: string;
+    domain?: string | null;
+    verified: boolean;
+    requiredHours?: number;
+    zipCodes?: string | null;
+    onboardingComplete?: boolean;
+    serviceStartDate?: string | null;
+    serviceEndDate?: string | null;
+    allowSelfSubmission?: boolean;
+  };
   cohortId?: string;
-  cohort?: { id: string; name: string; requiredHours?: number };
+  cohort?: {
+    id: string;
+    name: string;
+    requiredHours?: number;
+    serviceStartDate?: string | null;
+    serviceEndDate?: string | null;
+    allowSelfSubmission?: boolean | null;
+  };
   beneficiaryId?: string;
   beneficiary?: { id: string; name: string };
   // Legacy fields (kept for compatibility with existing settings/browse pages)

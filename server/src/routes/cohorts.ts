@@ -29,56 +29,67 @@ router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req
 
     const requiredHours = school?.requiredHours ?? 40;
 
-    const result = await Promise.all(
-      cohorts.map(async (c) => {
-        const students = await prisma.user.findMany({
-          where: { cohortId: c.id },
+    const students = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        cohort: { schoolId: user.schoolId },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
           select: {
             id: true,
             name: true,
-            email: true,
-            grade: true,
-            cohortId: true,
-            cohort: {
-              select: {
-                id: true,
-                name: true,
-                requiredHours: true,
-                serviceStartDate: true,
-                serviceEndDate: true,
-              },
-            },
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
           },
-        });
-        const progress = await buildStudentProgressRecords(students, {
-          requiredHours,
-          serviceStartDate: school?.serviceStartDate ?? null,
-          serviceEndDate: school?.serviceEndDate ?? null,
-        });
-        const totalHours = progress.reduce((sum, student) => sum + student.approvedHours, 0);
-        const completedCount = progress.filter((student) => student.status === "COMPLETED").length;
-        const atRiskCount = progress.filter((student) => student.status === "AT_RISK").length;
-        const invAccepted = c.invitations.filter((i) => i.status === "ACCEPTED").length;
-        const invPending = c.invitations.filter((i) => i.status === "PENDING").length;
-        return {
-          id: c.id,
-          name: c.name,
-          status: c.status,
-          requiredHours: c.requiredHours ?? requiredHours,
-          startYear: c.startYear,
-          endYear: c.endYear,
-          publishedAt: c.publishedAt,
-          studentCount: students.length,
-          invitationsSent: c._count.invitations,
-          invitationsAccepted: invAccepted,
-          invitationsPending: invPending,
-          totalHours: Math.round(totalHours * 100) / 100,
-          completedCount,
-          atRiskCount,
-          completionPercentage: students.length > 0 ? Math.round((completedCount / students.length) * 100) : 0,
-        };
-      })
-    );
+        },
+      },
+    });
+
+    const progress = await buildStudentProgressRecords(students, {
+      requiredHours,
+      serviceStartDate: school?.serviceStartDate ?? null,
+      serviceEndDate: school?.serviceEndDate ?? null,
+    });
+    const progressByCohort = new Map<string, typeof progress>();
+    for (const student of progress) {
+      if (!student.cohortId) continue;
+      const list = progressByCohort.get(student.cohortId) ?? [];
+      list.push(student);
+      progressByCohort.set(student.cohortId, list);
+    }
+
+    const result = cohorts.map((c) => {
+      const cohortProgress = progressByCohort.get(c.id) ?? [];
+      const totalHours = cohortProgress.reduce((sum, student) => sum + student.approvedHours, 0);
+      const completedCount = cohortProgress.filter((student) => student.status === "COMPLETED").length;
+      const atRiskCount = cohortProgress.filter((student) => student.status === "AT_RISK").length;
+      const invAccepted = c.invitations.filter((i) => i.status === "ACCEPTED").length;
+      const invPending = c.invitations.filter((i) => i.status === "PENDING").length;
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        requiredHours: c.requiredHours ?? requiredHours,
+        startYear: c.startYear,
+        endYear: c.endYear,
+        publishedAt: c.publishedAt,
+        studentCount: cohortProgress.length,
+        invitationsSent: c._count.invitations,
+        invitationsAccepted: invAccepted,
+        invitationsPending: invPending,
+        totalHours: Math.round(totalHours * 100) / 100,
+        completedCount,
+        atRiskCount,
+        completionPercentage: cohortProgress.length > 0 ? Math.round((completedCount / cohortProgress.length) * 100) : 0,
+      };
+    });
 
     res.json(result);
   } catch (err) {
@@ -322,13 +333,30 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
     if (records.length === 0) return res.status(400).json({ error: "CSV has no student rows" });
     if (records.length > 2000) return res.status(400).json({ error: "CSV exceeds 2000 row limit" });
 
-    const results = { added: 0, skipped: 0, errors: [] as string[] };
+    const results = {
+      added: 0,
+      skipped: 0,
+      errors: [] as Array<{ row: number; email: string | null; reason: string }>,
+    };
 
-    for (const row of records) {
+    for (const [index, row] of records.entries()) {
+      const rowNumber = index + 2;
       const email = (row.email || "").trim().toLowerCase();
       const name = (row.name || "").trim();
       if (!email || !name) {
-        results.errors.push(`Skipped row — missing name or email: ${JSON.stringify(row)}`);
+        results.errors.push({ row: rowNumber, email: email || null, reason: "Missing required name or email" });
+        results.skipped++;
+        continue;
+      }
+      const emailCheck = z.string().email().safeParse(email);
+      if (!emailCheck.success) {
+        results.errors.push({ row: rowNumber, email, reason: "Invalid email address" });
+        results.skipped++;
+        continue;
+      }
+      const existingStudent = await prisma.user.findUnique({ where: { email } });
+      if (existingStudent?.cohortId === cohort.id) {
+        results.errors.push({ row: rowNumber, email, reason: "Student is already enrolled in this cohort" });
         results.skipped++;
         continue;
       }
@@ -337,6 +365,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
         where: { cohortId_email: { cohortId: cohort.id, email } },
       });
       if (existing) {
+        results.errors.push({ row: rowNumber, email, reason: "Invitation already exists for this cohort" });
         results.skipped++;
         continue;
       }
@@ -355,7 +384,15 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       results.added++;
     }
 
-    res.json({ message: "Import complete", ...results });
+    res.json({
+      message: "Import complete",
+      ...results,
+      preview: {
+        totalRows: records.length,
+        importedRows: results.added,
+        skippedRows: results.skipped,
+      },
+    });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("CSV import error:", err);

@@ -25,10 +25,17 @@ const PREFIX = "enc:v1:";
 let _key: Buffer | null = null;
 let _warnedOnce = false;
 
+function isProdLike(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+}
+
 function getKey(): Buffer | null {
   if (_key) return _key;
   const hex = process.env.FIELD_ENCRYPTION_KEY;
   if (!hex) {
+    if (isProdLike()) {
+      throw new Error("[fieldEncryption] FIELD_ENCRYPTION_KEY is required in production.");
+    }
     if (!_warnedOnce) {
       console.warn(
         "[fieldEncryption] FIELD_ENCRYPTION_KEY is not set — sensitive fields will be stored in plaintext. " +
@@ -39,6 +46,9 @@ function getKey(): Buffer | null {
     return null;
   }
   if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
+    if (isProdLike()) {
+      throw new Error("[fieldEncryption] FIELD_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) in production.");
+    }
     console.error("[fieldEncryption] FIELD_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes). Encryption disabled.");
     return null;
   }

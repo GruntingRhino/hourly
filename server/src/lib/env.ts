@@ -18,6 +18,7 @@ const OPTIONAL = [
   "PORT",
   "ALLOWED_ORIGINS",         // comma-separated list of allowed CORS origins
   "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
+  "CRON_SECRET",            // shared secret for scheduled internal jobs (e.g. Vercel cron)
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
@@ -37,6 +38,19 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     missing.forEach((k) => console.error(`   - ${k}`));
     console.error("\nSee .env.example for setup instructions.");
     process.exit(1);
+  }
+
+  const isProdLike = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  if (isProdLike) {
+    const fieldKey = process.env.FIELD_ENCRYPTION_KEY;
+    if (!fieldKey) {
+      console.error("❌ FIELD_ENCRYPTION_KEY is required in production.");
+      process.exit(1);
+    }
+    if (fieldKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(fieldKey)) {
+      console.error("❌ FIELD_ENCRYPTION_KEY must be exactly 64 hex characters in production.");
+      process.exit(1);
+    }
   }
 
   const optional = OPTIONAL.filter((k) => !process.env[k]);
