@@ -351,7 +351,7 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
     let googleProfile: any;
     try {
       const jwt = await import("jsonwebtoken");
-      googleProfile = jwt.default.verify(data.registrationToken, process.env.JWT_SECRET || "dev-secret");
+      googleProfile = jwt.default.verify(data.registrationToken, process.env.JWT_SECRET!);
     } catch {
       return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
     }

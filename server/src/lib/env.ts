@@ -51,6 +51,11 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
       console.error("❌ FIELD_ENCRYPTION_KEY must be exactly 64 hex characters in production.");
       process.exit(1);
     }
+
+    if (!process.env.CRON_SECRET) {
+      console.error("❌ CRON_SECRET is required in production to secure internal scheduled endpoints.");
+      process.exit(1);
+    }
   }
 
   const optional = OPTIONAL.filter((k) => !process.env[k]);

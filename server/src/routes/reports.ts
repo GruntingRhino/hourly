@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
@@ -9,6 +10,15 @@ import { signToken } from "../middleware/auth";
 import { CLIENT_URL } from "../services/email";
 
 const router = Router();
+
+// 30 reads per IP per 15 minutes — public endpoint, tokens not guessable but still needs a floor
+const parentProgressLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again later." },
+});
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
@@ -358,7 +368,7 @@ router.post("/parent-link", authenticate, async (req: Request, res: Response) =>
 });
 
 // GET /api/reports/parent-progress?token=... — read-only parent progress view
-router.get("/parent-progress", async (req: Request, res: Response) => {
+router.get("/parent-progress", parentProgressLimiter, async (req: Request, res: Response) => {
   try {
     const token = String(req.query.token || "").trim();
     if (!token) return res.status(400).json({ error: "token query param is required" });
