@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -15,7 +15,7 @@ import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 const beneficiaryInviteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => `ben-invite:${(req as any).user?.userId ?? req.ip}`,
+  keyGenerator: (req) => `ben-invite:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many invitation attempts. Please wait before sending more invitations." },

@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -16,7 +16,7 @@ const router = Router();
 const publishCohortLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => `cohort-publish:${(req as any).user?.userId ?? req.ip}`,
+  keyGenerator: (req) => `cohort-publish:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many publish attempts. Please wait before resending invitations." },

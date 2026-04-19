@@ -2,7 +2,7 @@ import "./lib/env"; // Validate required env vars at startup
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import path from "path";
 import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
@@ -98,6 +98,7 @@ app.use("/api/saved", savedRoutes);
 const geocodeLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  keyGenerator: (req) => ipKeyGenerator(req.ip || ""),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many geocode requests. Please wait before trying again." },
