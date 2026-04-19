@@ -9,6 +9,67 @@ import { runReminderCycle } from "../lib/reminders";
 
 const router = Router();
 
+const SCHOOL_ROLES = new Set(["SCHOOL_ADMIN", "TEACHER", "STUDENT"]);
+
+/** Returns the school ID for any user regardless of how they're enrolled. */
+function resolveSchoolId(u: { schoolId: string | null; cohort?: { schoolId: string } | null; classroom?: { schoolId: string } | null }): string | null {
+  return u.schoolId ?? u.cohort?.schoolId ?? u.classroom?.schoolId ?? null;
+}
+
+async function canSendMessage(senderId: string, receiverId: string): Promise<boolean> {
+  const [sender, receiver] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: senderId },
+      select: { role: true, schoolId: true, beneficiaryId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    }),
+    prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { role: true, schoolId: true, beneficiaryId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    }),
+  ]);
+  if (!sender || !receiver) return false;
+
+  const sSchool = resolveSchoolId(sender);
+  const rSchool = resolveSchoolId(receiver);
+
+  // Same school: staff<->student, staff<->staff — no student<->student
+  if (sSchool && rSchool && sSchool === rSchool && SCHOOL_ROLES.has(sender.role) && SCHOOL_ROLES.has(receiver.role)) {
+    if (sender.role === "STUDENT" && receiver.role === "STUDENT") return false;
+    return true;
+  }
+
+  // School staff or student → BENEFICIARY_ADMIN: requires approved school↔beneficiary relationship
+  if (SCHOOL_ROLES.has(sender.role) && sSchool && receiver.role === "BENEFICIARY_ADMIN" && receiver.beneficiaryId) {
+    const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+      where: { schoolId: sSchool, beneficiaryId: receiver.beneficiaryId, status: "APPROVED" },
+      select: { id: true },
+    });
+    return !!approval;
+  }
+
+  // BENEFICIARY_ADMIN → school staff (not students): requires approved relationship
+  if (sender.role === "BENEFICIARY_ADMIN" && sender.beneficiaryId && rSchool && ["SCHOOL_ADMIN", "TEACHER"].includes(receiver.role)) {
+    const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+      where: { schoolId: rSchool, beneficiaryId: sender.beneficiaryId, status: "APPROVED" },
+      select: { id: true },
+    });
+    return !!approval;
+  }
+
+  return false;
+}
+
+// 1 manual reminder run per user per hour — prevents staff from spamming students with reminder emails
+// Keyed by userId synchronously (express-rate-limit does not support async keyGenerator)
+const reminderRunLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 1,
+  keyGenerator: (req) => `reminder-run:${(req as any).user?.userId ?? req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Reminder cycle already triggered this hour. Please wait before running again." },
+});
+
 // 20 messages per user per hour — prevents inbox-flooding another user
 const sendMessageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -53,8 +114,11 @@ router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Res
     const receiver = receiverEmail
       ? await prisma.user.findUnique({ where: { email: receiverEmail } })
       : await prisma.user.findUnique({ where: { id: receiverId } });
-    if (!receiver) {
-      return res.status(404).json({ error: "Recipient not found. Please check the email address." });
+
+    // Return the same error whether the user doesn't exist or is out of scope —
+    // distinguishing the two would let callers enumerate registered emails.
+    if (!receiver || !(await canSendMessage(req.user!.userId, receiver.id))) {
+      return res.status(404).json({ error: "Recipient not found or not eligible to receive messages from you." });
     }
 
     // Message preferences removed in new architecture
@@ -270,7 +334,7 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
 });
 
 // POST /api/messages/reminders/run — manually run the reminder cycle for the caller's school
-router.post("/reminders/run", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/reminders/run", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), reminderRunLimiter, async (req: Request, res: Response) => {
   try {
     const actor = await prisma.user.findUnique({
       where: { id: req.user!.userId },

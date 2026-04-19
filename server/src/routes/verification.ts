@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -9,7 +10,7 @@ import { resolveEffectiveRules } from "../lib/schoolRules";
 const router = Router();
 
 // POST /api/verification/:sessionId/approve — approve hours
-router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEFICIARY_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },
@@ -57,8 +58,10 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEF
       return res.status(400).json({ error: "Session is not pending verification" });
     }
 
-    const { approvedHours } = req.body;
-    const hours = approvedHours !== undefined ? approvedHours : session.totalHours;
+    const { approvedHours } = z.object({
+      approvedHours: z.number().positive().max(24).optional(),
+    }).parse(req.body);
+    const hours = approvedHours !== undefined ? approvedHours : (session.totalHours ?? 0);
 
     const updated = await prisma.serviceSession.update({
       where: { id: req.params.sessionId },
@@ -110,7 +113,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "BENEF
 });
 
 // POST /api/verification/:sessionId/reject — reject hours
-router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "BENEFICIARY_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.sessionId },

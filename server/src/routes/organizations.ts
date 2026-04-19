@@ -7,7 +7,7 @@ import { sendOrgApprovalRequestEmail } from "../services/email";
 const router = Router();
 
 // GET /api/organizations — list all
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", authenticate, async (_req: Request, res: Response) => {
   try {
     const orgs = await prisma.organization.findMany({
       include: {
@@ -23,7 +23,7 @@ router.get("/", async (_req: Request, res: Response) => {
 });
 
 // GET /api/organizations/:id
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", authenticate, async (req: Request, res: Response) => {
   try {
     const org = await prisma.organization.findUnique({
       where: { id: req.params.id },

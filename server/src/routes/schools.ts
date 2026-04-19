@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
@@ -215,35 +216,35 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       return res.status(403).json({ error: "Not your school" });
     }
 
-    // Validate and coerce new service rule fields
-    const rulesSchema = z.object({
+    // Validate all school update fields
+    const updateSchema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      domain: z.string().max(255).nullable().optional(),
+      requiredHours: z.number().min(1).max(2000).optional(),
+      verificationStandard: z.enum(["STANDARD", "BENEFICIARY_REQUIRED"]).optional(),
       serviceStartDate: z.string().datetime({ offset: true }).nullable().optional(),
       serviceEndDate: z.string().datetime({ offset: true }).nullable().optional(),
       allowSelfSubmission: z.boolean().optional(),
-      verificationStandard: z.enum(["STANDARD", "BENEFICIARY_REQUIRED"]).optional(),
       requireOrgVerification: z.boolean().optional(),
-      categoryHourCaps: z
-        .record(z.string(), z.number().positive())
-        .nullable()
-        .optional(),
+      categoryHourCaps: z.record(z.string(), z.number().positive()).nullable().optional(),
+      address: z.string().max(255).nullable().optional(),
+      city: z.string().max(100).nullable().optional(),
+      state: z.string().max(100).nullable().optional(),
+      zip: z.string().max(20).nullable().optional(),
+      zipCodes: z.array(z.string().regex(/^\d{5}$/)).nullable().optional(),
     });
 
-    let rulesData: z.infer<typeof rulesSchema> = {};
+    let body: z.infer<typeof updateSchema>;
     try {
-      rulesData = rulesSchema.parse({
-        serviceStartDate: req.body.serviceStartDate,
-        serviceEndDate: req.body.serviceEndDate,
-        allowSelfSubmission: req.body.allowSelfSubmission,
-        verificationStandard: req.body.verificationStandard,
-        requireOrgVerification: req.body.requireOrgVerification,
-        categoryHourCaps: req.body.categoryHourCaps,
-      });
+      body = updateSchema.parse(req.body);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: err.errors });
       }
       throw err;
     }
+
+    const rulesData = body;
 
     // Validate date ordering when both are set
     if (rulesData.serviceStartDate && rulesData.serviceEndDate) {
@@ -253,10 +254,10 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
     }
 
     const updateData: any = {
-      name: req.body.name,
-      domain: req.body.domain,
-      requiredHours: req.body.requiredHours,
-      verificationStandard: req.body.verificationStandard,
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.domain !== undefined && { domain: body.domain }),
+      ...(body.requiredHours !== undefined && { requiredHours: body.requiredHours }),
+      ...(body.verificationStandard !== undefined && { verificationStandard: body.verificationStandard }),
     };
     if (req.body.zipCodes !== undefined) {
       updateData.zipCodes = Array.isArray(req.body.zipCodes)
@@ -300,6 +301,16 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       where: { id: req.params.id },
       data: updateData,
     });
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "SCHOOL_SETTINGS_UPDATED",
+      targetType: "School",
+      targetId: req.params.id,
+      schoolId: req.params.id,
+      details: { updatedFields: Object.keys(updateData) },
+    });
+
     res.json(updated);
   } catch (err) {
     console.error("Update school error:", err);
@@ -983,7 +994,30 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
 // POST /api/schools/:id/groups/:groupId/students
 router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (actor?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    // Verify the group belongs to this school
+    const group = await prisma.studentGroup.findUnique({ where: { id: req.params.groupId } });
+    if (!group || group.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Group not found in this school" });
+    }
+
     const { studentId } = req.body;
+    if (!studentId) return res.status(400).json({ error: "studentId is required" });
+
+    // Verify the student belongs to this school
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { role: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+    const studentSchoolId = student?.classroom?.schoolId ?? student?.cohort?.schoolId ?? student?.schoolId ?? null;
+    if (!student || student.role !== "STUDENT" || studentSchoolId !== req.params.id) {
+      return res.status(403).json({ error: "Student is not enrolled in your school" });
+    }
+
     const member = await prisma.studentGroupMember.create({
       data: { groupId: req.params.groupId, studentId },
     });
@@ -1011,7 +1045,7 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: "Email already registered" });
 
-    const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const tempPassword = crypto.randomBytes(12).toString("base64url");
     const configuredRounds = Number(process.env.TEMP_PASSWORD_BCRYPT_ROUNDS ?? 8);
     const rounds = Number.isFinite(configuredRounds) ? Math.min(14, Math.max(4, Math.floor(configuredRounds))) : 8;
     const passwordHash = await bcrypt.hash(tempPassword, rounds);
@@ -1027,13 +1061,26 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       },
     });
 
-    // If classroomId provided, update that classroom's teacherId
+    // If classroomId provided, verify it belongs to this school before assigning
     if (classroomId) {
+      const classroom = await prisma.classroom.findUnique({ where: { id: classroomId }, select: { schoolId: true } });
+      if (!classroom || classroom.schoolId !== req.params.id) {
+        return res.status(400).json({ error: "classroomId does not belong to this school" });
+      }
       await prisma.classroom.update({
         where: { id: classroomId },
         data: { teacherId: teacher.id },
       });
     }
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "STAFF_CREATED",
+      targetType: "User",
+      targetId: teacher.id,
+      schoolId: req.params.id,
+      details: { email: teacher.email, role: teacher.role },
+    });
 
     const responseBody: Record<string, unknown> = {
       id: teacher.id,
@@ -1076,6 +1123,18 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
       },
     });
     if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Verify the session's student belongs to this school regardless of role
+    const sessionStudentSchoolId = await (async () => {
+      const s = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      });
+      return s?.classroom?.schoolId ?? s?.cohort?.schoolId ?? s?.schoolId ?? null;
+    })();
+    if (sessionStudentSchoolId !== req.params.id) {
+      return res.status(403).json({ error: "Student is not enrolled in your school" });
+    }
 
     // Teacher can only remove hours for students in their classroom
     if (user.role === "TEACHER") {

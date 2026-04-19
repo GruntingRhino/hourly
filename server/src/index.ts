@@ -2,6 +2,7 @@ import "./lib/env"; // Validate required env vars at startup
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
@@ -93,9 +94,18 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/saved", savedRoutes);
 
+// 30 geocode requests per IP per minute — Nominatim enforces 1 req/sec; this keeps us well under
+const geocodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many geocode requests. Please wait before trying again." },
+});
+
 // Geocode endpoint — proxies Nominatim so the client never touches the external API directly
 // GET /api/geocode?address=123+Main+St,+Springfield,+IL
-app.get("/api/geocode", async (req, res) => {
+app.get("/api/geocode", geocodeLimiter, async (req, res) => {
   const address = req.query.address as string | undefined;
   if (!address?.trim()) {
     return res.status(400).json({ error: "address query param required" });
