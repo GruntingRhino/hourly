@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
@@ -15,7 +15,7 @@ const router = Router();
 const parentLinkLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => `parent-link:${(req as any).user?.userId ?? req.ip}`,
+  keyGenerator: (req) => `parent-link:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many parent link requests. Please wait before generating another." },

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -64,7 +64,7 @@ async function canSendMessage(senderId: string, receiverId: string): Promise<boo
 const reminderRunLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 1,
-  keyGenerator: (req) => `reminder-run:${(req as any).user?.userId ?? req.ip}`,
+  keyGenerator: (req) => `reminder-run:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Reminder cycle already triggered this hour. Please wait before running again." },
@@ -74,7 +74,7 @@ const reminderRunLimiter = rateLimit({
 const sendMessageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 20,
-  keyGenerator: (req) => `msg-send:${(req as any).user?.userId ?? req.ip}`,
+  keyGenerator: (req) => `msg-send:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many messages sent. Please wait before sending more." },
