@@ -244,7 +244,10 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
     if (submission.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
     if (submission.status !== "PENDING") return res.status(400).json({ error: "Submission is not pending" });
 
-    const { adjustedHours, overrideCap } = req.body;
+    const { adjustedHours, overrideCap } = z.object({
+      adjustedHours: z.number().positive().max(24).optional(),
+      overrideCap: z.boolean().optional(),
+    }).parse(req.body);
     const hours = adjustedHours ?? submission.hours;
 
     // Category cap check

@@ -423,6 +423,10 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
       const cohort = await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } });
       schoolId = cohort?.schoolId ?? null;
     }
+    if (!schoolId && user?.classroomId) {
+      const classroom = await prisma.classroom.findUnique({ where: { id: user.classroomId }, select: { schoolId: true } });
+      schoolId = classroom?.schoolId ?? null;
+    }
     if (!schoolId) return res.json([]);
 
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
@@ -541,7 +545,25 @@ router.get("/slots/:slotId", authenticate, async (req: Request, res: Response) =
     });
     if (!slot) return res.status(404).json({ error: "Slot not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+
+    if (user?.role === "BENEFICIARY_ADMIN") {
+      if (user.beneficiaryId !== slot.opportunity.beneficiary.id) {
+        return res.status(403).json({ error: "Not your beneficiary's slot" });
+      }
+    } else {
+      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId, beneficiaryId: slot.opportunity.beneficiary.id, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!approval) return res.status(403).json({ error: "This opportunity is not available at your school" });
+    }
+
     let mySignup = null;
     if (user?.role === "STUDENT") {
       mySignup = await prisma.beneficiarySignup.findUnique({
@@ -574,13 +596,27 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
     });
     if (!ben) return res.status(404).json({ error: "Beneficiary not found" });
 
-    // Check access: beneficiary admin for their own, school for approved, students for school-approved
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.role === "BENEFICIARY_ADMIN" && user.beneficiaryId !== ben.id) {
-      return res.status(403).json({ error: "Not your beneficiary" });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+
+    if (user?.role === "BENEFICIARY_ADMIN") {
+      if (user.beneficiaryId !== ben.id) return res.status(403).json({ error: "Not your beneficiary" });
+    } else {
+      // School staff and students: require an APPROVED school-beneficiary relationship
+      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId, beneficiaryId: ben.id, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!approval) return res.status(403).json({ error: "This beneficiary is not available to your school" });
     }
 
-    res.json(ben);
+    // Strip cross-school approval details from response for non-BENEFICIARY_ADMIN callers
+    const { schoolApprovals: _sa, ...benPublic } = ben as any;
+    res.json(user?.role === "BENEFICIARY_ADMIN" ? ben : benPublic);
   } catch (err) {
     console.error("Get beneficiary error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -772,6 +808,23 @@ router.get("/:id/schools", authenticate, requireRole("BENEFICIARY_ADMIN"), async
 // GET /api/beneficiaries/:id/opportunities — list opportunities for a beneficiary
 router.get("/:id/opportunities", authenticate, async (req: Request, res: Response) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+
+    if (user?.role === "BENEFICIARY_ADMIN") {
+      if (user.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    } else {
+      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId, beneficiaryId: req.params.id, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!approval) return res.status(403).json({ error: "This beneficiary is not available to your school" });
+    }
+
     const opportunities = await prisma.beneficiaryOpportunity.findMany({
       where: { beneficiaryId: req.params.id, status: { not: "CANCELLED" } },
       include: {
@@ -928,9 +981,41 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
   try {
     const slot = await prisma.beneficiaryTimeSlot.findUnique({
       where: { id: req.params.slotId },
-      include: { _count: { select: { signups: true } } },
+      include: {
+        _count: { select: { signups: true } },
+        opportunity: { select: { beneficiaryId: true, status: true, schoolRestrictions: true } },
+      },
     });
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
+    if (slot.opportunity.status !== "ACTIVE") return res.status(400).json({ error: "This opportunity is no longer active" });
+
+    // Resolve the student's school
+    const studentUser = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+    const studentSchoolId = studentUser?.classroom?.schoolId ?? studentUser?.cohort?.schoolId ?? studentUser?.schoolId ?? null;
+    if (!studentSchoolId) {
+      return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
+    }
+
+    // Verify the beneficiary is approved for the student's school
+    const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+      where: { schoolId: studentSchoolId, beneficiaryId: slot.opportunity.beneficiaryId, status: "APPROVED" },
+      select: { id: true },
+    });
+    if (!approval) {
+      return res.status(403).json({ error: "This opportunity is not available at your school." });
+    }
+
+    // Enforce schoolRestrictions if the beneficiary set them
+    if (slot.opportunity.schoolRestrictions) {
+      let restrictions: string[] = [];
+      try { restrictions = JSON.parse(slot.opportunity.schoolRestrictions); } catch { /* ignore malformed */ }
+      if (restrictions.length > 0 && !restrictions.includes(studentSchoolId)) {
+        return res.status(403).json({ error: "This opportunity is not open to your school." });
+      }
+    }
 
     const existing = await prisma.beneficiarySignup.findUnique({
       where: { slotId_studentId: { slotId: slot.id, studentId: req.user!.userId } },
@@ -1008,7 +1093,13 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
 
-    const { approvedHours, overrideCap } = req.body;
+    const { approvedHours, overrideCap } = z.object({
+      approvedHours: z.number().positive().optional(),
+      overrideCap: z.boolean().optional(),
+    }).parse(req.body);
+    if (approvedHours !== undefined && approvedHours > signup.slot.durationHours) {
+      return res.status(400).json({ error: `approvedHours cannot exceed the slot duration of ${signup.slot.durationHours}h` });
+    }
     const hours = approvedHours ?? signup.slot.durationHours;
 
     // Category cap check
@@ -1106,6 +1197,14 @@ router.post("/invitations/:invId/respond", authenticate, requireRole("BENEFICIAR
         ...(action === "ACCEPTED" ? { acceptedAt: new Date() } : {}),
       },
     });
+
+    // Promote the school↔beneficiary relationship to APPROVED when the beneficiary accepts
+    if (action === "ACCEPTED") {
+      await prisma.schoolBeneficiaryApproval.updateMany({
+        where: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
+        data: { status: "APPROVED", approvedAt: new Date() },
+      });
+    }
 
     res.json(updated);
   } catch (err) {

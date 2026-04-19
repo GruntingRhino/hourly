@@ -8,6 +8,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendStudentInvitationEmail, CLIENT_URL } from "../services/email";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { logDataAccess } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -515,6 +516,16 @@ router.delete("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Req
     // Remove all students from cohort first, then delete
     await prisma.user.updateMany({ where: { cohortId: cohort.id }, data: { cohortId: null } });
     await prisma.cohort.delete({ where: { id: cohort.id } });
+
+    await logDataAccess({
+      actorId: req.user!.userId,
+      action: "COHORT_DELETED",
+      targetType: "Cohort",
+      targetId: cohort.id,
+      schoolId: cohort.schoolId,
+      details: { cohortName: cohort.name, studentCount: cohort._count.students },
+    });
+
     res.status(204).send();
   } catch (err) {
     console.error("Delete cohort error:", err);
@@ -529,6 +540,14 @@ router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMI
     const cohort = await prisma.cohort.findUnique({ where: { id: req.params.id } });
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
+
+    // Verify the student is actually enrolled in this specific cohort
+    const student = await prisma.user.findUnique({
+      where: { id: req.params.studentId },
+      select: { role: true, cohortId: true },
+    });
+    if (!student || student.role !== "STUDENT") return res.status(404).json({ error: "Student not found" });
+    if (student.cohortId !== req.params.id) return res.status(403).json({ error: "Student is not enrolled in this cohort" });
 
     await prisma.user.update({
       where: { id: req.params.studentId },

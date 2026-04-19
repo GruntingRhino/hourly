@@ -11,6 +11,16 @@ import { CLIENT_URL } from "../services/email";
 
 const router = Router();
 
+// 5 parent-link generations per student per hour — prevents token churn/abuse
+const parentLinkLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => `parent-link:${(req as any).user?.userId ?? req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many parent link requests. Please wait before generating another." },
+});
+
 // 30 reads per IP per 15 minutes — public endpoint, tokens not guessable but still needs a floor
 const parentProgressLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -135,6 +145,21 @@ router.get("/organization", authenticate, async (req: Request, res: Response) =>
 
     const orgId = (req.query.organizationId as string) || user?.organizationId;
     if (!orgId) return res.status(400).json({ error: "Organization ID required" });
+
+    // ORG_ADMIN may only query their own organization
+    if (req.user!.role === "ORG_ADMIN" && orgId !== user?.organizationId) {
+      return res.status(403).json({ error: "Not your organization" });
+    }
+
+    // School staff may only query organizations linked to their school
+    if (SCHOOL_ROLES.includes(req.user!.role)) {
+      if (!user?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const link = await prisma.schoolOrganization.findFirst({
+        where: { schoolId: user.schoolId, organizationId: orgId, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!link) return res.status(403).json({ error: "Organization is not approved for your school" });
+    }
 
     const sessions = await prisma.serviceSession.findMany({
       where: { opportunity: { organizationId: orgId } },
@@ -345,7 +370,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /api/reports/parent-link — generate a shareable parent progress link for the current student
-router.post("/parent-link", authenticate, async (req: Request, res: Response) => {
+router.post("/parent-link", authenticate, parentLinkLimiter, async (req: Request, res: Response) => {
   try {
     if (req.user!.role !== "STUDENT") {
       return res.status(403).json({ error: "Student role required" });
