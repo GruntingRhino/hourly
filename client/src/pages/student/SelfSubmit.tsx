@@ -38,12 +38,21 @@ const CATEGORY_OPTIONS = [
   "mentoring",
 ];
 
+const STATUS_FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "PENDING", label: "Pending" },
+  { key: "APPROVED", label: "Approved" },
+  { key: "REJECTED", label: "Rejected" },
+  { key: "REVISION_REQUESTED", label: "Needs Revision" },
+];
+
 export default function StudentSelfSubmit() {
   const [submissions, setSubmissions] = useState<SelfSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [allowSelfSubmission, setAllowSelfSubmission] = useState<boolean | null>(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [form, setForm] = useState<EditForm>({
     organizationName: "",
     description: "",
@@ -156,7 +165,7 @@ export default function StudentSelfSubmit() {
         <h1 className="text-2xl font-bold">Self-Submitted Hours</h1>
         {allowSelfSubmission !== false && (
           <button onClick={() => { setShowForm(true); setError(""); setSuccess(""); }}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800">
+            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85">
             + Submit Hours
           </button>
         )}
@@ -234,7 +243,7 @@ export default function StudentSelfSubmit() {
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={submitting}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+                className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
                 {submitting ? "Submitting..." : "Submit for Review"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
@@ -246,15 +255,49 @@ export default function StudentSelfSubmit() {
         </div>
       )}
 
+      {!loading && submissions.length > 0 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {STATUS_FILTERS.map((f) => {
+            const count = f.key === "ALL" ? submissions.length : submissions.filter(s => s.status === f.key).length;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  statusFilter === f.key
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                }`}
+              >
+                {f.label}
+                {count > 0 && f.key !== "ALL" && (
+                  <span className={`ml-1.5 ${statusFilter === f.key ? "opacity-75" : "text-gray-400"}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {loading ? (
         <div className="text-gray-500 text-sm">Loading...</div>
       ) : submissions.length === 0 ? (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
           No submissions yet. Click "+ Submit Hours" to report volunteer work done outside school events.
         </div>
-      ) : (
+      ) : (() => {
+        const filtered = (statusFilter === "ALL" ? submissions : submissions.filter(s => s.status === statusFilter))
+          .slice()
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return filtered.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-500 text-sm">
+            No {STATUS_FILTERS.find(f => f.key === statusFilter)?.label.toLowerCase()} submissions.
+          </div>
+        ) : (
         <div className="space-y-3">
-          {submissions.map((sub) => (
+          {filtered.map((sub) => (
             <div key={sub.id} className={`bg-white border rounded-lg p-4 ${sub.status === "REVISION_REQUESTED" ? "border-amber-300" : "border-gray-200"}`}>
               {editingId === sub.id ? (
                 <div>
@@ -317,7 +360,7 @@ export default function StudentSelfSubmit() {
                     </div>
                     <div className="flex gap-2">
                       <button type="submit" disabled={submitting}
-                        className="px-3 py-1.5 bg-gray-900 text-white rounded text-xs hover:bg-gray-800 disabled:opacity-50">
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:opacity-85 disabled:opacity-50">
                         {submitting ? "..." : "Resubmit for Review"}
                       </button>
                       <button type="button" onClick={() => setEditingId(null)}
@@ -363,7 +406,8 @@ export default function StudentSelfSubmit() {
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

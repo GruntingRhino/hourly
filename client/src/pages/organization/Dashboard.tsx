@@ -150,7 +150,7 @@ export default function OrgDashboard() {
       <div className="flex gap-3 mb-6">
         <Link
           to="/opportunities/new"
-          className="px-6 py-3 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800"
+          className="px-6 py-[9px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85"
         >
           Create Opportunity
         </Link>
@@ -178,7 +178,7 @@ export default function OrgDashboard() {
                 <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm mb-4">
                   {announceResult}
                 </div>
-                <button onClick={() => { setShowAnnounce(false); setAnnounceResult(""); }} className="w-full py-2 bg-gray-900 text-white rounded-md">Done</button>
+                <button onClick={() => { setShowAnnounce(false); setAnnounceResult(""); }} className="w-full py-[7px] bg-blue-600 text-white rounded-md hover:opacity-85">Done</button>
               </div>
             ) : (
               <form onSubmit={handleAnnounce} className="space-y-4">

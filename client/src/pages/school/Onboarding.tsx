@@ -99,7 +99,7 @@ export default function SchoolOnboarding() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+              className="w-full py-[9px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Goal and Continue"}
             </button>
@@ -110,12 +110,17 @@ export default function SchoolOnboarding() {
             <div className="space-y-2 text-sm text-gray-600">
               <div>1. Add or approve community partners.</div>
               <div>2. Create a cohort and import students by CSV.</div>
-              <div>3. Publish invitations and confirm the dashboard shows live student data.</div>
+              <div>3. Publish invitations and confirm the Launch Center shows live student data.</div>
             </div>
             <div className="mt-4">
-              <Link to="/settings" className="text-sm text-blue-600 hover:underline">
-                Review school settings instead
-              </Link>
+              <div className="flex flex-wrap gap-4">
+                <Link to="/launch" className="text-sm text-blue-600 hover:underline">
+                  Open Launch Center
+                </Link>
+                <Link to="/settings" className="text-sm text-blue-600 hover:underline">
+                  Review school settings instead
+                </Link>
+              </div>
             </div>
           </div>
         </div>

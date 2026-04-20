@@ -213,36 +213,37 @@ export default function SchoolDashboard() {
         );
       })()}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
         <div className="flex gap-2">
-          <button onClick={handleExportPdf} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button onClick={handleExportPdf} className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50">
             Export PDF
           </button>
-          <Link to="/cohorts" className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800">
+          <Link to="/cohorts" className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85">
             Manage Cohorts
           </Link>
         </div>
       </div>
 
       {/* School-wide stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-500">Total Students</div>
-          <div className="text-2xl font-bold">{totalStudents}</div>
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Total Students</div>
+          <div className="text-3xl font-bold text-gray-900 leading-none">{totalStudents}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-500">Total Hours</div>
-          <div className="text-2xl font-bold text-blue-600">{totalHours === 0 ? "0" : totalHours.toFixed(1)}</div>
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Total Hours</div>
+          <div className="text-3xl font-bold text-blue-600 leading-none">{totalHours === 0 ? "0" : totalHours.toFixed(1)}</div>
+          <div className="text-xs text-gray-400 mt-1">verified</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-500">Goal Reached</div>
-          <div className={`text-2xl font-bold ${totalCompleted > 0 ? "text-green-600" : "text-gray-800"}`}>{totalCompleted}</div>
-          <div className="text-xs text-gray-400">of {totalStudents} students</div>
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Goal Reached</div>
+          <div className={`text-3xl font-bold leading-none ${totalCompleted > 0 ? "text-green-600" : "text-gray-800"}`}>{totalCompleted}</div>
+          <div className="text-xs text-gray-400 mt-1">of {totalStudents} students</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-500">At Risk</div>
-          <div className={`text-2xl font-bold ${totalAtRisk > 0 ? "text-red-600" : "text-gray-800"}`}>{totalAtRisk}</div>
-          <div className="text-xs text-gray-400">deadline, pace, or attendance risk</div>
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">At Risk</div>
+          <div className={`text-3xl font-bold leading-none ${totalAtRisk > 0 ? "text-red-600" : "text-gray-800"}`}>{totalAtRisk}</div>
+          <div className="text-xs text-gray-400 mt-1">deadline, pace, or attendance</div>
         </div>
       </div>
 
@@ -269,26 +270,27 @@ export default function SchoolDashboard() {
         </div>
       )}
 
-      {/* Quick links */}
-      <div className="flex gap-3 mb-8 flex-wrap">
-        <Link to="/cohorts" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          View All Cohorts ({cohorts.length})
-        </Link>
-        <Link to="/beneficiaries" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          Partners ({beneficiaries.length} approved)
-        </Link>
-        <Link to="/submissions" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          Self-Submitted Hours
-        </Link>
-        <Link to="/students" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          Student Roster ({students.length})
-        </Link>
-        <Link to="/students/on-track" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          On-Track Students
-        </Link>
-        <Link to="/students/off-track" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-          Off-Track Students
-        </Link>
+      {/* Quick links — 3×2 grid */}
+      <div className="grid grid-cols-3 gap-2.5 mb-6">
+        {[
+          { to: "/cohorts", label: "View All Cohorts", count: cohorts.length },
+          { to: "/beneficiaries", label: "Partners Approved", count: beneficiaries.length },
+          { to: "/submissions", label: "Self-Submitted Hours", count: null },
+          { to: "/students", label: "Student Roster", count: students.length },
+          { to: "/students/on-track", label: "On-Track", count: cohorts.reduce((s, c) => s + (c.studentCount - c.atRiskCount), 0) },
+          { to: "/students/off-track", label: "Off-Track", count: totalAtRisk },
+        ].map((b) => (
+          <Link
+            key={b.to}
+            to={b.to}
+            className="flex items-center justify-between px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <span>{b.label}</span>
+            {b.count != null && (
+              <span className="ml-2 bg-gray-100 text-gray-500 rounded-full text-[11.5px] font-semibold px-2 py-0.5">{b.count}</span>
+            )}
+          </Link>
+        ))}
       </div>
 
       {/* Pending invites alert */}
@@ -303,60 +305,57 @@ export default function SchoolDashboard() {
 
       {/* Cohorts list */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Cohorts</h2>
-          <Link to="/cohorts" className="text-sm text-blue-600 hover:underline">Manage →</Link>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-[15px] font-semibold text-gray-900">Cohorts</h2>
+          <Link to="/cohorts" className="text-[13px] text-blue-600 hover:opacity-75">Manage →</Link>
         </div>
 
         {cohorts.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500 text-sm">
             No cohorts yet.{" "}
             <Link to="/cohorts" className="text-blue-600 hover:underline">Create your first cohort</Link> to get started.
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-2.5">
             {cohorts.map((c) => (
-              <Link key={c.id} to={`/cohorts/${c.id}`} className="block bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 transition-colors">
+              <Link key={c.id} to={`/cohorts/${c.id}`} className="block bg-white border border-gray-200 rounded-lg p-[18px] hover:border-blue-300 transition-colors">
                 <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="font-semibold">{c.name}</div>
-                    <div className="text-xs text-gray-500">{c.requiredHours}h goal</div>
+                  <div className="flex items-center gap-2.5">
+                    <div>
+                      <div className="font-bold text-[15px] text-gray-900">{c.name}</div>
+                      <div className="text-[12.5px] text-gray-500">{c.requiredHours}h goal</div>
+                    </div>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${c.status === "PUBLISHED" ? "bg-blue-50 text-blue-600" : "bg-yellow-50 text-yellow-700"}`}>
+                      {c.status.toLowerCase()}
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.status === "PUBLISHED" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
-                    {c.status}
-                  </span>
+                  <span className="text-[12px] text-gray-400 font-medium">{c.invitationsPending > 0 ? `${c.invitationsPending} pending` : ""}</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-center mb-3">
-                  <div>
-                    <div className="text-lg font-bold">{c.studentCount}</div>
-                    <div className="text-xs text-gray-500">Students</div>
-                  </div>
-                  <div>
-                    <div className={`text-lg font-bold ${c.totalHours > 0 ? "text-blue-600" : "text-gray-800"}`}>{c.studentCount > 0 ? (c.totalHours / c.studentCount).toFixed(1) : "0"}h</div>
-                    <div className="text-xs text-gray-500">Avg Hours</div>
-                  </div>
-                  <div>
-                    <div className={`text-lg font-bold ${(c.studentCount - c.atRiskCount) > 0 ? "text-green-600" : "text-gray-800"}`}>{c.studentCount - c.atRiskCount}</div>
-                    <div className="text-xs text-gray-500">On-Track</div>
-                  </div>
-                  <div>
-                    <div className={`text-lg font-bold ${c.atRiskCount > 0 ? "text-red-500" : "text-gray-800"}`}>{c.atRiskCount}</div>
-                    <div className="text-xs text-gray-500">Off-Track</div>
-                  </div>
+                <div className="flex gap-6 mb-3">
+                  {[
+                    { label: "Students", value: c.studentCount, color: "text-gray-900" },
+                    { label: "Avg Hours", value: c.studentCount > 0 ? `${(c.totalHours / c.studentCount).toFixed(1)}h` : "0h", color: "text-blue-600" },
+                    { label: "On-Track", value: c.studentCount - c.atRiskCount, color: "text-green-600" },
+                    { label: "Off-Track", value: c.atRiskCount, color: c.atRiskCount > 0 ? "text-red-500" : "text-gray-400" },
+                  ].map((stat) => (
+                    <div key={stat.label}>
+                      <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
+                      <div className="text-[11.5px] text-gray-500">{stat.label}</div>
+                    </div>
+                  ))}
                 </div>
 
                 {c.studentCount > 0 && (
-                  <div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${c.completionPercentage}%` }} />
+                  <>
+                    <div className="w-full bg-gray-200 rounded-full h-[5px]">
+                      <div
+                        className={`h-[5px] rounded-full ${c.completionPercentage >= 80 ? "bg-green-500" : c.completionPercentage >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                        style={{ width: `${c.completionPercentage}%` }}
+                      />
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{c.completionPercentage}% completion</div>
-                  </div>
-                )}
-
-                {c.invitationsPending > 0 && (
-                  <div className="mt-2 text-xs text-blue-600">{c.invitationsPending} invitation{c.invitationsPending !== 1 ? "s" : ""} pending</div>
+                    <div className="text-[11.5px] text-gray-400 mt-1">{c.completionPercentage}% completed {c.requiredHours}h goal</div>
+                  </>
                 )}
               </Link>
             ))}
@@ -367,38 +366,38 @@ export default function SchoolDashboard() {
       {/* Condensed student roster */}
       {students.length > 0 && (
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Student Roster</h2>
-            <Link to="/students" className="text-sm text-blue-600 hover:underline">View All ({students.length}) →</Link>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-[15px] font-semibold text-gray-900">Student Roster</h2>
+            <Link to="/students" className="text-[13px] text-blue-600 hover:opacity-75">View All ({students.length}) →</Link>
           </div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-[13.5px]">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 hidden sm:table-cell">Cohort</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Hours</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Status</th>
+                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">Name</th>
+                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200 hidden sm:table-cell">Cohort</th>
+                  <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">Hours</th>
+                  <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {[...students]
                   .sort((a, b) => (a.approvedHours / a.requiredHours) - (b.approvedHours / b.requiredHours))
                   .slice(0, 8)
                   .map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-medium">{s.name}</td>
-                      <td className="px-4 py-2 text-gray-500 text-xs hidden sm:table-cell">{s.cohortName}</td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="font-medium">{s.approvedHours.toFixed(1)}</span>
-                        <span className="text-gray-400 text-xs">/{s.requiredHours}h</span>
+                    <tr key={s.id} className="border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2.5 font-semibold text-gray-900">{s.name}</td>
+                      <td className="px-3 py-2.5 text-gray-500 text-[12px] hidden sm:table-cell">{s.cohortName}</td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className="font-medium text-gray-700">{s.approvedHours.toFixed(1)}</span>
+                        <span className="text-gray-400 text-[12px]">/{s.requiredHours}h</span>
                       </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      <td className="px-3 py-2.5 text-right">
+                        <span className={`text-[11.5px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${
                           s.status === "COMPLETED" ? "bg-green-50 text-green-700" :
-                          s.status === "ON_TRACK" ? "bg-blue-50 text-blue-700" :
+                          s.status === "ON_TRACK" ? "bg-green-50 text-green-700" :
                           "bg-red-50 text-red-600"
-                        }`}>{s.status.replace("_", " ")}</span>
+                        }`}>{s.status === "COMPLETED" ? "Completed" : s.status === "ON_TRACK" ? "On Track" : "At Risk"}</span>
                       </td>
                     </tr>
                   ))}

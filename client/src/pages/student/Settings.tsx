@@ -20,15 +20,10 @@ export default function StudentSettings() {
 
   // Profile tab
   const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [grade, setGrade] = useState(user?.grade || "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl || null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatarUrl || null);
-  const [instagram, setInstagram] = useState((user?.socialLinks as any)?.instagram || "");
-  const [tiktok, setTiktok] = useState((user?.socialLinks as any)?.tiktok || "");
-  const [twitter, setTwitter] = useState((user?.socialLinks as any)?.twitter || "");
-  const [youtube, setYoutube] = useState((user?.socialLinks as any)?.youtube || "");
   const [signupCount, setSignupCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -132,17 +127,9 @@ export default function StudentSettings() {
     try {
       await api.put("/auth/profile", {
         name,
-        // Send undefined for empty strings so the server skips encryption on blank fields
-        phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
         grade: grade || undefined,
         avatarUrl: avatarUrl || undefined,
-        socialLinks: {
-          instagram: instagram.trim() || undefined,
-          tiktok: tiktok.trim() || undefined,
-          twitter: twitter.trim() || undefined,
-          youtube: youtube.trim() || undefined,
-        },
       });
       await refreshUser();
       setMessage("Profile updated!");
@@ -433,15 +420,6 @@ export default function StudentSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
               <select
                 value={grade}
@@ -470,46 +448,11 @@ export default function StudentSettings() {
               />
             </div>
 
-            {/* Social Links */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Social Links</label>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Instagram (@username or URL)"
-                  value={instagram}
-                  onChange={(e) => setInstagram(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="TikTok (@username or URL)"
-                  value={tiktok}
-                  onChange={(e) => setTiktok(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Twitter/X (@username or URL)"
-                  value={twitter}
-                  onChange={(e) => setTwitter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="YouTube (channel URL)"
-                  value={youtube}
-                  onChange={(e) => setYoutube(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+                className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
@@ -543,7 +486,7 @@ export default function StudentSettings() {
                   type="button"
                   onClick={handleGenerateParentLink}
                   disabled={generatingParentLink}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+                  className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
                 >
                   {generatingParentLink ? "Generating..." : parentLink ? "Refresh Link" : "Generate Link"}
                 </button>
@@ -667,7 +610,7 @@ export default function StudentSettings() {
                 <button
                   type="submit"
                   disabled={joining || inviteCode.trim().length !== 8}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+                  className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
                 >
                   {joining ? "Joining..." : "Join"}
                 </button>
@@ -725,7 +668,7 @@ export default function StudentSettings() {
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
             >
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
@@ -828,7 +771,7 @@ export default function StudentSettings() {
           <button
             onClick={handleSaveNotifications}
             disabled={savingNotif}
-            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            className="mt-6 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
           >
             {savingNotif ? "Saving..." : "Save Preferences"}
           </button>
@@ -879,7 +822,7 @@ export default function StudentSettings() {
           <button
             onClick={handleSavePrivacy}
             disabled={savingPrivacy}
-            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            className="mt-6 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
           >
             {savingPrivacy ? "Saving..." : "Save Settings"}
           </button>

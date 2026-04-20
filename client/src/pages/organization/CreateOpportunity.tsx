@@ -462,7 +462,7 @@ export default function CreateOpportunity() {
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50"
+              className="px-6 py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50"
             >
               {loading ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Opportunity")}
             </button>

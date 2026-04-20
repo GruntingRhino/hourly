@@ -38,6 +38,7 @@ import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
 import SchoolOnboarding from "./pages/school/Onboarding";
+import LaunchCenter from "./pages/school/LaunchCenter";
 
 // Admin pages
 import ImpersonatePage from "./pages/admin/Impersonate";
@@ -114,6 +115,7 @@ function AppRoutes() {
               <Route path="/partners" element={<SchoolBeneficiaries />} />
               <Route path="/discover" element={<BeneficiaryDiscover />} />
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
+              <Route path="/launch" element={<LaunchCenter />} />
               <Route path="/messages" element={<SchoolMessages />} />
               <Route path="/settings" element={<SchoolSettings />} />
               <Route path="/admin/impersonate" element={<ImpersonatePage />} />

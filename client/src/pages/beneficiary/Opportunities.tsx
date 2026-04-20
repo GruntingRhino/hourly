@@ -369,11 +369,11 @@ export default function BeneficiaryOpportunities() {
       {/* Tabs */}
       <div className="flex gap-4 border-b mb-6">
         <button onClick={() => setTab("opportunities")}
-          className={`pb-2 text-sm font-medium border-b-2 ${tab === "opportunities" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          className={`pb-2 text-sm font-medium border-b-2 ${tab === "opportunities" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
           Opportunities
         </button>
         <button onClick={() => setTab("signups")}
-          className={`pb-2 text-sm font-medium border-b-2 ${tab === "signups" ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          className={`pb-2 text-sm font-medium border-b-2 ${tab === "signups" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
           Student Signups
           {pendingSignups.length > 0 && tab !== "signups" && (
             <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">{pendingSignups.length}</span>
@@ -483,7 +483,7 @@ export default function BeneficiaryOpportunities() {
               </div>
 
               <button type="submit" disabled={creating || saving}
-                className="w-full px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+                className="w-full px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
                 {editOppId
                   ? (saving ? "Saving..." : "Save Changes")
                   : (creating ? "Creating..." : "Create Opportunity")}
@@ -497,7 +497,7 @@ export default function BeneficiaryOpportunities() {
               <h2 className="font-semibold text-gray-700">Created Opportunities</h2>
               <div className="relative">
                 <button onClick={() => setFilterOpen((p) => !p)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border ${visibleStatuses.length < 3 ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border ${visibleStatuses.length < 3 ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                   </svg>
@@ -705,7 +705,7 @@ export default function BeneficiaryOpportunities() {
               <p className="text-xs text-gray-400 mb-5">This cannot be undone. The student's hours will not be counted.</p>
               <div className="flex gap-3">
                 <button onClick={() => handleNoShow(noShowConfirmId)}
-                  className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800">
+                  className="flex-1 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85">
                   Confirm No-Show
                 </button>
                 <button onClick={() => setNoShowConfirmId(null)}

@@ -163,7 +163,7 @@ export default function SchoolMessages() {
           </button>
           <button
             onClick={() => { setShowCompose((v) => !v); setShowBroadcast(false); setSendError(""); }}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
           >
             {showCompose ? "Cancel" : "New Message"}
           </button>

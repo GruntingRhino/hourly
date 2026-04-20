@@ -1,6 +1,13 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
+const AVATAR_COLORS: Record<string, string> = {
+  STUDENT: "#2563EB",
+  SCHOOL_ADMIN: "#0891B2",
+  TEACHER: "#0891B2",
+  BENEFICIARY_ADMIN: "#7C3AED",
+};
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -19,13 +26,15 @@ export default function Layout() {
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
+  const avatarColor = AVATAR_COLORS[user?.role ?? ""] ?? "#2563EB";
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top nav */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+      {/* Top nav — 58px, white, underline active indicator */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40" style={{ height: 58 }}>
+        <div className="max-w-[960px] mx-auto px-8 h-full flex items-center">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center shrink-0">
+          <Link to="/dashboard" className="flex items-center shrink-0 mr-8">
             <img
               src="/logo-full.png"
               alt="GoodHours"
@@ -38,42 +47,46 @@ export default function Layout() {
             <span className="hidden text-xl font-bold text-blue-700">GoodHours</span>
           </Link>
 
-          <nav className="flex items-center gap-0.5" aria-label="Main navigation">
+          {/* Nav links — underline active state */}
+          <nav className="flex items-stretch h-full gap-0.5 flex-1" aria-label="Main navigation">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 aria-label={item.label}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center px-3.5 text-sm transition-colors border-b-2 ${
                   isActive(item.path)
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    ? "border-blue-600 text-blue-600 font-semibold"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
                 }`}
               >
-                <span className="hidden sm:inline">{item.label}</span>
+                {item.label}
               </Link>
             ))}
-
-            {/* User profile */}
-            <div className="flex items-center gap-2 ml-3 pl-3 border-l border-gray-200">
-              <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center text-xs font-semibold text-white shrink-0 select-none">
-                {initials}
-              </div>
-              <span className="text-sm text-gray-600 hidden lg:inline max-w-[120px] truncate">{user?.name}</span>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-gray-500 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50"
-                aria-label="Log out"
-              >
-                Log out
-              </button>
-            </div>
           </nav>
+
+          {/* User profile */}
+          <div className="flex items-center gap-2.5 pl-4 border-l border-gray-200 shrink-0">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0 select-none"
+              style={{ background: avatarColor }}
+            >
+              {initials}
+            </div>
+            <span className="text-sm text-gray-700 font-medium hidden lg:inline max-w-[120px] truncate">{user?.name}</span>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label="Log out"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-[960px] mx-auto px-8 py-7 pb-12">
         <Outlet />
       </main>
     </div>
@@ -97,6 +110,7 @@ function getNavItems(role: string) {
         { path: "/beneficiaries", label: "Partners" },
         { path: "/discover", label: "Discover" },
         { path: "/submissions", label: "Submissions" },
+        { path: "/launch", label: "Launch" },
         { path: "/settings", label: "Settings" },
         ...(import.meta.env.DEV === true && role === "SCHOOL_ADMIN"
           ? [{ path: "/admin/impersonate", label: "⚙ Dev: Impersonate" }]

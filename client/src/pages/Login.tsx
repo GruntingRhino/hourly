@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 
 export default function Login() {
-  const { login, user } = useAuth();
+  const { login, loginWithToken, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +12,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
+  const [devGoogleEmail, setDevGoogleEmail] = useState("");
+  const [devGoogleLoading, setDevGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
@@ -35,6 +37,26 @@ export default function Login() {
       setError(err.message || "Invalid email or password. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDevGoogleSignin = async () => {
+    setError("");
+    setDevGoogleLoading(true);
+    try {
+      const result = await api.post<any>("/auth/google/dev-signin", {
+        email: devGoogleEmail.trim(),
+        state: "login",
+      });
+      if (!result.token) {
+        throw new Error("No GoodHours account found for this Google account.");
+      }
+      loginWithToken(result.token, result.user);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Dev Google sign-in failed.");
+    } finally {
+      setDevGoogleLoading(false);
     }
   };
 
@@ -152,6 +174,34 @@ export default function Login() {
             </svg>
             Continue with Google
           </button>
+
+          {import.meta.env.DEV && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">
+                Dev Only
+              </div>
+              <p className="text-sm text-amber-900 mb-3">
+                Bypass Google and sign in with any email domain in development.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={devGoogleEmail}
+                  onChange={(e) => setDevGoogleEmail(e.target.value)}
+                  placeholder="dev@any-domain.test"
+                  className="flex-1 h-9 px-3 border border-amber-200 rounded-md focus:outline-none focus:border-amber-400 text-[13.5px]"
+                />
+                <button
+                  type="button"
+                  onClick={handleDevGoogleSignin}
+                  disabled={devGoogleLoading || !devGoogleEmail.trim()}
+                  className="px-4 h-9 bg-amber-600 text-white rounded-md font-medium text-[13.5px] disabled:opacity-50"
+                >
+                  {devGoogleLoading ? "Signing in…" : "Dev Google"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Registering a new school?{" "}

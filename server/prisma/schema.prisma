@@ -99,6 +99,10 @@ model School {
   // Legacy
   allowJoinByCode  Boolean  @default(false)
   onboardingComplete Boolean @default(false)
+  launchOnboardingConfig String?
+  launchSupportConfig    String?
+  launchRollbackConfig   String?
+  launchMonitoringConfig String?
   zipCodes         String?  // JSON array of zip codes (service area)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -111,6 +115,7 @@ model School {
   groups           StudentGroup[]
   verifiedDomains  VerifiedDomain[]
   selfSubmissions  SelfSubmittedRequest[]
+  launchBugs       SchoolLaunchBug[]
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────
@@ -458,6 +463,27 @@ model StudentGroupMember {
   createdAt DateTime     @default(now())
 
   @@unique([groupId, studentId])
+}
+
+model SchoolLaunchBug {
+  id          String   @id @default(cuid())
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id])
+  title        String
+  description  String?
+  severity     String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status       String   @default("OPEN") // OPEN, INVESTIGATING, BLOCKED, FIXED, MONITORING, CLOSED
+  area         String?
+  source       String?
+  ownerName    String?
+  workaround   String?
+  nextAction   String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([schoolId, status])
+  @@index([schoolId, severity])
 }
 
 // ─── Legacy: Opportunities ──────────────────────────────────────

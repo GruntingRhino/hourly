@@ -11,10 +11,72 @@ import { resolveEffectiveRules } from "../lib/schoolRules";
 import { geocodeAddress } from "../lib/geocode";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { calculateStudentHours } from "../lib/hoursCalculator";
+import {
+  buildLaunchWorkspace,
+  normalizeFirstUserMonitoringConfig,
+  normalizeOnboardingInstructionsConfig,
+  normalizeRollbackPlanConfig,
+  normalizeSupportProcessConfig,
+} from "../lib/launchCenter";
 
 const router = Router();
 const schoolJoinSettingsSchema = z.object({
   allowJoinByCode: z.boolean(),
+});
+
+const dateInputSchema = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")]);
+
+const launchPlanUpdateSchema = z.object({
+  onboardingInstructions: z.object({
+    overview: z.string().max(2000).optional(),
+    nextMilestone: z.string().max(2000).optional(),
+  }).optional(),
+  supportProcess: z.object({
+    ownerName: z.string().max(120).optional(),
+    ownerEmail: z.union([z.string().email(), z.literal("")]).optional(),
+    responseTimeHours: z.number().int().min(1).max(168).optional(),
+    escalationAfterHours: z.number().int().min(1).max(168).optional(),
+    intakeChannels: z.array(z.string().max(80)).max(8).optional(),
+    notes: z.string().max(4000).optional(),
+  }).optional(),
+  rollbackPlan: z.object({
+    ownerName: z.string().max(120).optional(),
+    trigger: z.string().max(500).optional(),
+    freezeAction: z.string().max(500).optional(),
+    rollbackSteps: z.string().max(4000).optional(),
+    restoreCheck: z.string().max(1500).optional(),
+    lastDrillAt: dateInputSchema.optional(),
+  }).optional(),
+  firstUserMonitoring: z.object({
+    launchStartDate: dateInputSchema.optional(),
+    checkCadence: z.enum(["DAILY", "TWICE_DAILY", "WEEKDAYS"]).optional(),
+    activeStudentTarget: z.number().int().min(1).max(10000).optional(),
+    watchList: z.array(z.string().max(120)).max(20).optional(),
+    notes: z.string().max(2500).optional(),
+  }).optional(),
+});
+
+const launchBugCreateSchema = z.object({
+  title: z.string().trim().min(3).max(160),
+  description: z.string().max(2000).optional(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  area: z.string().max(120).optional(),
+  source: z.string().max(120).optional(),
+  ownerName: z.string().max(120).optional(),
+  workaround: z.string().max(1200).optional(),
+  nextAction: z.string().max(1200).optional(),
+});
+
+const launchBugUpdateSchema = z.object({
+  title: z.string().trim().min(3).max(160).optional(),
+  description: z.string().max(2000).optional(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  status: z.enum(["OPEN", "INVESTIGATING", "BLOCKED", "FIXED", "MONITORING", "CLOSED"]).optional(),
+  area: z.string().max(120).optional(),
+  source: z.string().max(120).optional(),
+  ownerName: z.string().max(120).optional(),
+  workaround: z.string().max(1200).optional(),
+  nextAction: z.string().max(1200).optional(),
 });
 
 function roundHours(value: number): number {
@@ -182,6 +244,231 @@ router.get("/my-rules", authenticate, async (req: Request, res: Response) => {
     res.json(rules);
   } catch (err) {
     console.error("Get my rules error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/schools/launch — launch center workspace for the authenticated school staff
+router.get("/launch", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const workspace = await buildLaunchWorkspace(user.schoolId);
+    if (!workspace) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json(workspace);
+  } catch (err) {
+    console.error("Get launch center error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/schools/launch — update persisted launch center configs
+router.put("/launch", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const data = launchPlanUpdateSchema.parse(req.body);
+    if (
+      data.onboardingInstructions === undefined &&
+      data.supportProcess === undefined &&
+      data.rollbackPlan === undefined &&
+      data.firstUserMonitoring === undefined
+    ) {
+      return res.status(400).json({ error: "At least one launch section is required" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        launchOnboardingConfig: true,
+        launchSupportConfig: true,
+        launchRollbackConfig: true,
+        launchMonitoringConfig: true,
+        staff: {
+          where: { role: { in: ["SCHOOL_ADMIN", "TEACHER"] } },
+          orderBy: { createdAt: "asc" },
+          select: {
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    const updateData: Record<string, string> = {};
+    if (data.onboardingInstructions !== undefined) {
+      updateData.launchOnboardingConfig = JSON.stringify(
+        normalizeOnboardingInstructionsConfig(data.onboardingInstructions, school)
+      );
+    }
+    if (data.supportProcess !== undefined) {
+      updateData.launchSupportConfig = JSON.stringify(
+        normalizeSupportProcessConfig(data.supportProcess, school)
+      );
+    }
+    if (data.rollbackPlan !== undefined) {
+      updateData.launchRollbackConfig = JSON.stringify(
+        normalizeRollbackPlanConfig(data.rollbackPlan, school)
+      );
+    }
+    if (data.firstUserMonitoring !== undefined) {
+      updateData.launchMonitoringConfig = JSON.stringify(
+        normalizeFirstUserMonitoringConfig(data.firstUserMonitoring, school)
+      );
+    }
+
+    await prisma.school.update({
+      where: { id: user.schoolId },
+      data: updateData,
+    });
+
+    const workspace = await buildLaunchWorkspace(user.schoolId);
+    res.json(workspace);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Update launch center error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/launch/bugs — create a launch bug
+router.post("/launch/bugs", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const data = launchBugCreateSchema.parse(req.body);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const bug = await prisma.schoolLaunchBug.create({
+      data: {
+        schoolId: user.schoolId,
+        title: data.title.trim(),
+        description: data.description?.trim() || null,
+        severity: data.severity,
+        status: "OPEN",
+        area: data.area?.trim() || null,
+        source: data.source?.trim() || null,
+        ownerName: data.ownerName?.trim() || null,
+        workaround: data.workaround?.trim() || null,
+        nextAction: data.nextAction?.trim() || null,
+        createdById: req.user!.userId,
+      },
+    });
+
+    res.status(201).json({
+      id: bug.id,
+      title: bug.title,
+      description: bug.description ?? "",
+      severity: bug.severity,
+      status: bug.status,
+      area: bug.area ?? "",
+      source: bug.source ?? "",
+      ownerName: bug.ownerName ?? "",
+      workaround: bug.workaround ?? "",
+      nextAction: bug.nextAction ?? "",
+      createdById: bug.createdById,
+      createdAt: bug.createdAt.toISOString(),
+      updatedAt: bug.updatedAt.toISOString(),
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Create launch bug error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/schools/launch/bugs/:bugId — update a launch bug
+router.put("/launch/bugs/:bugId", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const data = launchBugUpdateSchema.parse(req.body);
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: "No launch bug fields provided" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!user?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const bug = await prisma.schoolLaunchBug.findUnique({
+      where: { id: req.params.bugId },
+      select: { id: true, schoolId: true },
+    });
+    if (!bug) {
+      return res.status(404).json({ error: "Launch bug not found" });
+    }
+    if (bug.schoolId !== user.schoolId) {
+      return res.status(403).json({ error: "Not your school's launch bug" });
+    }
+
+    const updated = await prisma.schoolLaunchBug.update({
+      where: { id: req.params.bugId },
+      data: {
+        ...(data.title !== undefined && { title: data.title.trim() }),
+        ...(data.description !== undefined && { description: data.description.trim() || null }),
+        ...(data.severity !== undefined && { severity: data.severity }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.area !== undefined && { area: data.area.trim() || null }),
+        ...(data.source !== undefined && { source: data.source.trim() || null }),
+        ...(data.ownerName !== undefined && { ownerName: data.ownerName.trim() || null }),
+        ...(data.workaround !== undefined && { workaround: data.workaround.trim() || null }),
+        ...(data.nextAction !== undefined && { nextAction: data.nextAction.trim() || null }),
+      },
+    });
+
+    res.json({
+      id: updated.id,
+      title: updated.title,
+      description: updated.description ?? "",
+      severity: updated.severity,
+      status: updated.status,
+      area: updated.area ?? "",
+      source: updated.source ?? "",
+      ownerName: updated.ownerName ?? "",
+      workaround: updated.workaround ?? "",
+      nextAction: updated.nextAction ?? "",
+      createdById: updated.createdById,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Update launch bug error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

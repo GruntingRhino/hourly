@@ -50,17 +50,13 @@ The app also still carries a legacy organizations/classrooms/service-sessions st
 - frontend runs through Vite on `localhost:5173`
 - API runs as a long-lived Express server on `localhost:3001`
 - Vite proxies `/api` to the backend
-- the in-process reminder scheduler can run because the Node process stays alive
 
 ### Production-shaped deployment in repo
 
 - `client/dist` is deployed as the static frontend
 - `/api/*` is rewritten to `api/index.ts`, which re-exports the Express app
 - this is a serverless shape on Vercel
-
-### Important runtime caveat
-
-Automatic reminders currently rely on an in-process scheduler started from `server/src/index.ts`. That works in a long-lived dev server, but it is not a durable production scheduling model on serverless infrastructure without an external cron/worker trigger.
+- Vercel Cron fires `GET /api/internal/reminders/run` daily at 8 AM UTC, secured with `CRON_SECRET`
 
 ## High-Level Architecture
 
@@ -113,12 +109,6 @@ Automatic reminders currently rely on an in-process scheduler started from `serv
 - has access to most school dashboards and student views for the associated school
 - can review self-submissions, send school messages, and run reminder cycles
 - some actions remain admin-only, such as certain settings changes and some export paths
-
-### `DISTRICT_ADMIN`
-
-- currently behaves as a school-scoped staff role in most of the app
-- can access many school dashboards and reports for the associated school
-- true multi-school district tenancy is not implemented yet
 
 ### `BENEFICIARY_ADMIN`
 
@@ -484,6 +474,31 @@ School staff can:
 - request revision with note
 - send in-app notifications and email hooks for approval, rejection, revision, and new pending submissions
 
+### Launch operations center
+
+School staff now have a dedicated launch/rollout surface for early deployment operations.
+
+It includes:
+
+- live onboarding instructions with school-specific rollout notes
+- a launch checklist driven by real product state (location, partners, cohorts, invites, student activity)
+- a support process definition with owner, channels, first-response SLA, and escalation window
+- a rollback plan with trigger, freeze action, rollback steps, restore checks, and drill date
+- a bug triage list with severity, status, owner, workaround, next action, and timestamps
+- first-user monitoring with rollout target, watch list, saved monitoring notes, and one-click reminder runs
+
+The monitoring view aggregates:
+
+- approved and pending partners
+- cohort publish state
+- invited / accepted / enrolled students
+- students with hours
+- total approved and pending hours
+- pending review queue size
+- at-risk student count
+- no-show count
+- open and critical rollout bugs
+
 ## Beneficiary Features
 
 ### Beneficiary onboarding and partnerships
@@ -723,6 +738,7 @@ The system is therefore hybrid: new school/cohort/beneficiary flows are primary,
 - `/partners`
 - `/discover`
 - `/submissions`
+- `/launch`
 - `/messages`
 - `/settings`
 - `/admin/impersonate`
@@ -797,16 +813,22 @@ The system is therefore hybrid: new school/cohort/beneficiary flows are primary,
 
 - create
 - list
-- approve
+- create
+- list
+- approve (with optional adjusted hours, category-cap enforcement or override)
 - reject
 - request revision
 - student update/resubmit
+- bulk CSV import of pre-approved prior hours (`POST /api/self-submissions/import`)
 
 ### Schools
 
 - list current school records
 - school location/settings helpers
 - onboarding update
+- launch center workspace
+- launch plan update
+- launch bug create/update
 - settings patch
 - effective rules helper
 - school detail/update
@@ -842,28 +864,62 @@ The system is therefore hybrid: new school/cohort/beneficiary flows are primary,
 
 ### Platform utility endpoints
 
-- `/api/geocode`
+- `/api/geocode` (rate-limited: 30 req/min per IP)
 - `/api/health`
+- `/api/internal/reminders/run` (cron-triggered reminder execution)
 
 ## Known Caveats
 
-### `DISTRICT_ADMIN` is only partially implemented
-
-Current reality:
-
-- the data model gives a staff user only one `schoolId`
-- true district-wide multi-school tenancy is not modeled
-- several endpoints still exclude `DISTRICT_ADMIN`, especially some approval/export flows
-
-Treat this role as school-scoped for now.
-
-### Reminder scheduling is not production-ready by architecture
-
-The reminder logic exists and works in a long-lived dev server, but the scheduler is started with `setInterval(...)` inside the Node process. That is not a durable scheduling mechanism for a Vercel serverless deployment.
-
 ### Some school UI surfaces are broader than backend permissions
 
-The frontend exposes some school actions to `SCHOOL_ADMIN`, `TEACHER`, and `DISTRICT_ADMIN`, but a few backend routes still remain admin-only. Export paths are the clearest example.
+The frontend exposes some school actions to both `SCHOOL_ADMIN` and `TEACHER`, but a few backend routes still remain admin-only. Export paths are the clearest example.
+
+## Recent Changes
+
+### `DISTRICT_ADMIN` role removed
+
+`DISTRICT_ADMIN` has been fully removed from both client and server. The role no longer exists in the Role type, route guards, or UI. The app is now school-scoped only across all staff roles.
+
+### Reminder scheduling moved to external cron
+
+The in-process `setInterval` scheduler has been replaced with an internal HTTP endpoint (`/api/internal/reminders/run`) that is triggered by Vercel Cron daily at 8 AM UTC. The endpoint is secured with `CRON_SECRET`. Dev environments can still trigger it manually via the school messages UI or direct HTTP call.
+
+### Bulk prior-hours import for school admins
+
+`POST /api/self-submissions/import` accepts a CSV with columns `student_email`, `organization`, `date`, `hours`, `category`, `description` and bulk-creates pre-approved self-submitted hour records. This lets schools migrate legacy hour records into the platform without per-student entry.
+
+### Hour total accuracy fixes
+
+- `REVISION_REQUESTED` self-submissions now count toward pending hours
+- Waitlisted beneficiary signups are excluded from hour totals
+- The student group list endpoint now uses `calculateStudentHours` for consistent aggregation
+
+### Beneficiary admin UI improvements
+
+- Opportunities can be edited and deleted inline without navigating away
+- No-show confirmation uses a modal (not a browser dialog) to avoid blocking the extension
+
+### Security hardening
+
+- `approvedHours` validated as positive, max 24 on both verification and self-submission approval paths
+- Approved beneficiary signup hours validated against `slot.durationHours` ceiling
+- `ORG_ADMIN` blocked from querying other orgs' data via `?organizationId=` on report endpoints (IDOR fix)
+- Temp passwords for staff accounts use `crypto.randomBytes` instead of `Math.random`
+- Teacher assignment verifies that the target `classroomId` belongs to the school before committing
+- FERPA audit logs written for settings updates and staff account creation
+- All rate limiters use `ipKeyGenerator` to prevent IPv6 bypass
+- Geocode endpoint rate-limited at 30 req/min per IP
+- Beneficiary invitation acceptance now auto-promotes the `SchoolBeneficiaryApproval` to `APPROVED`
+- `COHORT_DELETED` audit log written on cohort deletion
+- `express-rate-limit` added to root `package.json` for Vercel compatibility
+
+### Landing page redesign
+
+`client/src/pages/Landing.tsx` has been rewritten with a new layout: sticky nav, two-column hero with inline school dashboard preview, gradient stats bar, tabbed demo section (School Admin / Student / Community Partner), How It Works, Features, gradient CTA, and dark footer. The dashboard preview tabs render inline mock components with realistic example data.
+
+### `/launch` route added to school staff
+
+The Launch Center is now accessible at `/launch` for `SCHOOL_ADMIN` and `TEACHER` roles. The `School` model stores the launch config in `launchOnboardingConfig` (JSON). Bug tracking is stored in `SchoolLaunchBug` records.
 
 ## Current State Summary
 
@@ -873,13 +929,15 @@ GoodHours in dev is a large, hybrid service-hours platform with:
 - cohort-based student management
 - beneficiary discovery, approval, and opportunity publishing
 - verified beneficiary attendance workflows
-- school-reviewed self-submitted hours
+- school-reviewed self-submitted hours with bulk CSV import for prior hours
 - direct messaging and school-wide announcements
-- automated reminder logic
+- automated reminder logic via external Vercel Cron
 - at-risk detection and exports
 - student CSV/PDF export
 - public parent progress sharing
+- launch operations center for school rollout management
 - audit logging and FERPA-style access tracking
+- security hardening across rate limits, input validation, IDOR guards, and audit trails
 - legacy compatibility for the earlier organization/classroom/session stack
 
 This is the state that should be treated as current context before any production promotion work.

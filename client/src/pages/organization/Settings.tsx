@@ -511,7 +511,7 @@ export default function OrgSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -573,7 +573,7 @@ export default function OrgSettings() {
               <button
                 type="submit"
                 disabled={searching || !schoolSearch.trim()}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+                className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
               >
                 {searching ? "Searching..." : "Search"}
               </button>
@@ -671,7 +671,7 @@ export default function OrgSettings() {
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+              className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
             >
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
@@ -773,7 +773,7 @@ export default function OrgSettings() {
           <button
             onClick={handleSaveNotifications}
             disabled={savingNotif}
-            className="mt-6 px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+            className="mt-6 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
           >
             {savingNotif ? "Saving..." : "Save Preferences"}
           </button>
@@ -837,7 +837,7 @@ export default function OrgSettings() {
           </p>
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
+            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85"
           >
             Export Volunteer Data (CSV)
           </button>

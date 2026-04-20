@@ -89,11 +89,11 @@ export default function SchoolCohorts() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Cohorts</h1>
+        <h1 className="text-[22px] font-bold text-gray-900">Cohorts</h1>
         {isAdmin && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85"
           >
             + New Cohort
           </button>
@@ -134,50 +134,50 @@ export default function SchoolCohorts() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={creating} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+              <button type="submit" disabled={creating} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
                 {creating ? "Creating..." : "Create"}
               </button>
-              <button type="button" onClick={() => setShowCreateForm(false)} className="px-3 py-2 text-gray-500 hover:text-gray-800 text-sm">Cancel</button>
+              <button type="button" onClick={() => setShowCreateForm(false)} className="px-3 py-[7px] text-[13.5px] text-gray-500 hover:text-gray-800">Cancel</button>
             </div>
           </form>
         </div>
       )}
 
       {cohorts.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-[13.5px] text-gray-500">
           No cohorts yet. Create one to get started.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-2.5">
           {cohorts.map((cohort) => (
-            <div key={cohort.id} className="bg-white border border-gray-200 rounded-lg p-5">
+            <div key={cohort.id} className="bg-white border border-gray-200 rounded-lg p-[18px]">
               <div className="flex justify-between items-start mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{cohort.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      cohort.status === "PUBLISHED" ? "bg-green-50 text-green-700" :
-                      cohort.status === "ARCHIVED" ? "bg-gray-100 text-gray-500" :
-                      "bg-yellow-50 text-yellow-700"
-                    }`}>{cohort.status}</span>
+                <div className="flex items-center gap-2.5">
+                  <div>
+                    <div className="font-bold text-[15px] text-gray-900">{cohort.name}</div>
+                    {(cohort.startYear || cohort.endYear) && (
+                      <div className="text-[12.5px] text-gray-500 mt-0.5">
+                        {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear} · {cohort.requiredHours}h goal
+                      </div>
+                    )}
                   </div>
-                  {(cohort.startYear || cohort.endYear) && (
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear}
-                    </div>
-                  )}
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${
+                    cohort.status === "PUBLISHED" ? "bg-blue-50 text-blue-600" :
+                    cohort.status === "ARCHIVED" ? "bg-gray-100 text-gray-500" :
+                    "bg-amber-50 text-amber-600"
+                  }`}>{cohort.status.toLowerCase()}</span>
                 </div>
                 <div className="flex gap-2">
                   <Link
                     to={`/cohorts/${cohort.id}`}
-                    className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50"
+                    className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Manage
                   </Link>
                   {cohort.status !== "PUBLISHED" && isAdmin && cohort.invitationsPending > 0 && (
                     <button
                       onClick={() => setPublishConfirm({ id: cohort.id, name: cohort.name })}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      className="px-3.5 py-[7px] bg-blue-600 text-white rounded-md text-[13px] font-medium hover:opacity-85"
                     >
                       Publish & Send Invites
                     </button>
@@ -185,32 +185,31 @@ export default function SchoolCohorts() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className="text-lg font-bold">{cohort.studentCount}</div>
-                  <div className="text-xs text-gray-500">Students</div>
-                </div>
-                <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className="text-lg font-bold">{cohort.invitationsPending}</div>
-                  <div className="text-xs text-gray-500">Pending Invites</div>
-                </div>
-                <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className={`text-lg font-bold ${cohort.completedCount > 0 ? "text-green-600" : "text-gray-800"}`}>{cohort.completedCount}</div>
-                  <div className="text-xs text-gray-500">Completed Goal</div>
-                </div>
-                <div className="bg-gray-50 rounded p-2 text-center">
-                  <div className={`text-lg font-bold ${cohort.atRiskCount > 0 ? "text-red-500" : "text-gray-800"}`}>{cohort.atRiskCount}</div>
-                  <div className="text-xs text-gray-500">At Risk</div>
-                </div>
+              <div className="flex gap-6 mb-3">
+                {[
+                  { label: "Students", value: cohort.studentCount, color: "text-gray-900" },
+                  { label: "Pending Invites", value: cohort.invitationsPending, color: "text-gray-500" },
+                  { label: "On-Track", value: cohort.studentCount - cohort.atRiskCount, color: "text-green-600" },
+                  { label: "Off-Track", value: cohort.atRiskCount, color: cohort.atRiskCount > 0 ? "text-red-500" : "text-gray-400" },
+                  { label: "Avg Hours", value: cohort.studentCount > 0 ? `${(cohort.totalHours / cohort.studentCount).toFixed(1)}h` : "0h", color: "text-blue-600" },
+                ].map((stat) => (
+                  <div key={stat.label}>
+                    <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
+                    <div className="text-[11.5px] text-gray-500">{stat.label}</div>
+                  </div>
+                ))}
               </div>
 
               {cohort.studentCount > 0 && (
-                <div className="mt-3">
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${cohort.completionPercentage}%` }} />
+                <>
+                  <div className="w-full bg-gray-200 rounded-full h-[5px]">
+                    <div
+                      className={`h-[5px] rounded-full ${cohort.completionPercentage >= 80 ? "bg-green-500" : cohort.completionPercentage >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                      style={{ width: `${cohort.completionPercentage}%` }}
+                    />
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">{cohort.completionPercentage}% completed {cohort.requiredHours}h goal</div>
-                </div>
+                  <div className="text-[11.5px] text-gray-400 mt-1">{cohort.completionPercentage}% completed {cohort.requiredHours}h goal</div>
+                </>
               )}
             </div>
           ))}

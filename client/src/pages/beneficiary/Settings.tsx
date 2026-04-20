@@ -210,7 +210,7 @@ export default function BeneficiarySettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+              className="px-5 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
