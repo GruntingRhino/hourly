@@ -269,11 +269,37 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 
     // If signing up as a school admin, create the school and link
     if (data.role === "SCHOOL_ADMIN") {
+      const directorySchool = data.directorySchoolId
+        ? await prisma.schoolDirectory.findUnique({
+            where: { id: data.directorySchoolId },
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              address: true,
+              city: true,
+              state: true,
+              zip: true,
+              latitude: true,
+              longitude: true,
+              emailDomain: true,
+              claimed: true,
+            },
+          })
+        : null;
+
       const school = await prisma.school.create({
         data: {
-          name: data.schoolName || data.name,
-          domain: data.schoolDomain || undefined,
+          name: directorySchool?.name || data.schoolName || data.name,
+          domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
           directoryId: data.directorySchoolId || null,
+          type: directorySchool?.type || null,
+          address: directorySchool?.address || null,
+          city: directorySchool?.city || null,
+          state: directorySchool?.state || null,
+          zip: directorySchool?.zip || null,
+          latitude: directorySchool?.latitude || null,
+          longitude: directorySchool?.longitude || null,
           verified: false,
           createdById: user.id,
           zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
@@ -321,6 +347,18 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
       } catch (err) {
         console.error("[signup] Failed to link school to BeneficiaryDirectory:", err);
+      }
+
+      if (directorySchool && !directorySchool.claimed) {
+        await prisma.schoolDirectory.update({
+          where: { id: directorySchool.id },
+          data: {
+            claimed: true,
+            claimedBySchoolId: school.id,
+          },
+        }).catch((err) => {
+          console.error("[signup] Failed to mark SchoolDirectory row as claimed:", err);
+        });
       }
     }
 
