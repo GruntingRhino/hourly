@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 const router = Router();
 
@@ -96,17 +97,12 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
 
       if (orgAdmins.length === 0) return;
 
-      const student = await prisma.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { name: true },
-      });
-
       await prisma.notification.createMany({
         data: orgAdmins.map((admin) => ({
           userId: admin.id,
           type: "STUDENT_SIGNUP",
           title: "New Signup",
-          body: `${student?.name || "A student"} signed up for "${opp.title}"`,
+          body: `${buildAnonymousVolunteerLabel(req.user!.userId)} signed up for "${opp.title}"`,
         })),
       });
     })().catch((sideEffectErr) => {
@@ -193,16 +189,12 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
         select: { id: true },
       });
       if (orgAdmins.length > 0) {
-        const student = await prisma.user.findUnique({
-          where: { id: signup.userId },
-          select: { name: true },
-        });
         await prisma.notification.createMany({
           data: orgAdmins.map((admin) => ({
             userId: admin.id,
             type: "SIGNUP_CANCELLED",
             title: "Signup Cancelled",
-            body: `${student?.name || "A student"} cancelled their signup for "${opp.title}"`,
+            body: `${buildAnonymousVolunteerLabel(signup.userId)} cancelled their signup for "${opp.title}"`,
           })),
         });
       }

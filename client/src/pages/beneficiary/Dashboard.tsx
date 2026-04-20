@@ -8,7 +8,7 @@ interface Signup {
   status: string;
   verificationStatus: string;
   totalHours: number | null;
-  student: { name: string; email: string };
+  student: { label: string };
   slot: {
     durationHours: number;
     opportunity: { title: string };
@@ -203,7 +203,7 @@ export default function BeneficiaryDashboard() {
               <div key={signup.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-semibold text-[13.5px] text-gray-900">{signup.student.name}</div>
+                    <div className="font-semibold text-[13.5px] text-gray-900">{signup.student.label}</div>
                     <div className="text-[12.5px] text-gray-500">{signup.slot.opportunity.title}</div>
                     <div className="text-[12px] text-gray-400">
                       {new Date(signup.slot.date).toLocaleDateString()} · {signup.slot.startTime}

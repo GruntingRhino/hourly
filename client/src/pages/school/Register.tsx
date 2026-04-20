@@ -56,8 +56,9 @@ function classifyEmailDomain(email: string): DomainStatus {
   if (atIdx < 0) return null;
   const domain = email.slice(atIdx + 1).toLowerCase().trim();
   if (!domain || !domain.includes(".")) return null;
-  // Personal emails are only blocked in production
-  if (import.meta.env.PROD && PERSONAL_EMAIL_DOMAINS.has(domain) && !isTestEmail(email)) {
+  // Personal emails are only blocked in production (not in dev deployment or local dev)
+  const isProduction = import.meta.env.PROD && import.meta.env.VITE_APP_ENV !== "development";
+  if (isProduction && PERSONAL_EMAIL_DOMAINS.has(domain) && !isTestEmail(email)) {
     return "personal";
   }
   if (domain.endsWith(".edu")) return "edu";
@@ -363,7 +364,7 @@ export default function SchoolRegister() {
               Continue with Google
             </button>
 
-            {import.meta.env.DEV && (
+            {(import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "development") && (
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">
                   Dev Only

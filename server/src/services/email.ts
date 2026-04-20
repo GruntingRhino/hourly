@@ -12,6 +12,17 @@ const CLIENT_URL =
   process.env.NEXT_PUBLIC_CLIENT_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
 
+// True in the deployed dev environment (hourly-dev.vercel.app) and local dev.
+// Never true in production (goodhours.app).
+function isDevEnv(): boolean {
+  return (
+    process.env.APP_ENV === "development" ||
+    (process.env.APP_ENV !== "production" &&
+      process.env.NODE_ENV !== "production" &&
+      process.env.VERCEL_ENV !== "production")
+  );
+}
+
 type CapturedEmail = {
   to: string;
   from: string;
@@ -128,6 +139,17 @@ export function getCapturedMailinatorInbox(inbox: string): CapturedEmail[] {
 
 async function send(to: string, subject: string, html: string): Promise<void> {
   const defaultFrom = FROM?.trim() || MAILINATOR_FROM?.trim() || "noreply@notifications.goodhours.app";
+
+  // In dev environments, log emails to console instead of sending via Resend.
+  if (isDevEnv() && !isMailinatorAddress(to)) {
+    console.info(
+      `[email:dev] Would send "${subject}" → ${to}\n` +
+      `  from: ${defaultFrom}\n` +
+      `  body: ${html.replace(/<[^>]+>/g, "").slice(0, 200).trim()}…`
+    );
+    return;
+  }
+
   if (canUseLocalMailinatorFallback(to)) {
     captureMailinatorEmail(to, subject, html, defaultFrom);
     console.info(`[email] Captured "${subject}" locally for ${to}`);

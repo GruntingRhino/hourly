@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/rbac";
 import { sendHourApprovedEmail } from "../services/email";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 import { resolveEffectiveRules } from "../lib/schoolRules";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 const router = Router();
 
@@ -201,13 +202,20 @@ router.get("/pending", authenticate, requireRole("ORG_ADMIN"), async (req: Reque
         opportunity: { organizationId: user.organizationId },
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true } },
         opportunity: { select: { id: true, title: true, date: true, startTime: true, endTime: true } },
       },
       orderBy: { submittedAt: "desc" },
     });
 
-    res.json(sessions);
+    res.json(
+      sessions.map((session) => ({
+        ...session,
+        user: {
+          label: buildAnonymousVolunteerLabel(session.user.id),
+        },
+      }))
+    );
   } catch (err) {
     console.error("Pending verifications error:", err);
     res.status(500).json({ error: "Internal server error" });

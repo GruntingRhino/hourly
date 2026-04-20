@@ -1,13 +1,11 @@
 import { Router, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
 import { calculateStudentHours } from "../lib/hoursCalculator";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
-import { signToken } from "../middleware/auth";
-import { CLIENT_URL } from "../services/email";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 const router = Router();
 
@@ -31,29 +29,6 @@ const parentProgressLimiter = rateLimit({
 });
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
-
-function resolveParentProgressBaseUrl(req: Request): string {
-  const origin = typeof req.headers.origin === "string" ? req.headers.origin.trim() : "";
-  const referer = typeof req.headers.referer === "string" ? req.headers.referer.trim() : "";
-
-  const refererOrigin = (() => {
-    if (!referer) return "";
-    try {
-      return new URL(referer).origin;
-    } catch {
-      return "";
-    }
-  })();
-
-  const requestOrigin = origin || refererOrigin;
-  const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
-
-  if (process.env.NODE_ENV !== "production" && isLocalDevOrigin) {
-    return requestOrigin;
-  }
-
-  return CLIENT_URL;
-}
 
 // GET /api/reports/student — student's hour summary
 router.get("/student", authenticate, async (req: Request, res: Response) => {
@@ -164,7 +139,7 @@ router.get("/organization", authenticate, async (req: Request, res: Response) =>
     const sessions = await prisma.serviceSession.findMany({
       where: { opportunity: { organizationId: orgId } },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true } },
         opportunity: { select: { id: true, title: true, date: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -177,7 +152,12 @@ router.get("/organization", authenticate, async (req: Request, res: Response) =>
       totalSessions: sessions.length,
       approvedSessions: approved.length,
       totalApprovedHours: Math.round(totalHours * 100) / 100,
-      sessions,
+      sessions: sessions.map((session) => ({
+        ...session,
+        user: {
+          label: buildAnonymousVolunteerLabel(session.user.id),
+        },
+      })),
     });
   } catch (err) {
     console.error("Org report error:", err);
@@ -375,16 +355,8 @@ router.post("/parent-link", authenticate, parentLinkLimiter, async (req: Request
     if (req.user!.role !== "STUDENT") {
       return res.status(403).json({ error: "Student role required" });
     }
-
-    const token = signToken(
-      { studentId: req.user!.userId, purpose: "PARENT_PROGRESS" },
-      { expiresIn: "30d" }
-    );
-    const baseUrl = resolveParentProgressBaseUrl(req);
-
-    res.json({
-      token,
-      url: `${baseUrl}/parent-progress?token=${encodeURIComponent(token)}`,
+    return res.status(403).json({
+      error: "Parent progress links are disabled until a school-managed FERPA-compliant sharing workflow is implemented.",
     });
   } catch (err) {
     console.error("Parent link error:", err);
@@ -395,50 +367,12 @@ router.post("/parent-link", authenticate, parentLinkLimiter, async (req: Request
 // GET /api/reports/parent-progress?token=... — read-only parent progress view
 router.get("/parent-progress", parentProgressLimiter, async (req: Request, res: Response) => {
   try {
-    const token = String(req.query.token || "").trim();
-    if (!token) return res.status(400).json({ error: "token query param is required" });
-
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { studentId?: string; purpose?: string };
-    if (payload.purpose !== "PARENT_PROGRESS" || !payload.studentId) {
-      return res.status(400).json({ error: "Invalid parent progress token" });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: payload.studentId },
-      include: {
-        classroom: { include: { school: true } },
-        cohort: { include: { school: true } },
-        school: true,
-      },
-    });
-    if (!user || user.role !== "STUDENT") {
-      return res.status(404).json({ error: "Student not found" });
-    }
-
-    const school = user.classroom?.school || user.cohort?.school || user.school;
-    const hours = (await calculateStudentHours([user.id])).get(user.id) ?? { approved: 0, pending: 0 };
-    const requiredHours = user.cohort?.requiredHours ?? school?.requiredHours ?? 40;
-    const deadline = user.cohort?.serviceEndDate ?? school?.serviceEndDate ?? null;
-    const remainingHours = Math.max(0, Math.round((requiredHours - hours.approved) * 100) / 100);
-
-    res.json({
-      student: {
-        id: user.id,
-        name: user.name,
-        grade: user.grade,
-      },
-      school: school ? { id: school.id, name: school.name } : null,
-      cohort: user.cohort ? { id: user.cohort.id, name: user.cohort.name } : null,
-      approvedHours: Math.round(hours.approved * 100) / 100,
-      pendingHours: Math.round(hours.pending * 100) / 100,
-      requiredHours,
-      remainingHours,
-      percentComplete: Math.min(100, Math.round((hours.approved / requiredHours) * 100)),
-      deadline,
+    return res.status(403).json({
+      error: "Parent progress links are disabled until a school-managed FERPA-compliant sharing workflow is implemented.",
     });
   } catch (err) {
     console.error("Parent progress error:", err);
-    res.status(400).json({ error: "Invalid or expired parent progress token" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

@@ -3,6 +3,7 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendOrgApprovalRequestEmail } from "../services/email";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 const router = Router();
 
@@ -138,7 +139,7 @@ router.get("/:id/schools", authenticate, requireRole("ORG_ADMIN"), async (req: R
   }
 });
 
-// GET /api/organizations/:id/volunteers — volunteer history
+// GET /api/organizations/:id/volunteers — anonymous volunteer summary
 router.get("/:id/volunteers", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
@@ -151,13 +152,38 @@ router.get("/:id/volunteers", authenticate, requireRole("ORG_ADMIN"), async (req
         opportunity: { organizationId: req.params.id },
         verificationStatus: "APPROVED",
       },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        opportunity: { select: { id: true, title: true, date: true } },
+      select: {
+        userId: true,
+        totalHours: true,
       },
       orderBy: { createdAt: "desc" },
     });
-    res.json(sessions);
+
+    const volunteerMap = new Map<string, { id: string; label: string; totalHours: number; sessionCount: number }>();
+
+    for (const session of sessions) {
+      const existing = volunteerMap.get(session.userId);
+      if (existing) {
+        existing.totalHours += session.totalHours || 0;
+        existing.sessionCount += 1;
+      } else {
+        volunteerMap.set(session.userId, {
+          id: session.userId,
+          label: buildAnonymousVolunteerLabel(session.userId),
+          totalHours: session.totalHours || 0,
+          sessionCount: 1,
+        });
+      }
+    }
+
+    res.json(
+      [...volunteerMap.values()]
+        .map((volunteer) => ({
+          ...volunteer,
+          totalHours: Math.round(volunteer.totalHours * 100) / 100,
+        }))
+        .sort((a, b) => b.totalHours - a.totalHours)
+    );
   } catch (err) {
     console.error("Volunteers error:", err);
     res.status(500).json({ error: "Internal server error" });

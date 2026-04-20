@@ -7,6 +7,7 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 const router = Router();
 
@@ -180,12 +181,19 @@ router.get("/organization", authenticate, requireRole("ORG_ADMIN"), async (req: 
     const sessions = await prisma.serviceSession.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true } },
         opportunity: { select: { id: true, title: true, date: true } },
       },
       orderBy: { createdAt: "desc" },
     });
-    res.json(sessions);
+    res.json(
+      sessions.map((session) => ({
+        ...session,
+        user: {
+          label: buildAnonymousVolunteerLabel(session.user.id),
+        },
+      }))
+    );
   } catch (err) {
     console.error("Org sessions error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -285,7 +293,7 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
           userId: admin.id,
           type: "VERIFICATION_SUBMITTED",
           title: "Verification Request",
-          body: `${session.user.name} submitted verification for "${session.opportunity.title}" — ${session.totalHours}h`,
+          body: `${buildAnonymousVolunteerLabel(session.user.id)} submitted verification for "${session.opportunity.title}" — ${session.totalHours}h`,
         })),
       });
     }

@@ -3,8 +3,8 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
-// DEV-ONLY page: accessible only when Vite runs in dev mode (import.meta.env.DEV is set by Vite, never true in production builds)
-const IS_DEV = import.meta.env.DEV === true;
+// DEV-ONLY page: shown in local dev and on hourly-dev.vercel.app
+const IS_DEV = import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development";
 
 export default function ImpersonatePage() {
   const { user, loginWithToken } = useAuth();

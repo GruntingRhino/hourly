@@ -38,7 +38,7 @@ interface SignupRecord {
     durationHours: number;
     opportunity: { title: string };
   };
-  student: { id: string; name: string; email: string };
+  student: { label: string };
 }
 
 interface ApprovedSchool {
@@ -61,7 +61,7 @@ interface SignupHistoryResponse {
     verificationStatus: string;
     totalHours: number | null;
     rejectionReason: string | null;
-    student: { id: string; name: string; email: string } | null;
+    student: { id?: string; label: string } | null;
     slot: {
       date: string;
       startTime: string;
@@ -603,17 +603,8 @@ export default function BeneficiaryOpportunities() {
                       <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
                         <div className="flex justify-between items-start gap-4">
                           <div>
-                            {s.checkedIn ? (
-                              <>
-                                <div className="font-medium text-sm">{s.student.name}</div>
-                                <div className="text-xs text-gray-500">{s.student.email}</div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="font-medium text-sm text-gray-400 italic">Anonymous volunteer</div>
-                                <div className="text-xs text-gray-400">Details revealed after check-in</div>
-                              </>
-                            )}
+                            <div className="font-medium text-sm">{s.student.label}</div>
+                            <div className="text-xs text-gray-400">Student identity is hidden for school privacy compliance.</div>
                             <div className="text-xs text-gray-600 mt-1">
                               {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} {s.slot.startTime}–{s.slot.endTime}
                             </div>
@@ -661,9 +652,7 @@ export default function BeneficiaryOpportunities() {
                     {reviewedSignups.map((s) => (
                       <div key={s.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex justify-between items-center">
                         <div>
-                          <div className="font-medium text-sm">
-                            {s.checkedIn ? s.student.name : <span className="italic text-gray-400">Anonymous volunteer</span>}
-                          </div>
+                          <div className="font-medium text-sm">{s.student.label}</div>
                           <div className="text-xs text-gray-500">
                             {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {s.totalHours ?? s.slot.durationHours}h
                           </div>
@@ -697,7 +686,7 @@ export default function BeneficiaryOpportunities() {
             <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-2">Mark as No-Show?</h3>
               <p className="text-sm text-gray-600 mb-1">
-                <strong>{signup.checkedIn ? signup.student.name : "This volunteer"}</strong> will be marked as a no-show for:
+                <strong>{signup.student.label}</strong> will be marked as a no-show for:
               </p>
               <p className="text-sm text-gray-500 mb-4">
                 {signup.slot.opportunity.title} · {new Date(signup.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
@@ -726,7 +715,7 @@ export default function BeneficiaryOpportunities() {
               <div>
                 <div className="font-semibold text-gray-900">Verification History</div>
                 <div className="text-sm text-gray-500 mt-1">
-                  {historySignup.signup.student?.name || "Anonymous volunteer"} · {historySignup.signup.slot.opportunity.title}
+                  {(historySignup.signup.student?.label || "Anonymous volunteer")} · {historySignup.signup.slot.opportunity.title}
                 </div>
               </div>
               <button onClick={() => setHistorySignup(null)} className="text-gray-400 hover:text-gray-600 text-sm">Close</button>

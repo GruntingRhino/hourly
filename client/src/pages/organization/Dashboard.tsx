@@ -18,7 +18,7 @@ interface Opportunity {
 interface PendingSession {
   id: string;
   totalHours: number | null;
-  user: { id: string; name: string; email: string };
+  user: { label: string };
   opportunity: { id: string; title: string };
 }
 
@@ -269,7 +269,7 @@ export default function OrgDashboard() {
                 {pending.map((p) => (
                   <div key={p.id} className="bg-white border border-yellow-200 rounded-lg p-4 flex justify-between items-center gap-4">
                     <div>
-                      <div className="font-medium text-sm">{p.user.name}</div>
+                      <div className="font-medium text-sm">{p.user.label}</div>
                       <div className="text-xs text-gray-500">
                         {p.opportunity.title} &middot; {p.totalHours} hours
                       </div>
