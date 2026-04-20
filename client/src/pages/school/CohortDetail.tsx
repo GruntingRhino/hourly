@@ -264,7 +264,7 @@ export default function CohortDetail() {
           <button
             key={t.key}
             onClick={() => setTab(t.key as any)}
-            className={`pb-2 text-sm font-medium border-b-2 ${tab === t.key ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            className={`pb-2 text-sm font-medium border-b-2 ${tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
           >
             {t.label}
           </button>
@@ -289,7 +289,7 @@ export default function CohortDetail() {
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1 min-w-32" />
               <input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="Student email" required
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1 min-w-40" />
-              <button type="submit" disabled={addingStudent} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+              <button type="submit" disabled={addingStudent} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
                 {addingStudent ? "Adding..." : "Add"}
               </button>
             </form>
@@ -506,7 +506,7 @@ export default function CohortDetail() {
             {csvData && (
               <div>
                 <p className="text-xs text-gray-500 mb-2">Preview (first 200 chars): {csvData.slice(0, 200)}{csvData.length > 200 ? "..." : ""}</p>
-                <button onClick={handleImport} disabled={importing} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+                <button onClick={handleImport} disabled={importing} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
                   {importing ? "Importing..." : "Import Students"}
                 </button>
               </div>

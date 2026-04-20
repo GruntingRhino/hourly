@@ -21,7 +21,7 @@ const registerSchoolLimiter = rateLimit({
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/api/auth/google/callback`;
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/school/register`;
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
@@ -94,6 +94,105 @@ function isEduDomain(email: string): boolean {
   return getEmailDomain(email).endsWith(".edu");
 }
 
+function buildUserPayload(user: any) {
+  const studentSchool = user.school || user.cohort?.school || null;
+  const schoolId = user.schoolId || user.cohort?.school?.id || null;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    schoolId,
+    school: studentSchool,
+    cohortId: user.cohortId,
+    cohort: user.cohort,
+    beneficiaryId: user.beneficiaryId,
+    beneficiary: user.beneficiary,
+    emailVerified: true,
+  };
+}
+
+async function findDomainSuggestions(email: string) {
+  const emailDomain = getEmailDomain(email);
+  if (!emailDomain || (IS_PRODUCTION && isPersonalEmailDomain(email))) {
+    return [];
+  }
+
+  return prisma.schoolDirectory.findMany({
+    where: { emailDomain: { equals: emailDomain, mode: "insensitive" } },
+    select: {
+      id: true, name: true, type: true, city: true, state: true,
+      zip: true, claimed: true, gradeRange: true, enrollment: true, website: true,
+    },
+    take: 5,
+  });
+}
+
+async function handleGoogleIdentity(params: {
+  googleId: string;
+  email: string;
+  name: string;
+  state?: string;
+  persistGoogleId?: boolean;
+}) {
+  const userIncludes = {
+    school: true,
+    cohort: { include: { school: true } },
+    beneficiary: true,
+  };
+
+  let user = await prisma.user.findFirst({
+    where: { OR: [{ googleId: params.googleId }, { email: params.email }] },
+    include: userIncludes,
+  });
+
+  if (user) {
+    if (params.persistGoogleId && !user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId: params.googleId, emailVerified: true },
+        include: userIncludes,
+      }) as any;
+    }
+
+    const existingUser = user!;
+    const token = signToken({ userId: existingUser.id, email: existingUser.email, role: existingUser.role });
+    return {
+      status: 200 as const,
+      body: {
+        token,
+        user: buildUserPayload(existingUser),
+      },
+    };
+  }
+
+  if (params.state === "login") {
+    return {
+      status: 404 as const,
+      body: {
+        error: "No GoodHours account found for this Google account. If you're a school administrator, please register your school first.",
+      },
+    };
+  }
+
+  const domainSuggestions = await findDomainSuggestions(params.email);
+  const regToken = signToken(
+    { googleId: params.googleId, email: params.email, name: params.name || params.email, pendingSchoolAdmin: true },
+    { expiresIn: "1h" }
+  );
+
+  return {
+    status: 202 as const,
+    body: {
+      requiresSchoolRegistration: true,
+      registrationToken: regToken,
+      email: params.email,
+      name: params.name || "",
+      domainSuggestions,
+    },
+  };
+}
+
 // GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
 // Returns: { status: "personal" | "edu" | "custom", blocked: boolean }
 router.get("/classify-domain", (req: Request, res: Response) => {
@@ -125,6 +224,51 @@ router.get("/url", (req: Request, res: Response) => {
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account${stateParam}`;
   res.json({ url });
 });
+
+// GET /api/auth/google/callback — browser redirect bridge for Google OAuth
+// Supports legacy/prod Google Console setups that still point at the API URL.
+// The frontend page reads ?code= and POSTs it back to this route for token exchange.
+router.get("/callback", (req: Request, res: Response) => {
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  const state = typeof req.query.state === "string" ? req.query.state : "";
+  const error = typeof req.query.error === "string" ? req.query.error : "";
+
+  const target = new URL("/school/register", CLIENT_URL);
+  if (code) target.searchParams.set("code", code);
+  if (state) target.searchParams.set("state", state);
+  if (error) target.searchParams.set("error", error);
+
+  res.redirect(target.toString());
+});
+
+if (!IS_PRODUCTION) {
+  router.post("/dev-signin", async (req: Request, res: Response) => {
+    try {
+      const { email, name, state } = z.object({
+        email: z.string().email(),
+        name: z.string().min(1).max(255).optional(),
+        state: z.string().max(50).optional(),
+      }).parse(req.body);
+
+      const effectiveName = name?.trim() || email.split("@")[0];
+      const result = await handleGoogleIdentity({
+        googleId: `dev-google:${email.toLowerCase()}`,
+        email,
+        name: effectiveName,
+        state,
+        persistGoogleId: false,
+      });
+
+      return res.status(result.status).json(result.body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: err.errors });
+      }
+      console.error("Dev Google sign-in error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+}
 
 // POST /api/auth/google/callback — exchange code for tokens, sign in or start school registration
 router.post("/callback", async (req: Request, res: Response) => {
@@ -179,76 +323,15 @@ router.post("/callback", async (req: Request, res: Response) => {
       });
     }
 
-    const userIncludes = {
-      school: true,
-      cohort: { include: { school: true } },
-      beneficiary: true,
-    };
-
-    // Find existing user by googleId or email
-    let user = await prisma.user.findFirst({
-      where: { OR: [{ googleId }, { email }] },
-      include: userIncludes,
-    });
-
-    if (user) {
-      // Existing user — link googleId if not already
-      if (!user.googleId) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { googleId, emailVerified: true },
-          include: userIncludes,
-        }) as any;
-      }
-
-      const u = user as any;
-      const studentSchool = u.school || u.cohort?.school || null;
-      const schoolId = u.schoolId || u.cohort?.school?.id || null;
-      const token = signToken({ userId: u.id, email: u.email, role: u.role });
-      return res.json({
-        token,
-        user: {
-          id: u.id,
-          email: u.email,
-          name: u.name,
-          role: u.role,
-          schoolId,
-          school: studentSchool,
-          cohortId: u.cohortId,
-          cohort: u.cohort,
-          beneficiaryId: u.beneficiaryId,
-          beneficiary: u.beneficiary,
-          emailVerified: true,
-        },
-      });
-    }
-
-    // New user — look up schools matching their email domain before returning
-    const emailDomain = getEmailDomain(email);
-    let domainSuggestions: any[] = [];
-    if (emailDomain && !isPersonalEmailDomain(email)) {
-      domainSuggestions = await prisma.schoolDirectory.findMany({
-        where: { emailDomain: { equals: emailDomain, mode: "insensitive" } },
-        select: {
-          id: true, name: true, type: true, city: true, state: true,
-          zip: true, claimed: true, gradeRange: true, enrollment: true, website: true,
-        },
-        take: 5,
-      });
-    }
-
-    const regToken = signToken(
-      { googleId, email, name: name || email, pendingSchoolAdmin: true },
-      { expiresIn: "1h" }
-    );
-
-    return res.status(202).json({
-      requiresSchoolRegistration: true,
-      registrationToken: regToken,
+    const result = await handleGoogleIdentity({
+      googleId,
       email,
-      name: name || "",
-      domainSuggestions,
+      name: name || email,
+      state: typeof req.query.state === "string" ? req.query.state : undefined,
+      persistGoogleId: true,
     });
+
+    return res.status(result.status).json(result.body);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Google auth callback error:", err);

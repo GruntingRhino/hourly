@@ -280,7 +280,7 @@ export default function SchoolSelfSubmissions() {
       <div className="flex gap-4 border-b mb-6 overflow-x-auto">
         {(["PENDING", "APPROVED", "REJECTED", "REVISION_REQUESTED"] as FilterStatus[]).map((s) => (
           <button key={s} onClick={() => setFilter(s)}
-            className={`pb-2 text-sm font-medium border-b-2 whitespace-nowrap ${filter === s ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            className={`pb-2 text-sm font-medium border-b-2 whitespace-nowrap ${filter === s ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {filterLabels[s]}
           </button>
         ))}
@@ -337,7 +337,7 @@ export default function SchoolSelfSubmissions() {
                   <div className="flex gap-2 text-xs">
                     {(["approve", "revision", "reject"] as const).map((mode) => (
                       <button key={mode} onClick={() => setReviewMode(mode === reviewMode ? null : mode)}
-                        className={`px-2.5 py-1 rounded border ${reviewMode === mode ? "bg-gray-900 text-white border-gray-900" : "border-gray-300 text-gray-600 hover:border-gray-500"}`}>
+                        className={`px-2.5 py-1 rounded border ${reviewMode === mode ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:border-gray-500"}`}>
                         {mode === "approve" ? "Approve" : mode === "revision" ? "Request Revision" : "Reject"}
                       </button>
                     ))}

@@ -177,7 +177,7 @@ export default function JoinCohort() {
             <button
               type="submit"
               disabled={submitting || !passwordOk}
-              className="w-full py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50 text-sm"
+              className="w-full py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50 text-sm"
             >
               {submitting ? "Creating account..." : "Join Cohort"}
             </button>

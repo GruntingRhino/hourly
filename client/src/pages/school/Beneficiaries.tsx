@@ -296,7 +296,7 @@ export default function SchoolBeneficiaries() {
           ] : []),
         ].map((t) => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`pb-2 text-sm font-medium border-b-2 ${tab === t.key ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            className={`pb-2 text-sm font-medium border-b-2 ${tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}
@@ -422,7 +422,7 @@ export default function SchoolBeneficiaries() {
               <button key={cat || "all"} onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   selectedCategory === cat
-                    ? "bg-gray-900 text-white border-gray-900"
+                    ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"}`}>
                 {cat || "All"}
               </button>
@@ -495,7 +495,7 @@ export default function SchoolBeneficiaries() {
             </div>
             {csvData && (
               <button onClick={handleCsvImport} disabled={csvImporting}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+                className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
                 {csvImporting ? "Importing..." : "Import Partners"}
               </button>
             )}
@@ -551,7 +551,7 @@ export default function SchoolBeneficiaries() {
               <textarea value={newBen.description} onChange={(e) => setNewBen((p) => ({ ...p, description: e.target.value }))}
                 rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
             </div>
-            <button type="submit" disabled={creating} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50">
+            <button type="submit" disabled={creating} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
               {creating ? "Creating..." : "Create Partner"}
             </button>
           </form>

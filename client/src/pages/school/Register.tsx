@@ -100,6 +100,9 @@ export default function SchoolRegister() {
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
   const [registrationToken, setRegistrationToken] = useState("");
   const [userName, setUserName] = useState("");
+  const [devGoogleEmail, setDevGoogleEmail] = useState("");
+  const [devGoogleName, setDevGoogleName] = useState("");
+  const [devGoogleLoading, setDevGoogleLoading] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,6 +171,38 @@ export default function SchoolRegister() {
       }
     } catch (err: any) {
       setError(err.message || "Google sign-in failed. Please try again.");
+    }
+  };
+
+  const handleDevGoogleSignin = async () => {
+    setError("");
+    setDevGoogleLoading(true);
+    try {
+      const result = await api.post<any>("/auth/google/dev-signin", {
+        email: devGoogleEmail.trim(),
+        name: devGoogleName.trim() || undefined,
+      });
+
+      if (result.token && !result.requiresSchoolRegistration) {
+        loginWithToken(result.token, result.user);
+        navigate("/dashboard");
+        return;
+      }
+
+      if (result.requiresSchoolRegistration) {
+        setRegistrationToken(result.registrationToken);
+        setUserName(result.name);
+        setDomainSuggestions(result.domainSuggestions || []);
+        setContactEmail(result.email || "");
+        setStep("search");
+        return;
+      }
+
+      throw new Error("Dev Google sign-in failed.");
+    } catch (err: any) {
+      setError(err.message || "Dev Google sign-in failed.");
+    } finally {
+      setDevGoogleLoading(false);
     }
   };
 
@@ -327,6 +362,43 @@ export default function SchoolRegister() {
               </svg>
               Continue with Google
             </button>
+
+            {import.meta.env.DEV && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">
+                  Dev Only
+                </div>
+                <p className="text-sm text-amber-900 mb-3">
+                  Bypass Google and continue with any email domain in development.
+                </p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={devGoogleName}
+                    onChange={(e) => setDevGoogleName(e.target.value)}
+                    placeholder="Admin name"
+                    className="w-full h-10 px-3 border border-amber-200 rounded-lg focus:outline-none focus:border-amber-400 bg-white text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={devGoogleEmail}
+                      onChange={(e) => setDevGoogleEmail(e.target.value)}
+                      placeholder="admin@any-domain.test"
+                      className="flex-1 h-10 px-3 border border-amber-200 rounded-lg focus:outline-none focus:border-amber-400 bg-white text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleDevGoogleSignin}
+                      disabled={devGoogleLoading || !devGoogleEmail.trim()}
+                      className="px-4 h-10 bg-amber-600 text-white rounded-lg font-medium text-sm disabled:opacity-50"
+                    >
+                      {devGoogleLoading ? "Working..." : "Dev Google"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="my-5 flex items-center gap-3">
               <div className="flex-1 h-px bg-gray-200" />

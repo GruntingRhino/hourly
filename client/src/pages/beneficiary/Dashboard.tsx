@@ -108,38 +108,46 @@ export default function BeneficiaryDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
-      <p className="text-gray-500 text-sm mb-6">{user?.beneficiary?.name}</p>
-
-      {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-lg p-5 text-center">
-          <div className="text-3xl font-bold text-orange-500">{pendingSignups.length}</div>
-          <div className="text-sm text-gray-500 mt-1">Pending Hour Approvals</div>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+          <p className="text-[13.5px] text-gray-500 mt-0.5">{user?.beneficiary?.name}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-5 text-center">
-          <div className="text-3xl font-bold text-blue-600">{pendingInvitations.length}</div>
-          <div className="text-sm text-gray-500 mt-1">School Invitations</div>
+        <Link to="/opportunities" className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85">
+          + New Opportunity
+        </Link>
+      </div>
+
+      {error && <div className="mb-4 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-[13px]">{error}</div>}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Pending Approvals</div>
+          <div className="text-3xl font-bold text-amber-500 leading-none">{pendingSignups.length}</div>
+          <div className="text-xs text-gray-400 mt-1">awaiting your review</div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-5 text-center">
-          <Link to="/opportunities" className="block">
-            <div className="text-3xl font-bold text-gray-700">+</div>
-            <div className="text-sm text-gray-500 mt-1">Manage Opportunities</div>
-          </Link>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">School Invitations</div>
+          <div className="text-3xl font-bold text-blue-600 leading-none">{pendingInvitations.length}</div>
+          <div className="text-xs text-gray-400 mt-1">pending response</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">School Partners</div>
+          <div className="text-3xl font-bold text-green-600 leading-none">{invitations.filter(i => i.status === "ACCEPTED").length}</div>
+          <div className="text-xs text-gray-400 mt-1">approved</div>
         </div>
       </div>
 
       {/* School Invitations */}
       {pendingInvitations.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-3">Pending School Invitations</h2>
-          <div className="space-y-2">
-            {pendingInvitations.map((inv) => (
-              <div key={inv.id} className="bg-white border border-blue-100 rounded-lg p-4 flex items-center justify-between gap-4">
+        <div className="mb-7">
+          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Pending School Invitations</h2>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {pendingInvitations.map((inv, i, arr) => (
+              <div key={inv.id} className={`p-4 flex items-center justify-between gap-4 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                 <div>
-                  <div className="font-medium">{inv.schoolName}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">
+                  <div className="font-semibold text-[13.5px] text-gray-900">{inv.schoolName}</div>
+                  <div className="text-[12px] text-gray-400 mt-0.5">
                     Invited {new Date(inv.createdAt).toLocaleDateString()} · sent to {inv.sentTo}
                   </div>
                 </div>
@@ -147,14 +155,14 @@ export default function BeneficiaryDashboard() {
                   <button
                     onClick={() => handleInvitationRespond(inv.id, "ACCEPTED")}
                     disabled={respondingId === inv.id}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3.5 py-[7px] bg-blue-600 text-white rounded-md text-[13px] font-medium hover:opacity-85 disabled:opacity-50"
                   >
                     {respondingId === inv.id ? "..." : "Accept"}
                   </button>
                   <button
                     onClick={() => handleInvitationRespond(inv.id, "DECLINED")}
                     disabled={respondingId === inv.id}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 disabled:opacity-50"
+                    className="px-3.5 py-[7px] bg-white border border-gray-200 text-gray-600 rounded-md text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
                   >
                     Decline
                   </button>
@@ -167,18 +175,18 @@ export default function BeneficiaryDashboard() {
 
       {/* Past invitations */}
       {invitations.filter((inv) => inv.status !== "PENDING").length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-semibold text-gray-500 mb-2">Past School Invitations</h2>
-          <div className="space-y-1">
-            {invitations.filter((inv) => inv.status !== "PENDING").map((inv) => (
-              <div key={inv.id} className="bg-white border border-gray-100 rounded-lg px-4 py-3 flex items-center justify-between">
-                <div className="text-sm font-medium">{inv.schoolName}</div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
+        <div className="mb-7">
+          <h2 className="text-[13px] font-semibold text-gray-500 mb-2">Past School Invitations</h2>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {invitations.filter((inv) => inv.status !== "PENDING").map((inv, i, arr) => (
+              <div key={inv.id} className={`px-4 py-3 flex items-center justify-between ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                <div className="text-[13.5px] font-medium text-gray-700">{inv.schoolName}</div>
+                <span className={`text-[11.5px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${
                   inv.status === "ACCEPTED" ? "bg-green-50 text-green-700" :
                   inv.status === "DECLINED" ? "bg-gray-100 text-gray-500" :
-                  "bg-yellow-50 text-yellow-700"
+                  "bg-amber-50 text-amber-600"
                 }`}>
-                  {inv.status}
+                  {inv.status.toLowerCase()}
                 </span>
               </div>
             ))}
@@ -189,18 +197,18 @@ export default function BeneficiaryDashboard() {
       {/* Pending Hour Approvals */}
       {pendingSignups.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold mb-3">Pending Hour Approvals</h2>
-          <div className="space-y-2">
-            {pendingSignups.map((signup) => (
-              <div key={signup.id} className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Pending Hour Approvals</h2>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {pendingSignups.map((signup, i, arr) => (
+              <div key={signup.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium">{signup.student.name}</div>
-                    <div className="text-xs text-gray-500">{signup.slot.opportunity.title}</div>
-                    <div className="text-xs text-gray-400">
-                      {new Date(signup.slot.date).toLocaleDateString()} &middot; {signup.slot.startTime}
+                    <div className="font-semibold text-[13.5px] text-gray-900">{signup.student.name}</div>
+                    <div className="text-[12.5px] text-gray-500">{signup.slot.opportunity.title}</div>
+                    <div className="text-[12px] text-gray-400">
+                      {new Date(signup.slot.date).toLocaleDateString()} · {signup.slot.startTime}
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-[13px] font-semibold text-gray-700 mt-1">
                       {signup.slot.durationHours}h expected
                     </div>
                   </div>
@@ -209,37 +217,37 @@ export default function BeneficiaryDashboard() {
                       <button
                         onClick={() => handleApprove(signup.id, signup.slot.durationHours)}
                         disabled={approving === signup.id}
-                        className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
+                        className="px-3.5 py-[7px] bg-blue-600 text-white rounded-md text-[13px] font-medium hover:opacity-85 disabled:opacity-50">
                         {approving === signup.id ? "..." : "Approve"}
                       </button>
                       <button
                         onClick={() => { setRejectingId(signup.id); setRejectReason(""); setError(""); }}
                         disabled={approving === signup.id}
-                        className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50">
+                        className="px-3.5 py-[7px] bg-white border border-gray-200 text-red-500 rounded-md text-[13px] font-medium hover:bg-red-50 disabled:opacity-50">
                         Reject
                       </button>
                     </div>
                   )}
                 </div>
                 {rejectingId === signup.id && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="mt-3 pt-3 border-t border-gray-200">
                     <input
                       type="text"
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       placeholder="Reason for rejection..."
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm mb-2"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-[13.5px] mb-2 outline-none focus:border-blue-400"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleReject(signup.id)}
                         disabled={approving === signup.id}
-                        className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50">
+                        className="px-3.5 py-[7px] bg-red-600 text-white rounded-md text-[13px] font-medium hover:opacity-85 disabled:opacity-50">
                         {approving === signup.id ? "..." : "Confirm Reject"}
                       </button>
                       <button
                         onClick={() => { setRejectingId(null); setRejectReason(""); }}
-                        className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
+                        className="px-3.5 py-[7px] text-[13px] text-gray-500 hover:text-gray-700">
                         Cancel
                       </button>
                     </div>
@@ -252,7 +260,7 @@ export default function BeneficiaryDashboard() {
       )}
 
       {pendingSignups.length === 0 && pendingInvitations.length === 0 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-500 text-[13.5px]">
           No pending items. <Link to="/opportunities" className="text-blue-600 hover:underline">Create opportunities</Link> for students.
         </div>
       )}

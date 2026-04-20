@@ -176,7 +176,7 @@ export default function SchoolGroups() {
         {isOwner && (
           <button
             onClick={() => setShowAddStaff(true)}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
           >
             + Add Staff Member
           </button>
@@ -583,7 +583,7 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
               </div>
               <p className="text-xs text-green-600 mt-2">Share these credentials with {result.name}.</p>
             </div>
-            <button onClick={onClose} className="w-full py-2 bg-gray-900 text-white rounded-md">Done</button>
+            <button onClick={onClose} className="w-full py-[7px] bg-blue-600 text-white rounded-md hover:opacity-85">Done</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -614,7 +614,7 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
             </div>
             <div className="flex gap-2 pt-2">
               <button type="submit" disabled={loading}
-                className="flex-1 py-2 bg-gray-900 text-white rounded-md font-medium hover:bg-gray-800 disabled:opacity-50">
+                className="flex-1 py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50">
                 {loading ? "Creating..." : "Create Account"}
               </button>
               <button type="button" onClick={onClose}

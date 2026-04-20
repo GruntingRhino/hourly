@@ -93,7 +93,7 @@ export default function StudentMessages() {
         <h1 className="text-2xl font-bold">Messages</h1>
         <button
           onClick={() => setShowCompose(!showCompose)}
-          className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+          className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
         >
           {showCompose ? "Cancel" : "New Message"}
         </button>
@@ -167,7 +167,7 @@ export default function StudentMessages() {
               key={f}
               onClick={() => setSenderFilter(f)}
               className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                senderFilter === f ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                senderFilter === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
               {f}

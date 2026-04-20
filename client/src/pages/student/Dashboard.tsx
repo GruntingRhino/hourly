@@ -213,106 +213,100 @@ export default function StudentDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-[22px] font-bold text-gray-900 mb-6">Dashboard</h1>
 
-      {/* Deadline countdown */}
       {deadline && (
         <DeadlineBanner deadline={deadline} approvedHours={totalApprovedHours} requiredHours={requiredHours} />
       )}
 
-      {/* Revision needed alert */}
       {revisionNeeded.length > 0 && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-sm">
+        <div className="mb-4 px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
           <strong>{revisionNeeded.length} submission{revisionNeeded.length > 1 ? "s" : ""} need revision.</strong>{" "}
           <Link to="/submit" className="underline hover:text-amber-900">Review &rarr;</Link>
         </div>
       )}
 
-      {/* Cohort info */}
       {user?.cohort && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        <div className="mb-4 px-3.5 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-[13px] text-blue-800">
           Cohort: <strong>{user.cohort.name}</strong>
           {user.cohort.requiredHours && <span className="ml-2 text-blue-600">Goal: {user.cohort.requiredHours}h</span>}
         </div>
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-lg p-5">
-          <div className="text-sm text-gray-500 mb-1">Verified Hours</div>
-          <div className="text-3xl font-bold text-green-600">{totalApprovedHours.toFixed(1)}</div>
-          <div className="text-sm text-gray-400 mt-1">of {requiredHours} required</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Verified Hours</div>
+          <div className="text-3xl font-bold text-green-600 leading-none">{totalApprovedHours.toFixed(1)}</div>
+          <div className="text-xs text-gray-400 mt-1">of {requiredHours} required</div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-5">
-          <div className="text-sm text-gray-500 mb-1">Pending Verification</div>
-          <div className="text-3xl font-bold text-yellow-600">{totalPendingHours.toFixed(1)}h</div>
-          <div className="text-sm text-gray-400 mt-1">awaiting approval</div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Pending Verification</div>
+          <div className="text-3xl font-bold text-amber-500 leading-none">{totalPendingHours.toFixed(1)}h</div>
+          <div className="text-xs text-gray-400 mt-1">awaiting approval</div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-5">
-          <div className="text-sm text-gray-500 mb-1">Activities Signed Up</div>
-          <div className="text-3xl font-bold text-purple-600">{signups.filter(s => s.status !== "CANCELLED").length}</div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Activities Signed Up</div>
+          <div className="text-3xl font-bold text-blue-600 leading-none">{signups.filter(s => s.status !== "CANCELLED").length}</div>
+          <div className="text-xs text-gray-400 mt-1">upcoming</div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-5">
-          <div className="text-sm text-gray-500 mb-1">Hours Remaining</div>
-          <div className="text-3xl font-bold text-blue-600">{remainingHours.toFixed(1)}h</div>
-          <div className="text-sm text-gray-400 mt-1">needed to reach your goal</div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Hours Remaining</div>
+          <div className="text-3xl font-bold text-gray-900 leading-none">{remainingHours.toFixed(1)}h</div>
+          <div className="text-xs text-gray-400 mt-1">needed to reach goal</div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-8">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium">Progress toward goal</span>
+      <div className="bg-white border border-gray-200 rounded-lg px-5 py-4 mb-6">
+        <div className="flex justify-between text-[13.5px] mb-2">
+          <span className="font-semibold text-gray-900">Progress toward goal</span>
           <span className="text-gray-500">{totalApprovedHours.toFixed(1)} / {requiredHours} hours</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
+        <div className="w-full bg-gray-200 rounded-full h-[7px]">
           <div
-            className="bg-blue-500 h-3 rounded-full transition-all"
+            className="bg-blue-600 h-[7px] rounded-full transition-all"
             style={{ width: `${Math.min(100, (totalApprovedHours / requiredHours) * 100)}%` }}
           />
         </div>
         {totalPendingHours > 0 && (
-          <div className="text-xs text-gray-400 mt-1">{totalPendingHours.toFixed(1)}h more pending approval</div>
+          <div className="text-[12px] text-amber-500 mt-1.5">{totalPendingHours.toFixed(1)}h more pending approval</div>
         )}
       </div>
 
       {recommended.length > 0 && totalApprovedHours < requiredHours && (
-        <div className="mb-8">
+        <div className="mb-7">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Recommended Opportunities</h2>
-            <Link to="/browse" className="text-sm text-blue-600 hover:underline">
-              Browse all
-            </Link>
+            <h2 className="text-[15px] font-semibold text-gray-900">Recommended Opportunities</h2>
+            <Link to="/browse" className="text-[13px] text-blue-600 hover:opacity-75">Browse all</Link>
           </div>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-3 gap-3">
             {recommended.map(({ slot, openSpots, reasons }) => {
               const slotCategory = slot.opportunity.category || slot.opportunity.beneficiary.category || "General";
               return (
                 <Link
                   key={slot.id}
                   to={`/slot/${slot.id}`}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition"
+                  className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-medium text-gray-900">{slot.opportunity.title}</div>
-                      <div className="text-sm text-gray-500 mt-1">{slot.opportunity.beneficiary.name}</div>
+                      <div className="font-semibold text-[13.5px] text-gray-900">{slot.opportunity.title}</div>
+                      <div className="text-[12.5px] text-gray-500 mt-0.5">{slot.opportunity.beneficiary.name}</div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${openSpots > 0 ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
-                      {openSpots > 0 ? "Open" : "Waitlist"}
-                    </span>
+                    <StatusBadge status={openSpots > 0 ? "OPEN" : "WAITLISTED"} />
                   </div>
-                  <div className="text-sm text-gray-600 mt-3">
+                  <div className="text-[12.5px] text-gray-600 mt-2.5">
                     {new Date(slot.date).toLocaleDateString()} · {slot.startTime}–{slot.endTime}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <div className="text-[12.5px] text-blue-600 font-semibold mt-0.5">
                     {slot.durationHours}h · {slotCategory}
                   </div>
                   {slot.opportunity.location && (
-                    <div className="text-sm text-gray-500 mt-1">{slot.opportunity.location}</div>
+                    <div className="text-[12px] text-gray-400 mt-0.5">{slot.opportunity.location}</div>
                   )}
                   {reasons.length > 0 && (
-                    <div className="text-xs text-blue-700 mt-3">
+                    <div className="text-[11.5px] text-blue-700 mt-2">
                       Recommended because {reasons.join(" · ")}
                     </div>
                   )}
@@ -326,33 +320,32 @@ export default function StudentDashboard() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Upcoming */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Upcoming Activities</h2>
+          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Upcoming Activities</h2>
           {upcoming.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-5 text-gray-500 text-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
               No upcoming activities.{" "}
               <Link to="/browse" className="text-blue-600 hover:underline">Browse opportunities</Link>
             </div>
           ) : (
-            <div className="space-y-2">
-              {upcoming.slice(0, 5).map((s) => (
-                <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              {upcoming.slice(0, 5).map((s, i, arr) => (
+                <div key={s.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="font-medium">{s.slot.opportunity.title}</div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(s.slot.date).toLocaleDateString()} &middot; {s.slot.startTime}–{s.slot.endTime}
+                      <div className="font-semibold text-[13.5px] text-gray-900">{s.slot.opportunity.title}</div>
+                      <div className="text-[12.5px] text-gray-500 mt-0.5">
+                        {new Date(s.slot.date).toLocaleDateString()} · {s.slot.startTime}–{s.slot.endTime}
                       </div>
-                      <div className="text-sm text-gray-400">{s.slot.opportunity.beneficiary.name}</div>
+                      <div className="text-[12.5px] text-gray-400">{s.slot.opportunity.beneficiary.name}</div>
                       {s.slot.opportunity.location && (
-                        <div className="text-xs text-gray-400">{s.slot.opportunity.location}</div>
+                        <div className="text-[12px] text-gray-400">{s.slot.opportunity.location}</div>
                       )}
-                      <div className="text-xs text-blue-600 mt-1">{s.slot.durationHours}h</div>
+                      <div className="text-[12px] font-semibold text-blue-600 mt-1">{s.slot.durationHours}h</div>
                     </div>
                     <button
                       onClick={() => handleCancel(s.id)}
                       disabled={cancelling === s.id}
-                      className="ml-2 text-xs text-gray-400 hover:text-red-500 disabled:opacity-40"
-                      title="Cancel signup"
+                      className="ml-2 text-[12px] text-gray-400 hover:text-red-500 disabled:opacity-40"
                     >
                       {cancelling === s.id ? "..." : "Cancel"}
                     </button>
@@ -365,37 +358,33 @@ export default function StudentDashboard() {
 
         {/* Recent activity */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Recent Activity</h2>
+          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Recent Activity</h2>
           {recent.length === 0 && selfSubs.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-5 text-gray-500 text-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
               No activity yet.
             </div>
           ) : (
-            <div className="space-y-2">
-              {recent.map((s) => (
-                <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium">{s.slot.opportunity.title}</div>
-                      <div className="text-sm text-gray-500">{s.slot.opportunity.beneficiary.name}</div>
-                      {s.totalHours != null && (
-                        <div className="text-sm text-gray-400 mt-1">{s.totalHours}h verified</div>
-                      )}
-                    </div>
-                    <StatusBadge status={s.verificationStatus} />
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              {recent.map((s, i, arr) => (
+                <div key={s.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 || selfSubs.length > 0 ? "border-b border-gray-200" : ""}`}>
+                  <div>
+                    <div className="font-semibold text-[13.5px] text-gray-900">{s.slot.opportunity.title}</div>
+                    <div className="text-[12.5px] text-gray-500">{s.slot.opportunity.beneficiary.name}</div>
+                    {s.totalHours != null && (
+                      <div className="text-[12px] text-gray-400 mt-0.5">{s.totalHours}h verified</div>
+                    )}
                   </div>
+                  <StatusBadge status={s.verificationStatus} />
                 </div>
               ))}
-              {selfSubs.slice(0, 3).map((ss) => (
-                <div key={ss.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium">{ss.organizationName}</div>
-                      <div className="text-sm text-gray-500">Self-submitted &middot; {new Date(ss.date).toLocaleDateString()}</div>
-                      <div className="text-sm text-gray-400 mt-1">{ss.hours}h</div>
-                    </div>
-                    <StatusBadge status={ss.status} />
+              {selfSubs.slice(0, 3).map((ss, i, arr) => (
+                <div key={ss.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                  <div>
+                    <div className="font-semibold text-[13.5px] text-gray-900">{ss.organizationName}</div>
+                    <div className="text-[12.5px] text-gray-500">Self-submitted · {new Date(ss.date).toLocaleDateString()}</div>
+                    <div className="text-[12px] text-gray-400 mt-0.5">{ss.hours}h</div>
                   </div>
+                  <StatusBadge status={ss.status} />
                 </div>
               ))}
             </div>
@@ -407,18 +396,19 @@ export default function StudentDashboard() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    APPROVED: "bg-green-100 text-green-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    REJECTED: "bg-red-100 text-red-700",
-    CONFIRMED: "bg-blue-100 text-blue-700",
-    WAITLISTED: "bg-gray-100 text-gray-600",
-    REVISION_REQUESTED: "bg-amber-100 text-amber-700",
+  const map: Record<string, { bg: string; text: string; label: string }> = {
+    APPROVED:           { bg: "bg-green-50",  text: "text-green-700",  label: "Verified" },
+    OPEN:               { bg: "bg-green-50",  text: "text-green-700",  label: "Open" },
+    PENDING:            { bg: "bg-amber-50",  text: "text-amber-600",  label: "Pending" },
+    CONFIRMED:          { bg: "bg-blue-50",   text: "text-blue-600",   label: "Confirmed" },
+    WAITLISTED:         { bg: "bg-amber-50",  text: "text-amber-600",  label: "Waitlisted" },
+    REJECTED:           { bg: "bg-red-50",    text: "text-red-600",    label: "Rejected" },
+    REVISION_REQUESTED: { bg: "bg-amber-50",  text: "text-amber-700",  label: "Needs Revision" },
   };
-  const labels: Record<string, string> = { REVISION_REQUESTED: "Needs Revision" };
+  const { bg, text, label } = map[status] ?? { bg: "bg-gray-100", text: "text-gray-600", label: status };
   return (
-    <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${colors[status] || "bg-gray-100 text-gray-600"}`}>
-      {labels[status] ?? status}
+    <span className={`shrink-0 text-[11.5px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${bg} ${text}`}>
+      {label}
     </span>
   );
 }
