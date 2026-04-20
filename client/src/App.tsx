@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 
 // Public pages
 import Landing from "./pages/Landing";
+import FAQ from "./pages/FAQ";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -78,6 +79,7 @@ function AppRoutes() {
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
       <Route path="/parent-progress" element={<ParentProgress />} />
+      <Route path="/faq" element={<FAQ />} />
 
       {user ? (
         <>

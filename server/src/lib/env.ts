@@ -20,6 +20,7 @@ const OPTIONAL = [
   "ALLOWED_ORIGINS",         // comma-separated list of allowed CORS origins
   "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
   "CRON_SECRET",            // shared secret for scheduled internal jobs (e.g. Vercel cron)
+  "APP_ENV",                // "production" | "development" — set explicitly per Vercel project
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
@@ -41,7 +42,11 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     process.exit(1);
   }
 
-  const isProdLike = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  // APP_ENV takes precedence; fall back to runtime env signals.
+  const isProdLike =
+    process.env.APP_ENV === "production" ||
+    (process.env.APP_ENV !== "development" &&
+      (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production"));
   if (isProdLike) {
     const fieldKey = process.env.FIELD_ENCRYPTION_KEY;
     if (!fieldKey) {

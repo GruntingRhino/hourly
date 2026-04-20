@@ -112,7 +112,7 @@ function getNavItems(role: string) {
         { path: "/submissions", label: "Submissions" },
         { path: "/launch", label: "Launch" },
         { path: "/settings", label: "Settings" },
-        ...(import.meta.env.DEV === true && role === "SCHOOL_ADMIN"
+        ...((import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development") && role === "SCHOOL_ADMIN"
           ? [{ path: "/admin/impersonate", label: "⚙ Dev: Impersonate" }]
           : []),
       ];

@@ -175,7 +175,7 @@ export default function Login() {
             Continue with Google
           </button>
 
-          {import.meta.env.DEV && (
+          {(import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "development") && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">
                 Dev Only

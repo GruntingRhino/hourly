@@ -28,10 +28,6 @@ export default function StudentSettings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
-  const [parentLink, setParentLink] = useState("");
-  const [parentLinkMessage, setParentLinkMessage] = useState("");
-  const [parentLinkIsError, setParentLinkIsError] = useState(false);
-  const [generatingParentLink, setGeneratingParentLink] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security tab
@@ -186,35 +182,6 @@ export default function StudentSettings() {
     } catch (err: any) {
       setMessage(err.message || "Failed to export PDF");
       setIsError(true);
-    }
-  };
-
-  const handleGenerateParentLink = async () => {
-    setGeneratingParentLink(true);
-    setParentLinkMessage("");
-    setParentLinkIsError(false);
-    try {
-      const result = await api.post<{ url: string }>("/reports/parent-link");
-      setParentLink(result.url);
-      setParentLinkMessage("Read-only parent progress link generated. It expires in 30 days.");
-    } catch (err: any) {
-      setParentLinkMessage(err.message || "Failed to generate parent progress link");
-      setParentLinkIsError(true);
-    } finally {
-      setGeneratingParentLink(false);
-    }
-  };
-
-  const handleCopyParentLink = async () => {
-    if (!parentLink) return;
-    setParentLinkMessage("");
-    setParentLinkIsError(false);
-    try {
-      await navigator.clipboard.writeText(parentLink);
-      setParentLinkMessage("Parent progress link copied.");
-    } catch {
-      setParentLinkMessage("Unable to copy automatically. Copy the link manually.");
-      setParentLinkIsError(true);
     }
   };
 
@@ -474,60 +441,10 @@ export default function StudentSettings() {
           </form>
 
           <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-gray-900">Parent Progress Link</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Generate a read-only link so a parent or guardian can track your approved, pending, and remaining hours.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleGenerateParentLink}
-                  disabled={generatingParentLink}
-                  className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
-                >
-                  {generatingParentLink ? "Generating..." : parentLink ? "Refresh Link" : "Generate Link"}
-                </button>
-                {parentLink && (
-                  <button
-                    type="button"
-                    onClick={handleCopyParentLink}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-white"
-                  >
-                    Copy Link
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {parentLinkMessage && (
-              <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${
-                parentLinkIsError
-                  ? "bg-red-50 border-red-200 text-red-700"
-                  : "bg-green-50 border-green-200 text-green-700"
-              }`}>
-                {parentLinkMessage}
-              </div>
-            )}
-
-            {parentLink && (
-              <div className="mt-3">
-                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1">
-                  Shareable URL
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={parentLink}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-700"
-                />
-                <div className="mt-2 text-xs text-gray-500">
-                  This link is read-only and expires after 30 days.
-                </div>
-              </div>
-            )}
+            <h3 className="font-semibold text-gray-900">Parent Progress Sharing</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Direct student-generated parent links are disabled. Parent or guardian progress sharing must be managed through a school-controlled FERPA-safe workflow.
+            </p>
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-200">

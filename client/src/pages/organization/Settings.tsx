@@ -81,8 +81,9 @@ interface OrgStats {
 
 interface Volunteer {
   id: string;
-  name: string;
+  label: string;
   totalHours: number;
+  sessionCount: number;
 }
 
 export default function OrgSettings() {
@@ -349,8 +350,8 @@ export default function OrgSettings() {
     try {
       const volunteers = await api.get<any[]>(`/organizations/${user.organizationId}/volunteers`);
       const rows = [
-        ["Name", "Email", "Total Hours", "Sessions"],
-        ...volunteers.map((v) => [v.name, v.email || "", v.totalHours?.toString() || "0", v.sessionCount?.toString() || "0"]),
+        ["Volunteer", "Total Hours", "Sessions"],
+        ...volunteers.map((v) => [v.label || "Anonymous volunteer", v.totalHours?.toString() || "0", v.sessionCount?.toString() || "0"]),
       ];
       const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
@@ -816,7 +817,7 @@ export default function OrgSettings() {
                           <span className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-500">
                             {i + 1}
                           </span>
-                          <span className="text-sm font-medium">{v.name}</span>
+                          <span className="text-sm font-medium">{v.label}</span>
                         </div>
                         <span className="text-sm font-bold text-blue-600">{v.totalHours}h</span>
                       </div>
@@ -833,7 +834,7 @@ export default function OrgSettings() {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h3 className="font-semibold mb-2">Export Volunteer Data</h3>
           <p className="text-sm text-gray-500 mb-6">
-            Download a CSV of all volunteers and their hours.
+            Download a CSV of anonymized volunteer summaries and hours.
           </p>
           <button
             onClick={handleExportCSV}

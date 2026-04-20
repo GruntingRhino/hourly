@@ -376,9 +376,9 @@ export default function Landing() {
           className="py-8">
           <div className="max-w-4xl mx-auto px-6 grid grid-cols-3 gap-6 text-center">
             {[
-              { value: "700,000+", label: "Student volunteer hours tracked" },
-              { value: "100%", label: "Verified & compliant records" },
-              { value: "FERPA", label: "Compliant student data security" },
+              { value: "700,000+", label: "Community Partners Across USA" },
+              { value: "100%", label: "Verified school-controlled records" },
+              { value: "Privacy", label: "School-scoped student data controls" },
             ].map((s) => (
               <div key={s.label} className="text-white">
                 <div className="text-3xl font-extrabold">{s.value}</div>
@@ -483,7 +483,7 @@ export default function Landing() {
                     "Approve community service partners",
                     "Full audit trail for all volunteering actions",
                     "Review student self-submitted volunteering",
-                    "FERPA-compliant secure data storage",
+                    "School-scoped student data access controls",
                   ],
                 },
                 {
@@ -513,7 +513,7 @@ export default function Landing() {
                     "Manage student signups and attendance",
                     "Approve or reject hours with audit logging",
                     "Branded partner profile and directory listing",
-                    "Student details revealed only after attendance",
+                    "Volunteer identities hidden from partners by default",
                   ],
                 },
               ].map(({ emoji, bg, title, color, checkColor, items }) => (
@@ -581,7 +581,7 @@ export default function Landing() {
             }} />
           <div className="text-xs text-gray-500">© {new Date().getFullYear()} GoodHours. All rights reserved.</div>
           <div className="flex gap-5">
-            <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Help</a>
+            <Link to="/faq" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Help</Link>
             <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Terms</a>
             <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Privacy</a>
           </div>

@@ -10,6 +10,7 @@ import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap } from "../lib/schoolRules";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 
 // 10 invitations per school admin per hour — prevents inbox-bombing a beneficiary contact
 const beneficiaryInviteLimiter = rateLimit({
@@ -1059,17 +1060,9 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async
       orderBy: { createdAt: "desc" },
     });
 
-    // Fetch student names
-    const studentIds = [...new Set(signups.map((s) => s.studentId))];
-    const students = await prisma.user.findMany({
-      where: { id: { in: studentIds } },
-      select: { id: true, name: true, email: true },
-    });
-    const studentMap = new Map(students.map((s) => [s.id, s]));
-
     const result = signups.map((s) => ({
       ...s,
-      student: studentMap.get(s.studentId) ?? { id: s.studentId, name: "Unknown", email: "" },
+      student: { label: buildAnonymousVolunteerLabel(s.id) },
     }));
 
     res.json(result);
@@ -1341,16 +1334,10 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
       return res.status(403).json({ error: "Access denied" });
     }
 
-    const [student, history] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: signup.studentId },
-        select: { id: true, name: true, email: true },
-      }),
-      prisma.beneficiaryAuditLog.findMany({
+    const history = await prisma.beneficiaryAuditLog.findMany({
         where: { signupId: signup.id },
         orderBy: { createdAt: "asc" },
-      }),
-    ]);
+      });
     const actorIds = [...new Set(history.map((entry) => entry.actorId))];
     const actors = actorIds.length
       ? await prisma.user.findMany({
@@ -1370,7 +1357,9 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
         checkedIn: signup.checkedIn,
         checkedOut: signup.checkedOut,
         verifiedAt: signup.verifiedAt,
-        student,
+        student: actor.role === "BENEFICIARY_ADMIN"
+          ? { label: buildAnonymousVolunteerLabel(signup.id) }
+          : { id: signup.studentId, label: buildAnonymousVolunteerLabel(signup.id) },
         slot: {
           id: signup.slot.id,
           date: signup.slot.date,
