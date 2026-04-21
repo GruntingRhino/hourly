@@ -171,6 +171,11 @@ export default function FAQ() {
           >
             Email help@goodhours.app
           </a>
+          <div className="mt-5 pt-5 border-t border-gray-100 flex justify-center gap-5 text-[12.5px] text-gray-400">
+            <Link to="/terms" className="hover:text-gray-600">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-gray-600">Privacy Policy</Link>
+            <Link to="/" className="hover:text-gray-600">Home</Link>
+          </div>
         </div>
       </div>
     </div>

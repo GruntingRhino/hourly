@@ -331,7 +331,7 @@ export default function Landing() {
 
       <main>
         {/* Hero */}
-        <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-20 grid md:grid-cols-2 gap-12 items-center">
+        <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-20 grid md:grid-cols-2 gap-12 items-start">
           <div>
             <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full px-3 py-1.5 mb-5">
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -374,52 +374,18 @@ export default function Landing() {
         {/* Stats bar */}
         <section style={{ background: "linear-gradient(90deg, #1a3a8f 0%, #1a56db 50%, #c2410c 100%)" }}
           className="py-8">
-          <div className="max-w-4xl mx-auto px-6 grid grid-cols-3 gap-6 text-center">
+          <div className="max-w-4xl mx-auto px-6 grid grid-cols-4 gap-6 text-center">
             {[
               { value: "700,000+", label: "Community Partners Across USA" },
               { value: "100%", label: "Verified school-controlled records" },
-              { value: "Privacy", label: "School-scoped student data controls" },
+              { value: "FERPA", label: "Compliant student data security" },
+              { value: "35,000", label: "High Schools Across USA. Claim Yours." },
             ].map((s) => (
               <div key={s.label} className="text-white">
                 <div className="text-3xl font-extrabold">{s.value}</div>
                 <div className="text-sm opacity-85 mt-1">{s.label}</div>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* Demo section */}
-        <section id="demo" className="py-20 bg-gray-50">
-          <div className="max-w-6xl mx-auto px-6 md:px-10">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-extrabold text-gray-900 mb-2">See GoodHours in Action</h2>
-              <p className="text-gray-500 text-base">Your school's volunteer hours, organized and verified in one place.</p>
-            </div>
-            {/* Tabs */}
-            <div className="flex items-center border-b-2 border-gray-200 mb-6">
-              {(["school", "student", "partner"] as DemoTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-[2px] capitalize transition-colors ${
-                    activeTab === tab
-                      ? "border-blue-600 text-blue-700 font-semibold"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}>
-                  {tab === "school" ? "School Admin" : tab === "student" ? "Student" : "Community Partner"}
-                </button>
-              ))}
-              <Link to="/school/register"
-                className="ml-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors">
-                Register Free →
-              </Link>
-            </div>
-            {/* Dashboard panel */}
-            <div>
-              {activeTab === "school" && <SchoolDashboardMock />}
-              {activeTab === "student" && <StudentDashboardMock />}
-              {activeTab === "partner" && <PartnerDashboardMock />}
-            </div>
           </div>
         </section>
 
@@ -465,9 +431,35 @@ export default function Landing() {
         {/* Features */}
         <section id="features" className="py-20 bg-gray-50">
           <div className="max-w-6xl mx-auto px-6 md:px-10">
-            <div className="text-center mb-12">
+            <div className="text-center mb-10">
               <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Built for Everyone</h2>
               <p className="text-gray-500">GoodHours works for schools, students, and community partners.</p>
+            </div>
+            {/* Demo tabs + mockup */}
+            <div id="demo" className="mb-12">
+              <div className="flex items-center border-b-2 border-gray-200 mb-6">
+                {(["school", "student", "partner"] as DemoTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-[2px] capitalize transition-colors ${
+                      activeTab === tab
+                        ? "border-blue-600 text-blue-700 font-semibold"
+                        : "border-transparent text-gray-500 hover:text-blue-600"
+                    }`}>
+                    {tab === "school" ? "School Admin" : tab === "student" ? "Student" : "Community Partner"}
+                  </button>
+                ))}
+                <Link to="/school/register"
+                  className="ml-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors">
+                  Register Free →
+                </Link>
+              </div>
+              <div>
+                {activeTab === "school" && <SchoolDashboardMock />}
+                {activeTab === "student" && <StudentDashboardMock />}
+                {activeTab === "partner" && <PartnerDashboardMock />}
+              </div>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
               {[
@@ -582,8 +574,8 @@ export default function Landing() {
           <div className="text-xs text-gray-500">© {new Date().getFullYear()} GoodHours. All rights reserved.</div>
           <div className="flex gap-5">
             <Link to="/faq" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Help</Link>
-            <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Terms</a>
-            <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Privacy</a>
+            <Link to="/terms" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Terms</Link>
+            <Link to="/privacy" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">Privacy</Link>
           </div>
         </div>
       </footer>
