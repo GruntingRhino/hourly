@@ -5,6 +5,8 @@ import Layout from "./components/Layout";
 // Public pages
 import Landing from "./pages/Landing";
 import FAQ from "./pages/FAQ";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -80,6 +82,8 @@ function AppRoutes() {
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
       <Route path="/parent-progress" element={<ParentProgress />} />
       <Route path="/faq" element={<FAQ />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {user ? (
         <>
