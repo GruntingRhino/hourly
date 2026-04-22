@@ -25,6 +25,9 @@ const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/sc
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
+// Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
+const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
+
 // Legacy approved-domain whitelist (env-var override, rarely used).
 const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
   .split(",")
@@ -80,10 +83,7 @@ function emailDomainMatchesSchool(emailDomain: string, schoolDomain: string): bo
 
 /** Returns true for Playwright test accounts that bypass the personal-domain check. */
 function isTestEmail(email: string): boolean {
-  return (
-    /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email) ||
-    /^altideas4life@gmail\.com$/i.test(email)
-  );
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
 }
 
 /** Layer 1: true if the domain is a known personal / consumer email provider. */
@@ -117,7 +117,7 @@ function buildUserPayload(user: any) {
 
 async function findDomainSuggestions(email: string) {
   const emailDomain = getEmailDomain(email);
-  if (!emailDomain || (IS_PRODUCTION && isPersonalEmailDomain(email))) {
+  if (!emailDomain || (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email))) {
     return [];
   }
 
@@ -203,8 +203,8 @@ router.get("/classify-domain", (req: Request, res: Response) => {
   if (!email || !email.includes("@")) {
     return res.json({ status: "unknown", blocked: false });
   }
-  // Personal emails are only blocked in production
-  if (IS_PRODUCTION && isPersonalEmailDomain(email)) {
+  // Personal emails are only blocked in production (unless feature flag overrides)
+  if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email)) {
     return res.json({ status: "personal", blocked: true });
   }
   if (isEduDomain(email)) {
@@ -446,8 +446,8 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       return res.status(400).json({ error: "Invalid registration token" });
     }
 
-    // Block personal/consumer email providers on the contact email (production only)
-    if (IS_PRODUCTION && isPersonalEmailDomain(data.contactEmail)) {
+    // Block personal/consumer email providers on the contact email (production only, unless feature flag overrides)
+    if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(data.contactEmail)) {
       return res.status(400).json({
         error: "Please use your school's official email address. Personal email providers like Gmail, Yahoo, and Outlook are not accepted.",
         code: "PERSONAL_EMAIL",
