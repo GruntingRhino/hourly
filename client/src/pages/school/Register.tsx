@@ -256,7 +256,8 @@ export default function SchoolRegister() {
     } else {
       setSelectedSchool(school);
       setAlreadyClaimed(null);
-      setContactEmail("");
+      // For email/password path, keep the email already collected in step 1
+      if (signupMode !== "email") setContactEmail("");
       setStep("contact");
     }
   };
@@ -283,7 +284,7 @@ export default function SchoolRegister() {
     if (!customSchoolName.trim()) return;
     setSelectedSchool(null);
     setAlreadyClaimed(null);
-    setContactEmail("");
+    if (signupMode !== "email") setContactEmail("");
     setStep("contact");
   };
 
