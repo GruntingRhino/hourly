@@ -80,7 +80,10 @@ function emailDomainMatchesSchool(emailDomain: string, schoolDomain: string): bo
 
 /** Returns true for Playwright test accounts that bypass the personal-domain check. */
 function isTestEmail(email: string): boolean {
-  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+  return (
+    /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email) ||
+    /^altideas4life@gmail\.com$/i.test(email)
+  );
 }
 
 /** Layer 1: true if the domain is a known personal / consumer email provider. */

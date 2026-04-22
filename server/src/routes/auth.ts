@@ -191,7 +191,10 @@ function isPersonalEmailDomain(email: string): boolean {
 
 /** Playwright/QA test accounts — bypass all domain restrictions. */
 function isTestEmail(email: string): boolean {
-  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
+  return (
+    /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email) ||
+    /^altideas4life@gmail\.com$/i.test(email)
+  );
 }
 
 /** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
