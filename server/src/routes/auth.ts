@@ -17,6 +17,9 @@ import {
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
+// Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
+const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
+
 // Limits for endpoints that trigger outbound email — the primary DDOS surface.
 // Each limit is per IP address and resets on a rolling window.
 
@@ -191,10 +194,7 @@ function isPersonalEmailDomain(email: string): boolean {
 
 /** Playwright/QA test accounts — bypass all domain restrictions. */
 function isTestEmail(email: string): boolean {
-  return (
-    /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email) ||
-    /^altideas4life@gmail\.com$/i.test(email)
-  );
+  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
 }
 
 /** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
@@ -219,7 +219,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
   try {
     const data = signupSchema.parse(req.body);
 
-    if (IS_PROD_LIKE) {
+    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
       if (isPersonalEmailDomain(data.email) && !isTestEmail(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
