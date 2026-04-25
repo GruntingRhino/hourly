@@ -213,7 +213,10 @@ export default function StudentDashboard() {
 
   return (
     <div>
-      <h1 className="text-[22px] font-bold text-gray-900 mb-6">Dashboard</h1>
+      <div className="mb-6">
+        <div className="text-sm font-semibold text-blue-700 mb-1">{user?.name || "Student"}</div>
+        <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+      </div>
 
       {deadline && (
         <DeadlineBanner deadline={deadline} approvedHours={totalApprovedHours} requiredHours={requiredHours} />

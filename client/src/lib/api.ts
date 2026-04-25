@@ -1,5 +1,7 @@
+import { getAuthToken } from "./authSession";
+
 const API_BASE = "/api";
-const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export class ApiError extends Error {
   status: number;
@@ -20,7 +22,7 @@ function getTimeoutMs(): number {
 }
 
 async function fetchWithAuth(path: string, options?: RequestInit): Promise<Response> {
-  const token = localStorage.getItem("goodhours_token");
+  const token = getAuthToken();
   const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(options?.headers as Record<string, string>),

@@ -256,7 +256,8 @@ export default function SchoolRegister() {
     } else {
       setSelectedSchool(school);
       setAlreadyClaimed(null);
-      setContactEmail("");
+      // For email/password path, keep the email already collected in step 1
+      if (signupMode !== "email") setContactEmail("");
       setStep("contact");
     }
   };
@@ -283,7 +284,7 @@ export default function SchoolRegister() {
     if (!customSchoolName.trim()) return;
     setSelectedSchool(null);
     setAlreadyClaimed(null);
-    setContactEmail("");
+    if (signupMode !== "email") setContactEmail("");
     setStep("contact");
   };
 
@@ -319,7 +320,11 @@ export default function SchoolRegister() {
         setStep("sent");
       }
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+      if (err?.message === "Email already registered") {
+        setError("This email address is already linked to another school on GoodHours.");
+      } else {
+        setError(err.message || "Registration failed. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -598,8 +603,8 @@ export default function SchoolRegister() {
             {/* Already-registered banner */}
             {alreadyClaimed && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
-                <strong>{alreadyClaimed.name}</strong> is already registered on GoodHours.
-                Contact your school's GoodHours administrator to get access.
+                <strong>{alreadyClaimed.name}</strong> is already linked to another school administrator on GoodHours.
+                Sign in with the existing admin account or contact your school's current GoodHours administrator.
               </div>
             )}
 
@@ -750,7 +755,7 @@ export default function SchoolRegister() {
             )}
             <p className="text-sm text-gray-500 mb-6">
               {signupMode === "email"
-                ? "Enter your school email address. We'll verify the domain and send a confirmation."
+                ? "We already have your school email. Review it below, then create the account."
                 : "We'll send a verification link to confirm this registration."}
             </p>
             {error && (
@@ -759,28 +764,34 @@ export default function SchoolRegister() {
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {signupMode === "email" ? "Your School Email" : "Contact Email"}
+                  {signupMode === "email" ? "School Email" : "Contact Email"}
                 </label>
-                <input
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setContactEmail(val);
-                    const status = classifyEmailDomain(val);
-                    setDomainStatus(status);
-                    if (error) setError("");
-                  }}
-                  required
-                  placeholder="principal@yourschool.edu"
-                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
-                    domainStatus === "personal"
-                      ? "border-red-300 focus:ring-red-400 bg-red-50"
-                      : domainStatus === "edu"
-                      ? "border-green-300 focus:ring-green-400"
-                      : "border-gray-300 focus:ring-blue-500"
-                  }`}
-                />
+                {signupMode === "email" ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 break-words">
+                    {contactEmail}
+                  </div>
+                ) : (
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setContactEmail(val);
+                      const status = classifyEmailDomain(val);
+                      setDomainStatus(status);
+                      if (error) setError("");
+                    }}
+                    required
+                    placeholder="principal@yourschool.edu"
+                    className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
+                      domainStatus === "personal"
+                        ? "border-red-300 focus:ring-red-400 bg-red-50"
+                        : domainStatus === "edu"
+                        ? "border-green-300 focus:ring-green-400"
+                        : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                  />
+                )}
 
                 {/* Layer 1 — Personal email blocked */}
                 {domainStatus === "personal" && (
@@ -809,7 +820,7 @@ export default function SchoolRegister() {
                   </div>
                 )}
 
-                {!domainStatus && (
+                {!domainStatus && signupMode !== "email" && (
                   <p className="text-xs text-gray-400 mt-1">
                     Use your school's official email address.
                   </p>

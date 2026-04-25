@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 
@@ -38,14 +38,31 @@ export default function EmailVerificationRequired() {
     }
   };
 
+  const handleSignIn = () => {
+    logout();
+    navigate("/login");
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm text-center">
-        <h1 className="text-2xl font-bold italic mb-8">GoodHours</h1>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-4xl mb-4">✉️</div>
-          <h2 className="text-xl font-bold mb-2">Verify your email</h2>
-          <p className="text-gray-600 text-sm mb-4">
+      <div className="w-full max-w-md">
+        <Link to="/" className="flex justify-center mb-8">
+          <img
+            src="/logo-full.png"
+            alt="GoodHours"
+            className="h-10 w-auto"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+              (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
+            }}
+          />
+          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+        </Link>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-2xl">✉️</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Verify your email</h2>
+          <p className="text-gray-600 text-sm mb-5 break-words">
             A verification link was sent to <strong>{user?.email}</strong>. Check your inbox and click the link to activate your account.
           </p>
 
@@ -64,7 +81,7 @@ export default function EmailVerificationRequired() {
           <button
             onClick={handleResend}
             disabled={resending}
-            className="w-full py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50 mb-3"
+            className="w-full py-[9px] bg-blue-600 text-white rounded-lg font-medium hover:opacity-85 disabled:opacity-50 mb-3"
           >
             {resending ? "Sending..." : "Resend verification email"}
           </button>
@@ -73,14 +90,14 @@ export default function EmailVerificationRequired() {
             <button
               onClick={handleBypassVerification}
               disabled={bypassing}
-              className="w-full py-2 bg-yellow-500 text-white rounded-md font-medium hover:bg-yellow-600 disabled:opacity-50 mb-3 text-sm"
+              className="w-full py-[9px] bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 disabled:opacity-50 mb-3 text-sm"
             >
               {bypassing ? "Bypassing..." : "[Dev] Skip email verification"}
             </button>
           )}
 
-          <button onClick={logout} className="w-full py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-            Sign out
+          <button onClick={handleSignIn} className="w-full py-[9px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+            Sign in here
           </button>
         </div>
       </div>

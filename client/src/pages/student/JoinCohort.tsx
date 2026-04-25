@@ -14,6 +14,8 @@ const PASSWORD_RULES = [
 interface InvitationInfo {
   email: string;
   name: string | null;
+  grade: string | null;
+  house: string | null;
   cohortName: string;
   schoolName: string;
   schoolId: string;
@@ -31,8 +33,6 @@ export default function JoinCohort() {
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [grade, setGrade] = useState("");
-  const [house, setHouse] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,8 +66,6 @@ export default function JoinCohort() {
         token,
         name,
         password,
-        grade: grade || undefined,
-        house: house || undefined,
       });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
@@ -127,34 +125,12 @@ export default function JoinCohort() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Grade <span className="text-gray-400">(optional)</span>
-              </label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select grade</option>
-                <option value="9th">9th</option>
-                <option value="10th">10th</option>
-                <option value="11th">11th</option>
-                <option value="12th">12th</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                House <span className="text-gray-400">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={house}
-                onChange={(e) => setHouse(e.target.value)}
-                placeholder="e.g. Gryffindor, Red House"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {(invInfo?.grade || invInfo?.house) && (
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                {invInfo.grade && <div>Grade: <strong>{invInfo.grade}</strong></div>}
+                {invInfo.house && <div>House: <strong>{invInfo.house}</strong></div>}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <input
