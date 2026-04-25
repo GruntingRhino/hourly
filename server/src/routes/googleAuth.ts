@@ -477,15 +477,18 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
 
       // Validate contact email domain against the school's known domain.
       // Prefer the explicit emailDomain field; fall back to parsing the website URL.
-      const schoolDomain = dirEntry?.emailDomain || (dirEntry?.website ? extractDomainFromWebsite(dirEntry.website) : null);
-      if (schoolDomain) {
-        const contactDomain = getEmailDomain(data.contactEmail);
-        const isEdu = contactDomain.endsWith(".edu");
-        if (!isEdu && !emailDomainMatchesSchool(contactDomain, schoolDomain)) {
-          return res.status(400).json({
-            error: `Contact email domain does not match the school's domain (${schoolDomain}). Please use your school's official email address.`,
-            code: "DOMAIN_MISMATCH",
-          });
+      // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
+      if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
+        const schoolDomain = dirEntry?.emailDomain || (dirEntry?.website ? extractDomainFromWebsite(dirEntry.website) : null);
+        if (schoolDomain) {
+          const contactDomain = getEmailDomain(data.contactEmail);
+          const isEdu = contactDomain.endsWith(".edu");
+          if (!isEdu && !emailDomainMatchesSchool(contactDomain, schoolDomain)) {
+            return res.status(400).json({
+              error: `Contact email domain does not match the school's domain (${schoolDomain}). Please use your school's official email address.`,
+              code: "DOMAIN_MISMATCH",
+            });
+          }
         }
       }
     }

@@ -226,7 +226,8 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     }
 
     // If a directory school was selected, validate email domain against its known domain
-    if (data.role === "SCHOOL_ADMIN" && data.directorySchoolId && !isTestEmail(data.email)) {
+    // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
+    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && data.role === "SCHOOL_ADMIN" && data.directorySchoolId && !isTestEmail(data.email)) {
       const dirEntry = await prisma.schoolDirectory.findUnique({
         where: { id: data.directorySchoolId },
         select: { emailDomain: true, website: true },
