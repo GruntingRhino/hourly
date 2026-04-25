@@ -1,6 +1,14 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { api, ApiError } from "../lib/api";
+import {
+  clearAuthSession,
+  getAuthToken,
+  getCachedUser,
+  registerAuthSessionResponder,
+  requestAuthSession,
+  setAuthSession,
+} from "../lib/authSession";
 
 type Role = "STUDENT" | "ORG_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "BENEFICIARY_ADMIN";
 
@@ -75,84 +83,75 @@ export interface SignupData {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const USER_CACHE_KEY = "goodhours_user";
-
-function readCachedUser(): User | null {
-  try {
-    const raw = localStorage.getItem(USER_CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as User;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedUser(user: User | null): void {
-  try {
-    if (!user) {
-      localStorage.removeItem(USER_CACHE_KEY);
-      return;
-    }
-    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
-  } catch {
-    // ignore cache write failures
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => readCachedUser());
+  const [user, setUser] = useState<User | null>(() => getCachedUser<User>());
   const [loading, setLoading] = useState(() => {
-    const token = localStorage.getItem("goodhours_token");
-    return Boolean(token && !readCachedUser());
+    const token = getAuthToken();
+    return Boolean(token && !getCachedUser<User>());
   });
 
   const refreshUser = async () => {
     try {
       const data = await api.get<User>("/auth/me");
       setUser(data);
-      writeCachedUser(data);
+      const token = getAuthToken();
+      if (token) setAuthSession(token, data);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        localStorage.removeItem("goodhours_token");
-        writeCachedUser(null);
+        clearAuthSession();
         setUser(null);
       }
     }
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("goodhours_token");
-    if (token) {
-      refreshUser().finally(() => setLoading(false));
-    } else {
+    const unregister = registerAuthSessionResponder<User>(() => ({
+      token: getAuthToken(),
+      user: getCachedUser<User>(),
+    }));
+
+    void (async () => {
+      let token = getAuthToken();
+
+      if (!token) {
+        const synced = await requestAuthSession<User>();
+        if (synced?.token) {
+          setAuthSession(synced.token, synced.user);
+          token = synced.token;
+          if (synced.user) setUser(synced.user);
+        }
+      }
+
+      if (token) {
+        await refreshUser();
+      }
+
       setLoading(false);
-    }
+    })();
+
+    return unregister;
   }, []);
 
   const login = async (email: string, password: string) => {
     const data = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
-    localStorage.setItem("goodhours_token", data.token);
+    setAuthSession(data.token, data.user);
     setUser(data.user);
-    writeCachedUser(data.user);
   };
 
   const loginWithToken = (token: string, u: User) => {
-    localStorage.setItem("goodhours_token", token);
+    setAuthSession(token, u);
     setUser(u);
-    writeCachedUser(u);
   };
 
   const signup = async (signupData: SignupData): Promise<SignupResult> => {
     const data = await api.post<SignupResult>("/auth/signup", signupData);
-    localStorage.setItem("goodhours_token", data.token);
+    setAuthSession(data.token, data.user);
     setUser(data.user);
-    writeCachedUser(data.user);
     return data;
   };
 
   const logout = () => {
-    localStorage.removeItem("goodhours_token");
-    writeCachedUser(null);
+    clearAuthSession();
     setUser(null);
   };
 

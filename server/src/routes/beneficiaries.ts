@@ -97,10 +97,28 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
+    const beneficiaryIds = approvals.map((a) => a.beneficiaryId);
+    const latestInvitations = beneficiaryIds.length > 0
+      ? await prisma.beneficiaryInvitation.findMany({
+          where: { schoolId, beneficiaryId: { in: beneficiaryIds } },
+          orderBy: [{ createdAt: "desc" }],
+        })
+      : [];
+
+    const latestInvitationByBeneficiary = new Map<string, typeof latestInvitations[number]>();
+    for (const invitation of latestInvitations) {
+      if (!latestInvitationByBeneficiary.has(invitation.beneficiaryId)) {
+        latestInvitationByBeneficiary.set(invitation.beneficiaryId, invitation);
+      }
+    }
+
     let beneficiaries = approvals.map((a) => ({
       ...a.beneficiary,
       approvalStatus: a.status,
       approvalId: a.id,
+      latestInvitationStatus: latestInvitationByBeneficiary.get(a.beneficiaryId)?.status ?? null,
+      latestInvitationSentTo: latestInvitationByBeneficiary.get(a.beneficiaryId)?.sentTo ?? null,
+      latestInvitationCreatedAt: latestInvitationByBeneficiary.get(a.beneficiaryId)?.createdAt ?? null,
     }));
 
     if (search) {
@@ -368,8 +386,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
       data: {
         schoolId: user.schoolId,
         beneficiaryId: beneficiary.id,
-        status: "APPROVED",
-        approvedAt: new Date(),
+        status: "PENDING",
       },
     });
 
@@ -385,6 +402,58 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Create beneficiary error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/beneficiaries/:id — update a school-created beneficiary
+router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      name: z.string().min(1).max(255),
+      category: z.string().max(100).optional().or(z.literal("")),
+      address: z.string().max(255).optional().or(z.literal("")),
+      city: z.string().max(100).optional().or(z.literal("")),
+      state: z.string().max(50).optional().or(z.literal("")),
+      zip: z.string().regex(/^\d{5}$/).optional().or(z.literal("")),
+      email: z.string().email().optional().or(z.literal("")),
+      phone: z.string().max(20).optional().or(z.literal("")),
+      website: z.string().max(255).optional().or(z.literal("")),
+      description: z.string().max(1000).optional().or(z.literal("")),
+      visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PRIVATE"),
+    });
+    const data = schema.parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const beneficiary = await prisma.beneficiary.findUnique({ where: { id: req.params.id } });
+    if (!beneficiary) return res.status(404).json({ error: "Beneficiary not found" });
+    if (beneficiary.createdBySchoolId !== user.schoolId) {
+      return res.status(403).json({ error: "Only school-created partners can be edited here" });
+    }
+
+    const updated = await prisma.beneficiary.update({
+      where: { id: beneficiary.id },
+      data: {
+        name: data.name,
+        category: data.category || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip: data.zip || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        website: data.website || null,
+        description: data.description || null,
+        visibility: data.visibility,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Update beneficiary error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -482,9 +551,9 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
     const results = { added: 0, failed: 0, errors: [] as string[] };
     for (let i = 0; i < records.length; i++) {
       const row = records[i];
-      const name = (row.organization_name || "").trim();
+      const name = (row.organization_name || row.name || "").trim();
       if (!name) {
-        results.errors.push(`Row ${i + 2}: missing organization_name`);
+        results.errors.push(`Row ${i + 2}: missing organization_name or name`);
         results.failed++;
         continue;
       }
@@ -492,15 +561,16 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
         const ben = await prisma.beneficiary.create({
           data: {
             name,
-            email: row.contact_email?.trim() || null,
+            category: (row.category || "").trim() || null,
+            email: (row.contact_email || row.email)?.trim() || null,
             phone: (row.phone || row.phone_number)?.trim() || null,
+            website: row.website?.trim() || null,
             address: row.address?.trim() || null,
             city: row.city?.trim() || null,
             state: row.state?.trim() || null,
             zip: (row.zip || row.zip_code)?.trim() || null,
-            website: row.website?.trim() || null,
             description: row.description?.trim() || null,
-            visibility: "PRIVATE",
+            visibility: ((row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE"),
             status: "ACTIVE",
             createdBySchoolId: user.schoolId,
           },
@@ -694,7 +764,13 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
         },
       });
       const magicLink = `${CLIENT_URL}/join/beneficiary?token=${token}`;
-      sendBeneficiaryInvitationEmail(inviteEmail, beneficiary.name, school?.name ?? "A school", magicLink).catch(() => {});
+      sendBeneficiaryInvitationEmail(
+        inviteEmail,
+        beneficiary.name,
+        school?.name ?? "A school",
+        magicLink,
+        school?.partnerInviteTemplate ?? null
+      ).catch(() => {});
     }
 
     res.json({ beneficiary, approval });
@@ -714,9 +790,15 @@ router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), beneficiar
     const ben = await prisma.beneficiary.findUnique({ where: { id: req.params.id } });
     if (!ben) return res.status(404).json({ error: "Beneficiary not found" });
 
-    const school = await prisma.school.findUnique({ where: { id: user.schoolId }, select: { name: true } });
+    const school = await prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: { name: true, partnerInviteTemplate: true },
+    });
 
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const { email, message } = z.object({
+      email: z.string().email(),
+      message: z.string().max(4000).optional(),
+    }).parse(req.body);
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -733,7 +815,13 @@ router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), beneficiar
     });
 
     const magicLink = `${CLIENT_URL}/join/beneficiary?token=${token}`;
-    await sendBeneficiaryInvitationEmail(email, ben.name, school?.name ?? "A school", magicLink);
+    await sendBeneficiaryInvitationEmail(
+      email,
+      ben.name,
+      school?.name ?? "A school",
+      magicLink,
+      message ?? school?.partnerInviteTemplate ?? null
+    );
 
     res.json({ message: "Invitation sent" });
   } catch (err) {
@@ -775,6 +863,20 @@ router.post("/:id/drop", authenticate, requireRole("SCHOOL_ADMIN"), async (req: 
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const [school, beneficiary] = await Promise.all([
+      prisma.school.findUnique({ where: { id: user.schoolId }, select: { name: true } }),
+      prisma.beneficiary.findUnique({ where: { id: req.params.id } }),
+    ]);
+    if (!beneficiary) return res.status(404).json({ error: "Beneficiary not found" });
+    if (
+      beneficiary.createdBySchoolId === user.schoolId &&
+      beneficiary.visibility === "PRIVATE" &&
+      school &&
+      beneficiary.name === school.name
+    ) {
+      return res.status(400).json({ error: "This Partner account is used for tracking volunteer opportunities within the school." });
+    }
 
     await prisma.schoolBeneficiaryApproval.updateMany({
       where: { schoolId: user.schoolId, beneficiaryId: req.params.id },
@@ -1159,7 +1261,22 @@ router.get("/:id/invitations", authenticate, requireRole("BENEFICIARY_ADMIN"), a
     });
     const schoolMap = new Map(schools.map((s) => [s.id, s.name]));
 
-    const result = invitations.map((inv) => ({
+    const deduped = new Map<string, typeof invitations[number]>();
+    for (const inv of invitations) {
+      const current = deduped.get(inv.schoolId);
+      if (!current) {
+        deduped.set(inv.schoolId, inv);
+        continue;
+      }
+
+      const currentScore = current.status === "ACCEPTED" ? 3 : current.status === "PENDING" ? 2 : 1;
+      const nextScore = inv.status === "ACCEPTED" ? 3 : inv.status === "PENDING" ? 2 : 1;
+      if (nextScore > currentScore) {
+        deduped.set(inv.schoolId, inv);
+      }
+    }
+
+    const result = [...deduped.values()].map((inv) => ({
       ...inv,
       schoolName: schoolMap.get(inv.schoolId) ?? "Unknown School",
     }));
@@ -1190,14 +1307,6 @@ router.post("/invitations/:invId/respond", authenticate, requireRole("BENEFICIAR
         ...(action === "ACCEPTED" ? { acceptedAt: new Date() } : {}),
       },
     });
-
-    // Promote the school↔beneficiary relationship to APPROVED when the beneficiary accepts
-    if (action === "ACCEPTED") {
-      await prisma.schoolBeneficiaryApproval.updateMany({
-        where: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
-        data: { status: "APPROVED", approvedAt: new Date() },
-      });
-    }
 
     res.json(updated);
   } catch (err) {

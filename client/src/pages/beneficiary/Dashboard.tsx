@@ -110,8 +110,8 @@ export default function BeneficiaryDashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
+          <div className="text-sm font-semibold text-blue-700 mb-1">{user?.beneficiary?.name || "Beneficiary"}</div>
           <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
-          <p className="text-[13.5px] text-gray-500 mt-0.5">{user?.beneficiary?.name}</p>
         </div>
         <Link to="/opportunities" className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85">
           + New Opportunity

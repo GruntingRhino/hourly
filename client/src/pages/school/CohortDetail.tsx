@@ -19,6 +19,8 @@ interface Invitation {
   id: string;
   email: string;
   name: string | null;
+  grade: string | null;
+  house: string | null;
   status: string;
   createdAt: string;
   expiresAt: string;
@@ -60,10 +62,11 @@ export default function CohortDetail() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [addEmail, setAddEmail] = useState("");
   const [addName, setAddName] = useState("");
+  const [addGrade, setAddGrade] = useState("");
+  const [addHouse, setAddHouse] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [publishConfirm, setPublishConfirm] = useState(false);
   const [publishToast, setPublishToast] = useState("");
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
@@ -121,9 +124,16 @@ export default function CohortDetail() {
     e.preventDefault();
     setAddingStudent(true);
     try {
-      await api.post(`/cohorts/${id}/add-student`, { email: addEmail, name: addName || undefined });
+      await api.post(`/cohorts/${id}/add-student`, {
+        email: addEmail,
+        name: addName || undefined,
+        grade: addGrade || undefined,
+        house: addHouse || undefined,
+      });
       setAddEmail("");
       setAddName("");
+      setAddGrade("");
+      setAddHouse("");
       void load();
     } catch (err: any) {
       setError(err.message || "Failed to add student.");
@@ -133,14 +143,13 @@ export default function CohortDetail() {
   };
 
   const handlePublish = async () => {
-    setPublishConfirm(false);
     try {
       const result = await api.post<any>(`/cohorts/${id}/publish`);
-      setPublishToast(`Sent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.`);
+      setPublishToast(`Resent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.`);
       setTimeout(() => setPublishToast(""), 4000);
       void load();
     } catch (err: any) {
-      setError(err.message || "Failed to publish.");
+      setError(err.message || "Failed to resend invitations.");
     }
   };
 
@@ -235,20 +244,11 @@ export default function CohortDetail() {
       {publishToast && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{publishToast}</div>
       )}
-      {publishConfirm && (
-        <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
-          <p className="text-sm text-gray-700 mb-3">Send invitation emails to all <strong>{pendingInvitations}</strong> pending student{pendingInvitations !== 1 ? "s" : ""} in this cohort?</p>
-          <div className="flex gap-2">
-            <button onClick={handlePublish} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Send Invites</button>
-            <button onClick={() => setPublishConfirm(false)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
-          </div>
-        </div>
-      )}
-      {isAdmin && cohort.status !== "PUBLISHED" && pendingInvitations > 0 && !publishConfirm && (
+      {isAdmin && pendingInvitations > 0 && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-sm text-blue-800">{pendingInvitations} student invitation{pendingInvitations !== 1 ? "s" : ""} ready to send.</span>
-          <button onClick={() => setPublishConfirm(true)} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-            Publish & Send Invites
+          <span className="text-sm text-blue-800">{pendingInvitations} student invitation{pendingInvitations !== 1 ? "s" : ""} still pending acceptance.</span>
+          <button onClick={handlePublish} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+            Resend Invites
           </button>
         </div>
       )}
@@ -284,14 +284,20 @@ export default function CohortDetail() {
             </Link>
           </div>
           {isAdmin && (
-            <form onSubmit={handleAddStudent} className="mb-4 flex gap-2 flex-wrap">
+            <form onSubmit={handleAddStudent} className="mb-4 grid gap-2 sm:grid-cols-4">
               <input type="text" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Name (optional)"
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1 min-w-32" />
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
               <input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="Student email" required
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1 min-w-40" />
-              <button type="submit" disabled={addingStudent} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              <input type="text" value={addGrade} onChange={(e) => setAddGrade(e.target.value)} placeholder="Grade"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              <div className="flex gap-2">
+                <input type="text" value={addHouse} onChange={(e) => setAddHouse(e.target.value)} placeholder="House"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1" />
+                <button type="submit" disabled={addingStudent} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
                 {addingStudent ? "Adding..." : "Add"}
-              </button>
+                </button>
+              </div>
             </form>
           )}
 
@@ -305,6 +311,7 @@ export default function CohortDetail() {
                     <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
                     <th className="text-left px-4 py-2 font-medium text-gray-600">Email</th>
                     <th className="text-left px-4 py-2 font-medium text-gray-600">Grade</th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600">House</th>
                     <th className="text-right px-4 py-2 font-medium text-gray-600">Hours</th>
                     <th className="text-right px-4 py-2 font-medium text-gray-600">Status</th>
                   </tr>
@@ -317,6 +324,7 @@ export default function CohortDetail() {
                         <td className="px-4 py-2">{s.name}</td>
                         <td className="px-4 py-2 text-gray-500 text-xs">{s.email}</td>
                         <td className="px-4 py-2 text-gray-500">{s.grade || "-"}</td>
+                        <td className="px-4 py-2 text-gray-500">{s.house || "-"}</td>
                         <td className="px-4 py-2 text-right">
                           <span className="font-medium">{s.approvedHours.toFixed(1)}</span>
                           <span className="text-gray-400 text-xs">/{requiredHours}h</span>
@@ -429,6 +437,8 @@ export default function CohortDetail() {
               <tr>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Email</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Grade</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">House</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Status</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Added</th>
               </tr>
@@ -438,6 +448,8 @@ export default function CohortDetail() {
                 <tr key={inv.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">{inv.email}</td>
                   <td className="px-4 py-2 text-gray-500">{inv.name || "-"}</td>
+                  <td className="px-4 py-2 text-gray-500">{inv.grade || "-"}</td>
+                  <td className="px-4 py-2 text-gray-500">{inv.house || "-"}</td>
                   <td className="px-4 py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       inv.status === "ACCEPTED" ? "bg-green-50 text-green-700" :
@@ -449,7 +461,7 @@ export default function CohortDetail() {
                 </tr>
               ))}
               {cohort.invitations.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No invitations sent yet.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No invitations sent yet.</td></tr>
               )}
             </tbody>
           </table>

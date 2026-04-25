@@ -40,6 +40,8 @@ router.get("/student", async (req: Request, res: Response) => {
     res.json({
       email: inv.email,
       name: inv.name,
+      grade: inv.grade,
+      house: inv.house,
       cohortName: inv.cohort.name,
       schoolName: inv.cohort.school.name,
       schoolId: inv.cohort.school.id,
@@ -57,8 +59,6 @@ router.post("/student/accept", async (req: Request, res: Response) => {
       token: z.string(),
       name: z.string().min(1).max(255),
       password: passwordSchema,
-      grade: z.string().max(50).optional(),
-      house: z.string().max(100).optional(),
     });
     const data = schema.parse(req.body);
 
@@ -85,6 +85,8 @@ router.post("/student/accept", async (req: Request, res: Response) => {
           data: {
             cohortId: inv.cohortId,
             schoolId: inv.cohort.schoolId,
+            grade: existing.grade ?? inv.grade,
+            house: existing.house ?? inv.house,
           },
         });
         await prisma.studentInvitation.update({
@@ -105,8 +107,8 @@ router.post("/student/accept", async (req: Request, res: Response) => {
         passwordHash,
         name: data.name,
         role: "STUDENT",
-        grade: data.grade || null,
-        house: data.house || null,
+        grade: inv.grade || null,
+        house: inv.house || null,
         cohortId: inv.cohortId,
         schoolId: inv.cohort.schoolId,
         emailVerified: true, // invitation-based — email implicitly verified
@@ -190,7 +192,27 @@ router.post("/beneficiary/accept", async (req: Request, res: Response) => {
     });
 
     if (!inv) return res.status(404).json({ error: "Invalid invitation token" });
-    if (inv.status === "ACCEPTED") return res.status(400).json({ error: "Invitation already accepted" });
+    if (inv.status === "ACCEPTED") {
+      const existingAcceptedUser = await prisma.user.findUnique({ where: { email: inv.sentTo } });
+      if (existingAcceptedUser?.role === "BENEFICIARY_ADMIN") {
+        const jwtToken = signToken({
+          userId: existingAcceptedUser.id,
+          email: existingAcceptedUser.email,
+          role: existingAcceptedUser.role,
+        });
+        return res.json({
+          token: jwtToken,
+          user: {
+            id: existingAcceptedUser.id,
+            email: existingAcceptedUser.email,
+            name: existingAcceptedUser.name,
+            role: existingAcceptedUser.role,
+            beneficiaryId: existingAcceptedUser.beneficiaryId,
+          },
+        });
+      }
+      return res.status(400).json({ error: "Invitation already accepted" });
+    }
     if (inv.status === "DECLINED") return res.status(400).json({ error: "Invitation was declined" });
     if (new Date() > inv.expiresAt) {
       await prisma.beneficiaryInvitation.update({ where: { id: inv.id }, data: { status: "EXPIRED" } });
@@ -213,11 +235,10 @@ router.post("/beneficiary/accept", async (req: Request, res: Response) => {
         where: { id: inv.beneficiaryId },
         data: { claimed: true, status: "ACTIVE" },
       });
-      // Approve the school relationship
       await prisma.schoolBeneficiaryApproval.upsert({
         where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
-        update: { status: "APPROVED", approvedAt: new Date() },
-        create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
+        update: {},
+        create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
       });
       const jwtToken = signToken({ userId: existing.id, email: existing.email, role: existing.role });
       return res.json({ token: jwtToken, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, beneficiaryId: inv.beneficiaryId } });
@@ -250,11 +271,10 @@ router.post("/beneficiary/accept", async (req: Request, res: Response) => {
       data: { claimed: true, status: "ACTIVE" },
     });
 
-    // Approve the school relationship
     await prisma.schoolBeneficiaryApproval.upsert({
       where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
-      update: { status: "APPROVED", approvedAt: new Date() },
-      create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
+      update: {},
+      create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
     });
 
     const jwtToken = signToken({ userId: user.id, email: user.email, role: user.role });
@@ -283,8 +303,11 @@ router.post("/beneficiary/decline", async (req: Request, res: Response) => {
 
     const inv = await prisma.beneficiaryInvitation.findUnique({ where: { token } });
     if (!inv) return res.status(404).json({ error: "Invalid invitation token" });
-    if (["ACCEPTED", "DECLINED"].includes(inv.status)) {
-      return res.status(400).json({ error: `Invitation already ${inv.status.toLowerCase()}` });
+    if (inv.status === "DECLINED") {
+      return res.json({ message: "Invitation already declined" });
+    }
+    if (inv.status === "ACCEPTED") {
+      return res.status(400).json({ error: "Invitation already accepted" });
     }
 
     await prisma.beneficiaryInvitation.update({

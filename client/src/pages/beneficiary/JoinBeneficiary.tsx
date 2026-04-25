@@ -86,11 +86,15 @@ export default function JoinBeneficiary() {
 
   if (loadError) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full text-center">
-        <Link to="/" className="block text-2xl font-bold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-bold mb-2 text-red-700">Invitation Error</h2>
-          <p className="text-sm text-gray-600">{loadError}</p>
+      <div className="max-w-md w-full">
+        <Link to="/" className="flex justify-center mb-8">
+          <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+        </Link>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-red-700">Invitation Error</h2>
+          <p className="text-sm text-gray-600 break-words">{loadError}</p>
         </div>
       </div>
     </div>
@@ -98,11 +102,15 @@ export default function JoinBeneficiary() {
 
   if (declined) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full text-center">
-        <Link to="/" className="block text-2xl font-bold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-bold mb-2">Invitation Declined</h2>
-          <p className="text-sm text-gray-600">You've declined the partnership from {invInfo?.schoolName}. You can contact them if you change your mind.</p>
+      <div className="max-w-md w-full">
+        <Link to="/" className="flex justify-center mb-8">
+          <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+        </Link>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-gray-900">Invitation Declined</h2>
+          <p className="text-sm text-gray-600 break-words">You declined the partnership from {invInfo?.schoolName}. You can contact them if you change your mind.</p>
         </div>
       </div>
     </div>
@@ -110,16 +118,20 @@ export default function JoinBeneficiary() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
-        <Link to="/" className="block text-center text-2xl font-bold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="mb-4 p-3 bg-purple-50 border border-purple-100 rounded text-sm text-purple-800 text-center">
-            <div className="font-semibold">{invInfo?.schoolName}</div>
-            <div className="text-xs mt-0.5">has invited <strong>{invInfo?.beneficiaryName}</strong> to partner</div>
+      <div className="w-full max-w-md">
+        <Link to="/" className="flex justify-center mb-8">
+          <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
+          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+        </Link>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+          <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 text-center">
+            <div className="font-semibold break-words">{invInfo?.schoolName}</div>
+            <div className="text-xs mt-1 text-blue-700">has invited <strong>{invInfo?.beneficiaryName}</strong> to partner</div>
           </div>
 
-          <h2 className="text-xl font-bold mb-1">Accept Partnership</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-1">Accept Partnership</h2>
+          <p className="text-sm text-gray-500 mb-5 break-words">
             Create your administrator account for <strong>{invInfo?.beneficiaryName}</strong>.<br />
             Account email: <strong>{invInfo?.sentTo}</strong>
           </p>
@@ -130,12 +142,12 @@ export default function JoinBeneficiary() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               {password.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
                   {PASSWORD_RULES.map((r) => (
@@ -147,7 +159,7 @@ export default function JoinBeneficiary() {
               )}
             </div>
             <button type="submit" disabled={submitting || !passwordOk}
-              className="w-full py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50 text-sm">
+              className="w-full py-[10px] bg-blue-600 text-white rounded-xl font-medium hover:opacity-85 disabled:opacity-50 text-sm">
               {submitting ? "Creating account..." : "Accept & Create Account"}
             </button>
           </form>

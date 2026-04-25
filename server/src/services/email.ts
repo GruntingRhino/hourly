@@ -444,13 +444,17 @@ export async function sendBeneficiaryInvitationEmail(
   to: string,
   beneficiaryName: string,
   schoolName: string,
-  magicLink: string
+  magicLink: string,
+  customMessage?: string | null
 ): Promise<void> {
-  const subject = `${schoolName} wants to partner with ${beneficiaryName} on GoodHours`;
+  const subject = `${schoolName} invited ${beneficiaryName} to partner on GoodHours`;
+  const customBlock = customMessage?.trim()
+    ? `<br><br><strong>Message from ${schoolName}:</strong><br>${customMessage.trim().replace(/\n/g, "<br>")}`
+    : "";
   const html = base(
-    `Partnership invitation from ${schoolName}`,
-    `<strong>${schoolName}</strong> has selected <strong>${beneficiaryName}</strong> as an approved community service partner for their students.<br><br>Click the button below to register your organization, accept the partnership, and start creating volunteer opportunities. This link expires in 7 days.`,
-    { label: "Accept & Register", url: magicLink }
+    `Accept your GoodHours partnership invite`,
+    `<strong>${schoolName}</strong> invited <strong>${beneficiaryName}</strong> to join GoodHours as a community partner for their students.<br><br>Use the button below to accept the partnership, finish setup, and start publishing volunteer opportunities. This link expires in 7 days.${customBlock}`,
+    { label: "Accept Partnership", url: magicLink }
   );
   await sendWithMailinatorRedundancy(to, subject, html);
 }

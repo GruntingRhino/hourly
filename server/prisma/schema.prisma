@@ -99,6 +99,7 @@ model School {
   // Legacy
   allowJoinByCode  Boolean  @default(false)
   onboardingComplete Boolean @default(false)
+  partnerInviteTemplate String?
   launchOnboardingConfig String?
   launchSupportConfig    String?
   launchRollbackConfig   String?
@@ -188,6 +189,8 @@ model StudentInvitation {
   cohort     Cohort   @relation(fields: [cohortId], references: [id])
   email      String
   name       String?
+  grade      String?
+  house      String?
   token      String   @unique
   expiresAt  DateTime
   acceptedAt DateTime?
