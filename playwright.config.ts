@@ -7,6 +7,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
+    baseURL: process.env.PW_BASE_URL || 'http://localhost:5173',
     browserName: 'chromium',
     headless: true,
     trace: 'off',
