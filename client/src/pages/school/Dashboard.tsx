@@ -213,7 +213,10 @@ export default function SchoolDashboard() {
         );
       })()}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+        <div>
+          <div className="text-sm font-semibold text-blue-700 mb-1">{user?.school?.name || "School"}</div>
+          <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+        </div>
         <div className="flex gap-2">
           <button onClick={handleExportPdf} className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50">
             Export PDF
@@ -251,7 +254,7 @@ export default function SchoolDashboard() {
         <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
           <div className="font-semibold text-amber-900 mb-2">This school is not activated yet</div>
           <div className="text-sm text-amber-800 mb-4">
-            The account is live, but there are no student records yet. Finish these steps before treating the product as production-ready for this school.
+            You have successfully claimed ownership for your school. Complete these three steps to start tracking volunteer hours for your students.
           </div>
           <div className="grid md:grid-cols-3 gap-3 text-sm">
             <Link to="/settings" className="rounded-lg border border-amber-200 bg-white p-3 hover:border-amber-300">

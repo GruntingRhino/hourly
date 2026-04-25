@@ -32,7 +32,6 @@ export default function SchoolCohorts() {
   const [createHours, setCreateHours] = useState("");
   const [createStartYear, setCreateStartYear] = useState("");
   const [creating, setCreating] = useState(false);
-  const [publishConfirm, setPublishConfirm] = useState<{ id: string; name: string } | null>(null);
   const [publishToast, setPublishToast] = useState("");
 
   const loadCohorts = async () => {
@@ -41,7 +40,7 @@ export default function SchoolCohorts() {
       const data = await api.get<Cohort[]>("/cohorts");
       setCohorts(data);
     } catch {
-      setError("Failed to load cohorts.");
+      setError("Could not load cohorts. Please retry.");
     } finally {
       setLoading(false);
     }
@@ -74,13 +73,11 @@ export default function SchoolCohorts() {
   const handlePublish = async (cohortId: string) => {
     try {
       const result = await api.post<any>(`/cohorts/${cohortId}/publish`);
-      setPublishConfirm(null);
-      setPublishToast(`Sent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.${result.failed > 0 ? ` ${result.failed} failed.` : ""}`);
+      setPublishToast(`Resent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.${result.failed > 0 ? ` ${result.failed} failed.` : ""}`);
       setTimeout(() => setPublishToast(""), 4000);
       void loadCohorts();
     } catch (err: any) {
-      setPublishConfirm(null);
-      setError(err.message || "Failed to publish cohort.");
+      setError(err.message || "Failed to resend invitations.");
     }
   };
 
@@ -102,16 +99,6 @@ export default function SchoolCohorts() {
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
       {publishToast && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{publishToast}</div>}
-      {publishConfirm && (
-        <div className="mb-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
-          <p className="text-sm text-gray-700 mb-3">Send invitation emails to all imported students in <strong>"{publishConfirm.name}"</strong>?</p>
-          <div className="flex gap-2">
-            <button onClick={() => handlePublish(publishConfirm.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Send Invites</button>
-            <button onClick={() => setPublishConfirm(null)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
-          </div>
-        </div>
-      )}
-
       {showCreateForm && (
         <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
           <h2 className="font-semibold mb-4">Create Cohort</h2>
@@ -125,7 +112,7 @@ export default function SchoolCohorts() {
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Required Hours</label>
                 <input type="number" value={createHours} onChange={(e) => setCreateHours(e.target.value)}
-                  placeholder="School default" min={0} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  placeholder="Use school goal" min={0} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Start Year</label>
@@ -156,11 +143,11 @@ export default function SchoolCohorts() {
                   <div>
                     <div className="font-bold text-[15px] text-gray-900">{cohort.name}</div>
                     {(cohort.startYear || cohort.endYear) && (
-                      <div className="text-[12.5px] text-gray-500 mt-0.5">
-                        {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear} · {cohort.requiredHours}h goal
-                      </div>
-                    )}
-                  </div>
+                    <div className="text-[12.5px] text-gray-500 mt-0.5">
+                      {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear} · {cohort.requiredHours}h goal
+                    </div>
+                  )}
+                </div>
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${
                     cohort.status === "PUBLISHED" ? "bg-blue-50 text-blue-600" :
                     cohort.status === "ARCHIVED" ? "bg-gray-100 text-gray-500" :
@@ -174,12 +161,12 @@ export default function SchoolCohorts() {
                   >
                     Manage
                   </Link>
-                  {cohort.status !== "PUBLISHED" && isAdmin && cohort.invitationsPending > 0 && (
+                  {isAdmin && cohort.invitationsPending > 0 && (
                     <button
-                      onClick={() => setPublishConfirm({ id: cohort.id, name: cohort.name })}
+                      onClick={() => handlePublish(cohort.id)}
                       className="px-3.5 py-[7px] bg-blue-600 text-white rounded-md text-[13px] font-medium hover:opacity-85"
                     >
-                      Publish & Send Invites
+                      Resend Invites
                     </button>
                   )}
                 </div>

@@ -38,7 +38,7 @@ export default function Layout() {
             <img
               src="/logo-full.png"
               alt="GoodHours"
-              className="h-8 w-auto"
+              className="h-10 w-auto"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
                 (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
@@ -73,7 +73,7 @@ export default function Layout() {
             >
               {initials}
             </div>
-            <span className="text-sm text-gray-700 font-medium hidden lg:inline max-w-[120px] truncate">{user?.name}</span>
+            <span className="text-sm text-gray-700 font-medium hidden md:inline max-w-[180px] truncate">{user?.name}</span>
             <button
               onClick={handleLogout}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -108,7 +108,6 @@ function getNavItems(role: string) {
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },
         { path: "/beneficiaries", label: "Partners" },
-        { path: "/discover", label: "Discover" },
         { path: "/submissions", label: "Submissions" },
         { path: "/launch", label: "Launch" },
         { path: "/settings", label: "Settings" },

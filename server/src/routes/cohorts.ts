@@ -2,7 +2,6 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -12,15 +11,25 @@ import { logDataAccess } from "../lib/dataAccessLog";
 
 const router = Router();
 
-// 5 publishes per school per hour — prevents bulk re-sending invitations to all students
-const publishCohortLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  keyGenerator: (req) => `cohort-publish:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many publish attempts. Please wait before resending invitations." },
-});
+async function sendCohortInvitation(
+  cohort: { name: string; school: { name: string } },
+  invitation: { email: string; name: string | null; token: string }
+): Promise<boolean> {
+  const magicLink = `${CLIENT_URL}/join/student?token=${invitation.token}`;
+  try {
+    await sendStudentInvitationEmail(
+      invitation.email,
+      invitation.name,
+      cohort.name,
+      cohort.school.name,
+      magicLink
+    );
+    return true;
+  } catch (emailErr) {
+    console.error(`[cohort invite] Failed to send to ${invitation.email}:`, emailErr);
+    return false;
+  }
+}
 
 // GET /api/cohorts — list cohorts for school
 router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
@@ -256,7 +265,13 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     ]);
     const pendingVerifications = pendingBenSignups + pendingSelfSubs;
 
-    res.json({ ...cohort, students: studentsWithHours, requiredHours, pendingVerifications });
+    res.json({
+      ...cohort,
+      students: studentsWithHours,
+      invitations: cohort.invitations.filter((invitation) => invitation.status !== "ACCEPTED"),
+      requiredHours,
+      pendingVerifications,
+    });
   } catch (err) {
     console.error("Get cohort error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -267,7 +282,10 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
 router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    const cohort = await prisma.cohort.findUnique({ where: { id: req.params.id } });
+    const cohort = await prisma.cohort.findUnique({
+      where: { id: req.params.id },
+      include: { school: { select: { name: true } } },
+    });
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
@@ -324,7 +342,10 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
 router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    const cohort = await prisma.cohort.findUnique({ where: { id: req.params.id } });
+    const cohort = await prisma.cohort.findUnique({
+      where: { id: req.params.id },
+      include: { school: { select: { name: true } } },
+    });
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
@@ -355,6 +376,8 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       const rowNumber = index + 2;
       const email = (row.email || "").trim().toLowerCase();
       const name = (row.name || "").trim();
+      const grade = (row.grade || "").trim();
+      const house = (row.house || "").trim();
       if (!email || !name) {
         results.errors.push({ row: rowNumber, email: email || null, reason: "Missing required name or email" });
         results.skipped++;
@@ -388,13 +411,24 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
           cohortId: cohort.id,
           email,
           name: name || null,
+          grade: grade || null,
+          house: house || null,
           token,
           expiresAt,
           status: "PENDING",
         },
       });
+      const sent = await sendCohortInvitation(cohort, { email, name: name || null, token });
+      if (!sent) {
+        results.errors.push({ row: rowNumber, email, reason: "Invite created but email delivery failed. Retry from the cohort page." });
+      }
       results.added++;
     }
+
+    await prisma.cohort.update({
+      where: { id: cohort.id },
+      data: { status: "PUBLISHED", publishedAt: cohort.publishedAt ?? new Date() },
+    });
 
     res.json({
       message: "Import complete",
@@ -412,8 +446,8 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
   }
 });
 
-// POST /api/cohorts/:id/publish — send student invitations
-router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), publishCohortLimiter, async (req: Request, res: Response) => {
+// POST /api/cohorts/:id/publish — resend pending student invitations
+router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     const cohort = await prisma.cohort.findUnique({
@@ -434,18 +468,10 @@ router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
     let sent = 0;
     let failed = 0;
     for (const inv of pendingInvitations) {
-      const magicLink = `${CLIENT_URL}/join/student?token=${inv.token}`;
-      try {
-        await sendStudentInvitationEmail(
-          inv.email,
-          inv.name,
-          cohort.name,
-          cohort.school.name,
-          magicLink
-        );
+      const ok = await sendCohortInvitation(cohort, inv);
+      if (ok) {
         sent++;
-      } catch (emailErr) {
-        console.error(`[cohort publish] Failed to send to ${inv.email}:`, emailErr);
+      } else {
         failed++;
       }
     }
@@ -471,9 +497,11 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
-    const { email, name } = z.object({
+    const { email, name, grade, house } = z.object({
       email: z.string().email(),
       name: z.string().min(1).max(255).optional(),
+      grade: z.string().max(50).optional(),
+      house: z.string().max(100).optional(),
     }).parse(req.body);
 
     const existing = await prisma.studentInvitation.findUnique({
@@ -485,16 +513,25 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     const inv = await prisma.studentInvitation.create({
-      data: { cohortId: cohort.id, email, name: name || null, token, expiresAt, status: "PENDING" },
+      data: {
+        cohortId: cohort.id,
+        email,
+        name: name || null,
+        grade: grade || null,
+        house: house || null,
+        token,
+        expiresAt,
+        status: "PENDING",
+      },
     });
 
-    // Send invitation email if cohort is already published
-    if (cohort.status === "PUBLISHED") {
-      const magicLink = `${CLIENT_URL}/join/student?token=${token}`;
-      sendStudentInvitationEmail(email, name || null, cohort.name, cohort.school.name, magicLink).catch(() => {});
-    }
+    const emailSent = await sendCohortInvitation(cohort, inv);
+    await prisma.cohort.update({
+      where: { id: cohort.id },
+      data: { status: "PUBLISHED", publishedAt: cohort.publishedAt ?? new Date() },
+    });
 
-    res.status(201).json(inv);
+    res.status(201).json({ ...inv, emailSent });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Add student error:", err);

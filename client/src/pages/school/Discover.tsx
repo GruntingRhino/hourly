@@ -182,7 +182,7 @@ function MapController({ target }: { target: MapTarget | null }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function BeneficiaryDiscover() {
+export default function BeneficiaryDiscover({ embedded = false }: { embedded?: boolean }) {
   const [school, setSchool] = useState<SchoolLocation | null>(null);
   const [beneficiaries, setBeneficiaries] = useState<NearbyBeneficiary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -340,25 +340,26 @@ export default function BeneficiaryDiscover() {
   const noCoords = school && (!school.latitude || !school.longitude);
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 56px)", overflow: "hidden" }}>
-      {/* Header */}
-      <div className="flex-none px-4 py-3 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Discover Community Partners</h1>
-            <p className="text-sm text-gray-500">Find and approve organizations near your school</p>
-          </div>
-          <div className="text-sm text-gray-500">
-            {loading
-              ? "Loading..."
-              : searchQuery
-              ? `${filtered.length} of ${total ?? beneficiaries.length} partners`
-              : total != null && beneficiaries.length < total
-              ? `Showing ${beneficiaries.length} of ${total} partners within ${radius} miles`
-              : `${total ?? beneficiaries.length} partners within ${radius} miles`}
+    <div className="flex flex-col" style={{ height: embedded ? "calc(100vh - 220px)" : "calc(100vh - 56px)", overflow: "hidden" }}>
+      {!embedded && (
+        <div className="flex-none px-4 py-3 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Discover Community Partners</h1>
+              <p className="text-sm text-gray-500">Find and approve organizations near your school</p>
+            </div>
+            <div className="text-sm text-gray-500">
+              {loading
+                ? "Loading..."
+                : searchQuery
+                ? `${filtered.length} of ${total ?? beneficiaries.length} partners`
+                : total != null && beneficiaries.length < total
+                ? `Showing ${beneficiaries.length} of ${total} partners within ${radius} miles`
+                : `${total ?? beneficiaries.length} partners within ${radius} miles`}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {geocodingInProgress && (
         <div className="flex-none px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-800 flex items-center gap-2">

@@ -23,6 +23,7 @@ interface SchoolData {
   allowSelfSubmission: boolean;
   requireOrgVerification: boolean;
   categoryHourCaps: string | null;
+  partnerInviteTemplate: string | null;
 }
 
 type CapRow = { category: string; hours: string };
@@ -30,6 +31,7 @@ type CapRow = { category: string; hours: string };
 interface SchoolSettingsData {
   schoolId: string;
   allowJoinByCode: boolean;
+  partnerInviteTemplate?: string;
 }
 
 interface DataAccessLogEntry {
@@ -52,6 +54,7 @@ export default function SchoolSettings() {
   const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [tab, setTab] = useState<Tab>("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
+  const [adminName, setAdminName] = useState(user?.name || "");
   const [schoolName, setSchoolName] = useState("");
   const [domain, setDomain] = useState("");
   const [requiredHours, setRequiredHours] = useState("40");
@@ -60,6 +63,7 @@ export default function SchoolSettings() {
   const [schoolCity, setSchoolCity] = useState("");
   const [schoolState, setSchoolState] = useState("");
   const [schoolZip, setSchoolZip] = useState("");
+  const [partnerInviteTemplate, setPartnerInviteTemplate] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -133,6 +137,7 @@ export default function SchoolSettings() {
         })),
       ]).then(([schoolData, schoolSettings]) => {
         setSchool(schoolData);
+        setAdminName(user?.name || "");
         setSchoolName(schoolData.name || "");
         setDomain(schoolData.domain || "");
         setRequiredHours(String(schoolData.requiredHours));
@@ -141,6 +146,7 @@ export default function SchoolSettings() {
         setSchoolCity(schoolData.city || "");
         setSchoolState(schoolData.state || "");
         setSchoolZip(schoolData.zip || "");
+        setPartnerInviteTemplate(schoolData.partnerInviteTemplate || "");
         try {
           const zips = schoolData.zipCodes ? JSON.parse(schoolData.zipCodes) : [];
           setZipCodes(Array.isArray(zips) ? zips.join(", ") : "");
@@ -195,16 +201,22 @@ export default function SchoolSettings() {
       const zipArray = zipCodes
         ? zipCodes.split(",").map((z) => z.trim()).filter(Boolean)
         : [];
-      await api.put(`/schools/${user.schoolId}`, {
-        name: schoolName,
-        domain: domain || null,
-        requiredHours: parseFloat(requiredHours),
-        zipCodes: zipArray,
-        address: schoolAddress || null,
-        city: schoolCity || null,
-        state: schoolState || null,
-        zip: schoolZip || null,
-      });
+      await Promise.all([
+        api.put(`/schools/${user.schoolId}`, {
+          name: schoolName,
+          domain: domain || null,
+          requiredHours: parseFloat(requiredHours),
+          zipCodes: zipArray,
+          address: schoolAddress || null,
+          city: schoolCity || null,
+          state: schoolState || null,
+          zip: schoolZip || null,
+          partnerInviteTemplate: partnerInviteTemplate.trim() || null,
+        }),
+        adminName.trim() && adminName.trim() !== user?.name
+          ? api.put("/auth/profile", { name: adminName.trim() })
+          : Promise.resolve(null),
+      ]);
       setMessage("Settings updated!");
       await refreshUser();
     } catch (err: any) {
@@ -462,6 +474,15 @@ export default function SchoolSettings() {
 
           <form onSubmit={handleSave} className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+              <input
+                type="text"
+                value={adminName}
+                onChange={(e) => setAdminName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">School Name</label>
               <input
                 type="text"
@@ -558,6 +579,19 @@ export default function SchoolSettings() {
                   Save to geocode your address and enable the Discover map.
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Partner Invite Template <span className="text-gray-400">(used as the default message for partner invites)</span>
+              </label>
+              <textarea
+                value={partnerInviteTemplate}
+                onChange={(e) => setPartnerInviteTemplate(e.target.value)}
+                rows={5}
+                placeholder="Tell partners why your school is inviting them and what students need from the partnership."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
             </div>
 
             {isAdmin && (
@@ -1052,25 +1086,25 @@ export default function SchoolSettings() {
               ) : (
                 <div className="space-y-3">
                   {dataAccessLogs.slice(0, 50).map((entry) => (
-                    <div key={entry.id} className="rounded-lg border border-gray-200 p-3">
+                    <div key={entry.id} className="rounded-lg border border-gray-200 p-3 overflow-hidden">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 break-words">
                             {entry.actor.name} · {entry.actor.role}
                           </div>
-                          <div className="text-xs text-gray-500">{entry.actor.email}</div>
+                          <div className="text-xs text-gray-500 break-all">{entry.actor.email}</div>
                         </div>
                         <div className="text-xs text-gray-400">
                           {new Date(entry.createdAt).toLocaleString()}
                         </div>
                       </div>
-                      <div className="mt-2 text-sm text-gray-700">
+                      <div className="mt-2 text-sm text-gray-700 break-words">
                         {entry.action.replaceAll("_", " ")}
                         {entry.targetType ? ` · ${entry.targetType}` : ""}
                         {entry.targetId ? ` · ${entry.targetId}` : ""}
                       </div>
                       {entry.details && (
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-gray-500 break-words">
                           {formatAccessDetails(entry.details)}
                         </div>
                       )}

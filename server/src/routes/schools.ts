@@ -22,6 +22,7 @@ import {
 const router = Router();
 const schoolJoinSettingsSchema = z.object({
   allowJoinByCode: z.boolean(),
+  partnerInviteTemplate: z.string().max(4000).optional(),
 });
 
 const dateInputSchema = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")]);
@@ -172,7 +173,7 @@ router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), as
 
     const school = await prisma.school.findUnique({
       where: { id: user.schoolId },
-      select: { id: true, allowJoinByCode: true },
+      select: { id: true, allowJoinByCode: true, partnerInviteTemplate: true },
     });
     if (!school) {
       return res.status(404).json({ error: "School not found" });
@@ -181,6 +182,7 @@ router.get("/settings", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), as
     res.json({
       schoolId: school.id,
       allowJoinByCode: school.allowJoinByCode,
+      partnerInviteTemplate: school.partnerInviteTemplate ?? "",
     });
   } catch (err) {
     console.error("Get school settings error:", err);
@@ -217,13 +219,17 @@ router.patch("/settings", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
 
     const updated = await prisma.school.update({
       where: { id: user.schoolId },
-      data: { allowJoinByCode: data.allowJoinByCode },
-      select: { id: true, allowJoinByCode: true },
+      data: {
+        allowJoinByCode: data.allowJoinByCode,
+        ...(data.partnerInviteTemplate !== undefined ? { partnerInviteTemplate: data.partnerInviteTemplate.trim() || null } : {}),
+      },
+      select: { id: true, allowJoinByCode: true, partnerInviteTemplate: true },
     });
 
     res.json({
       schoolId: updated.id,
       allowJoinByCode: updated.allowJoinByCode,
+      partnerInviteTemplate: updated.partnerInviteTemplate ?? "",
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -518,6 +524,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       city: z.string().max(100).nullable().optional(),
       state: z.string().max(100).nullable().optional(),
       zip: z.string().max(20).nullable().optional(),
+      partnerInviteTemplate: z.string().max(4000).nullable().optional(),
       zipCodes: z.array(z.string().regex(/^\d{5}$/)).nullable().optional(),
     });
 
