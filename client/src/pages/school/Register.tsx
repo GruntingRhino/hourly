@@ -256,6 +256,7 @@ export default function SchoolRegister() {
     } else {
       setSelectedSchool(school);
       setAlreadyClaimed(null);
+      setError("");
       // For email/password path, keep the email already collected in step 1
       if (signupMode !== "email") setContactEmail("");
       setStep("contact");
@@ -284,6 +285,7 @@ export default function SchoolRegister() {
     if (!customSchoolName.trim()) return;
     setSelectedSchool(null);
     setAlreadyClaimed(null);
+    setError("");
     if (signupMode !== "email") setContactEmail("");
     setStep("contact");
   };
@@ -298,7 +300,7 @@ export default function SchoolRegister() {
       if (signupMode === "email") {
         // Email/password path: create account immediately, then redirect to verify email
         const result = await signup({
-          email: emailCollectEmail || contactEmail,
+          email: contactEmail || emailCollectEmail,
           password: emailCollectPassword,
           name: emailCollectName,
           role: "SCHOOL_ADMIN",
@@ -434,8 +436,10 @@ export default function SchoolRegister() {
     const handleEmailCollectNext = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!emailPasswordOk) return;
+      setError("");
       // Pre-fill contact email and fetch domain suggestions
       setContactEmail(emailCollectEmail);
+      setDomainStatus(classifyEmailDomain(emailCollectEmail));
       const domain = emailCollectEmail.split("@")[1]?.toLowerCase().trim();
       if (domain) {
         try {
@@ -443,7 +447,12 @@ export default function SchoolRegister() {
           if (results.length) setDomainSuggestions(results);
         } catch {}
       }
-      setStep("search");
+      // If the user already picked a school, skip back to step 3 directly
+      if (selectedSchool || customSchoolName.trim()) {
+        setStep("contact");
+      } else {
+        setStep("search");
+      }
     };
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -548,7 +557,7 @@ export default function SchoolRegister() {
           </Link>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
             <button
-              onClick={() => setStep(signupMode === "email" ? "email-collect" : "google")}
+              onClick={() => { setError(""); setStep(signupMode === "email" ? "email-collect" : "google"); }}
               className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -735,7 +744,7 @@ export default function SchoolRegister() {
           </Link>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
             <button
-              onClick={() => setStep("search")}
+              onClick={() => { setError(""); setStep("search"); }}
               className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -764,34 +773,28 @@ export default function SchoolRegister() {
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {signupMode === "email" ? "School Email" : "Contact Email"}
+                  School Email
                 </label>
-                {signupMode === "email" ? (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 break-words">
-                    {contactEmail}
-                  </div>
-                ) : (
-                  <input
-                    type="email"
-                    value={contactEmail}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setContactEmail(val);
-                      const status = classifyEmailDomain(val);
-                      setDomainStatus(status);
-                      if (error) setError("");
-                    }}
-                    required
-                    placeholder="principal@yourschool.edu"
-                    className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
-                      domainStatus === "personal"
-                        ? "border-red-300 focus:ring-red-400 bg-red-50"
-                        : domainStatus === "edu"
-                        ? "border-green-300 focus:ring-green-400"
-                        : "border-gray-300 focus:ring-blue-500"
-                    }`}
-                  />
-                )}
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setContactEmail(val);
+                    const status = classifyEmailDomain(val);
+                    setDomainStatus(status);
+                    if (error) setError("");
+                  }}
+                  required
+                  placeholder="principal@yourschool.edu"
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 transition-colors ${
+                    domainStatus === "personal"
+                      ? "border-red-300 focus:ring-red-400 bg-red-50"
+                      : domainStatus === "edu"
+                      ? "border-green-300 focus:ring-green-400"
+                      : "border-gray-300 focus:ring-blue-500"
+                  }`}
+                />
 
                 {/* Layer 1 — Personal email blocked */}
                 {domainStatus === "personal" && (
@@ -820,7 +823,7 @@ export default function SchoolRegister() {
                   </div>
                 )}
 
-                {!domainStatus && signupMode !== "email" && (
+                {!domainStatus && (
                   <p className="text-xs text-gray-400 mt-1">
                     Use your school's official email address.
                   </p>

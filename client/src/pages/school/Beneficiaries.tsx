@@ -235,7 +235,8 @@ export default function SchoolBeneficiaries() {
   };
 
   const handleInvite = async (benId: string) => {
-    const email = inviteEmail[benId]?.trim();
+    const beneficiary = beneficiaries.find((item) => item.id === benId);
+    const email = (inviteEmail[benId]?.trim() || beneficiary?.email || "").trim();
     if (!email) {
       setInviteEmailError((prev) => ({ ...prev, [benId]: "Please enter an email address" }));
       return;
@@ -443,12 +444,12 @@ export default function SchoolBeneficiaries() {
             <div className="flex gap-2">
               <input
                 type="email"
-                value={inviteEmail[beneficiary.id] || ""}
+                value={inviteEmail[beneficiary.id] ?? beneficiary.email ?? ""}
                 onChange={(e) => {
                   setInviteEmail((prev) => ({ ...prev, [beneficiary.id]: e.target.value }));
                   setInviteEmailError((prev) => ({ ...prev, [beneficiary.id]: "" }));
                 }}
-                placeholder={beneficiary.email || "Email to send invitation"}
+                placeholder="Email to send invitation"
                 className={`flex-1 px-3 py-1.5 border rounded text-xs ${inviteEmailError[beneficiary.id] ? "border-red-400" : "border-gray-300"}`}
               />
               <button

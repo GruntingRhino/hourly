@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
+import SessionPrefBanner from "./components/SessionPrefBanner";
+import { getSessionPref } from "./lib/authSession";
 
 // Public pages
 import Landing from "./pages/Landing";
@@ -55,6 +58,7 @@ const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const [showPrefBanner, setShowPrefBanner] = useState(() => getSessionPref() === null);
   const isSchoolAdminLike = user?.role === "SCHOOL_ADMIN";
   const needsSchoolOnboarding =
     isSchoolAdminLike && user.school?.onboardingComplete === false;
@@ -68,6 +72,7 @@ function AppRoutes() {
   }
 
   return (
+    <>
     <Routes>
       {/* Public routes — always accessible */}
       <Route path="/" element={<Landing />} />
@@ -157,6 +162,10 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       )}
     </Routes>
+    {user && showPrefBanner && (
+      <SessionPrefBanner onDismiss={() => setShowPrefBanner(false)} />
+    )}
+    </>
   );
 }
 

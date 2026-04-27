@@ -17,6 +17,16 @@ import {
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
+// Strip +alias suffixes (e.g. user+tag@domain.com → user@domain.com) to block
+// duplicate account creation via address variants.
+function normalizeEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at === -1) return email;
+  const local = email.slice(0, at).replace(/\+.*$/, "");
+  const domain = email.slice(at + 1);
+  return `${local}@${domain}`;
+}
+
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
 
@@ -48,10 +58,11 @@ function isInteractiveSignupRequest(req: Request): boolean {
 
 async function precheckDuplicateSignupEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    if (!email) {
+    const raw = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!raw) {
       return next();
     }
+    const email = normalizeEmail(raw);
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       res.status(409).json({ error: "Email already registered" });
@@ -218,6 +229,7 @@ function emailDomainMatchesWebsite(emailDomain: string, websiteDomain: string): 
 router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   try {
     const data = signupSchema.parse(req.body);
+    data.email = normalizeEmail(data.email);
 
     if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
       if (isPersonalEmailDomain(data.email) && !isTestEmail(data.email)) {
@@ -404,6 +416,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
+    data.email = normalizeEmail(data.email);
 
     const user = await prisma.user.findUnique({
       where: { email: data.email },
@@ -673,7 +686,8 @@ router.post("/resend-verification", resendVerificationLimiter, authenticate, asy
 // POST /api/auth/forgot-password
 router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res: Response) => {
   try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const parsed = z.object({ email: z.string().email() }).parse(req.body);
+    const email = normalizeEmail(parsed.email);
     const user = await prisma.user.findUnique({ where: { email } });
 
     // Always respond with success to prevent user enumeration

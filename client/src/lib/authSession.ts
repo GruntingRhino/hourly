@@ -3,6 +3,48 @@ const USER_KEY = "goodhours_user";
 const SYNC_REQUEST_KEY = "goodhours_auth_sync_request";
 const SYNC_RESPONSE_PREFIX = "goodhours_auth_sync_response:";
 const TAB_ID_KEY = "goodhours_tab_id";
+const PREF_KEY = "goodhours_session_pref";
+const LOGOUT_OPT_OUT_KEY = "goodhours_auth_logout_opt_out";
+
+export type SessionPref = "persistent" | "session";
+
+export function getSessionPref(): SessionPref | null {
+  return localStorage.getItem(PREF_KEY) as SessionPref | null;
+}
+
+export function setSessionPref(pref: SessionPref): void {
+  localStorage.setItem(PREF_KEY, pref);
+  // Migrate token to the appropriate storage backend
+  const token = localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
+  const user = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
+  if (pref === "session") {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    if (user) sessionStorage.setItem(USER_KEY, user);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } else {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (user) localStorage.setItem(USER_KEY, user);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+  }
+}
+
+function getStorage(): Storage {
+  return getSessionPref() === "session" ? sessionStorage : localStorage;
+}
+
+function isSyncOptedOut(): boolean {
+  return sessionStorage.getItem(LOGOUT_OPT_OUT_KEY) === "1";
+}
+
+export function markAuthSyncOptOut(): void {
+  sessionStorage.setItem(LOGOUT_OPT_OUT_KEY, "1");
+}
+
+export function clearAuthSyncOptOut(): void {
+  sessionStorage.removeItem(LOGOUT_OPT_OUT_KEY);
+}
 
 type CachedUser = unknown;
 
@@ -18,11 +60,11 @@ function getTabId(): string {
 }
 
 export function getAuthToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
+  return getStorage().getItem(TOKEN_KEY);
 }
 
 export function getCachedUser<T>(): T | null {
-  const raw = sessionStorage.getItem(USER_KEY);
+  const raw = getStorage().getItem(USER_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as T;
@@ -32,21 +74,27 @@ export function getCachedUser<T>(): T | null {
 }
 
 export function setAuthSession(token: string, user?: CachedUser): void {
-  sessionStorage.setItem(TOKEN_KEY, token);
+  clearAuthSyncOptOut();
+  getStorage().setItem(TOKEN_KEY, token);
   if (user === undefined) return;
   if (user === null) {
-    sessionStorage.removeItem(USER_KEY);
+    getStorage().removeItem(USER_KEY);
     return;
   }
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  getStorage().setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearAuthSession(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
 }
 
 export async function requestAuthSession<T>(timeoutMs = 350): Promise<{ token: string; user: T | null } | null> {
+  if (isSyncOptedOut()) {
+    return null;
+  }
   const requestId = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;

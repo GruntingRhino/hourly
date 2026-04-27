@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 interface TimeSlotBasic {
@@ -7,7 +7,9 @@ interface TimeSlotBasic {
   date: string;
   startTime: string;
   endTime: string;
+  durationHours: number;
   capacity: number | null;
+  recurringGroupId: string | null;
   _count?: { signups: number };
 }
 
@@ -100,13 +102,107 @@ function getDisplayStatus(timeSlots: TimeSlotBasic[]): string {
   return "Active";
 }
 
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEK_LABELS = ["1st", "2nd", "3rd", "4th", "5th"];
+
 const emptyForm = {
   title: "",
   description: "",
   location: "",
   requirementsNote: "",
   slots: [{ date: "", startTime: "", endTime: "", capacity: "" }],
+  recurring: false,
+  recurrenceType: "monthly_day_of_week" as "monthly_day_of_week" | "monthly_dates",
+  recurrenceDaysOfWeek: [1] as number[],
+  recurrenceWeeksOfMonth: [1] as number[],
+  recurrenceDatesOfMonth: [1] as number[],
+  recurrenceStartTime: "",
+  recurrenceEndTime: "",
+  recurrenceCapacity: "10",
+  recurrenceMonthsAhead: 6,
+  recurrenceStartDate: "",
 };
+
+function formatApiErrorWithDetails(err: unknown, fallback: string): { message: string; details: string[] } {
+  if (err instanceof ApiError) {
+    const body = err.body as { error?: string; details?: Array<{ path?: Array<string | number>; message?: string }> } | null;
+    const details = Array.isArray(body?.details)
+      ? body.details.map(toReadableValidationMessage).filter(Boolean) as string[]
+      : [];
+    if (details.length > 0) {
+      return { message: "Please fix the issues below.", details };
+    }
+    if (body?.error) return { message: body.error, details: [] };
+  }
+  if (err instanceof Error && err.message) return { message: err.message, details: [] };
+  return { message: fallback, details: [] };
+}
+
+function toReadableValidationMessage(detail: { path?: Array<string | number>; message?: string }): string | null {
+  const path = Array.isArray(detail.path) ? detail.path : [];
+  const [root, index, field] = path;
+
+  if (root === "title") return "Enter a title.";
+  if (root === "description") return "Description is too long.";
+  if (root === "location") return "Location is too long.";
+  if (root === "requirementsNote") return "Requirements / notes are too long.";
+  if (root === "timeSlots" && typeof index !== "number") return "Add at least one time slot or switch to recurring schedule.";
+  if (root === "timeSlots" && typeof index === "number") {
+    const label = `Time slot ${index + 1}`;
+    if (field === "date") return `${label}: choose a date.`;
+    if (field === "startTime") return `${label}: choose a start time.`;
+    if (field === "endTime") return `${label}: choose an end time.`;
+    if (field === "capacity") return `${label}: enter a valid volunteer capacity.`;
+    if (field === "durationHours") return `${label}: end time must be after start time.`;
+  }
+  if (root === "recurrenceRule") return "Recurring schedule details are incomplete or invalid.";
+  if (detail.message === "Required") return "A required field is missing.";
+  return detail.message ?? null;
+}
+
+function validateOpportunityForm(form: typeof emptyForm): string[] {
+  const details: string[] = [];
+
+  if (!form.title.trim()) details.push("Enter a title.");
+
+  if (!form.recurring) {
+    if (form.slots.length === 0) {
+      details.push("Add at least one time slot.");
+      return details;
+    }
+
+    form.slots.forEach((slot, index) => {
+      const label = `Time slot ${index + 1}`;
+      if (!slot.date) details.push(`${label}: choose a date.`);
+      if (!slot.startTime) details.push(`${label}: choose a start time.`);
+      if (!slot.endTime) details.push(`${label}: choose an end time.`);
+      if (slot.startTime && slot.endTime && calcDurationHours(slot.startTime, slot.endTime) <= 0) {
+        details.push(`${label}: end time must be after start time.`);
+      }
+      if (slot.capacity && (!Number.isInteger(Number(slot.capacity)) || Number(slot.capacity) <= 0)) {
+        details.push(`${label}: enter a valid volunteer capacity.`);
+      }
+    });
+  } else {
+    if (!form.recurrenceStartDate) details.push("Recurring schedule: choose a start date.");
+    if (!form.recurrenceStartTime) details.push("Recurring schedule: choose a start time.");
+    if (!form.recurrenceEndTime) details.push("Recurring schedule: choose an end time.");
+    if (form.recurrenceStartTime && form.recurrenceEndTime && calcDurationHours(form.recurrenceStartTime, form.recurrenceEndTime) <= 0) {
+      details.push("Recurring schedule: end time must be after start time.");
+    }
+    if (!Number.isInteger(Number(form.recurrenceCapacity)) || Number(form.recurrenceCapacity) <= 0) {
+      details.push("Recurring schedule: enter a valid volunteer capacity.");
+    }
+    if (form.recurrenceType === "monthly_day_of_week") {
+      if (form.recurrenceDaysOfWeek.length === 0) details.push("Recurring schedule: choose at least one day of the week.");
+      if (form.recurrenceWeeksOfMonth.length === 0) details.push("Recurring schedule: choose at least one week of the month.");
+    } else if (form.recurrenceDatesOfMonth.length === 0) {
+      details.push("Recurring schedule: choose at least one date of the month.");
+    }
+  }
+
+  return details;
+}
 
 export default function BeneficiaryOpportunities() {
   const { user } = useAuth();
@@ -116,6 +212,7 @@ export default function BeneficiaryOpportunities() {
   const [loading, setLoading] = useState(true);
   const [signupsLoading, setSignupsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<{ [id: string]: string }>({});
@@ -136,7 +233,23 @@ export default function BeneficiaryOpportunities() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Slot edit modal state
+  const [editSlot, setEditSlot] = useState<TimeSlotBasic | null>(null);
+  const [slotForm, setSlotForm] = useState({ date: "", startTime: "", endTime: "", capacity: "" });
+  const [propagateFuture, setPropagateFuture] = useState(false);
+  const [savingSlot, setSavingSlot] = useState(false);
+
   const benId = user?.beneficiaryId;
+
+  const clearError = () => {
+    setError("");
+    setErrorDetails([]);
+  };
+
+  const showError = (message: string, details: string[] = []) => {
+    setError(message);
+    setErrorDetails(details);
+  };
 
   const loadOpportunities = async () => {
     if (!benId) return;
@@ -145,7 +258,7 @@ export default function BeneficiaryOpportunities() {
       const data = await api.get<Opportunity[]>(`/beneficiaries/${benId}/opportunities`);
       setOpportunities(data);
     } catch {
-      setError("Failed to load opportunities.");
+      showError("Failed to load opportunities.");
     } finally {
       setLoading(false);
     }
@@ -158,7 +271,7 @@ export default function BeneficiaryOpportunities() {
       const data = await api.get<SignupRecord[]>(`/beneficiaries/${benId}/signups`);
       setSignups(data);
     } catch {
-      setError("Failed to load signups.");
+      showError("Failed to load signups.");
     } finally {
       setSignupsLoading(false);
     }
@@ -202,6 +315,7 @@ export default function BeneficiaryOpportunities() {
   const handleEdit = (opp: Opportunity) => {
     setEditOppId(opp.id);
     setForm({
+      ...emptyForm,
       title: opp.title,
       description: opp.description ?? "",
       location: opp.location ?? "",
@@ -210,7 +324,7 @@ export default function BeneficiaryOpportunities() {
     });
     const restrictions: string[] = opp.schoolRestrictions ? JSON.parse(opp.schoolRestrictions) : approvedSchools.map((s) => s.id);
     setSelectedSchools(restrictions);
-    setError("");
+    clearError();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -219,12 +333,20 @@ export default function BeneficiaryOpportunities() {
     setForm(emptyForm);
     setSelectedSchools(approvedSchools.map((s) => s.id));
     prefillLocation();
-    setError("");
+    clearError();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    clearError();
+
+    if (!editOppId) {
+      const validationDetails = validateOpportunityForm(form);
+      if (validationDetails.length > 0) {
+        showError("Please fix the issues below.", validationDetails);
+        return;
+      }
+    }
 
     if (editOppId) {
       setSaving(true);
@@ -238,8 +360,9 @@ export default function BeneficiaryOpportunities() {
         });
         setOpportunities((prev) => prev.map((o) => o.id === editOppId ? updated : o));
         handleCancelEdit();
-      } catch (err: any) {
-        setError(err.message || "Failed to save changes.");
+      } catch (err) {
+        const formatted = formatApiErrorWithDetails(err, "Failed to save changes.");
+        showError(formatted.message, formatted.details);
       } finally {
         setSaving(false);
       }
@@ -248,27 +371,50 @@ export default function BeneficiaryOpportunities() {
 
     setCreating(true);
     try {
-      await api.post(`/beneficiaries/${benId}/opportunities`, {
+      const startDate = form.recurring
+        ? (form.recurrenceStartDate || new Date().toISOString().split("T")[0])
+        : (form.slots[0]?.date || new Date().toISOString().split("T")[0]);
+
+      const body: Record<string, unknown> = {
         title: form.title,
         description: form.description,
         location: form.location || undefined,
         requirementsNote: form.requirementsNote || undefined,
-        startDate: form.slots[0]?.date || new Date().toISOString().split("T")[0],
+        startDate,
         schoolRestrictions: selectedSchools.length > 0 ? selectedSchools : undefined,
-        timeSlots: form.slots.map((s) => ({
+      };
+
+      if (form.recurring) {
+        const dur = calcDurationHours(form.recurrenceStartTime, form.recurrenceEndTime);
+        body.recurrenceRule = {
+          type: form.recurrenceType,
+          ...(form.recurrenceType === "monthly_day_of_week"
+            ? { daysOfWeek: form.recurrenceDaysOfWeek, weeksOfMonth: form.recurrenceWeeksOfMonth }
+            : { datesOfMonth: form.recurrenceDatesOfMonth }),
+          startTime: form.recurrenceStartTime,
+          endTime: form.recurrenceEndTime,
+          durationHours: dur || 1,
+          capacity: parseInt(form.recurrenceCapacity) || 10,
+          monthsAhead: form.recurrenceMonthsAhead,
+        };
+      } else {
+        body.timeSlots = form.slots.map((s) => ({
           date: s.date,
           startTime: s.startTime,
           endTime: s.endTime,
           durationHours: calcDurationHours(s.startTime, s.endTime) || 1,
           capacity: s.capacity ? parseInt(s.capacity) : 10,
-        })),
-      });
+        }));
+      }
+
+      await api.post(`/beneficiaries/${benId}/opportunities`, body);
       setForm(emptyForm);
       prefillLocation();
       setSelectedSchools(approvedSchools.map((s) => s.id));
       void loadOpportunities();
-    } catch (err: any) {
-      setError(err.message || "Failed to create opportunity.");
+    } catch (err) {
+      const formatted = formatApiErrorWithDetails(err, "Failed to create opportunity.");
+      showError(formatted.message, formatted.details);
     } finally {
       setCreating(false);
     }
@@ -276,17 +422,71 @@ export default function BeneficiaryOpportunities() {
 
   const handleDelete = async (oppId: string) => {
     setDeleting(true);
-    setError("");
+    clearError();
     try {
       await api.delete(`/beneficiaries/${benId}/opportunities/${oppId}`);
       setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
       setDeleteConfirmId(null);
       if (editOppId === oppId) handleCancelEdit();
     } catch (err: any) {
-      setError(err.message || "Failed to delete opportunity.");
+      showError(err.message || "Failed to delete opportunity.");
       setDeleteConfirmId(null);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openEditSlot = (slot: TimeSlotBasic) => {
+    setEditSlot(slot);
+    setSlotForm({
+      date: new Date(slot.date).toISOString().split("T")[0],
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      capacity: String(slot.capacity ?? 10),
+    });
+    setPropagateFuture(false);
+  };
+
+  const slotChanged = editSlot
+    ? slotForm.date !== new Date(editSlot.date).toISOString().split("T")[0] ||
+      slotForm.startTime !== editSlot.startTime ||
+      slotForm.endTime !== editSlot.endTime
+    : false;
+
+  const handleSaveSlot = async () => {
+    if (!editSlot || !benId) return;
+    setSavingSlot(true);
+    clearError();
+    try {
+      const updated = await api.patch<TimeSlotBasic>(`/beneficiaries/${benId}/slots/${editSlot.id}`, {
+        date: slotForm.date,
+        startTime: slotForm.startTime,
+        endTime: slotForm.endTime,
+        capacity: parseInt(slotForm.capacity) || editSlot.capacity,
+        propagateFuture: propagateFuture && !!editSlot.recurringGroupId && slotChanged,
+      });
+      setOpportunities((prev) =>
+        prev.map((opp) => ({
+          ...opp,
+          timeSlots: opp.timeSlots.map((s) => {
+            if (s.id === editSlot.id) return { ...s, ...updated };
+            if (
+              propagateFuture &&
+              editSlot.recurringGroupId &&
+              s.recurringGroupId === editSlot.recurringGroupId
+            ) {
+              return { ...s, startTime: updated.startTime, endTime: updated.endTime };
+            }
+            return s;
+          }),
+        }))
+      );
+      setEditSlot(null);
+      void loadOpportunities();
+    } catch (err: any) {
+      showError(err.message || "This time slot could not be updated.");
+    } finally {
+      setSavingSlot(false);
     }
   };
 
@@ -298,7 +498,7 @@ export default function BeneficiaryOpportunities() {
         prev.map((s) => s.id === signupId ? { ...s, verificationStatus: "APPROVED", totalHours: hours } : s)
       );
     } catch (err: any) {
-      setError(err.message || "Failed to approve.");
+      showError(err.message || "Failed to approve.");
     } finally {
       setActionId(null);
     }
@@ -306,7 +506,7 @@ export default function BeneficiaryOpportunities() {
 
   const handleReject = async (signupId: string) => {
     const reason = rejectReason[signupId]?.trim();
-    if (!reason) { setError("Please enter a reason for rejection."); return; }
+    if (!reason) { showError("Please enter a reason for rejection."); return; }
     setRejectingId(signupId);
     try {
       await api.post(`/beneficiaries/signups/${signupId}/reject`, { reason });
@@ -315,7 +515,7 @@ export default function BeneficiaryOpportunities() {
       );
       setRejectReason((prev) => ({ ...prev, [signupId]: "" }));
     } catch (err: any) {
-      setError(err.message || "Failed to reject.");
+      showError(err.message || "Failed to reject.");
     } finally {
       setRejectingId(null);
     }
@@ -328,7 +528,7 @@ export default function BeneficiaryOpportunities() {
       await api.post(`/beneficiaries/signups/${signupId}/no-show`, {});
       setSignups((prev) => prev.map((s) => s.id === signupId ? { ...s, status: "NO_SHOW" } : s));
     } catch (err: any) {
-      setError(err.message || "Failed to mark no-show.");
+      showError(err.message || "Failed to mark no-show.");
     } finally {
       setNoShowId(null);
     }
@@ -336,12 +536,12 @@ export default function BeneficiaryOpportunities() {
 
   const loadHistory = async (signupId: string) => {
     setHistoryLoadingId(signupId);
-    setError("");
+    clearError();
     try {
       const data = await api.get<SignupHistoryResponse>(`/beneficiaries/signups/${signupId}/history`);
       setHistorySignup(data);
     } catch (err: any) {
-      setError(err.message || "Failed to load verification history.");
+      showError(err.message || "Failed to load verification history.");
     } finally {
       setHistoryLoadingId(null);
     }
@@ -382,7 +582,16 @@ export default function BeneficiaryOpportunities() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div className="font-medium">{error}</div>
+          {errorDetails.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-red-700">
+              {errorDetails.map((detail, index) => (
+                <li key={`${detail}-${index}`}>{detail}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Opportunities tab — two-panel layout */}
@@ -424,36 +633,182 @@ export default function BeneficiaryOpportunities() {
               {/* Time slots — only shown when creating */}
               {!editOppId && (
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-sm font-medium text-gray-700">Time Slots *</label>
-                    <button type="button" onClick={addSlot} className="text-xs text-blue-600 hover:underline">+ Add slot</button>
+                  {/* Recurring toggle */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <label className="text-sm font-medium text-gray-700">Schedule</label>
+                    <div className="flex rounded-md overflow-hidden border border-gray-300 text-xs">
+                      <button type="button"
+                        onClick={() => setForm((p) => ({ ...p, recurring: false }))}
+                        className={`px-3 py-1.5 ${!form.recurring ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                        Manual
+                      </button>
+                      <button type="button"
+                        onClick={() => setForm((p) => ({ ...p, recurring: true }))}
+                        className={`px-3 py-1.5 border-l border-gray-300 ${form.recurring ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                        Recurring
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {form.slots.map((slot, i) => (
-                      <div key={i} className="grid grid-cols-5 gap-2 items-center">
-                        <input type="date" value={slot.date} onChange={(e) => updateSlot(i, "date", e.target.value)}
-                          required className="px-2 py-1.5 border border-gray-300 rounded text-sm col-span-2" />
-                        <input type="time" value={slot.startTime} onChange={(e) => updateSlot(i, "startTime", e.target.value)}
-                          required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <input type="time" value={slot.endTime} onChange={(e) => updateSlot(i, "endTime", e.target.value)}
-                          required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                        <div className="flex gap-1 items-center">
-                          <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
-                            placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                            title="Maximum # Volunteers" />
-                          {form.slots.length > 1 && (
-                            <button type="button" onClick={() => removeSlot(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                          )}
+
+                  {!form.recurring ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-gray-600">Time Slots *</span>
+                        <button type="button" onClick={addSlot} className="text-xs text-blue-600 hover:underline">+ Add slot</button>
+                      </div>
+                      <div className="space-y-2">
+                        {form.slots.map((slot, i) => (
+                          <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                            <input type="date" value={slot.date} onChange={(e) => updateSlot(i, "date", e.target.value)}
+                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm col-span-2" />
+                            <input type="time" value={slot.startTime} onChange={(e) => updateSlot(i, "startTime", e.target.value)}
+                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            <input type="time" value={slot.endTime} onChange={(e) => updateSlot(i, "endTime", e.target.value)}
+                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            <div className="flex gap-1 items-center">
+                              <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
+                                placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                                title="Maximum # Volunteers" />
+                              {form.slots.length > 1 && (
+                                <button type="button" onClick={() => removeSlot(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                      {/* Recurrence type */}
+                      <div className="flex gap-4 text-sm">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" checked={form.recurrenceType === "monthly_day_of_week"}
+                            onChange={() => setForm((p) => ({ ...p, recurrenceType: "monthly_day_of_week" }))} />
+                          <span>Day of week</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" checked={form.recurrenceType === "monthly_dates"}
+                            onChange={() => setForm((p) => ({ ...p, recurrenceType: "monthly_dates" }))} />
+                          <span>Specific dates</span>
+                        </label>
+                      </div>
+
+                      {form.recurrenceType === "monthly_day_of_week" ? (
+                        <div className="space-y-2">
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Days of week</div>
+                            <div className="flex flex-wrap gap-1">
+                              {DAY_NAMES.map((name, idx) => {
+                                const active = form.recurrenceDaysOfWeek.includes(idx);
+                                return (
+                                  <button key={idx} type="button"
+                                    onClick={() => setForm((p) => ({
+                                      ...p,
+                                      recurrenceDaysOfWeek: active
+                                        ? p.recurrenceDaysOfWeek.filter((d) => d !== idx)
+                                        : [...p.recurrenceDaysOfWeek, idx].sort(),
+                                    }))}
+                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                    {name.slice(0, 3)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Which weeks of the month</div>
+                            <div className="flex gap-1">
+                              {WEEK_LABELS.map((label, idx) => {
+                                const week = idx + 1;
+                                const active = form.recurrenceWeeksOfMonth.includes(week);
+                                return (
+                                  <button key={week} type="button"
+                                    onClick={() => setForm((p) => ({
+                                      ...p,
+                                      recurrenceWeeksOfMonth: active
+                                        ? p.recurrenceWeeksOfMonth.filter((w) => w !== week)
+                                        : [...p.recurrenceWeeksOfMonth, week].sort(),
+                                    }))}
+                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Dates of the month</div>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                              const active = form.recurrenceDatesOfMonth.includes(d);
+                              return (
+                                <button key={d} type="button"
+                                  onClick={() => setForm((p) => ({
+                                    ...p,
+                                    recurrenceDatesOfMonth: active
+                                      ? p.recurrenceDatesOfMonth.filter((x) => x !== d)
+                                      : [...p.recurrenceDatesOfMonth, d].sort((a, b) => a - b),
+                                  }))}
+                                  className={`w-8 h-8 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                  {d}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Time & capacity */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Start time</div>
+                          <input type="time" value={form.recurrenceStartTime}
+                            onChange={(e) => setForm((p) => ({ ...p, recurrenceStartTime: e.target.value }))}
+                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">End time</div>
+                          <input type="time" value={form.recurrenceEndTime}
+                            onChange={(e) => setForm((p) => ({ ...p, recurrenceEndTime: e.target.value }))}
+                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Max volunteers</div>
+                          <input type="number" min={1} value={form.recurrenceCapacity}
+                            onChange={(e) => setForm((p) => ({ ...p, recurrenceCapacity: e.target.value }))}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
                         </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Start date + months ahead */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Starting from</div>
+                          <input type="date" value={form.recurrenceStartDate}
+                            onChange={(e) => setForm((p) => ({ ...p, recurrenceStartDate: e.target.value }))}
+                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Generate for</div>
+                          <select value={form.recurrenceMonthsAhead}
+                            onChange={(e) => setForm((p) => ({ ...p, recurrenceMonthsAhead: parseInt(e.target.value) }))}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                            {[1,2,3,4,5,6,9,12].map((m) => (
+                              <option key={m} value={m}>{m} month{m > 1 ? "s" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {editOppId && (
                 <div className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
-                  Time slots cannot be edited after creation. To add new dates, create a new opportunity.
+                  Time slots can be edited individually using the pencil icon on each slot.
                 </div>
               )}
 
@@ -569,12 +924,27 @@ export default function BeneficiaryOpportunities() {
                       {opp.description && <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{opp.description}</div>}
                       {opp.timeSlots.length > 0 && (
                         <div className="mt-2 border-t pt-2 space-y-1">
-                          {opp.timeSlots.map((slot) => (
-                            <div key={slot.id} className="flex justify-between text-xs text-gray-600">
-                              <span>{new Date(slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {slot.startTime}–{slot.endTime}</span>
-                              <span className="text-gray-400">{slot._count?.signups || 0}{slot.capacity ? `/${slot.capacity}` : ""} signed up</span>
-                            </div>
-                          ))}
+                          {opp.timeSlots.map((slot) => {
+                            const slotDate = new Date(slot.date);
+                            const isEditable = slotDate.getTime() > Date.now() + 24 * 60 * 60 * 1000;
+                            return (
+                              <div key={slot.id} className="flex justify-between items-center text-xs text-gray-600">
+                                <span className="flex items-center gap-1.5">
+                                  {slot.recurringGroupId && (
+                                    <span title="Recurring" className="text-blue-400">↻</span>
+                                  )}
+                                  {slotDate.toLocaleDateString(undefined, { timeZone: "UTC" })} · {slot.startTime}–{slot.endTime}
+                                  {isEditable && (
+                                    <button type="button" onClick={() => openEditSlot(slot)}
+                                      className="text-gray-300 hover:text-blue-500 ml-0.5" title="Edit slot">
+                                      ✎
+                                    </button>
+                                  )}
+                                </span>
+                                <span className="text-gray-400">{slot._count?.signups || 0}{slot.capacity ? `/${slot.capacity}` : ""} signed up</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -674,6 +1044,68 @@ export default function BeneficiaryOpportunities() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Slot edit modal */}
+      {editSlot && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Edit Time Slot</h3>
+              <button onClick={() => setEditSlot(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Date</label>
+                <input type="date" value={slotForm.date}
+                  onChange={(e) => setSlotForm((p) => ({ ...p, date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start time</label>
+                  <input type="time" value={slotForm.startTime}
+                    onChange={(e) => setSlotForm((p) => ({ ...p, startTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End time</label>
+                  <input type="time" value={slotForm.endTime}
+                    onChange={(e) => setSlotForm((p) => ({ ...p, endTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Max volunteers</label>
+                <input type="number" min={1} value={slotForm.capacity}
+                  onChange={(e) => setSlotForm((p) => ({ ...p, capacity: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+              </div>
+
+              {/* Propagate checkbox — only for recurring slots with date/time change */}
+              {editSlot.recurringGroupId && slotChanged && (
+                <label className="flex items-start gap-2 cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <input type="checkbox" checked={propagateFuture}
+                    onChange={(e) => setPropagateFuture(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300" />
+                  <span className="text-xs text-blue-800">
+                    Apply this date/time change to all future slots in this recurring series
+                  </span>
+                </label>
+              )}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={handleSaveSlot} disabled={savingSlot}
+                className="flex-1 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
+                {savingSlot ? "Saving..." : "Save"}
+              </button>
+              <button onClick={() => setEditSlot(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-md text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

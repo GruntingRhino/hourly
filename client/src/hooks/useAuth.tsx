@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { api, ApiError } from "../lib/api";
 import {
   clearAuthSession,
+  markAuthSyncOptOut,
   getAuthToken,
   getCachedUser,
   registerAuthSessionResponder,
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    markAuthSyncOptOut();
     clearAuthSession();
     setUser(null);
   };
