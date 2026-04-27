@@ -908,6 +908,105 @@ router.get("/:id/schools", authenticate, requireRole("BENEFICIARY_ADMIN"), async
   }
 });
 
+// ─── Recurrence helpers ───────────────────────────────────────────────────────
+
+interface RecurrenceRule {
+  type: "monthly_day_of_week" | "monthly_dates";
+  daysOfWeek?: number[];    // 0=Sun..6=Sat, multiple allowed (for monthly_day_of_week)
+  weeksOfMonth?: number[];  // 1-5, which Nth occurrence per month
+  datesOfMonth?: number[];  // 1-31 (for monthly_dates)
+  startTime: string;        // "HH:MM"
+  endTime: string;          // "HH:MM"
+  durationHours: number;
+  capacity: number;
+  monthsAhead: number;      // 1-12
+}
+
+function calcDurationHours(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
+}
+
+function generateRecurringSlots(
+  rule: RecurrenceRule,
+  fromDate: Date,
+): { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number }[] {
+  const slots: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number }[] = [];
+  const cursor = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1));
+
+  for (let m = 0; m < rule.monthsAhead; m++) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth();
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+    if (rule.type === "monthly_day_of_week" && rule.daysOfWeek?.length && rule.weeksOfMonth?.length) {
+      for (const dow of rule.daysOfWeek) {
+        const occurrences: number[] = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          if (new Date(Date.UTC(year, month, d)).getUTCDay() === dow) {
+            occurrences.push(d);
+          }
+        }
+        for (const week of rule.weeksOfMonth) {
+          const day = occurrences[week - 1];
+          if (day) {
+            const slotDate = new Date(Date.UTC(year, month, day));
+            if (slotDate >= fromDate) {
+              slots.push({ date: slotDate, startTime: rule.startTime, endTime: rule.endTime, durationHours: rule.durationHours, capacity: rule.capacity });
+            }
+          }
+        }
+      }
+      // Sort slots within the month by date
+      slots.sort((a, b) => a.date.getTime() - b.date.getTime());
+    } else if (rule.type === "monthly_dates" && rule.datesOfMonth?.length) {
+      for (const dateNum of rule.datesOfMonth) {
+        if (dateNum <= daysInMonth) {
+          const slotDate = new Date(Date.UTC(year, month, dateNum));
+          if (slotDate >= fromDate) {
+            slots.push({ date: slotDate, startTime: rule.startTime, endTime: rule.endTime, durationHours: rule.durationHours, capacity: rule.capacity });
+          }
+        }
+      }
+    }
+
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return slots;
+}
+
+const recurrenceRuleSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("monthly_day_of_week"),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
+    weeksOfMonth: z.array(z.number().int().min(1).max(5)).min(1),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/),
+    durationHours: z.number().positive(),
+    capacity: z.number().int().positive(),
+    monthsAhead: z.number().int().min(1).max(12),
+  }),
+  z.object({
+    type: z.literal("monthly_dates"),
+    datesOfMonth: z.array(z.number().int().min(1).max(31)).min(1),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/),
+    durationHours: z.number().positive(),
+    capacity: z.number().int().positive(),
+    monthsAhead: z.number().int().min(1).max(12),
+  }),
+]);
+
+const opportunityTimeSlotSchema = z.object({
+  date: z.string().min(1, "Choose a date for each time slot."),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose a valid start time for each time slot."),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose a valid end time for each time slot."),
+  durationHours: z.number().positive("End time must be after start time."),
+  capacity: z.number().int().positive("Enter a valid volunteer capacity.").default(10),
+});
+
 // GET /api/beneficiaries/:id/opportunities — list opportunities for a beneficiary
 router.get("/:id/opportunities", authenticate, async (req: Request, res: Response) => {
   try {
@@ -957,19 +1056,43 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
       category: z.string().max(100).optional(),
       location: z.string().max(255).optional(),
       address: z.string().max(255).optional(),
-      startDate: z.string(), // ISO date string
+      startDate: z.string(),
       endDate: z.string().optional(),
       requirementsNote: z.string().max(1000).optional(),
-      schoolRestrictions: z.array(z.string()).optional(), // school IDs; null = all approved schools
-      timeSlots: z.array(z.object({
-        date: z.string(),
-        startTime: z.string(),
-        endTime: z.string(),
-        durationHours: z.number().positive(),
-        capacity: z.number().int().positive().default(10),
-      })).min(1),
+      schoolRestrictions: z.array(z.string()).optional(),
+      recurrenceRule: recurrenceRuleSchema.optional(),
+      timeSlots: z.array(opportunityTimeSlotSchema).optional().default([]),
+    }).superRefine((d, ctx) => {
+      if (!d.recurrenceRule && d.timeSlots.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["timeSlots"],
+          message: "Add at least one time slot or switch to recurring schedule.",
+        });
+      }
     });
     const data = schema.parse(req.body);
+
+    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
+    let recurringGroupId: string | undefined;
+
+    if (data.recurrenceRule) {
+      recurringGroupId = crypto.randomUUID();
+      const fromDate = new Date(data.startDate);
+      const generated = generateRecurringSlots(data.recurrenceRule, fromDate);
+      if (generated.length === 0) {
+        return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
+      }
+      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId }));
+    } else {
+      slotsToCreate = data.timeSlots!.map((ts) => ({
+        date: new Date(ts.date),
+        startTime: ts.startTime,
+        endTime: ts.endTime,
+        durationHours: ts.durationHours,
+        capacity: ts.capacity,
+      }));
+    }
 
     const opp = await prisma.beneficiaryOpportunity.create({
       data: {
@@ -983,15 +1106,10 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
         endDate: data.endDate ? new Date(data.endDate) : null,
         requirementsNote: data.requirementsNote || null,
         schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
+        recurrenceRule: data.recurrenceRule ? JSON.stringify(data.recurrenceRule) : null,
         status: "ACTIVE",
         timeSlots: {
-          create: data.timeSlots.map((ts) => ({
-            date: new Date(ts.date),
-            startTime: ts.startTime,
-            endTime: ts.endTime,
-            durationHours: ts.durationHours,
-            capacity: ts.capacity,
-          })),
+          create: slotsToCreate,
         },
       },
       include: { timeSlots: true },
@@ -999,7 +1117,14 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
 
     res.status(201).json(opp);
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) {
+      console.error("Create opportunity validation error:", {
+        beneficiaryId: req.params.id,
+        issues: err.errors,
+        body: req.body,
+      });
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
     console.error("Create opportunity error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1055,26 +1180,263 @@ router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIAR
     const opp = await prisma.beneficiaryOpportunity.findUnique({
       where: { id: req.params.oppId },
       include: {
+        beneficiary: { select: { name: true } },
         timeSlots: {
-          include: { signups: { where: { status: { in: ["CONFIRMED", "WAITLISTED"] } }, select: { id: true } } },
+          include: {
+            signups: {
+              where: { status: { in: ["CONFIRMED", "WAITLISTED"] } },
+              select: { id: true, studentId: true },
+            },
+          },
         },
       },
     });
     if (!opp || opp.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Opportunity not found" });
 
-    const hasActiveSignups = opp.timeSlots.some((slot) => slot.signups.length > 0);
-    if (hasActiveSignups) {
-      return res.status(400).json({ error: "Cannot delete an opportunity that has confirmed student signups." });
-    }
+    const now = new Date();
 
-    await prisma.beneficiaryOpportunity.update({
-      where: { id: req.params.oppId },
-      data: { status: "CANCELLED" },
-    });
+    // Collect all active signups across all time slots
+    const activeSignups = opp.timeSlots.flatMap((slot) => slot.signups);
+
+    // Only notify students signed up for future time slots
+    const futureSlotIds = new Set(opp.timeSlots.filter((slot) => slot.date > now).map((s) => s.id));
+    const futureSignups = opp.timeSlots
+      .filter((slot) => futureSlotIds.has(slot.id))
+      .flatMap((slot) => slot.signups);
+    const affectedStudentIds = [...new Set(futureSignups.map((s) => s.studentId))];
+
+    // Cancel all active signups and mark the opportunity cancelled in one transaction
+    await prisma.$transaction([
+      prisma.beneficiarySignup.updateMany({
+        where: { id: { in: activeSignups.map((s) => s.id) } },
+        data: { status: "CANCELLED" },
+      }),
+      prisma.beneficiaryOpportunity.update({
+        where: { id: req.params.oppId },
+        data: { status: "CANCELLED" },
+      }),
+    ]);
+
+    // Notify students with future signups that the opportunity was deleted
+    if (affectedStudentIds.length > 0) {
+      await prisma.notification.createMany({
+        data: affectedStudentIds.map((studentId) => ({
+          userId: studentId,
+          type: "OPPORTUNITY_CANCELLED",
+          title: "Opportunity deleted",
+          body: `${opp.beneficiary.name} has deleted "${opp.title}". Your signup has been removed.`,
+        })),
+      });
+    }
 
     res.json({ message: "Opportunity deleted" });
   } catch (err) {
     console.error("Delete opportunity error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/beneficiaries/:id/slots/:slotId — edit a future time slot for one beneficiary
+router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const slot = await prisma.beneficiaryTimeSlot.findUnique({
+      where: { id: req.params.slotId },
+      include: { opportunity: { select: { beneficiaryId: true } } },
+    });
+    if (!slot || slot.opportunity.beneficiaryId !== req.params.id) {
+      return res.status(404).json({ error: "Time slot not found" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== req.params.id) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    if (slot.date <= cutoff) {
+      return res.status(400).json({ error: "Can only edit slots more than 24 hours in the future" });
+    }
+
+    const schema = z.object({
+      date: z.string().optional(),
+      startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      capacity: z.number().int().positive().optional(),
+      propagateFuture: z.boolean().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const originalDate = slot.date;
+    const newDate = data.date ? new Date(data.date) : slot.date;
+    const newStartTime = data.startTime ?? slot.startTime;
+    const newEndTime = data.endTime ?? slot.endTime;
+    const newCapacity = data.capacity ?? slot.capacity;
+    const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+
+    const updated = await prisma.beneficiaryTimeSlot.update({
+      where: { id: req.params.slotId },
+      data: {
+        date: newDate,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        durationHours: newDuration,
+        capacity: newCapacity,
+      },
+    });
+
+    if (data.propagateFuture && slot.recurringGroupId) {
+      const dayDelta = Math.round((newDate.getTime() - originalDate.getTime()) / (24 * 60 * 60 * 1000));
+
+      const [origSH, origSM] = slot.startTime.split(":").map(Number);
+      const [newSH, newSM] = newStartTime.split(":").map(Number);
+      const startMinuteDelta = (newSH * 60 + newSM) - (origSH * 60 + origSM);
+
+      const [origEH, origEM] = slot.endTime.split(":").map(Number);
+      const [newEH, newEM] = newEndTime.split(":").map(Number);
+      const endMinuteDelta = (newEH * 60 + newEM) - (origEH * 60 + origEM);
+
+      const futureSlots = await prisma.beneficiaryTimeSlot.findMany({
+        where: {
+          recurringGroupId: slot.recurringGroupId,
+          id: { not: req.params.slotId },
+          date: { gt: cutoff },
+        },
+      });
+
+      for (const fs of futureSlots) {
+        const fsDate = new Date(fs.date);
+        fsDate.setUTCDate(fsDate.getUTCDate() + dayDelta);
+
+        const [fsSH, fsSM] = fs.startTime.split(":").map(Number);
+        const newFsSM = fsSH * 60 + fsSM + startMinuteDelta;
+        const newFsStartH = Math.floor(((newFsSM % 1440) + 1440) % 1440 / 60);
+        const newFsStartMin = ((newFsSM % 1440) + 1440) % 1440 % 60;
+
+        const [fsEH, fsEM] = fs.endTime.split(":").map(Number);
+        const newFsEMins = fsEH * 60 + fsEM + endMinuteDelta;
+        const newFsEndH = Math.floor(((newFsEMins % 1440) + 1440) % 1440 / 60);
+        const newFsEndMin = ((newFsEMins % 1440) + 1440) % 1440 % 60;
+
+        await prisma.beneficiaryTimeSlot.update({
+          where: { id: fs.id },
+          data: {
+            date: fsDate,
+            startTime: `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`,
+            endTime: `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`,
+          },
+        });
+      }
+    }
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Edit beneficiary slot error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/beneficiaries/slots/:slotId — edit a future time slot
+router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const slot = await prisma.beneficiaryTimeSlot.findUnique({
+      where: { id: req.params.slotId },
+      include: { opportunity: { select: { beneficiaryId: true } } },
+    });
+    if (!slot) return res.status(404).json({ error: "Time slot not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== slot.opportunity.beneficiaryId) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    if (slot.date <= cutoff) {
+      return res.status(400).json({ error: "Can only edit slots more than 24 hours in the future" });
+    }
+
+    const schema = z.object({
+      date: z.string().optional(),
+      startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      capacity: z.number().int().positive().optional(),
+      propagateFuture: z.boolean().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const originalDate = slot.date;
+    const newDate = data.date ? new Date(data.date) : slot.date;
+    const newStartTime = data.startTime ?? slot.startTime;
+    const newEndTime = data.endTime ?? slot.endTime;
+    const newCapacity = data.capacity ?? slot.capacity;
+    const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+
+    const updated = await prisma.beneficiaryTimeSlot.update({
+      where: { id: req.params.slotId },
+      data: {
+        date: newDate,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        durationHours: newDuration,
+        capacity: newCapacity,
+      },
+    });
+
+    // Propagate to other future slots in the same recurring series
+    if (data.propagateFuture && slot.recurringGroupId) {
+      const dayDelta = Math.round((newDate.getTime() - originalDate.getTime()) / (24 * 60 * 60 * 1000));
+
+      const [origSH, origSM] = slot.startTime.split(":").map(Number);
+      const [newSH, newSM] = newStartTime.split(":").map(Number);
+      const startMinuteDelta = (newSH * 60 + newSM) - (origSH * 60 + origSM);
+
+      const [origEH, origEM] = slot.endTime.split(":").map(Number);
+      const [newEH, newEM] = newEndTime.split(":").map(Number);
+      const endMinuteDelta = (newEH * 60 + newEM) - (origEH * 60 + origEM);
+
+      const futureSlots = await prisma.beneficiaryTimeSlot.findMany({
+        where: {
+          recurringGroupId: slot.recurringGroupId,
+          id: { not: req.params.slotId },
+          date: { gt: cutoff },
+        },
+      });
+
+      for (const fs of futureSlots) {
+        const fsDate = new Date(fs.date);
+        fsDate.setUTCDate(fsDate.getUTCDate() + dayDelta);
+
+        const [fsSH, fsSM] = fs.startTime.split(":").map(Number);
+        const newFsSM = fsSH * 60 + fsSM + startMinuteDelta;
+        const newFsStartH = Math.floor(((newFsSM % 1440) + 1440) % 1440 / 60);
+        const newFsStartMin = ((newFsSM % 1440) + 1440) % 1440 % 60;
+
+        const [fsEH, fsEM] = fs.endTime.split(":").map(Number);
+        const newFsEM = fsEH * 60 + fsEM + endMinuteDelta;
+        const newFsEndH = Math.floor(((newFsEM % 1440) + 1440) % 1440 / 60);
+        const newFsEndMin = ((newFsEM % 1440) + 1440) % 1440 % 60;
+
+        const fsStart = `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`;
+        const fsEnd = `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`;
+
+        await prisma.beneficiaryTimeSlot.update({
+          where: { id: fs.id },
+          data: {
+            date: fsDate,
+            startTime: fsStart,
+            endTime: fsEnd,
+            durationHours: calcDurationHours(fsStart, fsEnd) || fs.durationHours,
+          },
+        });
+      }
+    }
+
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    console.error("Edit time slot error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

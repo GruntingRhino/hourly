@@ -51,12 +51,9 @@ async function main() {
       data: {
         name: "Playwright School A",
         verified: true,
+        onboardingComplete: true,
         createdById: adminA.id,
       },
-    });
-    await prisma.user.update({
-      where: { id: adminA.id },
-      data: { schoolId: schoolA.id },
     });
     // Private school beneficiary
     const bA = await prisma.beneficiary.create({
@@ -76,11 +73,15 @@ async function main() {
       },
     });
   } else {
-    await prisma.user.update({
-      where: { id: adminA.id },
-      data: { schoolId: schoolA.id },
+    await prisma.school.update({
+      where: { id: schoolA.id },
+      data: { onboardingComplete: true, verified: true },
     });
   }
+  await prisma.user.update({
+    where: { id: adminA.id },
+    data: { schoolId: schoolA.id },
+  });
 
   // ── School B admin ───────────────────────────────────────────────────────────
   const adminB = await prisma.user.upsert({
@@ -104,12 +105,9 @@ async function main() {
       data: {
         name: "Playwright School B",
         verified: true,
+        onboardingComplete: true,
         createdById: adminB.id,
       },
-    });
-    await prisma.user.update({
-      where: { id: adminB.id },
-      data: { schoolId: schoolB.id },
     });
     const bB = await prisma.beneficiary.create({
       data: {
@@ -128,11 +126,15 @@ async function main() {
       },
     });
   } else {
-    await prisma.user.update({
-      where: { id: adminB.id },
-      data: { schoolId: schoolB.id },
+    await prisma.school.update({
+      where: { id: schoolB.id },
+      data: { onboardingComplete: true, verified: true },
     });
   }
+  await prisma.user.update({
+    where: { id: adminB.id },
+    data: { schoolId: schoolB.id },
+  });
 
   // ── Cohorts ──────────────────────────────────────────────────────────────────
   let cohortA = await prisma.cohort.findFirst({
@@ -163,15 +165,20 @@ async function main() {
 
   // ── Beneficiary org admins ───────────────────────────────────────────────────
   let orgA = await prisma.beneficiary.findFirst({
-    where: { name: "Playwright Org A", visibility: "PUBLIC" },
+    where: { name: "Playwright Org A" },
   });
   if (!orgA) {
     orgA = await prisma.beneficiary.create({
       data: {
         name: "Playwright Org A",
-        visibility: "PUBLIC",
+        visibility: "PRIVATE",
         status: "ACTIVE",
       },
+    });
+  } else {
+    await prisma.beneficiary.update({
+      where: { id: orgA.id },
+      data: { visibility: "PRIVATE", status: "ACTIVE" },
     });
   }
 
@@ -191,15 +198,20 @@ async function main() {
   void benefAdminA;
 
   let orgB = await prisma.beneficiary.findFirst({
-    where: { name: "Playwright Org B", visibility: "PUBLIC" },
+    where: { name: "Playwright Org B" },
   });
   if (!orgB) {
     orgB = await prisma.beneficiary.create({
       data: {
         name: "Playwright Org B",
-        visibility: "PUBLIC",
+        visibility: "PRIVATE",
         status: "ACTIVE",
       },
+    });
+  } else {
+    await prisma.beneficiary.update({
+      where: { id: orgB.id },
+      data: { visibility: "PRIVATE", status: "ACTIVE" },
     });
   }
 
