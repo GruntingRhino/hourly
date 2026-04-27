@@ -1,0 +1,447 @@
+- generic [ref=e78]:
+  - navigation [ref=e79]:
+    - link "GoodHours" [ref=e80] [cursor=pointer]:
+      - /url: "#"
+      - img "GoodHours" [ref=e81]
+    - generic [ref=e82]:
+      - link "How It Works" [ref=e83] [cursor=pointer]:
+        - /url: "#how"
+      - link "Features" [ref=e84] [cursor=pointer]:
+        - /url: "#features"
+      - link "See Demo" [ref=e85] [cursor=pointer]:
+        - /url: "#demo"
+    - generic [ref=e86]:
+      - link "Sign In" [ref=e87] [cursor=pointer]:
+        - /url: /login
+      - link "Register School" [ref=e88] [cursor=pointer]:
+        - /url: /school/register
+  - main [ref=e89]:
+    - generic [ref=e90]:
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - img [ref=e93]
+          - text: School-first community service tracking
+        - heading "The Trusted System of Record for Student Volunteer Hours" [level=1] [ref=e95]
+        - list [ref=e96]:
+          - listitem [ref=e97]:
+            - img [ref=e99]
+            - text: Automatically track, verify, and report student volunteer hours
+          - listitem [ref=e101]:
+            - img [ref=e103]
+            - text: Connect schools with approved community service partners
+          - listitem [ref=e105]:
+            - img [ref=e107]
+            - text: Meet graduation requirements with a compliant digital record
+          - listitem [ref=e109]:
+            - img [ref=e111]
+            - text: Free for schools — no credit card required to get started
+        - generic [ref=e113]:
+          - link "Register Your School — Free" [ref=e114] [cursor=pointer]:
+            - /url: /school/register
+          - paragraph [ref=e115]: Students and partners join by invitation only
+      - generic [ref=e116]:
+        - generic:
+          - generic:
+            - generic:
+              - generic: Lincoln High School
+              - generic: Dashboard
+              - generic: Cohorts
+              - generic: Partners
+              - generic: Submissions
+              - generic:
+                - generic: Export PDF
+                - generic: Manage Cohorts
+            - generic:
+              - generic:
+                - generic: Total Students
+                - generic: "247"
+              - generic:
+                - generic: Total Hours
+                - generic: 8,432.5
+                - generic: verified
+              - generic:
+                - generic: Goal Reached
+                - generic: "89"
+                - generic: of 247 students
+              - generic:
+                - generic: At Risk
+                - generic: "12"
+                - generic: deadline, pace, or attendance
+            - generic:
+              - generic:
+                - generic: View All Cohorts (3)
+              - generic:
+                - generic: Partners (10)
+              - generic:
+                - generic: Self-Submitted Hours
+              - generic:
+                - generic: Student Roster (247)
+              - generic:
+                - generic: On-Track (235)
+              - generic:
+                - generic: Off-Track (12)
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Cohorts
+                  - generic: Manage →
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic: Class of 2026
+                      - generic: published
+                    - generic:
+                      - generic:
+                        - generic: "84"
+                        - generic: Students
+                      - generic:
+                        - generic: 38.2h
+                        - generic: Avg Hours
+                      - generic:
+                        - generic: "71"
+                        - generic: On-Track
+                      - generic:
+                        - generic: "13"
+                        - generic: Off-Track
+                    - generic: 94% completed 40h goal
+                  - generic:
+                    - generic:
+                      - generic: Class of 2027
+                      - generic: published
+                    - generic:
+                      - generic:
+                        - generic: "91"
+                        - generic: Students
+                      - generic:
+                        - generic: 22.4h
+                        - generic: Avg Hours
+                      - generic:
+                        - generic: "78"
+                        - generic: On-Track
+                      - generic:
+                        - generic: "12"
+                        - generic: Off-Track
+                    - generic: 56% completed 40h goal
+                  - generic:
+                    - generic:
+                      - generic: Class of 2025
+                      - generic: published
+                    - generic:
+                      - generic:
+                        - generic: "72"
+                        - generic: Students
+                      - generic:
+                        - generic: 40.0h
+                        - generic: Avg Hours
+                      - generic:
+                        - generic: "72"
+                        - generic: On-Track
+                      - generic:
+                        - generic: "0"
+                        - generic: Off-Track
+                    - generic: 100% completed 40h goal
+              - generic:
+                - generic:
+                  - generic: Student Roster
+                  - generic: View All →
+                - table:
+                  - rowgroup:
+                    - row "Name Hours Status":
+                      - columnheader "Name"
+                      - columnheader "Hours"
+                      - columnheader "Status"
+                  - rowgroup:
+                    - row "Ava Thompson 32.0/40h On Track":
+                      - cell "Ava Thompson"
+                      - cell "32.0/40h":
+                        - text: "32.0"
+                        - generic: /40h
+                      - cell "On Track"
+                    - row "James Rivera 28.5/40h On Track":
+                      - cell "James Rivera"
+                      - cell "28.5/40h":
+                        - text: "28.5"
+                        - generic: /40h
+                      - cell "On Track"
+                    - row "Sofia Chen 8.0/40h At Risk":
+                      - cell "Sofia Chen"
+                      - cell "8.0/40h":
+                        - text: "8.0"
+                        - generic: /40h
+                      - cell "At Risk"
+                    - row "Marcus Lee 14.0/40h On Track":
+                      - cell "Marcus Lee"
+                      - cell "14.0/40h":
+                        - text: "14.0"
+                        - generic: /40h
+                      - cell "On Track"
+                    - row "Priya Patel 40.0/40h Completed":
+                      - cell "Priya Patel"
+                      - cell "40.0/40h":
+                        - text: "40.0"
+                        - generic: /40h
+                      - cell "Completed"
+    - generic [ref=e118]:
+      - generic [ref=e119]:
+        - generic [ref=e120]: 700,000+
+        - generic [ref=e121]: Community Partners Across USA
+      - generic [ref=e122]:
+        - generic [ref=e123]: 100%
+        - generic [ref=e124]: Verified school-controlled records
+      - generic [ref=e125]:
+        - generic [ref=e126]: FERPA
+        - generic [ref=e127]: Compliant student data security
+      - generic [ref=e128]:
+        - generic [ref=e129]: 35,000
+        - generic [ref=e130]: High Schools Across USA. Claim Yours.
+    - generic [ref=e132]:
+      - generic [ref=e133]:
+        - heading "How It Works" [level=2] [ref=e134]
+        - paragraph [ref=e135]: Three steps from registration to verified hours
+      - generic [ref=e136]:
+        - generic [ref=e137]:
+          - generic [ref=e138]: "1"
+          - heading "School Registers" [level=3] [ref=e139]
+          - paragraph [ref=e140]: School admins sign in with Google and register using their school's official email. Your school becomes the trusted anchor for everything else.
+        - generic [ref=e141]:
+          - generic [ref=e142]: "2"
+          - heading "Invite Students & Partners" [level=3] [ref=e143]
+          - paragraph [ref=e144]: Create cohorts, import your student roster, and invite approved community service organizations. Everything flows through school approval.
+        - generic [ref=e145]:
+          - generic [ref=e146]: "3"
+          - heading "Track & Verify" [level=3] [ref=e147]
+          - paragraph [ref=e148]: Students sign up for opportunities, complete service, and hours are verified through a structured audit trail you control.
+    - generic [ref=e150]:
+      - generic [ref=e151]:
+        - heading "Built for Everyone" [level=2] [ref=e152]
+        - paragraph [ref=e153]: GoodHours works for schools, students, and community partners.
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - button "School Admin" [ref=e156]
+          - button "Student" [ref=e157]
+          - button "Community Partner" [ref=e158]
+          - link "Register Free →" [ref=e159] [cursor=pointer]:
+            - /url: /school/register
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e163]: Lincoln High School
+            - generic [ref=e164]: Dashboard
+            - generic [ref=e165]: Cohorts
+            - generic [ref=e166]: Partners
+            - generic [ref=e167]: Submissions
+            - generic [ref=e168]:
+              - generic [ref=e169]: Export PDF
+              - generic [ref=e170]: Manage Cohorts
+          - generic [ref=e171]:
+            - generic [ref=e172]:
+              - generic [ref=e173]: Total Students
+              - generic [ref=e174]: "247"
+            - generic [ref=e175]:
+              - generic [ref=e176]: Total Hours
+              - generic [ref=e177]: 8,432.5
+              - generic [ref=e178]: verified
+            - generic [ref=e179]:
+              - generic [ref=e180]: Goal Reached
+              - generic [ref=e181]: "89"
+              - generic [ref=e182]: of 247 students
+            - generic [ref=e183]:
+              - generic [ref=e184]: At Risk
+              - generic [ref=e185]: "12"
+              - generic [ref=e186]: deadline, pace, or attendance
+          - generic [ref=e187]:
+            - generic [ref=e189]: View All Cohorts (3)
+            - generic [ref=e191]: Partners (10)
+            - generic [ref=e193]: Self-Submitted Hours
+            - generic [ref=e195]: Student Roster (247)
+            - generic [ref=e197]: On-Track (235)
+            - generic [ref=e199]: Off-Track (12)
+          - generic [ref=e200]:
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - generic [ref=e203]: Cohorts
+                - generic [ref=e204]: Manage →
+              - generic [ref=e205]:
+                - generic [ref=e206]:
+                  - generic [ref=e207]:
+                    - generic [ref=e208]: Class of 2026
+                    - generic [ref=e209]: published
+                  - generic [ref=e210]:
+                    - generic [ref=e211]:
+                      - generic [ref=e212]: "84"
+                      - generic [ref=e213]: Students
+                    - generic [ref=e214]:
+                      - generic [ref=e215]: 38.2h
+                      - generic [ref=e216]: Avg Hours
+                    - generic [ref=e217]:
+                      - generic [ref=e218]: "71"
+                      - generic [ref=e219]: On-Track
+                    - generic [ref=e220]:
+                      - generic [ref=e221]: "13"
+                      - generic [ref=e222]: Off-Track
+                  - generic [ref=e225]: 94% completed 40h goal
+                - generic [ref=e226]:
+                  - generic [ref=e227]:
+                    - generic [ref=e228]: Class of 2027
+                    - generic [ref=e229]: published
+                  - generic [ref=e230]:
+                    - generic [ref=e231]:
+                      - generic [ref=e232]: "91"
+                      - generic [ref=e233]: Students
+                    - generic [ref=e234]:
+                      - generic [ref=e235]: 22.4h
+                      - generic [ref=e236]: Avg Hours
+                    - generic [ref=e237]:
+                      - generic [ref=e238]: "78"
+                      - generic [ref=e239]: On-Track
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: "12"
+                      - generic [ref=e242]: Off-Track
+                  - generic [ref=e245]: 56% completed 40h goal
+                - generic [ref=e246]:
+                  - generic [ref=e247]:
+                    - generic [ref=e248]: Class of 2025
+                    - generic [ref=e249]: published
+                  - generic [ref=e250]:
+                    - generic [ref=e251]:
+                      - generic [ref=e252]: "72"
+                      - generic [ref=e253]: Students
+                    - generic [ref=e254]:
+                      - generic [ref=e255]: 40.0h
+                      - generic [ref=e256]: Avg Hours
+                    - generic [ref=e257]:
+                      - generic [ref=e258]: "72"
+                      - generic [ref=e259]: On-Track
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: "0"
+                      - generic [ref=e262]: Off-Track
+                  - generic [ref=e265]: 100% completed 40h goal
+            - generic [ref=e266]:
+              - generic [ref=e267]:
+                - generic [ref=e268]: Student Roster
+                - generic [ref=e269]: View All →
+              - table [ref=e270]:
+                - rowgroup [ref=e271]:
+                  - row "Name Hours Status" [ref=e272]:
+                    - columnheader "Name" [ref=e273]
+                    - columnheader "Hours" [ref=e274]
+                    - columnheader "Status" [ref=e275]
+                - rowgroup [ref=e276]:
+                  - row "Ava Thompson 32.0/40h On Track" [ref=e277]:
+                    - cell "Ava Thompson" [ref=e278]
+                    - cell "32.0/40h" [ref=e279]:
+                      - text: "32.0"
+                      - generic [ref=e280]: /40h
+                    - cell "On Track" [ref=e281]
+                  - row "James Rivera 28.5/40h On Track" [ref=e282]:
+                    - cell "James Rivera" [ref=e283]
+                    - cell "28.5/40h" [ref=e284]:
+                      - text: "28.5"
+                      - generic [ref=e285]: /40h
+                    - cell "On Track" [ref=e286]
+                  - row "Sofia Chen 8.0/40h At Risk" [ref=e287]:
+                    - cell "Sofia Chen" [ref=e288]
+                    - cell "8.0/40h" [ref=e289]:
+                      - text: "8.0"
+                      - generic [ref=e290]: /40h
+                    - cell "At Risk" [ref=e291]
+                  - row "Marcus Lee 14.0/40h On Track" [ref=e292]:
+                    - cell "Marcus Lee" [ref=e293]
+                    - cell "14.0/40h" [ref=e294]:
+                      - text: "14.0"
+                      - generic [ref=e295]: /40h
+                    - cell "On Track" [ref=e296]
+                  - row "Priya Patel 40.0/40h Completed" [ref=e297]:
+                    - cell "Priya Patel" [ref=e298]
+                    - cell "40.0/40h" [ref=e299]:
+                      - text: "40.0"
+                      - generic [ref=e300]: /40h
+                    - cell "Completed" [ref=e301]
+      - generic [ref=e302]:
+        - generic [ref=e303]:
+          - generic [ref=e304]: 🏫
+          - heading "For Schools" [level=3] [ref=e305]
+          - list [ref=e306]:
+            - listitem [ref=e307]:
+              - img [ref=e309]
+              - text: School-first registration, free forever
+            - listitem [ref=e311]:
+              - img [ref=e313]
+              - text: Create cohorts and bulk-import students
+            - listitem [ref=e315]:
+              - img [ref=e317]
+              - text: Approve community service partners
+            - listitem [ref=e319]:
+              - img [ref=e321]
+              - text: Full audit trail for all volunteering actions
+            - listitem [ref=e323]:
+              - img [ref=e325]
+              - text: Review student self-submitted volunteering
+            - listitem [ref=e327]:
+              - img [ref=e329]
+              - text: School-scoped student data access controls
+        - generic [ref=e331]:
+          - generic [ref=e332]: 🎒
+          - heading "For Students" [level=3] [ref=e333]
+          - list [ref=e334]:
+            - listitem [ref=e335]:
+              - img [ref=e337]
+              - text: Invited directly by your school cohort
+            - listitem [ref=e339]:
+              - img [ref=e341]
+              - text: Browse only school-approved opportunities
+            - listitem [ref=e343]:
+              - img [ref=e345]
+              - text: Sign up for time slots with calendar view
+            - listitem [ref=e347]:
+              - img [ref=e349]
+              - text: Track progress toward graduation requirement
+            - listitem [ref=e351]:
+              - img [ref=e353]
+              - text: Submit self-selected volunteering for review
+            - listitem [ref=e355]:
+              - img [ref=e357]
+              - text: Download certified hour transcripts
+        - generic [ref=e359]:
+          - generic [ref=e360]: 🤝
+          - heading "For Community Partners" [level=3] [ref=e361]
+          - list [ref=e362]:
+            - listitem [ref=e363]:
+              - img [ref=e365]
+              - text: Invited by partnering schools
+            - listitem [ref=e367]:
+              - img [ref=e369]
+              - text: Create calendar-based volunteer opportunities
+            - listitem [ref=e371]:
+              - img [ref=e373]
+              - text: Manage student signups and attendance
+            - listitem [ref=e375]:
+              - img [ref=e377]
+              - text: Approve or reject hours with audit logging
+            - listitem [ref=e379]:
+              - img [ref=e381]
+              - text: Branded partner profile and directory listing
+            - listitem [ref=e383]:
+              - img [ref=e385]
+              - text: Volunteer identities hidden from partners by default
+    - generic [ref=e388]:
+      - heading "Ready to get started?" [level=2] [ref=e390]
+      - paragraph [ref=e391]: GoodHours is free for schools. Register with Google Sign-In — students and community partners join through invitation only.
+      - link "Sign In with Google to Register" [ref=e392] [cursor=pointer]:
+        - /url: /school/register
+        - img [ref=e393]
+        - text: Sign In with Google to Register
+      - paragraph [ref=e398]:
+        - text: Already registered?
+        - link "Sign in" [ref=e399] [cursor=pointer]:
+          - /url: /login
+  - contentinfo [ref=e400]:
+    - generic [ref=e401]:
+      - img "GoodHours" [ref=e402]
+      - generic [ref=e403]: © 2026 GoodHours. All rights reserved.
+      - generic [ref=e404]:
+        - link "Help" [ref=e405] [cursor=pointer]:
+          - /url: /faq
+        - link "Terms" [ref=e406] [cursor=pointer]:
+          - /url: /terms
+        - link "Privacy" [ref=e407] [cursor=pointer]:
+          - /url: /privacy
