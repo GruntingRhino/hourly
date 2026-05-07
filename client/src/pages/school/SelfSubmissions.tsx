@@ -10,7 +10,9 @@ interface SelfSubmission {
   date: string;
   hours: number;
   createdAt: string;
+  reviewedAt: string | null;
   revisionNote: string | null;
+  timesRevised: number;
   student: { id: string; name: string; email: string };
   rejectionReason: string | null;
 }
@@ -295,13 +297,20 @@ export default function SchoolSelfSubmissions() {
       ) : (
         <div className="space-y-3">
           {submissions.map((sub) => (
-            <div key={sub.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div key={sub.id} className={`bg-white border rounded-lg p-4 ${
+              sub.status === "PENDING" && sub.revisionNote ? "border-amber-300" : "border-gray-200"
+            }`}>
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="font-medium">{sub.organizationName}</div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {sub.student.name} &middot; {new Date(sub.date).toLocaleDateString()}
                   </div>
+                  {sub.status === "PENDING" && sub.revisionNote && (
+                    <div className="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200">
+                      {`Revision ${Math.max(1, sub.timesRevised)}`}
+                    </div>
+                  )}
                   <div className="text-sm text-gray-600 mt-1">{sub.description}</div>
                   <div className="text-sm mt-1">
                     <span className="font-medium">{sub.hours}h requested</span>
@@ -310,7 +319,12 @@ export default function SchoolSelfSubmissions() {
                     <div className="text-xs text-red-500 mt-1 italic">Rejected: {sub.rejectionReason}</div>
                   )}
                   {sub.revisionNote && (
-                    <div className="text-xs text-amber-600 mt-1 italic">Revision note: {sub.revisionNote}</div>
+                    <div className="text-xs text-amber-700 mt-1 italic">
+                      {sub.status === "PENDING"
+                        ? `Revised after note (${`Revision ${Math.max(1, sub.timesRevised)}`}):`
+                        : "Revision note:"}{" "}
+                      {sub.revisionNote}
+                    </div>
                   )}
                 </div>
                 <div className="ml-4 flex flex-col items-end gap-2">

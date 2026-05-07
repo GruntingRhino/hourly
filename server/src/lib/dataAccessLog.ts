@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import prisma from "./prisma";
 
 /**
@@ -43,4 +44,36 @@ export async function resolveStudentSchoolId(studentId: string): Promise<string 
   });
   if (!student) return null;
   return student.classroom?.schoolId ?? student.cohort?.schoolId ?? student.schoolId ?? null;
+}
+
+export function buildRequestAuditMetadata(req: Request): Record<string, unknown> {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const requestIp = Array.isArray(forwardedFor)
+    ? forwardedFor[0]
+    : typeof forwardedFor === "string"
+      ? forwardedFor.split(",")[0]?.trim() || null
+      : req.ip || null;
+  const userAgent = typeof req.headers["user-agent"] === "string"
+    ? req.headers["user-agent"].trim().slice(0, 200)
+    : null;
+
+  return {
+    requestIp,
+    userAgent,
+  };
+}
+
+export function summarizeStudentSubjects(
+  students: Array<{ name: string | null; email?: string | null }>,
+  limit = 25
+): Record<string, unknown> {
+  const includedStudents = students
+    .map((student) => (student.name || student.email || "").trim())
+    .filter(Boolean);
+
+  return {
+    studentCount: includedStudents.length,
+    includedStudents: includedStudents.slice(0, limit),
+    omittedStudentCount: Math.max(0, includedStudents.length - limit),
+  };
 }

@@ -5,12 +5,28 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { sendHourRemovedEmail, sendOrgRequestApprovedEmail } from "../services/email";
-import { logDataAccess } from "../lib/dataAccessLog";
-import { resolveEffectiveRules } from "../lib/schoolRules";
+import {
+  sendHourRemovedEmail,
+  sendOrgRequestApprovedEmail,
+  sendOwnershipTransferConfirmationEmail,
+  CLIENT_URL,
+} from "../services/email";
+import {
+  buildRequestAuditMetadata,
+  logDataAccess,
+  summarizeStudentSubjects,
+} from "../lib/dataAccessLog";
+import { getCategoryCapStatusesForStudent, resolveEffectiveRules } from "../lib/schoolRules";
+import { safeSchoolSelect } from "../lib/schoolSelect";
 import { geocodeAddress } from "../lib/geocode";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { calculateStudentHours } from "../lib/hoursCalculator";
+import {
+  assertStudentAccessibleToStaff,
+  buildCohortScopedStudentWhere,
+  getAccessibleTeacherCohorts,
+  getStaffAccessScope,
+} from "../lib/cohortAccess";
 import {
   buildLaunchWorkspace,
   normalizeFirstUserMonitoringConfig,
@@ -20,6 +36,49 @@ import {
 } from "../lib/launchCenter";
 
 const router = Router();
+const REQUIRED_CATEGORY_CAP = "Community Service";
+
+type CategoryCapWarning = {
+  studentId: string;
+  studentName: string;
+  category: string;
+  cap: number;
+  approvedHours: number;
+  message: string;
+};
+
+async function buildCategoryCapWarningsForSchool(schoolId: string): Promise<CategoryCapWarning[]> {
+  const students = await prisma.user.findMany({
+    where: {
+      role: "STUDENT",
+      OR: [
+        { schoolId },
+        { cohort: { schoolId } },
+        { classroom: { schoolId } },
+      ],
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  const warnings = await Promise.all(
+    students.map(async (student) => {
+      const statuses = await getCategoryCapStatusesForStudent(student.id);
+      return statuses
+        .filter((status) => status.alreadyOverCap)
+        .map((status) => ({
+          studentId: student.id,
+          studentName: student.name,
+          category: status.category,
+          cap: status.cap,
+          approvedHours: status.approvedHours,
+          message: `${student.name} has already completed ${status.approvedHours.toFixed(1)} ${status.category} hours, which is above the ${status.cap}h cap. Their hours are kept, but they cannot do more ${status.category}.`,
+        }));
+    }),
+  );
+
+  return warnings.flat();
+}
 const schoolJoinSettingsSchema = z.object({
   allowJoinByCode: z.boolean(),
   partnerInviteTemplate: z.string().max(4000).optional(),
@@ -82,6 +141,64 @@ const launchBugUpdateSchema = z.object({
 
 function roundHours(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function isMissingSchemaObjectError(err: unknown, objectName: string): boolean {
+  return err instanceof Error && err.message.includes(objectName) && (
+    err.message.includes("does not exist")
+    || err.message.includes("Unknown field")
+    || err.message.includes("Unknown arg")
+  );
+}
+
+function buildStaffStudentAuditDetails(params: {
+  req: Request;
+  actorRole: string;
+  accessKind: "student_list_view" | "school_data_export";
+  reportType: "student_directory" | "school_export_csv";
+  scopeLabel: string;
+  scopeType: "school" | "cohort_selection" | "assigned_cohorts";
+  assignedCohorts?: string[];
+  filters?: Record<string, unknown>;
+  students: Array<{ name: string; email: string }>;
+}) {
+  return {
+    accessKind: params.accessKind,
+    reportType: params.reportType,
+    actorRole: params.actorRole,
+    scopeType: params.scopeType,
+    scopeLabel: params.scopeLabel,
+    assignedCohorts: params.assignedCohorts ?? [],
+    filters: params.filters ?? {},
+    ...summarizeStudentSubjects(params.students),
+    ...buildRequestAuditMetadata(params.req),
+  };
+}
+
+async function runOwnershipTransfer(params: {
+  schoolId: string;
+  currentAdminId: string;
+  targetUserId: string;
+}): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: params.currentAdminId },
+      data: { role: "TEACHER" },
+    });
+    await tx.user.update({
+      where: { id: params.targetUserId },
+      data: { role: "SCHOOL_ADMIN" },
+    });
+    await tx.school.update({
+      where: { id: params.schoolId },
+      data: {
+        createdById: params.targetUserId,
+        ownershipTransferToken: null,
+        ownershipTransferExpires: null,
+        ownershipTransferTargetUserId: null,
+      },
+    });
+  });
 }
 
 // GET /api/schools — public search (for orgs to find schools)
@@ -240,6 +357,185 @@ router.patch("/settings", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
   }
 });
 
+// GET /api/schools/:id/staff — list school staff and their accessible cohorts
+router.get("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id || !scope.isSchoolAdmin) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    let staff: Array<any>;
+    try {
+      staff = await prisma.user.findMany({
+        where: {
+          schoolId: req.params.id,
+          role: { in: ["SCHOOL_ADMIN", "TEACHER"] },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          assignedCohorts: {
+            select: {
+              cohort: { select: { id: true, name: true } },
+            },
+            orderBy: { cohort: { name: "asc" } },
+          },
+        },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      });
+    } catch (err) {
+      if (
+        !isMissingSchemaObjectError(err, "CohortTeacherAssignment")
+        && !isMissingSchemaObjectError(err, "assignedCohorts")
+      ) {
+        throw err;
+      }
+      staff = await prisma.user.findMany({
+        where: {
+          schoolId: req.params.id,
+          role: { in: ["SCHOOL_ADMIN", "TEACHER"] },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      }).then((rows) => rows.map((row) => ({ ...row, assignedCohorts: [] })));
+    }
+
+    res.json(staff.map((member) => ({
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      role: member.role,
+      assignedCohorts: member.assignedCohorts.map((assignment: any) => assignment.cohort),
+    })));
+  } catch (err) {
+    console.error("List school staff error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/:id/ownership-transfer — request school ownership transfer
+router.post("/:id/ownership-transfer", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, name: true, email: true, schoolId: true, role: true },
+    });
+    if (admin?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const { targetEmail } = z.object({
+      targetEmail: z.string().email(),
+    }).parse(req.body);
+
+    const normalizedTargetEmail = targetEmail.trim().toLowerCase();
+    if (normalizedTargetEmail === admin.email.trim().toLowerCase()) {
+      return res.status(400).json({ error: "You already own this school." });
+    }
+
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        email: normalizedTargetEmail,
+        schoolId: req.params.id,
+        role: { in: ["TEACHER", "SCHOOL_ADMIN"] },
+      },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    if (!targetUser) {
+      return res.status(404).json({ error: "Target account must already be registered as school staff for this school." });
+    }
+    if (targetUser.role === "SCHOOL_ADMIN") {
+      return res.status(400).json({ error: "That account already owns this school." });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, name: true },
+    });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await prisma.school.update({
+      where: { id: school.id },
+      data: {
+        ownershipTransferToken: token,
+        ownershipTransferExpires: expiresAt,
+        ownershipTransferTargetUserId: targetUser.id,
+      },
+    });
+
+    const confirmationLink = `${CLIENT_URL}/school/confirm-transfer?token=${token}`;
+    await sendOwnershipTransferConfirmationEmail(
+      admin.email,
+      school.name,
+      targetUser.name,
+      targetUser.email,
+      confirmationLink
+    );
+
+    res.json({
+      message: "Transfer confirmation email sent.",
+      targetUser: {
+        id: targetUser.id,
+        name: targetUser.name,
+        email: targetUser.email,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Ownership transfer request error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/schools/confirm-transfer — confirm school ownership transfer by token
+router.post("/confirm-transfer", async (req: Request, res: Response) => {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+
+    const school = await prisma.school.findFirst({
+      where: {
+        ownershipTransferToken: token,
+        ownershipTransferExpires: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        createdById: true,
+        ownershipTransferTargetUserId: true,
+      },
+    });
+    if (!school?.createdById || !school.ownershipTransferTargetUserId) {
+      return res.status(400).json({ error: "Invalid or expired transfer token" });
+    }
+
+    await runOwnershipTransfer({
+      schoolId: school.id,
+      currentAdminId: school.createdById,
+      targetUserId: school.ownershipTransferTargetUserId,
+    });
+
+    res.json({ message: "Ownership transferred successfully." });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Ownership transfer confirm error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/my-rules — effective service rules for the authenticated user
 router.get("/my-rules", authenticate, async (req: Request, res: Response) => {
   try {
@@ -247,7 +543,17 @@ router.get("/my-rules", authenticate, async (req: Request, res: Response) => {
     if (!rules) {
       return res.status(404).json({ error: "No school rules found" });
     }
-    res.json(rules);
+    const categoryCapStatuses =
+      req.user?.role === "STUDENT"
+        ? await getCategoryCapStatusesForStudent(req.user.userId)
+        : [];
+    res.json({
+      ...rules,
+      categoryCapStatuses,
+      blockedCategories: categoryCapStatuses
+        .filter((status) => status.maxedOut || status.alreadyOverCap)
+        .map((status) => status.category),
+    });
   } catch (err) {
     console.error("Get my rules error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -489,7 +795,8 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
 
     const school = await prisma.school.findUnique({
       where: { id: req.params.id },
-      include: {
+      select: {
+        ...safeSchoolSelect,
         _count: { select: { staff: true, classrooms: true, approvedOrgs: true, groups: true } },
       },
     });
@@ -547,6 +854,28 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       }
     }
 
+    const currentSchool = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: { requiredHours: true },
+    });
+    if (!currentSchool) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    const effectiveRequiredHours = body.requiredHours ?? currentSchool.requiredHours;
+    if (rulesData.categoryHourCaps) {
+      const normalizedCategoryHourCaps = Object.fromEntries(
+        Object.entries(rulesData.categoryHourCaps).filter(([category]) => category.trim() !== REQUIRED_CATEGORY_CAP)
+      );
+      rulesData.categoryHourCaps = normalizedCategoryHourCaps;
+      const totalCapHours = Object.values(normalizedCategoryHourCaps).reduce((sum, hours) => sum + hours, 0);
+      if (totalCapHours > effectiveRequiredHours) {
+        return res.status(400).json({
+          error: `Category caps cannot exceed the total required hours of ${effectiveRequiredHours}h.`,
+        });
+      }
+    }
+
     const updateData: any = {
       ...(body.name !== undefined && { name: body.name }),
       ...(body.domain !== undefined && { domain: body.domain }),
@@ -594,7 +923,12 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
     const updated = await prisma.school.update({
       where: { id: req.params.id },
       data: updateData,
+      select: safeSchoolSelect,
     });
+    const categoryCapWarnings =
+      updateData.categoryHourCaps !== undefined
+        ? await buildCategoryCapWarningsForSchool(req.params.id)
+        : [];
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -605,7 +939,10 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
       details: { updatedFields: Object.keys(updateData) },
     });
 
-    res.json(updated);
+    res.json({
+      ...updated,
+      categoryCapWarnings,
+    });
   } catch (err) {
     console.error("Update school error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -615,18 +952,20 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
 // GET /api/schools/:id/students — list students (via classrooms)
 router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.schoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { classroom: { schoolId: req.params.id } },
-          { cohort: { schoolId: req.params.id } },
-        ],
+        ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          OR: [
+            { classroom: { schoolId: req.params.id } },
+            { cohort: { schoolId: req.params.id } },
+          ],
+        }),
       },
       select: {
         id: true, name: true, email: true, grade: true,
@@ -648,9 +987,10 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
 
     const school = await prisma.school.findUnique({
       where: { id: req.params.id },
-      select: { requiredHours: true, serviceStartDate: true, serviceEndDate: true },
+      select: { name: true, requiredHours: true, serviceStartDate: true, serviceEndDate: true },
     });
     if (!school) return res.status(404).json({ error: "School not found" });
+    const accessibleCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     const progress = await buildStudentProgressRecords(students, {
       requiredHours: school.requiredHours,
@@ -676,7 +1016,18 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
       targetType: "school",
       targetId: req.params.id,
       schoolId: req.params.id,
-      details: { studentCount: result.length },
+      details: buildStaffStudentAuditDetails({
+        req,
+        actorRole: req.user!.role,
+        accessKind: "student_list_view",
+        reportType: "student_directory",
+        scopeType: scope?.isSchoolAdmin ? "school" : "assigned_cohorts",
+        scopeLabel: scope?.isSchoolAdmin
+          ? school.name
+          : accessibleCohorts.map((cohort) => cohort.name).join(", "),
+        assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
+        students: students.map((student) => ({ name: student.name, email: student.email })),
+      }),
     });
 
     res.json(result);
@@ -689,8 +1040,8 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
 // GET /api/schools/:id/students/:studentId/verification-history — beneficiary verification audit trail for one student
 router.get("/:id/students/:studentId/verification-history", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (actor?.schoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -708,10 +1059,8 @@ router.get("/:id/students/:studentId/verification-history", authenticate, requir
     if (!student) return res.status(404).json({ error: "Student not found" });
     if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
 
-    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
-    if (studentSchoolId !== req.params.id) {
-      return res.status(403).json({ error: "Student is not enrolled in your school" });
-    }
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, student.id) : false;
+    if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
 
     const signups = await prisma.beneficiarySignup.findMany({
       where: { studentId: student.id },
@@ -782,8 +1131,8 @@ router.get("/:id/students/:studentId/verification-history", authenticate, requir
 // GET /api/schools/:id/students/:studentId/hour-breakdown — per-student source-of-truth view
 router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (actor?.schoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -802,10 +1151,8 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
     if (!student) return res.status(404).json({ error: "Student not found" });
     if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
 
-    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
-    if (studentSchoolId !== req.params.id) {
-      return res.status(403).json({ error: "Student is not enrolled in your school" });
-    }
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, student.id) : false;
+    if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
 
     const [beneficiarySignups, selfSubmissions, legacySessions, totalsMap] = await Promise.all([
       prisma.beneficiarySignup.findMany({
@@ -918,6 +1265,7 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         evidenceNote: submission.evidenceNote,
         rejectionReason: submission.rejectionReason,
         revisionNote: submission.revisionNote,
+        timesRevised: submission.timesRevised,
         reviewedAt: submission.reviewedAt,
         reviewer: submission.reviewedBy
           ? auditActorMap.get(submission.reviewedBy) ?? { id: submission.reviewedBy, name: "Unknown", role: "UNKNOWN" }
@@ -1017,21 +1365,31 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
 // GET /api/schools/:id/stats — school-wide stats
 router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.schoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      select: {
+        name: true,
+        requiredHours: true,
+        serviceStartDate: true,
+        serviceEndDate: true,
+      },
+    });
     if (!school) return res.status(404).json({ error: "School not found" });
 
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { classroom: { schoolId: req.params.id } },
-          { cohort: { schoolId: req.params.id } },
-        ],
+        ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          OR: [
+            { classroom: { schoolId: req.params.id } },
+            { cohort: { schoolId: req.params.id } },
+          ],
+        }),
       },
       select: {
         id: true,
@@ -1193,6 +1551,58 @@ router.get("/:id/organizations", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
   }
 });
 
+// GET /api/schools/:id/partner-opportunities — opportunities from approved partners
+router.get("/:id/partner-opportunities", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
+
+    const search = (req.query.search as string | undefined)?.trim();
+    const category = (req.query.category as string | undefined)?.trim();
+
+    const opportunities = await prisma.beneficiaryOpportunity.findMany({
+      where: {
+        status: "ACTIVE",
+        beneficiary: {
+          schoolApprovals: {
+            some: {
+              schoolId: req.params.id,
+              status: "APPROVED",
+            },
+          },
+        },
+        ...(category ? { category: { equals: category, mode: "insensitive" } } : {}),
+        ...(search
+          ? {
+              OR: [
+                { title: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } },
+                { location: { contains: search, mode: "insensitive" } },
+                { category: { contains: search, mode: "insensitive" } },
+                { beneficiary: { name: { contains: search, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        beneficiary: { select: { id: true, name: true, category: true } },
+        timeSlots: {
+          include: { _count: { select: { signups: true } } },
+          orderBy: { date: "asc" },
+        },
+      },
+      orderBy: [{ startDate: "asc" }, { title: "asc" }],
+    });
+
+    res.json(opportunities);
+  } catch (err) {
+    console.error("School partner opportunities error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── Student Groups ─────────────────────────────────────────────
 
 // GET /api/schools/:id/groups
@@ -1260,7 +1670,7 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
           cohort: { select: { requiredHours: true } },
         },
       }),
-      prisma.school.findUnique({ where: { id: req.params.id } }),
+      prisma.school.findUnique({ where: { id: req.params.id }, select: { requiredHours: true } }),
       calculateStudentHours(studentIds),
     ]);
 
@@ -1486,6 +1896,10 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     if (user?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
+      return res.status(403).json({ error: "Not your school" });
+    }
 
     const school = await prisma.school.findUnique({
       where: { id: req.params.id },
@@ -1510,6 +1924,9 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
       if (!cohort) {
         return res.status(404).json({ error: "Cohort not found for this school" });
       }
+      if (scope && !scope.isSchoolAdmin && !scope.assignedCohortIds.includes(cohortId)) {
+        return res.status(403).json({ error: "Not your cohort" });
+      }
       cohortLabel = cohort.name;
     }
 
@@ -1519,6 +1936,8 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     };
     if (cohortId) {
       whereClause.cohortId = cohortId;
+    } else if (scope && !scope.isSchoolAdmin) {
+      whereClause.cohortId = { in: scope.assignedCohortIds };
     } else {
       whereClause.OR = [
         { classroom: { schoolId: req.params.id } },
@@ -1554,6 +1973,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
       serviceEndDate: school.serviceEndDate,
     });
     const progressMap = new Map(progress.map((student) => [student.id, student]));
+    const accessibleCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -1561,7 +1981,24 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
       targetType: "school",
       targetId: req.params.id,
       schoolId: req.params.id,
-      details: { studentCount: students.length, cohortId: cohortId ?? null },
+      details: buildStaffStudentAuditDetails({
+        req,
+        actorRole: req.user!.role,
+        accessKind: "school_data_export",
+        reportType: "school_export_csv",
+        scopeType: cohortLabel
+          ? "cohort_selection"
+          : scope?.isSchoolAdmin
+            ? "school"
+            : "assigned_cohorts",
+        scopeLabel: cohortLabel
+          ?? (scope?.isSchoolAdmin
+            ? school.name
+            : accessibleCohorts.map((cohort) => cohort.name).join(", ")),
+        assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
+        filters: cohortLabel ? { cohort: cohortLabel } : {},
+        students: students.map((student) => ({ name: student.name, email: student.email })),
+      }),
     });
 
     const rows: string[][] = [["Student ID", "Name", "Email", "Grade", "Cohort", "Approved Hours", "Required Hours", "% Complete", "Enrolled At"]];
@@ -1667,8 +2104,52 @@ router.get("/:id/data-access-logs", authenticate, requireRole("SCHOOL_ADMIN"), a
       orderBy: { createdAt: "desc" },
       take: 500,
     });
+    const userTargetIds = [...new Set(logs
+      .filter((log) => log.targetId && ["student", "user", "User"].includes(log.targetType || ""))
+      .map((log) => log.targetId!)
+    )];
+    const schoolTargetIds = [...new Set(logs
+      .filter((log) => log.targetId && ["school", "School"].includes(log.targetType || ""))
+      .map((log) => log.targetId!)
+    )];
+    const cohortTargetIds = [...new Set(logs
+      .filter((log) => log.targetId && ["cohort", "Cohort"].includes(log.targetType || ""))
+      .map((log) => log.targetId!)
+    )];
 
-    res.json(logs);
+    const [users, schools, cohorts] = await Promise.all([
+      userTargetIds.length
+        ? prisma.user.findMany({ where: { id: { in: userTargetIds } }, select: { id: true, name: true, email: true } })
+        : Promise.resolve([]),
+      schoolTargetIds.length
+        ? prisma.school.findMany({ where: { id: { in: schoolTargetIds } }, select: { id: true, name: true } })
+        : Promise.resolve([]),
+      cohortTargetIds.length
+        ? prisma.cohort.findMany({ where: { id: { in: cohortTargetIds } }, select: { id: true, name: true } })
+        : Promise.resolve([]),
+    ]);
+
+    const userLabelById = new Map(users.map((entry) => [entry.id, entry.name || entry.email]));
+    const schoolLabelById = new Map(schools.map((entry) => [entry.id, entry.name]));
+    const cohortLabelById = new Map(cohorts.map((entry) => [entry.id, entry.name]));
+
+    res.json(logs.map((log) => {
+      let targetLabel: string | null = null;
+      if (log.targetId) {
+        if (["student", "user", "User"].includes(log.targetType || "")) {
+          targetLabel = userLabelById.get(log.targetId) ?? null;
+        } else if (["school", "School"].includes(log.targetType || "")) {
+          targetLabel = schoolLabelById.get(log.targetId) ?? null;
+        } else if (["cohort", "Cohort"].includes(log.targetType || "")) {
+          targetLabel = cohortLabelById.get(log.targetId) ?? null;
+        }
+      }
+      return {
+        ...log,
+        targetId: null,
+        targetLabel,
+      };
+    }));
   } catch (err) {
     console.error("Data access logs error:", err);
     res.status(500).json({ error: "Internal server error" });

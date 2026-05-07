@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
@@ -10,10 +10,18 @@ import { extractDomainFromWebsite } from "./auth";
 
 const router = Router();
 
-// 3 registration attempts per IP per hour — prevents email-bombing the contact address
+function normalizeContactEmail(email: unknown): string {
+  return typeof email === "string" && email.trim()
+    ? email.trim().toLowerCase()
+    : "unknown";
+}
+
+// 3 registration attempts per IP/contact-email pair per hour — prevents inbox-bombing the contact address
 const registerSchoolLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
+  keyGenerator: (req) =>
+    `register-school:${ipKeyGenerator(req.ip || "")}:${normalizeContactEmail(req.body?.contactEmail)}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many registration attempts from this IP. Please try again later." },

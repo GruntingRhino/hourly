@@ -30,6 +30,39 @@ function normalizeEmail(email: string): string {
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
 
+function normalizeRateLimitEmail(email: unknown): string {
+  if (typeof email !== "string") return "unknown";
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed) return "unknown";
+  return normalizeEmail(trimmed);
+}
+
+function getRequestUserAgent(req: Request): string {
+  return (req.get("user-agent") || "unknown").trim().toLowerCase();
+}
+
+const schoolAuthSelect = {
+  id: true,
+  name: true,
+  domain: true,
+  verified: true,
+  requiredHours: true,
+  verificationStandard: true,
+  zipCodes: true,
+  address: true,
+  city: true,
+  state: true,
+  zip: true,
+  latitude: true,
+  longitude: true,
+  serviceStartDate: true,
+  serviceEndDate: true,
+  allowSelfSubmission: true,
+  requireOrgVerification: true,
+  categoryHourCaps: true,
+  partnerInviteTemplate: true,
+} as const;
+
 // Limits for endpoints that trigger outbound email — the primary DDOS surface.
 // Each limit is per IP address and resets on a rolling window.
 
@@ -99,31 +132,51 @@ const signupLimiter = rateLimit({
   message: { error: "Too many signup attempts from this IP. Please try again later." },
 });
 
-// Forgot-password: 5 requests per IP per 15 minutes
+// Forgot-password: 5 requests per IP/email pair per 15 minutes
 const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => ipKeyGenerator(req.ip || ""),
+  keyGenerator: (req) =>
+    `forgot-password:${ipKeyGenerator(req.ip || "")}:${normalizeRateLimitEmail(req.body?.email)}`,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many password reset requests from this IP. Please try again later." },
+  message: { error: "Too many password reset requests for this email. Please try again later." },
 });
 
-// Resend-verification: 3 requests per IP per hour
+// Resend-verification: 3 requests per account per hour
 const resendVerificationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  keyGenerator: (req) => ipKeyGenerator(req.ip || ""),
+  keyGenerator: (req) =>
+    `resend-verification:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many resend requests from this IP. Please try again later." },
+  message: { error: "Too many verification email resend attempts. Please try again later." },
 });
 
-// Login: 10 attempts per IP per 15 minutes — prevents brute-force of passwords.
+// Login global IP window: 50 failed attempts per IP/UA per 15 minutes.
+const loginIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  keyGenerator: (req) => `login-ip:${ipKeyGenerator(req.ip || "")}:${getRequestUserAgent(req)}`,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  skip: (req) => {
+    if (IS_PROD_LIKE) return false;
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    return /^abhay\.sivaram\+\d+@gmail\.com$/.test(email);
+  },
+});
+
+// Login credential window: 8 failed attempts per IP/email pair per 15 minutes.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
-  keyGenerator: (req) => ipKeyGenerator(req.ip || ""),
+  max: 8,
+  keyGenerator: (req) =>
+    `login-credential:${ipKeyGenerator(req.ip || "")}:${normalizeRateLimitEmail(req.body?.email)}`,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
@@ -413,7 +466,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 });
 
 // POST /api/auth/login
-router.post("/login", loginLimiter, async (req: Request, res: Response) => {
+router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
     data.email = normalizeEmail(data.email);
@@ -422,9 +475,9 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       where: { email: data.email },
       include: {
         organization: true,
-        school: true,
-        classroom: { include: { school: true } },
-        cohort: { include: { school: true } },
+        school: { select: schoolAuthSelect },
+        classroom: { include: { school: { select: schoolAuthSelect } } },
+        cohort: { include: { school: { select: schoolAuthSelect } } },
         beneficiary: true,
       },
     });
@@ -486,9 +539,9 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       where: { id: req.user!.userId },
       include: {
         organization: true,
-        school: true,
-        classroom: { include: { school: true } },
-        cohort: { include: { school: true } },
+        school: { select: schoolAuthSelect },
+        classroom: { include: { school: { select: schoolAuthSelect } } },
+        cohort: { include: { school: { select: schoolAuthSelect } } },
         beneficiary: true,
       },
     });
@@ -654,7 +707,7 @@ router.get("/verify-email", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/resend-verification
-router.post("/resend-verification", resendVerificationLimiter, authenticate, async (req: Request, res: Response) => {
+router.post("/resend-verification", authenticate, resendVerificationLimiter, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -873,8 +926,8 @@ if (!IS_PROD_LIKE) {
       const target = await prisma.user.findUnique({
         where: { email: targetEmail },
         include: {
-          school: true,
-          cohort: { include: { school: true } },
+          school: { select: schoolAuthSelect },
+          cohort: { include: { school: { select: schoolAuthSelect } } },
           beneficiary: true,
         },
       });

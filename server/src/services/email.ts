@@ -23,6 +23,22 @@ function isDevEnv(): boolean {
   );
 }
 
+type EmailDeliveryMode = "auto" | "send" | "log";
+
+function getEmailDeliveryMode(): EmailDeliveryMode {
+  const raw = String(process.env.EMAIL_DELIVERY_MODE || "auto").trim().toLowerCase();
+  if (raw === "send" || raw === "log") return raw;
+  return "auto";
+}
+
+function shouldLogOnlyEmailDelivery(to: string): boolean {
+  if (isMailinatorAddress(to)) return false;
+  const mode = getEmailDeliveryMode();
+  if (mode === "send") return false;
+  if (mode === "log") return true;
+  return isDevEnv() && (!process.env.RESEND_API_KEY || !FROM);
+}
+
 type CapturedEmail = {
   to: string;
   from: string;
@@ -140,8 +156,9 @@ export function getCapturedMailinatorInbox(inbox: string): CapturedEmail[] {
 async function send(to: string, subject: string, html: string): Promise<void> {
   const defaultFrom = FROM?.trim() || MAILINATOR_FROM?.trim() || "noreply@notifications.goodhours.app";
 
-  // In dev environments, log emails to console instead of sending via Resend.
-  if (isDevEnv() && !isMailinatorAddress(to)) {
+  // In explicitly log-only mode, or in auto mode without real provider config,
+  // keep local/dev flows usable without silently pretending delivery succeeded.
+  if (shouldLogOnlyEmailDelivery(to)) {
     console.info(
       `[email:dev] Would send "${subject}" → ${to}\n` +
       `  from: ${defaultFrom}\n` +
@@ -577,6 +594,24 @@ export async function sendBehindScheduleEmail(
       "Behind on service progress",
       `Hi ${studentName},<br><br>You currently have <strong>${approvedHours.toFixed(1)} of ${requiredHours.toFixed(1)} required hours</strong> for <strong>${schoolName}</strong>.<br><br>${reasons.length ? `Current risk factors:<br>${reasons.map((reason) => `• ${reason}`).join("<br>")}<br><br>` : ""}Please review your dashboard and make a plan to get back on track.`,
       { label: "Review Progress", url: `${CLIENT_URL}/dashboard` }
+    )
+  );
+}
+
+export async function sendOwnershipTransferConfirmationEmail(
+  to: string,
+  schoolName: string,
+  targetName: string,
+  targetEmail: string,
+  confirmationLink: string
+): Promise<void> {
+  await send(
+    to,
+    `Confirm ownership transfer for ${schoolName}`,
+    base(
+      "Confirm school ownership transfer",
+      `You requested to transfer ownership of <strong>${schoolName}</strong> to <strong>${targetName}</strong> (${targetEmail}).<br><br>Click below to confirm this transfer. Once confirmed, the target account becomes the school admin and your account is retained as teacher/staff access.`,
+      { label: "Confirm Transfer", url: confirmationLink }
     )
   );
 }

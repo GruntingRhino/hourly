@@ -19,11 +19,27 @@ interface Cohort {
   completedCount: number;
   atRiskCount: number;
   completionPercentage: number;
+  teachers?: Array<{ id: string; name: string; email: string }>;
+}
+
+interface TeacherImportIssue {
+  row: number;
+  email: string | null;
+  cohort: string | null;
+  reason: string;
+}
+
+interface TeacherImportResult {
+  assigned: number;
+  created: number;
+  skipped: number;
+  errors: TeacherImportIssue[];
 }
 
 export default function SchoolCohorts() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
+  const isTeacher = user?.role === "TEACHER";
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,6 +49,9 @@ export default function SchoolCohorts() {
   const [createStartYear, setCreateStartYear] = useState("");
   const [creating, setCreating] = useState(false);
   const [publishToast, setPublishToast] = useState("");
+  const [teacherCsvData, setTeacherCsvData] = useState("");
+  const [teacherImporting, setTeacherImporting] = useState(false);
+  const [teacherImportResult, setTeacherImportResult] = useState<TeacherImportResult | null>(null);
 
   const loadCohorts = async () => {
     setLoading(true);
@@ -81,12 +100,30 @@ export default function SchoolCohorts() {
     }
   };
 
+  const handleTeacherImport = async () => {
+    if (!teacherCsvData.trim()) return;
+    setTeacherImporting(true);
+    setError("");
+    try {
+      const result = await api.post<TeacherImportResult>("/cohorts/teachers/import", { csvData: teacherCsvData });
+      setTeacherImportResult(result);
+      if ((result.errors ?? []).length === 0) {
+        setTeacherCsvData("");
+      }
+      void loadCohorts();
+    } catch (err: any) {
+      setError(err.message || "Failed to import teacher assignments.");
+    } finally {
+      setTeacherImporting(false);
+    }
+  };
+
   if (loading) return <div className="text-gray-500 py-8 text-center">Loading cohorts...</div>;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-[22px] font-bold text-gray-900">Cohorts</h1>
+        <h1 className="text-[22px] font-bold text-gray-900">{isTeacher ? "Assigned Cohorts" : "Cohorts"}</h1>
         {isAdmin && (
           <button
             onClick={() => setShowCreateForm(true)}
@@ -99,6 +136,41 @@ export default function SchoolCohorts() {
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
       {publishToast && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{publishToast}</div>}
+      {isAdmin && (
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="font-semibold mb-2">Assign Teachers by CSV</h2>
+          <div className="text-xs text-gray-500 mb-3">Headers must be exactly <span className="font-mono">name,email,cohort</span>. Cohort must match the cohort name exactly.</div>
+          <textarea
+            value={teacherCsvData}
+            onChange={(e) => setTeacherCsvData(e.target.value)}
+            rows={6}
+            placeholder={"name,email,cohort\nJamie Smith,jamie@school.edu,PW Cohort B"}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+          />
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleTeacherImport}
+              disabled={teacherImporting}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {teacherImporting ? "Importing..." : "Import Teacher Assignments"}
+            </button>
+          </div>
+          {teacherImportResult && (
+            <div className="mt-3 text-xs bg-gray-50 border border-gray-200 rounded p-3 space-y-1">
+              <div>{teacherImportResult.assigned} existing teacher assignment{teacherImportResult.assigned === 1 ? "" : "s"} added.</div>
+              <div>{teacherImportResult.created} new teacher account{teacherImportResult.created === 1 ? "" : "s"} created and assigned.</div>
+              {teacherImportResult.skipped > 0 && <div>{teacherImportResult.skipped} row{teacherImportResult.skipped === 1 ? "" : "s"} skipped.</div>}
+              {teacherImportResult.errors.map((issue) => (
+                <div key={`${issue.row}-${issue.email || "unknown"}-${issue.cohort || "unknown"}`} className="text-red-600">
+                  Row {issue.row}{issue.email ? ` (${issue.email})` : ""}{issue.cohort ? ` · ${issue.cohort}` : ""}: {issue.reason}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {showCreateForm && (
         <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
           <h2 className="font-semibold mb-4">Create Cohort</h2>
@@ -145,6 +217,11 @@ export default function SchoolCohorts() {
                     {(cohort.startYear || cohort.endYear) && (
                     <div className="text-[12.5px] text-gray-500 mt-0.5">
                       {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear} · {cohort.requiredHours}h goal
+                    </div>
+                  )}
+                  {!!cohort.teachers?.length && (
+                    <div className="mt-1 text-[12px] text-gray-500">
+                      Teachers: {cohort.teachers.map((teacher) => teacher.name).join(", ")}
                     </div>
                   )}
                 </div>

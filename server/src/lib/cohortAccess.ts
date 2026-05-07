@@ -1,0 +1,115 @@
+import prisma from "./prisma";
+
+export type StaffAccessScope = {
+  userId: string;
+  role: "SCHOOL_ADMIN" | "TEACHER";
+  schoolId: string;
+  assignedCohortIds: string[];
+  isSchoolAdmin: boolean;
+};
+
+export async function getStaffAccessScope(userId: string): Promise<StaffAccessScope | null> {
+  let user:
+    | {
+        id: string;
+        role: "SCHOOL_ADMIN" | "TEACHER" | string;
+        schoolId: string | null;
+        assignedCohorts: Array<{ cohortId: string }>;
+      }
+    | null;
+
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        schoolId: true,
+        assignedCohorts: { select: { cohortId: true } },
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof Error) || !err.message.includes("CohortTeacherAssignment")) {
+      throw err;
+    }
+
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        schoolId: true,
+      },
+    }).then((entry) => entry ? { ...entry, assignedCohorts: [] } : null);
+  }
+  if (!user?.schoolId) return null;
+  if (user.role !== "SCHOOL_ADMIN" && user.role !== "TEACHER") return null;
+  return {
+    userId: user.id,
+    role: user.role,
+    schoolId: user.schoolId,
+    assignedCohortIds: user.assignedCohorts.map((assignment) => assignment.cohortId),
+    isSchoolAdmin: user.role === "SCHOOL_ADMIN",
+  };
+}
+
+export function getAccessibleCohortIds(scope: StaffAccessScope): string[] | null {
+  return scope.isSchoolAdmin ? null : scope.assignedCohortIds;
+}
+
+export function ensureTeacherHasAssignedCohorts(scope: StaffAccessScope): boolean {
+  return scope.isSchoolAdmin || scope.assignedCohortIds.length > 0;
+}
+
+export function canAccessCohort(scope: StaffAccessScope, cohortId: string): boolean {
+  return scope.isSchoolAdmin || scope.assignedCohortIds.includes(cohortId);
+}
+
+export function buildCohortScopedStudentWhere(scope: StaffAccessScope): Record<string, unknown> {
+  if (scope.isSchoolAdmin) {
+    return {
+      OR: [
+        { classroom: { schoolId: scope.schoolId } },
+        { cohort: { schoolId: scope.schoolId } },
+      ],
+    };
+  }
+
+  return {
+    cohortId: { in: scope.assignedCohortIds },
+  };
+}
+
+export async function assertStudentAccessibleToStaff(
+  scope: StaffAccessScope,
+  studentId: string
+): Promise<boolean> {
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: {
+      role: true,
+      schoolId: true,
+      cohortId: true,
+      cohort: { select: { schoolId: true } },
+      classroom: { select: { schoolId: true } },
+    },
+  });
+  if (!student || student.role !== "STUDENT") return false;
+
+  const studentSchoolId = student.schoolId ?? student.cohort?.schoolId ?? student.classroom?.schoolId ?? null;
+  if (studentSchoolId !== scope.schoolId) return false;
+
+  if (scope.isSchoolAdmin) return true;
+  return !!student.cohortId && scope.assignedCohortIds.includes(student.cohortId);
+}
+
+export async function getAccessibleTeacherCohorts(scope: StaffAccessScope): Promise<Array<{ id: string; name: string }>> {
+  return prisma.cohort.findMany({
+    where: {
+      schoolId: scope.schoolId,
+      ...(scope.isSchoolAdmin ? {} : { id: { in: scope.assignedCohortIds } }),
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}

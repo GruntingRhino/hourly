@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import SearchableSelect from "../../components/SearchableSelect";
 import BeneficiaryDiscover from "./Discover";
+import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
 
 function toTitleCase(str: string) {
   return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
@@ -60,6 +62,21 @@ interface BeneficiaryOpportunity {
   }>;
 }
 
+interface ApprovedPartnerOpportunity {
+  id: string;
+  title: string;
+  category: string | null;
+  location: string | null;
+  status: string;
+  beneficiary: { id: string; name: string; category: string | null };
+  timeSlots: Array<{
+    id: string;
+    date: string;
+    durationHours: number;
+    _count: { signups: number };
+  }>;
+}
+
 const CATEGORIES = [
   "", "Education", "Environment", "Food & Nutrition", "Health",
   "Housing & Shelter", "Human Services", "Youth Development", "Animal Welfare",
@@ -98,7 +115,7 @@ export default function SchoolBeneficiaries() {
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"pending" | "approved" | "search" | "map" | "manage">("approved");
+  const [tab, setTab] = useState<"pending" | "approved" | "opportunities" | "search" | "map" | "manage">("approved");
   const [searchQuery, setSearchQuery] = useState("");
   const [smartResults, setSmartResults] = useState<DirEntry[]>([]);
   const [smartLoading, setSmartLoading] = useState(false);
@@ -126,6 +143,10 @@ export default function SchoolBeneficiaries() {
   const [loadingOpportunityId, setLoadingOpportunityId] = useState<string | null>(null);
   const [drawerBeneficiary, setDrawerBeneficiary] = useState<Beneficiary | null>(null);
   const [schoolInviteTemplate, setSchoolInviteTemplate] = useState("");
+  const [approvedPartnerOpportunities, setApprovedPartnerOpportunities] = useState<ApprovedPartnerOpportunity[]>([]);
+  const [approvedPartnerOpportunitiesLoading, setApprovedPartnerOpportunitiesLoading] = useState(false);
+  const [opportunitySearchQuery, setOpportunitySearchQuery] = useState("");
+  const [opportunityCategoryFilter, setOpportunityCategoryFilter] = useState("");
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
@@ -216,6 +237,15 @@ export default function SchoolBeneficiaries() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [tab, isAdmin, searchQuery, selectedCategory, proximityRadius, schoolLocation]);
+
+  useEffect(() => {
+    if (tab !== "opportunities" || !user?.schoolId) return;
+    setApprovedPartnerOpportunitiesLoading(true);
+    api.get<ApprovedPartnerOpportunity[]>(`/schools/${user.schoolId}/partner-opportunities`)
+      .then((data) => setApprovedPartnerOpportunities(data))
+      .catch((err: any) => setError(err.message || "Failed to load approved partner opportunities."))
+      .finally(() => setApprovedPartnerOpportunitiesLoading(false));
+  }, [tab, user?.schoolId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -484,6 +514,21 @@ export default function SchoolBeneficiaries() {
     );
   };
 
+  const opportunityCategoryOptions = buildOpportunityCategoryOptions(
+    approvedPartnerOpportunities.map((opportunity) => opportunity.category),
+  );
+  const filteredApprovedPartnerOpportunities = approvedPartnerOpportunities.filter((opportunity) => {
+    if (opportunityCategoryFilter && (opportunity.category || "") !== opportunityCategoryFilter) return false;
+    if (!opportunitySearchQuery.trim()) return true;
+    const q = opportunitySearchQuery.trim().toLowerCase();
+    return (
+      opportunity.title.toLowerCase().includes(q) ||
+      opportunity.beneficiary.name.toLowerCase().includes(q) ||
+      (opportunity.location?.toLowerCase().includes(q) ?? false) ||
+      (opportunity.category?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -501,6 +546,7 @@ export default function SchoolBeneficiaries() {
         {[
           ...(pending.length > 0 ? [{ key: "pending", label: `Pending Partners (${pending.length})` }] : []),
           { key: "approved", label: "Approved" },
+          { key: "opportunities", label: "Approved Opportunities" },
           ...(isAdmin ? [
             { key: "search", label: "Add from Directory" },
             { key: "map", label: "Add from Map" },
@@ -613,6 +659,65 @@ export default function SchoolBeneficiaries() {
             <div className="text-gray-500 text-sm py-4">
               No results. Try a different category or search term.
               {schoolLocation && " You can also try a larger radius."}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "opportunities" && (
+        <div>
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
+            <input
+              type="text"
+              value={opportunitySearchQuery}
+              onChange={(e) => setOpportunitySearchQuery(e.target.value)}
+              placeholder="Search approved opportunities or partners..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+            <SearchableSelect
+              value={opportunityCategoryFilter}
+              onChange={setOpportunityCategoryFilter}
+              options={opportunityCategoryOptions}
+              placeholder="Filter by category"
+              clearable
+              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md text-sm"
+            />
+          </div>
+
+          {approvedPartnerOpportunitiesLoading ? (
+            <div className="text-gray-500 text-sm">Loading opportunities...</div>
+          ) : filteredApprovedPartnerOpportunities.length === 0 ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+              No approved partner opportunities match the current filters.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredApprovedPartnerOpportunities.map((opportunity) => {
+                const signupCount = opportunity.timeSlots.reduce((sum, slot) => sum + slot._count.signups, 0);
+                return (
+                  <div key={opportunity.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-gray-900">{opportunity.title}</div>
+                        <div className="mt-1 text-sm text-gray-500">
+                          {opportunity.beneficiary.name}
+                          {opportunity.location ? ` · ${opportunity.location}` : ""}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {opportunity.category || "Uncategorized"} · {opportunity.timeSlots.length} slot{opportunity.timeSlots.length !== 1 ? "s" : ""} · {signupCount} signup{signupCount !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      {opportunity.timeSlots.slice(0, 6).map((slot) => (
+                        <div key={slot.id} className="text-xs text-gray-600">
+                          {new Date(slot.date).toLocaleDateString()} · {slot.durationHours}h · {slot._count.signups} signup{slot._count.signups !== 1 ? "s" : ""}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

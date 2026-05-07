@@ -2,10 +2,22 @@ import { Router, Request, Response } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
-import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
+import {
+  buildRequestAuditMetadata,
+  logDataAccess,
+  resolveStudentSchoolId,
+  summarizeStudentSubjects,
+} from "../lib/dataAccessLog";
 import { calculateStudentHours } from "../lib/hoursCalculator";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { safeSchoolSelect } from "../lib/schoolSelect";
+import {
+  assertStudentAccessibleToStaff,
+  buildCohortScopedStudentWhere,
+  getAccessibleTeacherCohorts,
+  getStaffAccessScope,
+} from "../lib/cohortAccess";
 
 const router = Router();
 
@@ -30,6 +42,27 @@ const parentProgressLimiter = rateLimit({
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
+function buildSchoolReportAuditDetails(params: {
+  req: Request;
+  schoolName: string;
+  actorRole: string;
+  scope: Awaited<ReturnType<typeof getStaffAccessScope>>;
+  selectedCohortNames: string[];
+  students: Array<{ name: string; email: string }>;
+}) {
+  const isAssignedCohortScope = !!params.scope && !params.scope.isSchoolAdmin;
+  return {
+    accessKind: "report_view",
+    reportType: "school_compliance",
+    actorRole: params.actorRole,
+    scopeType: isAssignedCohortScope ? "assigned_cohorts" : "school",
+    scopeLabel: isAssignedCohortScope ? params.selectedCohortNames.join(", ") : params.schoolName,
+    assignedCohorts: isAssignedCohortScope ? params.selectedCohortNames : [],
+    ...summarizeStudentSubjects(params.students),
+    ...buildRequestAuditMetadata(params.req),
+  };
+}
+
 // GET /api/reports/student — student's hour summary
 router.get("/student", authenticate, async (req: Request, res: Response) => {
   try {
@@ -44,8 +77,9 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
       if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
 
-      const studentSchoolId = await resolveStudentSchoolId(userId);
-      if (studentSchoolId !== actor.schoolId) {
+      const scope = await getStaffAccessScope(req.user!.userId);
+      const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, userId) : false;
+      if (!studentAllowed) {
         return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
 
@@ -174,18 +208,25 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
 
-    const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
+    const school = await prisma.school.findUnique({
+      where: { id: user.schoolId },
+      select: safeSchoolSelect,
+    });
     if (!school) return res.status(400).json({ error: "School not found" });
+    const selectedCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     // Include both legacy classroom students and new cohort students
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { classroom: { schoolId: school.id } },
-          { cohort: { schoolId: school.id } },
-        ],
+        ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          OR: [
+            { classroom: { schoolId: school.id } },
+            { cohort: { schoolId: school.id } },
+          ],
+        }),
       },
       select: {
         id: true,
@@ -235,7 +276,14 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       targetType: "school",
       targetId: school.id,
       schoolId: school.id,
-      details: { studentCount: report.length },
+      details: buildSchoolReportAuditDetails({
+        req,
+        schoolName: school.name,
+        actorRole: req.user!.role,
+        scope,
+        selectedCohortNames: selectedCohorts.map((cohort) => cohort.name),
+        students: students.map((student) => ({ name: student.name, email: student.email })),
+      }),
     });
 
     res.json({

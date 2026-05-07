@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
+import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import * as zipcodes from "zipcodes";
@@ -270,14 +271,31 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
       }
     }
 
-    const updated = await prisma.opportunity.update({
-      where: { id: req.params.id },
-      data: updateData,
-      include: { organization: { select: { id: true, name: true } } },
+    const updated = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "Opportunity" WHERE id = ${req.params.id} FOR UPDATE`;
+
+      if (updateData.capacity !== undefined) {
+        const confirmedCount = await tx.signup.count({
+          where: { opportunityId: req.params.id, status: "CONFIRMED" },
+        });
+        if (Number(updateData.capacity) < confirmedCount) {
+          throw new Error(`CAPACITY_FLOOR:${confirmedCount}`);
+        }
+      }
+
+      return tx.opportunity.update({
+        where: { id: req.params.id },
+        data: updateData,
+        include: { organization: { select: { id: true, name: true } } },
+      });
     });
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith("CAPACITY_FLOOR:")) {
+      const confirmedCount = Number(err.message.split(":")[1] || "0");
+      return res.status(400).json({ error: `Capacity cannot be lower than the ${confirmedCount} confirmed volunteer(s).` });
+    }
     console.error("Update opportunity error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

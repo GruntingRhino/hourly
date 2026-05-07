@@ -62,6 +62,7 @@ interface SchoolReportResponse {
 export default function SchoolDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
+  const isTeacher = user?.role === "TEACHER";
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0); // 0 = welcome, 1 = partners, 2 = cohorts
   const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? false;
@@ -215,14 +216,14 @@ export default function SchoolDashboard() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="text-sm font-semibold text-blue-700 mb-1">{user?.school?.name || "School"}</div>
-          <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-[22px] font-bold text-gray-900">{isTeacher ? "Teacher Dashboard" : "Dashboard"}</h1>
         </div>
         <div className="flex gap-2">
           <button onClick={handleExportPdf} className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50">
             Export PDF
           </button>
           <Link to="/cohorts" className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85">
-            Manage Cohorts
+            {isTeacher ? "View Assigned Cohorts" : "Manage Cohorts"}
           </Link>
         </div>
       </div>

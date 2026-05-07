@@ -1,8 +1,20 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { ApiError, api } from "../../lib/api";
+import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
 
 interface SchoolRules {
   allowSelfSubmission: boolean;
+  blockedCategories: string[];
+  categoryCapStatuses: CategoryCapStatus[];
+}
+
+interface CategoryCapStatus {
+  category: string;
+  cap: number;
+  approvedHours: number;
+  remainingHours: number;
+  maxedOut: boolean;
+  alreadyOverCap: boolean;
 }
 
 interface SelfSubmission {
@@ -15,6 +27,7 @@ interface SelfSubmission {
   createdAt: string;
   rejectionReason: string | null;
   revisionNote: string | null;
+  timesRevised?: number;
   category?: string | null;
 }
 
@@ -27,23 +40,13 @@ type EditForm = {
   category: string;
 };
 
-const CATEGORY_OPTIONS = [
-  "general",
-  "education",
-  "environment",
-  "food",
-  "health",
-  "community",
-  "arts",
-  "mentoring",
-];
-
 const STATUS_FILTERS = [
   { key: "ALL", label: "All" },
   { key: "PENDING", label: "Pending" },
   { key: "APPROVED", label: "Approved" },
   { key: "REJECTED", label: "Rejected" },
   { key: "REVISION_REQUESTED", label: "Needs Revision" },
+  { key: "CANCELLED", label: "Cancelled" },
 ];
 
 export default function StudentSelfSubmit() {
@@ -52,6 +55,8 @@ export default function StudentSelfSubmit() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [allowSelfSubmission, setAllowSelfSubmission] = useState<boolean | null>(null);
+  const [blockedCategories, setBlockedCategories] = useState<string[]>([]);
+  const [categoryCapStatuses, setCategoryCapStatuses] = useState<CategoryCapStatus[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [form, setForm] = useState<EditForm>({
     organizationName: "",
@@ -63,6 +68,7 @@ export default function StudentSelfSubmit() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
   // Editing a revision-requested submission
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({ organizationName: "", description: "", date: "", hours: "", evidenceNote: "", category: "general" });
@@ -76,6 +82,8 @@ export default function StudentSelfSubmit() {
       ]);
       setSubmissions(data);
       setAllowSelfSubmission(rules?.allowSelfSubmission ?? true);
+      setBlockedCategories((rules?.blockedCategories ?? []).slice().sort((a, b) => a.localeCompare(b)));
+      setCategoryCapStatuses(rules?.categoryCapStatuses ?? []);
     } catch {
       setError("Failed to load submissions.");
     } finally {
@@ -84,6 +92,20 @@ export default function StudentSelfSubmit() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  const blockedCategorySet = new Set(blockedCategories);
+  const categoryOptions = buildOpportunityCategoryOptions([
+    form.category,
+    editForm.category,
+    ...submissions.map((submission) => submission.category),
+  ]).filter((category) => !blockedCategorySet.has(category));
+
+  const activeBlockedCategory = categoryCapStatuses.find(
+    (status) => status.category === form.category && (status.maxedOut || status.alreadyOverCap),
+  ) ?? null;
+  const activeEditBlockedCategory = categoryCapStatuses.find(
+    (status) => status.category === editForm.category && (status.maxedOut || status.alreadyOverCap),
+  ) ?? null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +126,9 @@ export default function StudentSelfSubmit() {
       setSuccess("Submission sent for review.");
       void load();
     } catch (err: any) {
+      if (err instanceof ApiError && typeof err.body === "object" && err.body && "categoryBlocked" in err.body) {
+        void load();
+      }
       setError(err.message || "Failed to submit.");
     } finally {
       setSubmitting(false);
@@ -141,9 +166,30 @@ export default function StudentSelfSubmit() {
       setSuccess("Resubmitted for review.");
       void load();
     } catch (err: any) {
+      if (err instanceof ApiError && typeof err.body === "object" && err.body && "categoryBlocked" in err.body) {
+        void load();
+      }
       setError(err.message || "Failed to resubmit.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelSubmission = async (submissionId: string) => {
+    setCancelingId(submissionId);
+    setError("");
+    setSuccess("");
+    try {
+      await api.post(`/self-submissions/${submissionId}/cancel`, {});
+      if (editingId === submissionId) {
+        setEditingId(null);
+      }
+      setSuccess("Submission cancelled.");
+      void load();
+    } catch (err: any) {
+      setError(err.message || "Failed to cancel submission.");
+    } finally {
+      setCancelingId(null);
     }
   };
 
@@ -151,6 +197,7 @@ export default function StudentSelfSubmit() {
     if (status === "APPROVED") return "bg-green-50 text-green-700";
     if (status === "REJECTED") return "bg-red-50 text-red-600";
     if (status === "REVISION_REQUESTED") return "bg-amber-50 text-amber-700";
+    if (status === "CANCELLED") return "bg-gray-100 text-gray-600";
     return "bg-yellow-50 text-yellow-700";
   };
 
@@ -177,6 +224,12 @@ export default function StudentSelfSubmit() {
         </div>
       )}
 
+      {blockedCategories.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          Your school has capped these categories for you: {blockedCategories.join(", ")}. You have already reached the maximum allowed hours there, so they are hidden from new self-submissions.
+        </div>
+      )}
+
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
       {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{success}</div>}
 
@@ -188,6 +241,11 @@ export default function StudentSelfSubmit() {
             Your school administrator will review and approve.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {activeBlockedCategory && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                Your school is preventing you from doing more {activeBlockedCategory.category}. You have already completed {activeBlockedCategory.approvedHours.toFixed(1)}h, which meets or exceeds the {activeBlockedCategory.cap}h maximum.
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Organization Name *</label>
@@ -234,9 +292,10 @@ export default function StudentSelfSubmit() {
                 onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               >
-                {CATEGORY_OPTIONS.map((category) => (
+                <option value="general">General / Unspecified</option>
+                {categoryOptions.map((category) => (
                   <option key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {category}
                   </option>
                 ))}
               </select>
@@ -308,6 +367,11 @@ export default function StudentSelfSubmit() {
                     </div>
                   )}
                   <form onSubmit={handleResubmit} className="space-y-3">
+                    {activeEditBlockedCategory && (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        Your school is preventing you from doing more {activeEditBlockedCategory.category}. You have already completed {activeEditBlockedCategory.approvedHours.toFixed(1)}h, which meets or exceeds the {activeEditBlockedCategory.cap}h maximum.
+                      </div>
+                    )}
                     <div className="grid sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Organization Name *</label>
@@ -351,9 +415,10 @@ export default function StudentSelfSubmit() {
                         onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}
                         className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
                       >
-                        {CATEGORY_OPTIONS.map((category) => (
+                        <option value="general">General / Unspecified</option>
+                        {categoryOptions.map((category) => (
                           <option key={category} value={category}>
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                            {category}
                           </option>
                         ))}
                       </select>
@@ -362,6 +427,14 @@ export default function StudentSelfSubmit() {
                       <button type="submit" disabled={submitting}
                         className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:opacity-85 disabled:opacity-50">
                         {submitting ? "..." : "Resubmit for Review"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCancelSubmission(sub.id)}
+                        disabled={cancelingId === sub.id}
+                        className="px-3 py-1.5 bg-red-50 text-red-700 rounded text-xs hover:bg-red-100 disabled:opacity-50"
+                      >
+                        {cancelingId === sub.id ? "Cancelling..." : "Cancel Request"}
                       </button>
                       <button type="button" onClick={() => setEditingId(null)}
                         className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
@@ -389,6 +462,9 @@ export default function StudentSelfSubmit() {
                     {sub.revisionNote && (
                       <div className="text-xs text-amber-700 mt-1 italic">Revision needed: {sub.revisionNote}</div>
                     )}
+                    {sub.timesRevised ? (
+                      <div className="text-xs text-gray-400 mt-1">{`Revision ${sub.timesRevised}`}</div>
+                    ) : null}
                   </div>
                   <div className="ml-3 flex flex-col items-end gap-2 shrink-0">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(sub.status)}`}>
@@ -398,6 +474,15 @@ export default function StudentSelfSubmit() {
                       <button onClick={() => openEdit(sub)}
                         className="px-2.5 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700">
                         Edit & Resubmit
+                      </button>
+                    )}
+                    {["PENDING", "REVISION_REQUESTED"].includes(sub.status) && (
+                      <button
+                        onClick={() => void handleCancelSubmission(sub.id)}
+                        disabled={cancelingId === sub.id}
+                        className="px-2.5 py-1 bg-red-50 text-red-700 rounded text-xs hover:bg-red-100 disabled:opacity-50"
+                      >
+                        {cancelingId === sub.id ? "Cancelling..." : "Cancel Request"}
                       </button>
                     )}
                   </div>

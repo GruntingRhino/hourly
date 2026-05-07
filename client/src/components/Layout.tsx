@@ -103,7 +103,6 @@ function getNavItems(role: string) {
         { path: "/settings", label: "Settings" },
       ];
     case "SCHOOL_ADMIN":
-    case "TEACHER":
       return [
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },
@@ -114,6 +113,13 @@ function getNavItems(role: string) {
         ...((import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development") && role === "SCHOOL_ADMIN"
           ? [{ path: "/admin/impersonate", label: "⚙ Dev: Impersonate" }]
           : []),
+      ];
+    case "TEACHER":
+      return [
+        { path: "/dashboard", label: "Dashboard" },
+        { path: "/cohorts", label: "Cohorts" },
+        { path: "/submissions", label: "Submissions" },
+        { path: "/settings", label: "Settings" },
       ];
     case "BENEFICIARY_ADMIN":
       return [

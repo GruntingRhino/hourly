@@ -4,9 +4,9 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendHourApprovedEmail } from "../services/email";
-import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 import { resolveEffectiveRules } from "../lib/schoolRules";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { assertStudentAccessibleToStaff, getStaffAccessScope } from "../lib/cohortAccess";
 
 const router = Router();
 
@@ -34,10 +34,10 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
 
     // School staff may only approve sessions for students in their own school
     if (["SCHOOL_ADMIN", "TEACHER"].includes(req.user!.role)) {
-      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
-      if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
-      const studentSchoolId = await resolveStudentSchoolId(session.userId);
-      if (studentSchoolId !== actor.schoolId) {
+      const scope = await getStaffAccessScope(req.user!.userId);
+      if (!scope?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const studentAllowed = await assertStudentAccessibleToStaff(scope, session.userId);
+      if (!studentAllowed) {
         return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
 
@@ -136,10 +136,10 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL
 
     // School staff may only reject sessions for students in their own school
     if (["SCHOOL_ADMIN", "TEACHER"].includes(req.user!.role)) {
-      const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
-      if (!actor?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
-      const studentSchoolId = await resolveStudentSchoolId(session.userId);
-      if (studentSchoolId !== actor.schoolId) {
+      const scope = await getStaffAccessScope(req.user!.userId);
+      if (!scope?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const studentAllowed = await assertStudentAccessibleToStaff(scope, session.userId);
+      if (!studentAllowed) {
         return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
     }
@@ -225,8 +225,8 @@ router.get("/pending", authenticate, requireRole("ORG_ADMIN"), async (req: Reque
 // GET /api/verification/school-pending — get pending verifications for school staff
 router.get("/school-pending", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user?.schoolId) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope?.schoolId) {
       return res.status(400).json({ error: "Not associated with a school" });
     }
 
@@ -235,10 +235,16 @@ router.get("/school-pending", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER
         status: "PENDING_VERIFICATION",
         verificationStatus: "PENDING",
         user: {
-          OR: [
-            { classroom: { schoolId: user.schoolId } },
-            { cohort: { schoolId: user.schoolId } },
-          ],
+          ...(scope.isSchoolAdmin
+            ? {
+                OR: [
+                  { classroom: { schoolId: scope.schoolId } },
+                  { cohort: { schoolId: scope.schoolId } },
+                ],
+              }
+            : {
+                cohortId: { in: scope.assignedCohortIds },
+              }),
         },
       },
       include: {

@@ -79,6 +79,7 @@ interface HourBreakdownRecord {
   pendingHours: number;
   rejectionReason?: string | null;
   revisionNote?: string | null;
+  timesRevised?: number;
   description?: string;
   evidenceNote?: string | null;
   reviewedAt?: string | null;
@@ -389,6 +390,11 @@ export default function StudentList() {
                                 {record.organizationName} · {new Date(record.date).toLocaleDateString()}
                                 {record.category ? ` · ${record.category}` : ""}
                               </div>
+                              {record.source === "SELF_SUBMISSION" && record.status === "PENDING" && record.revisionNote && (
+                                <div className="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200">
+                                  {`Revision ${Math.max(1, record.timesRevised ?? 1)}`}
+                                </div>
+                              )}
                             </div>
                             <div className="text-right text-xs">
                               <div className="font-semibold text-gray-700">{record.status}{record.verificationStatus ? ` · ${record.verificationStatus}` : ""}</div>
@@ -403,7 +409,14 @@ export default function StudentList() {
                               {record.description && <div>Description: {record.description}</div>}
                               {record.evidenceNote && <div>Evidence: {record.evidenceNote}</div>}
                               {record.rejectionReason && <div className="text-red-600">Rejected: {record.rejectionReason}</div>}
-                              {record.revisionNote && <div className="text-amber-700">Revision requested: {record.revisionNote}</div>}
+                              {record.revisionNote && (
+                                <div className="text-amber-700">
+                                  {record.status === "PENDING"
+                                    ? `Revised after note (${`Revision ${Math.max(1, record.timesRevised ?? 1)}`}):`
+                                    : "Revision requested:"}{" "}
+                                  {record.revisionNote}
+                                </div>
+                              )}
                             </div>
                           )}
 

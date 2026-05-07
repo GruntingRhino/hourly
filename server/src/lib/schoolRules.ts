@@ -10,6 +10,15 @@ export interface EffectiveRules {
   categoryHourCaps: Record<string, number> | null;
 }
 
+export interface CategoryCapStatus {
+  category: string;
+  cap: number;
+  approvedHours: number;
+  remainingHours: number;
+  maxedOut: boolean;
+  alreadyOverCap: boolean;
+}
+
 function parseCaps(json: string | null | undefined): Record<string, number> | null {
   if (!json) return null;
   try {
@@ -21,6 +30,95 @@ function parseCaps(json: string | null | undefined): Record<string, number> | nu
 
 function requiresOrgVerification(verificationStandard: string | null | undefined, requireOrgVerification: boolean): boolean {
   return requireOrgVerification || verificationStandard === "BENEFICIARY_REQUIRED";
+}
+
+const CATEGORY_ALIASES: Record<string, string> = {
+  arts: "arts & culture",
+  "arts and culture": "arts & culture",
+  community: "community improvement",
+  mentoring: "tutoring & mentoring",
+  tutoring: "tutoring & mentoring",
+  food: "food & nutrition",
+  health: "health care",
+};
+
+export function normalizeCategoryKey(category: string | null | undefined): string {
+  const normalized = (category || "general").trim().toLowerCase();
+  return CATEGORY_ALIASES[normalized] ?? normalized;
+}
+
+function buildNormalizedCapLookup(caps: Record<string, number> | null | undefined): Map<string, { label: string; cap: number }> {
+  const lookup = new Map<string, { label: string; cap: number }>();
+  if (!caps) return lookup;
+  for (const [label, cap] of Object.entries(caps)) {
+    lookup.set(normalizeCategoryKey(label), { label, cap });
+  }
+  return lookup;
+}
+
+export async function getApprovedCategoryHoursForStudent(studentId: string): Promise<Map<string, number>> {
+  const [benSignups, selfSubs] = await Promise.all([
+    prisma.beneficiarySignup.findMany({
+      where: { studentId, verificationStatus: "APPROVED" },
+      select: {
+        totalHours: true,
+        slot: {
+          select: {
+            durationHours: true,
+            opportunity: { select: { category: true } },
+          },
+        },
+      },
+    }),
+    prisma.selfSubmittedRequest.findMany({
+      where: { studentId, status: "APPROVED" },
+      select: { hours: true, category: true },
+    }),
+  ]);
+
+  const totals = new Map<string, number>();
+  const add = (category: string | null | undefined, hours: number) => {
+    const key = normalizeCategoryKey(category);
+    totals.set(key, (totals.get(key) ?? 0) + hours);
+  };
+
+  for (const signup of benSignups) {
+    add(signup.slot.opportunity.category, signup.totalHours ?? signup.slot.durationHours);
+  }
+  for (const submission of selfSubs) {
+    add(submission.category, submission.hours);
+  }
+
+  return totals;
+}
+
+export async function getCategoryCapStatusesForStudent(studentId: string): Promise<CategoryCapStatus[]> {
+  const rules = await resolveEffectiveRules(studentId);
+  if (!rules?.categoryHourCaps) return [];
+
+  const approvedHours = await getApprovedCategoryHoursForStudent(studentId);
+  const capLookup = buildNormalizedCapLookup(rules.categoryHourCaps);
+
+  return Array.from(capLookup.entries()).map(([key, value]) => {
+    const current = approvedHours.get(key) ?? 0;
+    return {
+      category: value.label,
+      cap: value.cap,
+      approvedHours: current,
+      remainingHours: Math.max(0, value.cap - current),
+      maxedOut: current >= value.cap,
+      alreadyOverCap: current > value.cap,
+    };
+  });
+}
+
+export async function getBlockedCategoryKeysForStudent(studentId: string): Promise<Set<string>> {
+  const statuses = await getCategoryCapStatusesForStudent(studentId);
+  return new Set(
+    statuses
+      .filter((status) => status.maxedOut || status.alreadyOverCap)
+      .map((status) => normalizeCategoryKey(status.category)),
+  );
 }
 
 /**
@@ -89,42 +187,24 @@ export async function checkCategoryCap(
   newHours: number
 ): Promise<{ exceeded: boolean; cap: number; current: number; category: string }> {
   const rules = await resolveEffectiveRules(studentId);
-  const cat = category || "general";
+  const cat = normalizeCategoryKey(category);
 
   if (!rules?.categoryHourCaps) {
-    return { exceeded: false, cap: Infinity, current: 0, category: cat };
+    return { exceeded: false, cap: Infinity, current: 0, category: category || "general" };
   }
 
-  const cap = rules.categoryHourCaps[cat];
-  if (cap === undefined) {
-    return { exceeded: false, cap: Infinity, current: 0, category: cat };
+  const capLookup = buildNormalizedCapLookup(rules.categoryHourCaps);
+  const matchedCap = capLookup.get(cat);
+  if (!matchedCap) {
+    return { exceeded: false, cap: Infinity, current: 0, category: category || "general" };
   }
+  const approvedHours = await getApprovedCategoryHoursForStudent(studentId);
+  const current = approvedHours.get(cat) ?? 0;
 
-  const [benSignups, selfSubs] = await Promise.all([
-    prisma.beneficiarySignup.findMany({
-      where: { studentId, verificationStatus: "APPROVED" },
-      select: {
-        totalHours: true,
-        slot: { select: { opportunity: { select: { category: true } } } },
-      },
-    }),
-    prisma.selfSubmittedRequest.findMany({
-      where: { studentId, status: "APPROVED" },
-      select: { hours: true, category: true },
-    }),
-  ]);
-
-  let current = 0;
-  for (const bs of benSignups) {
-    if ((bs.slot.opportunity.category || "general") === cat) {
-      current += bs.totalHours ?? 0;
-    }
-  }
-  for (const ss of selfSubs) {
-    if ((ss.category || "general") === cat) {
-      current += ss.hours;
-    }
-  }
-
-  return { exceeded: current + newHours > cap, cap, current, category: cat };
+  return {
+    exceeded: current + newHours > matchedCap.cap,
+    cap: matchedCap.cap,
+    current,
+    category: matchedCap.label,
+  };
 }

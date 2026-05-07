@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SearchableSelect from "../../components/SearchableSelect";
 import { api } from "../../lib/api";
+import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
 
 interface TimeSlot {
   id: string;
@@ -19,6 +21,82 @@ interface TimeSlot {
     requirementsNote: string | null;
     beneficiary: { id: string; name: string; category: string | null };
   };
+}
+
+interface CategoryCapStatus {
+  category: string;
+  cap: number;
+  approvedHours: number;
+  remainingHours: number;
+  maxedOut: boolean;
+  alreadyOverCap: boolean;
+}
+
+interface SchoolRules {
+  blockedCategories: string[];
+  categoryCapStatuses: CategoryCapStatus[];
+}
+
+function normalizeSearchText(value: string | null | undefined): string {
+  return (value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLooseSubsequenceMatch(term: string, text: string): boolean {
+  let idx = 0;
+  for (const ch of text) {
+    if (ch === term[idx]) idx += 1;
+    if (idx === term.length) return true;
+  }
+  return false;
+}
+
+function scoreSearchTerm(term: string, value: string): number {
+  if (!term || !value) return 0;
+  if (value === term) return 120;
+  if (value.startsWith(term)) return 90;
+  if (value.includes(` ${term}`)) return 75;
+  if (value.includes(term)) return 60;
+
+  const words = value.split(" ");
+  if (words.some((word) => word.startsWith(term))) return 50;
+  if (term.length >= 3 && isLooseSubsequenceMatch(term, value)) return 20;
+  return 0;
+}
+
+function getSlotSearchScore(slot: TimeSlot, rawQuery: string): number {
+  const query = normalizeSearchText(rawQuery);
+  if (!query) return 1;
+
+  const terms = query.split(" ").filter(Boolean);
+  if (!terms.length) return 1;
+
+  const weightedFields = [
+    { value: normalizeSearchText(slot.opportunity.title), weight: 5 },
+    { value: normalizeSearchText(slot.opportunity.beneficiary.name), weight: 4 },
+    { value: normalizeSearchText(slot.opportunity.category), weight: 3 },
+    { value: normalizeSearchText(slot.opportunity.location), weight: 2 },
+    { value: normalizeSearchText(slot.opportunity.requirementsNote), weight: 1 },
+    { value: normalizeSearchText(slot.opportunity.description), weight: 1 },
+  ];
+
+  let total = 0;
+  for (const term of terms) {
+    let bestTermScore = 0;
+    for (const field of weightedFields) {
+      const score = scoreSearchTerm(term, field.value) * field.weight;
+      if (score > bestTermScore) bestTermScore = score;
+    }
+    if (bestTermScore === 0) return 0;
+    total += bestTermScore;
+  }
+
+  return total;
 }
 
 function getSlotDateKey(date: string): string {
@@ -141,26 +219,32 @@ function CalendarGrid({
 export default function StudentBrowse() {
   const navigate = useNavigate();
   const [slots, setSlots] = useState<TimeSlot[]>([]);
-  const [mySignupIds, setMySignupIds] = useState<Set<string>>(new Set());
+  const [mySignupStatuses, setMySignupStatuses] = useState<Map<string, string>>(new Map());
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [view, setView] = useState<"list" | "calendar">("list");
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [blockedCategories, setBlockedCategories] = useState<string[]>([]);
+  const [categoryCapStatuses, setCategoryCapStatuses] = useState<CategoryCapStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [available, mySignups] = await Promise.all([
+      const [available, mySignups, rules] = await Promise.all([
         api.get<TimeSlot[]>("/beneficiaries/available-slots"),
-        api.get<{ slot: { id: string } }[]>("/beneficiaries/my-signups").catch(() => []),
+        api.get<{ status: string; slot: { id: string } }[]>("/beneficiaries/my-signups").catch(() => []),
+        api.get<SchoolRules>("/schools/my-rules").catch(() => ({ blockedCategories: [], categoryCapStatuses: [] })),
       ]);
       setSlots(available);
-      setMySignupIds(new Set(mySignups.map((s) => s.slot.id)));
+      setMySignupStatuses(new Map(mySignups.map((s) => [s.slot.id, s.status])));
+      setBlockedCategories((rules?.blockedCategories ?? []).slice().sort((a, b) => a.localeCompare(b)));
+      setCategoryCapStatuses(rules?.categoryCapStatuses ?? []);
     } catch {
       setError("Failed to load opportunities. Please refresh.");
     } finally {
@@ -172,6 +256,13 @@ export default function StudentBrowse() {
     void loadData();
   }, []);
 
+  const blockedCategorySet = new Set(blockedCategories);
+  const categoryOptions = buildOpportunityCategoryOptions(slots.map((slot) => slot.opportunity.category))
+    .filter((category) => !blockedCategorySet.has(category));
+  const blockedSelectedCategory = selectedCategory && blockedCategorySet.has(selectedCategory)
+    ? categoryCapStatuses.find((status) => status.category === selectedCategory) ?? null
+    : null;
+
   const handleMonthChange = (dir: 1 | -1) => {
     setCurrentMonth((prev) => {
       const d = new Date(prev.getFullYear(), prev.getMonth() + dir, 1);
@@ -181,21 +272,23 @@ export default function StudentBrowse() {
   };
 
   const filtered = slots.filter((s) => {
+    const signupStatus = mySignupStatuses.get(s.id);
+    if (signupStatus && signupStatus !== "CANCELLED") return false;
+
     if (view === "calendar" && selectedDate) {
       return getSlotDateKey(s.date) === selectedDate;
     }
     if (view === "list" && search) {
-      const q = search.toLowerCase();
-      return (
-        s.opportunity.title.toLowerCase().includes(q) ||
-        s.opportunity.description.toLowerCase().includes(q) ||
-        s.opportunity.beneficiary.name.toLowerCase().includes(q) ||
-        (s.opportunity.location?.toLowerCase().includes(q) ?? false) ||
-        (s.opportunity.category?.toLowerCase().includes(q) ?? false)
-      );
+      if (getSlotSearchScore(s, search) === 0) return false;
     }
+    if (selectedCategory && (s.opportunity.category || "") !== selectedCategory) return false;
     return true;
   });
+
+  const visibleSlots =
+    view === "list" && search
+      ? [...filtered].sort((a, b) => getSlotSearchScore(b, search) - getSlotSearchScore(a, search))
+      : filtered;
 
   const handleCardClick = (slot: TimeSlot) => {
     navigate(`/slot/${slot.id}`, { state: { slot } });
@@ -230,13 +323,35 @@ export default function StudentBrowse() {
       </div>
 
       {view === "list" && (
-        <input
-          type="text"
-          placeholder="Search opportunities, organizations, or categories..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
-        />
+        <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
+          <input
+            type="text"
+            placeholder="Search opportunities, organizations, or categories..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <SearchableSelect
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+            options={categoryOptions}
+            placeholder="Filter by category"
+            clearable
+            className="w-full px-4 py-2 pr-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
+
+      {!loading && blockedCategories.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Your school has capped these categories for you: {blockedCategories.join(", ")}. You have already reached the maximum allowed hours there, so new opportunities in those categories are hidden.
+        </div>
+      )}
+
+      {blockedSelectedCategory && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Your school is preventing you from doing more {blockedSelectedCategory.category}. You have already completed {blockedSelectedCategory.approvedHours.toFixed(1)}h, which meets or exceeds the {blockedSelectedCategory.cap}h maximum.
+        </div>
       )}
 
       {view === "calendar" && !loading && (
@@ -255,7 +370,7 @@ export default function StudentBrowse() {
         <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
           {error}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : visibleSlots.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-3xl mb-3">
             {view === "calendar" && selectedDate ? "📅" : "⌕"}
@@ -269,14 +384,20 @@ export default function StudentBrowse() {
             {view === "calendar" && selectedDate
               ? "Select a highlighted date to see available slots."
               : search
-              ? "Try a different search term."
+              ? blockedSelectedCategory
+                ? "Choose a different category. Your school has blocked more hours in that category."
+                : "Try a different search term."
+              : blockedSelectedCategory
+              ? "Choose a different category. Your school has blocked more hours in that category."
               : "Your school hasn't approved any partner organizations yet. Check back later."}
           </div>
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((slot) => {
-            const isSignedUp = mySignupIds.has(slot.id);
+          {visibleSlots.map((slot) => {
+            const signupStatus = mySignupStatuses.get(slot.id);
+            const isSignedUp = !!signupStatus && signupStatus !== "CANCELLED";
+            const isWaitlisted = signupStatus === "WAITLISTED";
             const isFull = slot._count.signups >= slot.capacity;
             return (
               <div
@@ -330,12 +451,18 @@ export default function StudentBrowse() {
                     <div className="text-xs text-gray-400">spots</div>
                     <div className="mt-3">
                       {isSignedUp ? (
-                        <span className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-full font-medium">
-                          Signed Up
+                        <span
+                          className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                            isWaitlisted
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {isWaitlisted ? "Waitlisted" : "Signed Up"}
                         </span>
                       ) : isFull ? (
-                        <span className="text-xs px-3 py-1.5 bg-gray-100 text-gray-500 rounded-full">
-                          Full
+                        <span className="text-xs px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                          Join Waitlist →
                         </span>
                       ) : (
                         <span className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-200">

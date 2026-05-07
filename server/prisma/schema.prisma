@@ -64,6 +64,7 @@ model User {
   createdSchools       School[]         @relation("SchoolCreator")
   taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
   selfSubmissions      SelfSubmittedRequest[]
+  assignedCohorts      CohortTeacherAssignment[]
 }
 
 // ─── Schools ────────────────────────────────────────────────────
@@ -89,6 +90,9 @@ model School {
   registrationEmail      String?   // email to which the magic link was sent
   createdById      String?
   createdBy        User?    @relation("SchoolCreator", fields: [createdById], references: [id])
+  ownershipTransferToken String? @unique
+  ownershipTransferExpires DateTime?
+  ownershipTransferTargetUserId String?
   requiredHours    Float    @default(40)
   verificationStandard String @default("STANDARD")
   serviceStartDate       DateTime?
@@ -170,6 +174,7 @@ model Cohort {
   serviceEndDate      DateTime?
   allowSelfSubmission Boolean?   // null = inherit from school
   categoryHourCaps    String?    // JSON override; null = inherit from school
+  usesHouseField      Boolean    @default(false)
   startYear     Int?
   endYear       Int?
   status        String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
@@ -179,6 +184,19 @@ model Cohort {
 
   students      User[]            @relation("CohortStudents")
   invitations   StudentInvitation[]
+  teacherAssignments CohortTeacherAssignment[]
+}
+
+model CohortTeacherAssignment {
+  id        String   @id @default(cuid())
+  cohortId  String
+  teacherId String
+  createdAt DateTime @default(now())
+
+  cohort     Cohort @relation(fields: [cohortId], references: [id])
+  teacher    User   @relation(fields: [teacherId], references: [id])
+
+  @@unique([cohortId, teacherId])
 }
 
 // ─── Student Invitations ─────────────────────────────────────────
@@ -308,6 +326,7 @@ model SelfSubmittedRequest {
   reviewedAt      DateTime?
   rejectionReason String?
   revisionNote    String?  // admin note when requesting revision
+  timesRevised    Int      @default(0)
   convertedSessionId String? // if approved → creates a ServiceSession
   category        String?  // e.g. "environment", "education", "food", "health", "general"
   createdAt       DateTime @default(now())

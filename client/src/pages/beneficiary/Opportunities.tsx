@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import SearchableSelect from "../../components/SearchableSelect";
+import {
+  buildOpportunityCategoryOptions,
+  splitOpportunityCategory,
+} from "../../lib/opportunityCategories";
 
 interface TimeSlotBasic {
   id: string;
@@ -13,14 +18,21 @@ interface TimeSlotBasic {
   _count?: { signups: number };
 }
 
+interface DeleteSlotResponse {
+  success: boolean;
+  cancelledSignupCount?: number;
+}
+
 interface Opportunity {
   id: string;
   title: string;
   description: string | null;
+  category: string | null;
   location: string | null;
   requirementsNote: string | null;
   schoolRestrictions: string | null;
   status: string;
+  recurrenceRule: string | null;
   timeSlots: TimeSlotBasic[];
 }
 
@@ -86,6 +98,34 @@ function calcDurationHours(startTime: string, endTime: string): number {
   return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
 }
 
+function parseTimeString(value: string): { hours: number; minutes: number } | null {
+  const normalized = value.trim();
+  const match12Hour = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12Hour) {
+    const rawHours = Number(match12Hour[1]);
+    const minutes = Number(match12Hour[2]);
+    const meridiem = match12Hour[3].toUpperCase();
+    let hours = rawHours % 12;
+    if (meridiem === "PM") hours += 12;
+    return { hours, minutes };
+  }
+
+  const match24Hour = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24Hour) {
+    return { hours: Number(match24Hour[1]), minutes: Number(match24Hour[2]) };
+  }
+
+  return null;
+}
+
+function getSlotEndAt(date: string, endTime: string): Date {
+  const parsed = parseTimeString(endTime);
+  const endAt = new Date(date);
+  if (!parsed) return endAt;
+  endAt.setUTCHours(parsed.hours, parsed.minutes, 0, 0);
+  return endAt;
+}
+
 function getDisplayStatus(timeSlots: TimeSlotBasic[]): string {
   if (!timeSlots.length) return "Active";
   const today = new Date().toISOString().split("T")[0];
@@ -107,6 +147,8 @@ const WEEK_LABELS = ["1st", "2nd", "3rd", "4th", "5th"];
 
 const emptyForm = {
   title: "",
+  category: "",
+  customCategory: "",
   description: "",
   location: "",
   requirementsNote: "",
@@ -143,6 +185,8 @@ function toReadableValidationMessage(detail: { path?: Array<string | number>; me
   const [root, index, field] = path;
 
   if (root === "title") return "Enter a title.";
+  if (root === "category") return "Choose a category.";
+  if (root === "customCategory") return "Enter a custom category.";
   if (root === "description") return "Description is too long.";
   if (root === "location") return "Location is too long.";
   if (root === "requirementsNote") return "Requirements / notes are too long.";
@@ -164,6 +208,7 @@ function validateOpportunityForm(form: typeof emptyForm): string[] {
   const details: string[] = [];
 
   if (!form.title.trim()) details.push("Enter a title.");
+  if (!form.category.trim()) details.push("Choose a category.");
 
   if (!form.recurring) {
     if (form.slots.length === 0) {
@@ -207,6 +252,7 @@ function validateOpportunityForm(form: typeof emptyForm): string[] {
 export default function BeneficiaryOpportunities() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"opportunities" | "signups">("opportunities");
+  const [signupFilter, setSignupFilter] = useState<"PENDING" | "ALL" | "APPROVED" | "DENIED" | "NO_SHOW">("PENDING");
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [signups, setSignups] = useState<SignupRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +262,7 @@ export default function BeneficiaryOpportunities() {
   const [creating, setCreating] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<{ [id: string]: string }>({});
+  const [approvalHours, setApprovalHours] = useState<{ [id: string]: string }>({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [visibleStatuses, setVisibleStatuses] = useState<string[]>(["Active", "Upcoming"]);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -238,6 +285,8 @@ export default function BeneficiaryOpportunities() {
   const [slotForm, setSlotForm] = useState({ date: "", startTime: "", endTime: "", capacity: "" });
   const [propagateFuture, setPropagateFuture] = useState(false);
   const [savingSlot, setSavingSlot] = useState(false);
+  const [deletingSlot, setDeletingSlot] = useState(false);
+  const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false);
 
   const benId = user?.beneficiaryId;
 
@@ -311,16 +360,33 @@ export default function BeneficiaryOpportunities() {
     setSelectedSchools((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
   const toggleAllSchools = () =>
     setSelectedSchools((prev) => prev.length === approvedSchools.length ? [] : approvedSchools.map((s) => s.id));
+  const categoryOptions = buildOpportunityCategoryOptions(opportunities.map((opp) => opp.category));
 
   const handleEdit = (opp: Opportunity) => {
     setEditOppId(opp.id);
+    const rule = opp.recurrenceRule ? (() => {
+      try { return JSON.parse(opp.recurrenceRule!); } catch { return null; }
+    })() : null;
+    const { selectedCategory, customCategory } = splitOpportunityCategory(opp.category);
     setForm({
       ...emptyForm,
       title: opp.title,
+      category: selectedCategory,
+      customCategory,
       description: opp.description ?? "",
       location: opp.location ?? "",
       requirementsNote: opp.requirementsNote ?? "",
-      slots: [],
+      slots: [{ date: "", startTime: "", endTime: "", capacity: "" }],
+      recurring: !!rule,
+      recurrenceType: rule?.type ?? emptyForm.recurrenceType,
+      recurrenceDaysOfWeek: rule?.daysOfWeek ?? emptyForm.recurrenceDaysOfWeek,
+      recurrenceWeeksOfMonth: rule?.weeksOfMonth ?? emptyForm.recurrenceWeeksOfMonth,
+      recurrenceDatesOfMonth: rule?.datesOfMonth ?? emptyForm.recurrenceDatesOfMonth,
+      recurrenceStartTime: rule?.startTime ?? emptyForm.recurrenceStartTime,
+      recurrenceEndTime: rule?.endTime ?? emptyForm.recurrenceEndTime,
+      recurrenceCapacity: rule?.capacity != null ? String(rule.capacity) : emptyForm.recurrenceCapacity,
+      recurrenceMonthsAhead: rule?.monthsAhead ?? emptyForm.recurrenceMonthsAhead,
+      recurrenceStartDate: new Date().toISOString().split("T")[0],
     });
     const restrictions: string[] = opp.schoolRestrictions ? JSON.parse(opp.schoolRestrictions) : approvedSchools.map((s) => s.id);
     setSelectedSchools(restrictions);
@@ -351,13 +417,40 @@ export default function BeneficiaryOpportunities() {
     if (editOppId) {
       setSaving(true);
       try {
-        const updated = await api.patch<Opportunity>(`/beneficiaries/${benId}/opportunities/${editOppId}`, {
+        const editBody: Record<string, unknown> = {
           title: form.title,
+          category: form.category,
+          customCategory: null,
           description: form.description,
           location: form.location || null,
           requirementsNote: form.requirementsNote || null,
           schoolRestrictions: selectedSchools.length > 0 ? selectedSchools : null,
-        });
+        };
+        if (form.recurring) {
+          const dur = calcDurationHours(form.recurrenceStartTime, form.recurrenceEndTime);
+          editBody.recurrenceRule = {
+            type: form.recurrenceType,
+            ...(form.recurrenceType === "monthly_day_of_week"
+              ? { daysOfWeek: form.recurrenceDaysOfWeek, weeksOfMonth: form.recurrenceWeeksOfMonth }
+              : { datesOfMonth: form.recurrenceDatesOfMonth }),
+            startTime: form.recurrenceStartTime,
+            endTime: form.recurrenceEndTime,
+            durationHours: dur || 1,
+            capacity: parseInt(form.recurrenceCapacity) || 10,
+            monthsAhead: form.recurrenceMonthsAhead,
+          };
+        } else if (form.slots.some((s) => s.date && s.startTime && s.endTime)) {
+          editBody.timeSlots = form.slots
+            .filter((s) => s.date && s.startTime && s.endTime)
+            .map((s) => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              durationHours: calcDurationHours(s.startTime, s.endTime) || 1,
+              capacity: s.capacity ? parseInt(s.capacity) : 10,
+            }));
+        }
+        const updated = await api.patch<Opportunity>(`/beneficiaries/${benId}/opportunities/${editOppId}`, editBody);
         setOpportunities((prev) => prev.map((o) => o.id === editOppId ? updated : o));
         handleCancelEdit();
       } catch (err) {
@@ -377,6 +470,8 @@ export default function BeneficiaryOpportunities() {
 
       const body: Record<string, unknown> = {
         title: form.title,
+        category: form.category,
+        customCategory: undefined,
         description: form.description,
         location: form.location || undefined,
         requirementsNote: form.requirementsNote || undefined,
@@ -445,6 +540,7 @@ export default function BeneficiaryOpportunities() {
       capacity: String(slot.capacity ?? 10),
     });
     setPropagateFuture(false);
+    setConfirmDeleteSlot(false);
   };
 
   const slotChanged = editSlot
@@ -454,11 +550,11 @@ export default function BeneficiaryOpportunities() {
     : false;
 
   const handleSaveSlot = async () => {
-    if (!editSlot || !benId) return;
+    if (!editSlot) return;
     setSavingSlot(true);
     clearError();
     try {
-      const updated = await api.patch<TimeSlotBasic>(`/beneficiaries/${benId}/slots/${editSlot.id}`, {
+      const updated = await api.patch<TimeSlotBasic>(`/beneficiaries/slots/${editSlot.id}`, {
         date: slotForm.date,
         startTime: slotForm.startTime,
         endTime: slotForm.endTime,
@@ -490,13 +586,50 @@ export default function BeneficiaryOpportunities() {
     }
   };
 
-  const handleApprove = async (signupId: string, hours: number) => {
-    setActionId(signupId);
+  const handleDeleteSlot = async (forceCancel = false) => {
+    if (!editSlot || !benId) return;
+    if (!forceCancel && (editSlot._count?.signups || 0) > 0) {
+      setConfirmDeleteSlot(true);
+      clearError();
+      return;
+    }
+    setDeletingSlot(true);
+    clearError();
     try {
-      await api.post(`/beneficiaries/signups/${signupId}/approve`, { approvedHours: hours });
-      setSignups((prev) =>
-        prev.map((s) => s.id === signupId ? { ...s, verificationStatus: "APPROVED", totalHours: hours } : s)
-      );
+      if (forceCancel) {
+        await api.post<DeleteSlotResponse>(`/beneficiaries/${benId}/slots/${editSlot.id}/cancel`, { forceCancel: true });
+      } else {
+        await api.delete<DeleteSlotResponse>(`/beneficiaries/${benId}/slots/${editSlot.id}`);
+      }
+      setConfirmDeleteSlot(false);
+      setEditSlot(null);
+      void loadOpportunities();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const body = err.body as { code?: string } | null;
+        if (body?.code === "SLOT_HAS_SIGNUPS") {
+          setConfirmDeleteSlot(true);
+          return;
+        }
+      }
+      showError(err instanceof Error ? err.message : "This time slot could not be deleted.");
+    } finally {
+      setDeletingSlot(false);
+    }
+  };
+
+  const resolveApprovalHours = (signup: SignupRecord): number => {
+    const raw = approvalHours[signup.id];
+    const parsed = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : (signup.totalHours ?? signup.slot.durationHours);
+  };
+
+  const handleApprove = async (signup: SignupRecord) => {
+    const hours = resolveApprovalHours(signup);
+    setActionId(signup.id);
+    try {
+      await api.post(`/beneficiaries/signups/${signup.id}/approve`, { approvedHours: hours });
+      await loadSignups();
     } catch (err: any) {
       showError(err.message || "Failed to approve.");
     } finally {
@@ -510,9 +643,7 @@ export default function BeneficiaryOpportunities() {
     setRejectingId(signupId);
     try {
       await api.post(`/beneficiaries/signups/${signupId}/reject`, { reason });
-      setSignups((prev) =>
-        prev.map((s) => s.id === signupId ? { ...s, verificationStatus: "REJECTED", rejectionReason: reason } : s)
-      );
+      await loadSignups();
       setRejectReason((prev) => ({ ...prev, [signupId]: "" }));
     } catch (err: any) {
       showError(err.message || "Failed to reject.");
@@ -526,11 +657,23 @@ export default function BeneficiaryOpportunities() {
     setNoShowConfirmId(null);
     try {
       await api.post(`/beneficiaries/signups/${signupId}/no-show`, {});
-      setSignups((prev) => prev.map((s) => s.id === signupId ? { ...s, status: "NO_SHOW" } : s));
+      await loadSignups();
     } catch (err: any) {
       showError(err.message || "Failed to mark no-show.");
     } finally {
       setNoShowId(null);
+    }
+  };
+
+  const handleResetReview = async (signupId: string) => {
+    setActionId(signupId);
+    try {
+      await api.post(`/beneficiaries/signups/${signupId}/reset-review`, {});
+      await loadSignups();
+    } catch (err: any) {
+      showError(err.message || "Failed to reset review.");
+    } finally {
+      setActionId(null);
     }
   };
 
@@ -557,8 +700,37 @@ export default function BeneficiaryOpportunities() {
     }
   };
 
-  const pendingSignups = signups.filter((s) => s.status === "CONFIRMED" && s.verificationStatus === "PENDING");
-  const reviewedSignups = signups.filter((s) => s.verificationStatus !== "PENDING" || s.status === "NO_SHOW" || s.status === "CANCELLED");
+  const getSignupBucket = (signup: SignupRecord): "PENDING" | "APPROVED" | "DENIED" | "NO_SHOW" | "OTHER" => {
+    if (signup.status === "NO_SHOW") return "NO_SHOW";
+    if (
+      signup.status === "CONFIRMED" &&
+      signup.verificationStatus === "PENDING" &&
+      getSlotEndAt(signup.slot.date, signup.slot.endTime) <= new Date()
+    ) {
+      return "PENDING";
+    }
+    if (signup.verificationStatus === "APPROVED") return "APPROVED";
+    if (signup.verificationStatus === "REJECTED") return "DENIED";
+    return "OTHER";
+  };
+
+  const signupBuckets = {
+    PENDING: signups.filter((s) => getSignupBucket(s) === "PENDING"),
+    APPROVED: signups.filter((s) => getSignupBucket(s) === "APPROVED"),
+    DENIED: signups.filter((s) => getSignupBucket(s) === "DENIED"),
+    NO_SHOW: signups.filter((s) => getSignupBucket(s) === "NO_SHOW"),
+  };
+  const pendingSignups = signupBuckets.PENDING;
+  const visibleReviewedSignups =
+    signupFilter === "ALL"
+      ? [...signupBuckets.APPROVED, ...signupBuckets.DENIED, ...signupBuckets.NO_SHOW]
+      : signupFilter === "APPROVED"
+      ? signupBuckets.APPROVED
+      : signupFilter === "DENIED"
+      ? signupBuckets.DENIED
+      : signupFilter === "NO_SHOW"
+      ? signupBuckets.NO_SHOW
+      : [];
 
   return (
     <div>
@@ -614,6 +786,18 @@ export default function BeneficiaryOpportunities() {
                   required className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <SearchableSelect
+                  value={form.category}
+                  onChange={(category) => setForm((p) => ({ ...p, category, customCategory: category }))}
+                  options={categoryOptions}
+                  placeholder="Search categories or type your own"
+                  required
+                  allowCustomValue
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <input type="text" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
                   placeholder="Address or virtual" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
@@ -629,10 +813,8 @@ export default function BeneficiaryOpportunities() {
                   placeholder="e.g. Bring closed-toe shoes, minimum age 16"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
-
-              {/* Time slots — only shown when creating */}
-              {!editOppId && (
-                <div>
+              {/* Schedule — shown for both create and edit */}
+              <div>
                   {/* Recurring toggle */}
                   <div className="flex items-center gap-2 mb-3">
                     <label className="text-sm font-medium text-gray-700">Schedule</label>
@@ -804,11 +986,15 @@ export default function BeneficiaryOpportunities() {
                     </div>
                   )}
                 </div>
-              )}
 
-              {editOppId && (
+              {editOppId && !form.recurring && (
                 <div className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
-                  Time slots can be edited individually using the pencil icon on each slot.
+                  Existing slots can be edited using the pencil icon on each slot. Add new slots above.
+                </div>
+              )}
+              {editOppId && form.recurring && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-3 py-2">
+                  Saving will replace all future unbooked slots with a new schedule. Slots with sign-ups are kept.
                 </div>
               )}
 
@@ -965,7 +1151,45 @@ export default function BeneficiaryOpportunities() {
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">No student signups yet.</div>
           ) : (
             <div className="space-y-6">
-              {pendingSignups.length > 0 && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm text-gray-500">Show pending by default, or switch to a specific reviewed status.</div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ["PENDING", "Pending"],
+                    ["ALL", "Show everything"],
+                    ["NO_SHOW", "No-Show"],
+                    ["DENIED", "Denied"],
+                    ["APPROVED", "Approved"],
+                  ] as const).map(([value, label]) => {
+                    const active = signupFilter === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setSignupFilter(value)}
+                        className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                          active
+                            ? "border-blue-600 bg-blue-50 text-blue-700"
+                            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                            active
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-gray-300 bg-white text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {(signupFilter === "PENDING" || signupFilter === "ALL") && pendingSignups.length > 0 && (
                 <div>
                   <h2 className="text-sm font-semibold text-gray-700 mb-3">Pending Review ({pendingSignups.length})</h2>
                   <div className="space-y-3">
@@ -984,11 +1208,21 @@ export default function BeneficiaryOpportunities() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0 min-w-[120px]">
-                            <button onClick={() => handleApprove(s.id, s.totalHours ?? s.slot.durationHours)}
-                              disabled={actionId === s.id}
-                              className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
-                              {actionId === s.id ? "..." : `Approve ${s.totalHours ?? s.slot.durationHours}h`}
-                            </button>
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                min={0.25}
+                                step={0.25}
+                                value={approvalHours[s.id] ?? String(s.totalHours ?? s.slot.durationHours)}
+                                onChange={(e) => setApprovalHours((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
+                              />
+                              <button onClick={() => handleApprove(s)}
+                                disabled={actionId === s.id}
+                                className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
+                                {actionId === s.id ? "..." : "Approve"}
+                              </button>
+                            </div>
                             <div className="flex gap-1">
                               <input type="text" value={rejectReason[s.id] || ""}
                                 onChange={(e) => setRejectReason((prev) => ({ ...prev, [s.id]: e.target.value }))}
@@ -1015,30 +1249,82 @@ export default function BeneficiaryOpportunities() {
                 </div>
               )}
 
-              {reviewedSignups.length > 0 && (
+              {(signupFilter === "ALL" || signupFilter === "APPROVED" || signupFilter === "DENIED" || signupFilter === "NO_SHOW") && visibleReviewedSignups.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">Reviewed ({reviewedSignups.length})</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3">
+                    {signupFilter === "ALL"
+                      ? `Reviewed (${visibleReviewedSignups.length})`
+                      : signupFilter === "APPROVED"
+                      ? `Approved (${visibleReviewedSignups.length})`
+                      : signupFilter === "DENIED"
+                      ? `Denied (${visibleReviewedSignups.length})`
+                      : `No-Show (${visibleReviewedSignups.length})`}
+                  </h2>
                   <div className="space-y-2">
-                    {reviewedSignups.map((s) => (
-                      <div key={s.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex justify-between items-center">
-                        <div>
-                          <div className="font-medium text-sm">{s.student.label}</div>
-                          <div className="text-xs text-gray-500">
-                            {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {s.totalHours ?? s.slot.durationHours}h
+                      {visibleReviewedSignups.map((s) => (
+                        <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-medium text-sm">{s.student.label}</div>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "NO_SHOW" ? "bg-gray-100 text-gray-600" : s.verificationStatus === "APPROVED" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                                  {s.status === "NO_SHOW" ? "No-Show" : s.verificationStatus === "REJECTED" ? "Denied" : s.verificationStatus}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {s.totalHours ?? s.slot.durationHours}h
+                              </div>
+                              {s.rejectionReason && <div className="text-xs text-red-500 mt-1 italic">{s.rejectionReason}</div>}
+                            </div>
+
+                            <div className="w-full lg:w-[420px] space-y-2">
+                              <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+                                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500 mb-2">Change decision</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={0.25}
+                                    step={0.25}
+                                    value={approvalHours[s.id] ?? String(s.totalHours ?? s.slot.durationHours)}
+                                    onChange={(e) => setApprovalHours((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-xs bg-white"
+                                  />
+                                  <button onClick={() => handleApprove(s)} disabled={actionId === s.id}
+                                    className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-xs hover:bg-green-100 disabled:opacity-50">
+                                    {actionId === s.id ? "..." : "Approve"}
+                                  </button>
+                                  <button onClick={() => handleResetReview(s.id)} disabled={actionId === s.id}
+                                    className="px-2.5 py-1 text-amber-700 border border-amber-200 rounded text-xs hover:bg-amber-50 disabled:opacity-50">
+                                    {actionId === s.id ? "..." : "Undo"}
+                                  </button>
+                                  <button onClick={() => loadHistory(s.id)} disabled={historyLoadingId === s.id}
+                                    className="px-2.5 py-1 text-gray-600 border border-gray-200 rounded text-xs hover:bg-white disabled:opacity-50">
+                                    {historyLoadingId === s.id ? "..." : "History"}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="rounded-md border border-red-100 bg-red-50/50 p-2">
+                                <div className="text-[11px] font-medium uppercase tracking-wide text-red-500 mb-2">Override outcome</div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input type="text" value={rejectReason[s.id] || ""}
+                                    onChange={(e) => setRejectReason((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                    placeholder="Reason for denial"
+                                    className="flex-1 min-w-[150px] px-2 py-1 border border-red-200 rounded text-xs bg-white" />
+                                  <button onClick={() => handleReject(s.id)} disabled={rejectingId === s.id}
+                                    className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-50">
+                                    {rejectingId === s.id ? "..." : "Deny"}
+                                  </button>
+                                  <button onClick={() => setNoShowConfirmId(s.id)} disabled={noShowId === s.id}
+                                    className="px-2.5 py-1 text-gray-600 border border-gray-200 rounded text-xs hover:bg-white disabled:opacity-50">
+                                    {noShowId === s.id ? "..." : "Mark No-Show"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          {s.rejectionReason && <div className="text-xs text-red-500 mt-0.5 italic">{s.rejectionReason}</div>}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => loadHistory(s.id)} disabled={historyLoadingId === s.id}
-                            className="px-2 py-1 text-gray-500 border border-gray-200 rounded text-xs hover:bg-gray-50 disabled:opacity-50">
-                            {historyLoadingId === s.id ? "..." : "History"}
-                          </button>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "NO_SHOW" ? "bg-gray-100 text-gray-600" : s.verificationStatus === "APPROVED" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
-                            {s.status === "NO_SHOW" ? "No-Show" : s.verificationStatus}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
@@ -1053,8 +1339,40 @@ export default function BeneficiaryOpportunities() {
           <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Edit Time Slot</h3>
-              <button onClick={() => setEditSlot(null)} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void handleDeleteSlot(confirmDeleteSlot)}
+                  disabled={deletingSlot || savingSlot}
+                  title="Delete time slot"
+                  className="text-red-400 hover:text-red-600 disabled:opacity-40 p-1 rounded"
+                >
+                  {deletingSlot ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m-4 0h10"/>
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditSlot(null);
+                    setConfirmDeleteSlot(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-sm"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
+            {confirmDeleteSlot && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                This slot has {editSlot._count?.signups || 0} signup{(editSlot._count?.signups || 0) === 1 ? "" : "s"}. Delete again to cancel the slot, remove those signups, and notify affected students automatically.
+              </div>
+            )}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Date</label>

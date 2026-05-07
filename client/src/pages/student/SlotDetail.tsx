@@ -33,6 +33,12 @@ interface SlotFull {
   mySignup: { id: string; status: string; verificationStatus: string } | null;
 }
 
+interface SignupResponse {
+  id: string;
+  status: string;
+  verificationStatus?: string;
+}
+
 export default function SlotDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -57,17 +63,23 @@ export default function SlotDetail() {
     setSigningUp(true);
     setActionMsg("");
     try {
-      await api.post(`/beneficiaries/slots/${id}/signup`, {});
+      const created = await api.post<SignupResponse>(`/beneficiaries/slots/${id}/signup`, {});
       setSlot((prev) =>
         prev
           ? {
               ...prev,
-              mySignup: { id: "", status: "CONFIRMED", verificationStatus: "PENDING" },
-              _count: { signups: prev._count.signups + 1 },
+              mySignup: {
+                id: created.id,
+                status: created.status,
+                verificationStatus: created.verificationStatus ?? "PENDING",
+              },
+              _count: {
+                signups: created.status === "CONFIRMED" ? prev._count.signups + 1 : prev._count.signups,
+              },
             }
           : prev
       );
-      setActionMsg("Signed up successfully!");
+      setActionMsg(created.status === "WAITLISTED" ? "Added to the waitlist." : "Signed up successfully!");
       setActionOk(true);
     } catch (err: any) {
       setActionMsg(err.message || "Failed to sign up.");
@@ -184,21 +196,28 @@ export default function SlotDetail() {
             </div>
           )}
           {isSignedUp ? (
-            <div className="p-3 bg-green-50 rounded-md text-green-700 text-sm text-center font-medium">
-              You're signed up for this slot
-              {isWaitlisted && " (waitlisted — you'll be notified if a spot opens)"}
-            </div>
-          ) : isFull ? (
-            <div className="p-3 bg-gray-50 rounded-md text-gray-500 text-sm text-center">
-              This slot is full
+            <div
+              className={`p-3 rounded-md text-sm text-center font-medium ${
+                isWaitlisted ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
+              }`}
+            >
+              {isWaitlisted
+                ? "You're on the waitlist for this slot. You'll be notified if a spot opens."
+                : "You're signed up for this slot"}
             </div>
           ) : (
             <button
               onClick={handleSignup}
               disabled={signingUp}
-              className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+              className={`w-full py-3 text-white rounded-md font-medium disabled:opacity-50 ${
+                isFull ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
-              {signingUp ? "Signing up..." : "Sign Up for This Slot"}
+              {signingUp
+                ? "Submitting..."
+                : isFull
+                ? "Join Waitlist"
+                : "Sign Up for This Slot"}
             </button>
           )}
         </div>

@@ -4,25 +4,169 @@ import { z } from "zod";
 import { parse } from "csv-parse/sync";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
+import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
-import { checkCategoryCap } from "../lib/schoolRules";
+import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
-import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 
-// 10 invitations per school admin per hour — prevents inbox-bombing a beneficiary contact
+function normalizeInviteEmail(email: unknown): string {
+  return typeof email === "string" && email.trim()
+    ? email.trim().toLowerCase()
+    : "unknown";
+}
+
+// 10 invitations per school admin/recipient pair per hour — prevents inbox-bombing a beneficiary contact
 const beneficiaryInviteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => `ben-invite:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
+  keyGenerator: (req) =>
+    `ben-invite:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}:${normalizeInviteEmail(req.body?.email)}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many invitation attempts. Please wait before sending more invitations." },
 });
 
 const router = Router();
+
+function getSlotStartAt(slotDate: Date, startTime: string): Date {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const startAt = new Date(slotDate);
+  startAt.setUTCHours(hours, minutes, 0, 0);
+  return startAt;
+}
+
+function getSlotEndAt(slotDate: Date, endTime: string): Date {
+  const [hours, minutes] = endTime.split(":").map(Number);
+  const endAt = new Date(slotDate);
+  endAt.setUTCHours(hours, minutes, 0, 0);
+  return endAt;
+}
+
+function getBeneficiarySignupDisplayStatus(signup: {
+  status: string;
+  verificationStatus: string;
+}): string {
+  if (signup.status === "NO_SHOW") return "No-Show";
+  if (signup.verificationStatus === "APPROVED") return "Approved";
+  if (signup.verificationStatus === "REJECTED") return "Denied";
+  return "Pending";
+}
+
+async function notifyBeneficiarySignupReviewChange(params: {
+  studentId: string;
+  opportunityTitle: string;
+  slotDate: Date;
+  fromStatus: string;
+  toStatus: string;
+  approvedHours?: number | null;
+  rejectionReason?: string | null;
+}) {
+  const dateLabel = params.slotDate.toLocaleDateString();
+  let body = `"${params.opportunityTitle}" on ${dateLabel} changed from ${params.fromStatus} to ${params.toStatus}.`;
+  if (params.toStatus === "Approved" && params.approvedHours != null) {
+    body = `"${params.opportunityTitle}" on ${dateLabel} was approved for ${params.approvedHours} hour${params.approvedHours === 1 ? "" : "s"}.`;
+  } else if (params.toStatus === "Denied" && params.rejectionReason) {
+    body = `"${params.opportunityTitle}" on ${dateLabel} was denied. Reason: ${params.rejectionReason}`;
+  } else if (params.toStatus === "Pending") {
+    body = `"${params.opportunityTitle}" on ${dateLabel} was returned to pending review.`;
+  } else if (params.toStatus === "No-Show") {
+    body = `"${params.opportunityTitle}" on ${dateLabel} was marked as a no-show.`;
+  }
+
+  await prisma.notification.create({
+    data: {
+      userId: params.studentId,
+      type: "VERIFICATION_UPDATE",
+      title: `Hours status updated: ${params.toStatus}`,
+      body,
+      data: JSON.stringify({
+        fromStatus: params.fromStatus,
+        toStatus: params.toStatus,
+        approvedHours: params.approvedHours ?? null,
+        rejectionReason: params.rejectionReason ?? null,
+      }),
+    },
+  });
+}
+
+async function cancelBeneficiarySlot(
+  slotId: string,
+  beneficiaryId: string,
+  actorUserId: string,
+  forceCancel: boolean,
+) {
+  const slot = await prisma.beneficiaryTimeSlot.findUnique({
+    where: { id: slotId },
+    include: {
+      opportunity: { select: { beneficiaryId: true, title: true, beneficiary: { select: { name: true } } } },
+      signups: {
+        where: { status: { in: ["CONFIRMED", "WAITLISTED"] } },
+        select: { id: true, studentId: true, status: true },
+      },
+    },
+  });
+  if (!slot || slot.opportunity.beneficiaryId !== beneficiaryId) {
+    return { status: 404 as const, body: { error: "Time slot not found" } };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: actorUserId } });
+  if (user?.beneficiaryId !== beneficiaryId) {
+    return { status: 403 as const, body: { error: "Not your beneficiary" } };
+  }
+
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  if (slot.date <= cutoff) {
+    return { status: 400 as const, body: { error: "Can only delete slots more than 24 hours in the future" } };
+  }
+
+  if (slot.signups.length > 0 && !forceCancel) {
+    return {
+      status: 409 as const,
+      body: {
+        error: "This slot has students signed up. Confirm cancellation to remove the slot and notify them.",
+        code: "SLOT_HAS_SIGNUPS",
+        affectedSignupCount: slot.signups.length,
+      },
+    };
+  }
+
+  await runSerializableTransaction(async (tx) => {
+    if (slot.signups.length > 0) {
+      const signupIds = slot.signups.map((signup) => signup.id);
+      await tx.beneficiaryAuditLog.deleteMany({
+        where: { signupId: { in: signupIds } },
+      });
+      await tx.beneficiarySignup.deleteMany({
+        where: { id: { in: slot.signups.map((signup) => signup.id) } },
+      });
+    }
+
+    await tx.beneficiaryTimeSlot.delete({ where: { id: slotId } });
+  });
+
+  const affectedStudentIds = [...new Set(slot.signups.map((signup) => signup.studentId))];
+  if (affectedStudentIds.length > 0) {
+    const formattedDate = slot.date.toLocaleDateString();
+    await prisma.notification.createMany({
+      data: affectedStudentIds.map((studentId) => ({
+        userId: studentId,
+        type: "OPPORTUNITY_CANCELLED",
+        title: "Time slot cancelled",
+        body: `${slot.opportunity.beneficiary.name} cancelled "${slot.opportunity.title}" on ${formattedDate} from ${slot.startTime} to ${slot.endTime}. Your signup has been removed.`,
+      })),
+    });
+  }
+
+  return {
+    status: 200 as const,
+    body: { success: true, cancelledSignupCount: slot.signups.length },
+  };
+}
 
 // ─── Background city geocoding ────────────────────────────────────────────────
 // Tracks which US states currently have a background geocoding job running.
@@ -464,6 +608,9 @@ router.get("/my-signups", authenticate, requireRole("STUDENT"), async (req: Requ
     const signups = await prisma.beneficiarySignup.findMany({
       where: { studentId: req.user!.userId },
       include: {
+        auditLogs: {
+          orderBy: { createdAt: "desc" },
+        },
         slot: {
           include: {
             opportunity: {
@@ -507,9 +654,12 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
     if (!beneficiaryIds.length) return res.json([]);
 
     const now = new Date();
-    const slots = await prisma.beneficiaryTimeSlot.findMany({
+    const startOfTodayUtc = new Date(now);
+    startOfTodayUtc.setUTCHours(0, 0, 0, 0);
+    const [slots, blockedCategoryKeys] = await Promise.all([
+      prisma.beneficiaryTimeSlot.findMany({
       where: {
-        date: { gte: now },
+        date: { gte: startOfTodayUtc },
         opportunity: {
           beneficiaryId: { in: beneficiaryIds },
           status: "ACTIVE",
@@ -521,11 +671,19 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
             beneficiary: { select: { id: true, name: true, category: true } },
           },
         },
-        _count: { select: { signups: true } },
+        _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
       },
-      orderBy: { date: "asc" },
-    });
-    res.json(slots);
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      }),
+      getBlockedCategoryKeysForStudent(req.user!.userId),
+    ]);
+    res.json(
+      slots.filter((slot) => {
+        if (getSlotStartAt(slot.date, slot.startTime) < now) return false;
+        const categoryKey = normalizeCategoryKey(slot.opportunity.category);
+        return !blockedCategoryKeys.has(categoryKey);
+      }),
+    );
   } catch (err) {
     console.error("Available slots error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -695,7 +853,7 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /api/beneficiaries/approve-from-directory — school approves a directory beneficiary
-router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN"), beneficiaryInviteLimiter, async (req: Request, res: Response) => {
   try {
     const { directoryId } = z.object({ directoryId: z.string().min(1) }).parse(req.body);
 
@@ -1007,6 +1165,23 @@ const opportunityTimeSlotSchema = z.object({
   capacity: z.number().int().positive("Enter a valid volunteer capacity.").default(10),
 });
 
+function addCategoryValidation(
+  data: { category?: string; customCategory?: string | null },
+  ctx: z.RefinementCtx,
+  required: boolean,
+) {
+  const resolved = resolveOpportunityCategory(data.category, data.customCategory);
+  if (!resolved) {
+    if (required) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["category"],
+        message: "Enter a category.",
+      });
+    }
+    return;
+  }
+}
 // GET /api/beneficiaries/:id/opportunities — list opportunities for a beneficiary
 router.get("/:id/opportunities", authenticate, async (req: Request, res: Response) => {
   try {
@@ -1053,7 +1228,8 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
     const schema = z.object({
       title: z.string().min(1).max(255),
       description: z.string().max(2000),
-      category: z.string().max(100).optional(),
+      category: z.string().max(100),
+      customCategory: z.string().max(100).optional(),
       location: z.string().max(255).optional(),
       address: z.string().max(255).optional(),
       startDate: z.string(),
@@ -1070,8 +1246,34 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
           message: "Add at least one time slot or switch to recurring schedule.",
         });
       }
+      addCategoryValidation(d, ctx, true);
     });
     const data = schema.parse(req.body);
+    const resolvedCategory = resolveOpportunityCategory(data.category, data.customCategory);
+    if (!resolvedCategory) {
+      return res.status(400).json({ error: "Category is required" });
+    }
+
+    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
+    let recurringGroupId: string | undefined;
+
+    if (data.recurrenceRule) {
+      recurringGroupId = crypto.randomUUID();
+      const fromDate = new Date(data.startDate);
+      const generated = generateRecurringSlots(data.recurrenceRule, fromDate);
+      if (generated.length === 0) {
+        return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
+      }
+      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId }));
+    } else {
+      slotsToCreate = data.timeSlots!.map((ts) => ({
+        date: new Date(ts.date),
+        startTime: ts.startTime,
+        endTime: ts.endTime,
+        durationHours: ts.durationHours,
+        capacity: ts.capacity,
+      }));
+    }
 
     let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
     let recurringGroupId: string | undefined;
@@ -1099,7 +1301,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
         title: data.title,
         description: data.description,
         beneficiaryId: req.params.id,
-        category: data.category || null,
+        category: resolvedCategory,
         location: data.location || null,
         address: data.address || null,
         startDate: new Date(data.startDate),
@@ -1143,27 +1345,94 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
     const schema = z.object({
       title: z.string().min(1).max(255).optional(),
       description: z.string().max(2000).optional(),
+      category: z.string().max(100).optional(),
+      customCategory: z.string().max(100).nullable().optional(),
       location: z.string().max(255).nullable().optional(),
       requirementsNote: z.string().max(1000).nullable().optional(),
       schoolRestrictions: z.array(z.string()).nullable().optional(),
+      recurrenceRule: recurrenceRuleSchema.optional(),
+      timeSlots: z.array(opportunityTimeSlotSchema).optional(),
+    }).superRefine((d, ctx) => {
+      if (d.category !== undefined || d.customCategory !== undefined) {
+        addCategoryValidation(
+          { category: d.category, customCategory: d.customCategory ?? undefined },
+          ctx,
+          true,
+        );
+      }
     });
     const data = schema.parse(req.body);
+    const resolvedCategory =
+      data.category !== undefined || data.customCategory !== undefined
+        ? resolveOpportunityCategory(data.category, data.customCategory ?? undefined)
+        : undefined;
 
     const updated = await prisma.beneficiaryOpportunity.update({
       where: { id: req.params.oppId },
       data: {
         ...(data.title !== undefined && { title: data.title }),
         ...(data.description !== undefined && { description: data.description }),
+        ...(resolvedCategory !== undefined && { category: resolvedCategory }),
         ...(data.location !== undefined && { location: data.location }),
         ...(data.requirementsNote !== undefined && { requirementsNote: data.requirementsNote }),
         ...(data.schoolRestrictions !== undefined && {
           schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
         }),
+        ...(data.recurrenceRule !== undefined && {
+          recurrenceRule: JSON.stringify(data.recurrenceRule),
+        }),
       },
       include: { timeSlots: { include: { _count: { select: { signups: true } } }, orderBy: { date: "asc" } } },
     });
 
-    res.json(updated);
+    // Regenerate future slots when a recurrenceRule update is submitted.
+    // Only deletes unbooked future slots (>24h); signed-up slots are preserved.
+    if (data.recurrenceRule) {
+      const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const anySlot = await prisma.beneficiaryTimeSlot.findFirst({
+        where: { opportunityId: req.params.oppId },
+        select: { recurringGroupId: true },
+      });
+      const recurringGroupId = anySlot?.recurringGroupId ?? crypto.randomUUID();
+
+      const futureSlots = await prisma.beneficiaryTimeSlot.findMany({
+        where: { opportunityId: req.params.oppId, date: { gt: cutoff } },
+        include: { signups: { select: { id: true } } },
+      });
+      const toDelete = futureSlots.filter((s) => s.signups.length === 0).map((s) => s.id);
+      if (toDelete.length > 0) {
+        await prisma.beneficiaryTimeSlot.deleteMany({ where: { id: { in: toDelete } } });
+      }
+
+      const generated = generateRecurringSlots(data.recurrenceRule, new Date());
+      if (generated.length > 0) {
+        await prisma.beneficiaryTimeSlot.createMany({
+          data: generated.map((s) => ({ opportunityId: req.params.oppId, recurringGroupId, ...s })),
+        });
+      }
+    }
+
+    // Add new manual slots if provided
+    if (data.timeSlots && data.timeSlots.length > 0) {
+      await prisma.beneficiaryTimeSlot.createMany({
+        data: data.timeSlots.map((ts) => ({
+          opportunityId: req.params.oppId,
+          date: new Date(ts.date),
+          startTime: ts.startTime,
+          endTime: ts.endTime,
+          durationHours: ts.durationHours,
+          capacity: ts.capacity,
+        })),
+      });
+    }
+
+    // Re-fetch with fresh slots after any additions/deletions
+    const final = await prisma.beneficiaryOpportunity.findUnique({
+      where: { id: req.params.oppId },
+      include: { timeSlots: { include: { _count: { select: { signups: true } } }, orderBy: { date: "asc" } } },
+    });
+
+    res.json(final ?? updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Update opportunity error:", err);
@@ -1273,16 +1542,26 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const updated = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
-    const updated = await prisma.beneficiaryTimeSlot.update({
-      where: { id: req.params.slotId },
-      data: {
-        date: newDate,
-        startTime: newStartTime,
-        endTime: newEndTime,
-        durationHours: newDuration,
-        capacity: newCapacity,
-      },
+      const confirmedCount = await tx.beneficiarySignup.count({
+        where: { slotId: req.params.slotId, status: "CONFIRMED" },
+      });
+      if (newCapacity < confirmedCount) {
+        throw new Error(`CAPACITY_FLOOR:${confirmedCount}`);
+      }
+
+      return tx.beneficiaryTimeSlot.update({
+        where: { id: req.params.slotId },
+        data: {
+          date: newDate,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          durationHours: newDuration,
+          capacity: newCapacity,
+        },
+      });
     });
 
     if (data.propagateFuture && slot.recurringGroupId) {
@@ -1332,11 +1611,41 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
     res.json(updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof Error && err.message.startsWith("CAPACITY_FLOOR:")) {
+      const confirmedCount = Number(err.message.split(":")[1] || "0");
+      return res.status(400).json({ error: `Capacity cannot be lower than the ${confirmedCount} confirmed volunteer(s).` });
+    }
     console.error("Edit beneficiary slot error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// DELETE /api/beneficiaries/:id/slots/:slotId — delete a future time slot
+router.delete("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const forceCancel =
+      req.body?.forceCancel === true ||
+      req.query.forceCancel === "true" ||
+      req.query.forceCancel === "1";
+    const result = await cancelBeneficiarySlot(req.params.slotId, req.params.id, req.user!.userId, forceCancel);
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("Delete slot error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/:id/slots/:slotId/cancel — cancel and remove a future time slot
+router.post("/:id/slots/:slotId/cancel", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const forceCancel = req.body?.forceCancel === true;
+    const result = await cancelBeneficiarySlot(req.params.slotId, req.params.id, req.user!.userId, forceCancel);
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("Cancel slot error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 // PATCH /api/beneficiaries/slots/:slotId — edit a future time slot
 router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
   try {
@@ -1372,16 +1681,26 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), a
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const updated = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
-    const updated = await prisma.beneficiaryTimeSlot.update({
-      where: { id: req.params.slotId },
-      data: {
-        date: newDate,
-        startTime: newStartTime,
-        endTime: newEndTime,
-        durationHours: newDuration,
-        capacity: newCapacity,
-      },
+      const confirmedCount = await tx.beneficiarySignup.count({
+        where: { slotId: req.params.slotId, status: "CONFIRMED" },
+      });
+      if (newCapacity < confirmedCount) {
+        throw new Error(`CAPACITY_FLOOR:${confirmedCount}`);
+      }
+
+      return tx.beneficiaryTimeSlot.update({
+        where: { id: req.params.slotId },
+        data: {
+          date: newDate,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          durationHours: newDuration,
+          capacity: newCapacity,
+        },
+      });
     });
 
     // Propagate to other future slots in the same recurring series
@@ -1436,6 +1755,10 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), a
     res.json(updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof Error && err.message.startsWith("CAPACITY_FLOOR:")) {
+      const confirmedCount = Number(err.message.split(":")[1] || "0");
+      return res.status(400).json({ error: `Capacity cannot be lower than the ${confirmedCount} confirmed volunteer(s).` });
+    }
     console.error("Edit time slot error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1447,8 +1770,7 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     const slot = await prisma.beneficiaryTimeSlot.findUnique({
       where: { id: req.params.slotId },
       include: {
-        _count: { select: { signups: true } },
-        opportunity: { select: { beneficiaryId: true, status: true, schoolRestrictions: true } },
+        opportunity: { select: { beneficiaryId: true, status: true, schoolRestrictions: true, category: true } },
       },
     });
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
@@ -1482,19 +1804,59 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
       }
     }
 
-    const existing = await prisma.beneficiarySignup.findUnique({
-      where: { slotId_studentId: { slotId: slot.id, studentId: req.user!.userId } },
+    const blockedCategoryKeys = await getBlockedCategoryKeysForStudent(req.user!.userId);
+    if (blockedCategoryKeys.has(normalizeCategoryKey(slot.opportunity.category))) {
+      const categoryLabel = slot.opportunity.category || "this category";
+      return res.status(403).json({
+        error: `Your school is preventing you from doing more ${categoryLabel}. You have already completed the maximum allowed hours in that category.`,
+        categoryBlocked: true,
+        category: categoryLabel,
+      });
+    }
+
+    const result = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${slot.id} FOR UPDATE`;
+
+      const existing = await tx.beneficiarySignup.findUnique({
+        where: { slotId_studentId: { slotId: slot.id, studentId: req.user!.userId } },
+      });
+      if (existing) return { kind: "error" as const, status: 409, body: { error: "Already signed up for this slot" } };
+
+      const liveSlot = await tx.beneficiaryTimeSlot.findUnique({
+        where: { id: slot.id },
+        select: { capacity: true },
+      });
+      if (!liveSlot) return { kind: "error" as const, status: 404, body: { error: "Time slot not found" } };
+
+      const confirmedCount = await tx.beneficiarySignup.count({
+        where: { slotId: slot.id, status: "CONFIRMED" },
+      });
+      const status = confirmedCount >= liveSlot.capacity ? "WAITLISTED" : "CONFIRMED";
+
+      const signup = await tx.beneficiarySignup.create({
+        data: { slotId: slot.id, studentId: req.user!.userId, status },
+      });
+
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: status === "WAITLISTED" ? "SIGNUP_WAITLISTED" : "SIGNUP_CONFIRMED",
+          actorId: req.user!.userId,
+          signupId: signup.id,
+          details: JSON.stringify({
+            slotId: slot.id,
+            status,
+          }),
+        },
+      });
+
+      return { kind: "success" as const, signup };
     });
-    if (existing) return res.status(409).json({ error: "Already signed up for this slot" });
 
-    const confirmedCount = slot._count.signups;
-    const status = confirmedCount >= slot.capacity ? "WAITLISTED" : "CONFIRMED";
+    if (result.kind === "error") {
+      return res.status(result.status).json(result.body);
+    }
 
-    const signup = await prisma.beneficiarySignup.create({
-      data: { slotId: slot.id, studentId: req.user!.userId, status },
-    });
-
-    res.status(201).json(signup);
+    res.status(201).json(result.signup);
   } catch (err) {
     console.error("Slot signup error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -1519,14 +1881,22 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async
             opportunity: { select: { title: true } },
           },
         },
-        // student info via relation not defined, fetch separately
       },
       orderBy: { createdAt: "desc" },
     });
 
+    const studentIds = [...new Set(signups.map((signup) => signup.studentId))];
+    const students = studentIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: studentIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const studentMap = new Map(students.map((student) => [student.id, student.name]));
+
     const result = signups.map((s) => ({
       ...s,
-      student: { label: buildAnonymousVolunteerLabel(s.id) },
+      student: { id: s.studentId, label: studentMap.get(s.studentId) ?? "Unknown student" },
     }));
 
     res.json(result);
@@ -1549,6 +1919,15 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
     if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
+    if (!["CONFIRMED", "NO_SHOW"].includes(signup.status)) {
+      return res.status(400).json({ error: "Only confirmed or no-show signups can be approved" });
+    }
+    if (signup.status === "CANCELLED" || signup.status === "WAITLISTED") {
+      return res.status(400).json({ error: "This signup cannot be approved" });
+    }
+    if (getSlotEndAt(signup.slot.date, signup.slot.endTime) > new Date()) {
+      return res.status(400).json({ error: "Hour approval is only available after the time slot has ended" });
+    }
 
     const { approvedHours, overrideCap } = z.object({
       approvedHours: z.number().positive().optional(),
@@ -1558,14 +1937,16 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       return res.status(400).json({ error: `approvedHours cannot exceed the slot duration of ${signup.slot.durationHours}h` });
     }
     const hours = approvedHours ?? signup.slot.durationHours;
+    const currentApprovedHours = signup.verificationStatus === "APPROVED" ? (signup.totalHours ?? signup.slot.durationHours) : 0;
+    const additionalApprovedHours = Math.max(0, hours - currentApprovedHours);
 
     // Category cap check
-    if (!overrideCap) {
+    if (!overrideCap && additionalApprovedHours > 0) {
       const category = signup.slot.opportunity.category;
-      const capCheck = await checkCategoryCap(signup.studentId, category, hours);
+      const capCheck = await checkCategoryCap(signup.studentId, category, additionalApprovedHours);
       if (capCheck.exceeded) {
         return res.status(400).json({
-          error: `Approval would exceed the "${capCheck.category}" category cap of ${capCheck.cap} hours (current: ${capCheck.current.toFixed(1)}h, adding: ${hours}h). Pass overrideCap: true to bypass.`,
+          error: `Approval would exceed the "${capCheck.category}" category cap of ${capCheck.cap} hours (current: ${capCheck.current.toFixed(1)}h, adding: ${additionalApprovedHours}h). Pass overrideCap: true to bypass.`,
           capExceeded: true,
           cap: capCheck.cap,
           current: capCheck.current,
@@ -1574,11 +1955,15 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       }
     }
 
+    const fromStatus = getBeneficiarySignupDisplayStatus(signup);
+
     const updated = await prisma.beneficiarySignup.update({
       where: { id: req.params.signupId },
       data: {
+        status: "CONFIRMED",
         verificationStatus: "APPROVED",
         totalHours: hours,
+        rejectionReason: null,
         verifiedBy: req.user!.userId,
         verifiedAt: new Date(),
       },
@@ -1586,15 +1971,25 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: overrideCap ? "CAP_OVERRIDE" : "APPROVE",
+        action: signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
         actorId: req.user!.userId,
         signupId: signup.id,
         details: JSON.stringify({
+          previousStatus: fromStatus,
           approvedHours: hours,
           originalHours: signup.slot.durationHours,
           ...(overrideCap ? { capOverride: true } : {}),
         }),
       },
+    });
+
+    await notifyBeneficiarySignupReviewChange({
+      studentId: signup.studentId,
+      opportunityTitle: signup.slot.opportunity.title,
+      slotDate: signup.slot.date,
+      fromStatus,
+      toStatus: "Approved",
+      approvedHours: hours,
     });
 
     res.json(updated);
@@ -1733,12 +2128,20 @@ router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_
     if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
+    if (signup.status === "CANCELLED" || signup.status === "WAITLISTED") {
+      return res.status(400).json({ error: "This signup cannot be denied" });
+    }
+    if (getSlotEndAt(signup.slot.date, signup.slot.endTime) > new Date()) {
+      return res.status(400).json({ error: "Hour review is only available after the time slot has ended" });
+    }
 
     const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body);
+    const fromStatus = getBeneficiarySignupDisplayStatus(signup);
 
     const updated = await prisma.beneficiarySignup.update({
       where: { id: req.params.signupId },
       data: {
+        status: "CONFIRMED",
         verificationStatus: "REJECTED",
         rejectionReason: reason,
         verifiedBy: req.user!.userId,
@@ -1748,17 +2151,84 @@ router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: "REJECT",
+        action: signup.verificationStatus === "REJECTED" ? "REJECTION_UPDATED" : "REJECT",
         actorId: req.user!.userId,
         signupId: signup.id,
-        details: JSON.stringify({ reason }),
+        details: JSON.stringify({ previousStatus: fromStatus, reason }),
       },
+    });
+
+    await notifyBeneficiarySignupReviewChange({
+      studentId: signup.studentId,
+      opportunityTitle: signup.slot.opportunity.title,
+      slotDate: signup.slot.date,
+      fromStatus,
+      toStatus: "Denied",
+      rejectionReason: reason,
     });
 
     res.json(updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Reject signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/signups/:signupId/reset-review — beneficiary admin undoes a past review choice
+router.post("/signups/:signupId/reset-review", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { id: req.params.signupId },
+      include: { slot: { include: { opportunity: true } } },
+    });
+    if (!signup) return res.status(404).json({ error: "Signup not found" });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+      return res.status(403).json({ error: "Not your beneficiary's signup" });
+    }
+    if (signup.status === "CANCELLED" || signup.status === "WAITLISTED") {
+      return res.status(400).json({ error: "This signup cannot be reset" });
+    }
+
+    const fromStatus = getBeneficiarySignupDisplayStatus(signup);
+    if (fromStatus === "Pending") {
+      return res.status(400).json({ error: "This signup is already pending review" });
+    }
+
+    const updated = await prisma.beneficiarySignup.update({
+      where: { id: signup.id },
+      data: {
+        status: "CONFIRMED",
+        verificationStatus: "PENDING",
+        rejectionReason: null,
+        verifiedBy: null,
+        verifiedAt: null,
+        ...(signup.status === "NO_SHOW" ? { totalHours: null } : {}),
+      },
+    });
+
+    await prisma.beneficiaryAuditLog.create({
+      data: {
+        action: "REVIEW_RESET",
+        actorId: req.user!.userId,
+        signupId: signup.id,
+        details: JSON.stringify({ previousStatus: fromStatus, nextStatus: "Pending" }),
+      },
+    });
+
+    await notifyBeneficiarySignupReviewChange({
+      studentId: signup.studentId,
+      opportunityTitle: signup.slot.opportunity.title,
+      slotDate: signup.slot.date,
+      fromStatus,
+      toStatus: "Pending",
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Reset beneficiary review error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1805,6 +2275,11 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
       return res.status(403).json({ error: "Access denied" });
     }
 
+    const student = await prisma.user.findUnique({
+      where: { id: signup.studentId },
+      select: { id: true, name: true },
+    });
+
     const history = await prisma.beneficiaryAuditLog.findMany({
         where: { signupId: signup.id },
         orderBy: { createdAt: "asc" },
@@ -1828,9 +2303,7 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
         checkedIn: signup.checkedIn,
         checkedOut: signup.checkedOut,
         verifiedAt: signup.verifiedAt,
-        student: actor.role === "BENEFICIARY_ADMIN"
-          ? { label: buildAnonymousVolunteerLabel(signup.id) }
-          : { id: signup.studentId, label: buildAnonymousVolunteerLabel(signup.id) },
+        student: student ? { id: student.id, label: student.name } : { id: signup.studentId, label: "Unknown student" },
         slot: {
           id: signup.slot.id,
           date: signup.slot.date,
@@ -1870,32 +2343,76 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
     if (signup.status === "CANCELLED") return res.status(400).json({ error: "Already cancelled" });
     if (signup.verificationStatus === "APPROVED") return res.status(400).json({ error: "Cannot cancel an already-approved signup" });
 
-    await prisma.beneficiarySignup.update({
-      where: { id: signup.id },
-      data: { status: "CANCELLED" },
+    const result = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${signup.slotId} FOR UPDATE`;
+
+      const liveSignup = await tx.beneficiarySignup.findUnique({
+        where: { id: signup.id },
+      });
+      if (!liveSignup) return { kind: "error" as const, status: 404, body: { error: "Signup not found" } };
+      if (liveSignup.status === "CANCELLED") {
+        return { kind: "error" as const, status: 400, body: { error: "Already cancelled" } };
+      }
+      if (liveSignup.verificationStatus === "APPROVED") {
+        return { kind: "error" as const, status: 400, body: { error: "Cannot cancel an already-approved signup" } };
+      }
+
+      await tx.beneficiarySignup.update({
+        where: { id: signup.id },
+        data: { status: "CANCELLED" },
+      });
+
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: "SIGNUP_CANCELLED",
+          actorId: req.user!.userId,
+          signupId: signup.id,
+          details: JSON.stringify({ previousStatus: liveSignup.status }),
+        },
+      });
+
+      let promotedStudentId: string | null = null;
+      if (liveSignup.status === "CONFIRMED") {
+        const nextWaitlisted = await tx.beneficiarySignup.findFirst({
+          where: { slotId: signup.slotId, status: "WAITLISTED" },
+          orderBy: { createdAt: "asc" },
+        });
+        if (nextWaitlisted) {
+          await tx.beneficiarySignup.update({
+            where: { id: nextWaitlisted.id },
+            data: { status: "CONFIRMED" },
+          });
+          await tx.beneficiaryAuditLog.create({
+            data: {
+              action: "WAITLIST_PROMOTED",
+              actorId: req.user!.userId,
+              signupId: nextWaitlisted.id,
+              details: JSON.stringify({
+                previousStatus: "WAITLISTED",
+                nextStatus: "CONFIRMED",
+              }),
+            },
+          });
+          promotedStudentId = nextWaitlisted.studentId;
+        }
+      }
+
+      return { kind: "success" as const, promotedStudentId };
     });
 
-    // Promote the earliest waitlisted student if this was a CONFIRMED slot
-    if (signup.status === "CONFIRMED") {
-      const nextWaitlisted = await prisma.beneficiarySignup.findFirst({
-        where: { slotId: signup.slotId, status: "WAITLISTED" },
-        orderBy: { createdAt: "asc" },
+    if (result.kind === "error") {
+      return res.status(result.status).json(result.body);
+    }
+
+    if (result.promotedStudentId) {
+      await prisma.notification.create({
+        data: {
+          userId: result.promotedStudentId,
+          type: "SIGNUP_CONFIRMED",
+          title: "You're off the waitlist!",
+          body: `A spot opened up and you're now confirmed for "${signup.slot.startTime}–${signup.slot.endTime}" on ${new Date(signup.slot.date).toLocaleDateString()}.`,
+        },
       });
-      if (nextWaitlisted) {
-        await prisma.beneficiarySignup.update({
-          where: { id: nextWaitlisted.id },
-          data: { status: "CONFIRMED" },
-        });
-        // Notify the promoted student
-        await prisma.notification.create({
-          data: {
-            userId: nextWaitlisted.studentId,
-            type: "SIGNUP_CONFIRMED",
-            title: "You're off the waitlist!",
-            body: `A spot opened up and you're now confirmed for "${signup.slot.startTime}–${signup.slot.endTime}" on ${new Date(signup.slot.date).toLocaleDateString()}.`,
-          },
-        });
-      }
     }
 
     res.json({ message: "Signup cancelled" });
@@ -1921,14 +2438,16 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
     if (signup.status === "CANCELLED") return res.status(400).json({ error: "Cannot mark a cancelled signup as no-show" });
     if (signup.status === "WAITLISTED") return res.status(400).json({ error: "Waitlisted signups cannot be marked as no-show" });
     if (signup.status === "NO_SHOW") return res.status(400).json({ error: "Student is already marked as a no-show" });
-    if (signup.verificationStatus === "APPROVED") {
-      return res.status(400).json({ error: "Approved hours cannot be converted to a no-show" });
-    }
+    const fromStatus = getBeneficiarySignupDisplayStatus(signup);
 
     const updated = await prisma.beneficiarySignup.update({
       where: { id: signup.id },
       data: {
         status: "NO_SHOW",
+        verificationStatus: "PENDING",
+        rejectionReason: null,
+        verifiedBy: null,
+        verifiedAt: null,
         checkedOut: false,
         checkedOutAt: null,
         totalHours: null,
@@ -1940,8 +2459,16 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
         action: "NO_SHOW",
         actorId: req.user!.userId,
         signupId: signup.id,
-        details: JSON.stringify({ studentId: signup.studentId }),
+        details: JSON.stringify({ studentId: signup.studentId, previousStatus: fromStatus }),
       },
+    });
+
+    await notifyBeneficiarySignupReviewChange({
+      studentId: signup.studentId,
+      opportunityTitle: signup.slot.opportunity.title,
+      slotDate: signup.slot.date,
+      fromStatus,
+      toStatus: "No-Show",
     });
 
     res.json(updated);

@@ -23,6 +23,7 @@ import JoinCohort from "./pages/student/JoinCohort";
 import JoinBeneficiary from "./pages/beneficiary/JoinBeneficiary";
 import SchoolRegister from "./pages/school/Register";
 import SchoolVerifyRegistration from "./pages/school/VerifyRegistration";
+import SchoolConfirmTransfer from "./pages/school/ConfirmTransfer";
 
 // Student pages
 import StudentDashboard from "./pages/student/Dashboard";
@@ -83,6 +84,7 @@ function AppRoutes() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/school/register" element={<SchoolRegister />} />
       <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
+      <Route path="/school/confirm-transfer" element={<SchoolConfirmTransfer />} />
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
       <Route path="/parent-progress" element={<ParentProgress />} />
@@ -122,14 +124,18 @@ function AppRoutes() {
               <Route path="/cohorts/:id" element={<CohortDetail />} />
               <Route path="/cohorts/:id/on-track" element={<StudentList />} />
               <Route path="/cohorts/:id/off-track" element={<StudentList />} />
-              <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
-              <Route path="/partners" element={<SchoolBeneficiaries />} />
-              <Route path="/discover" element={<BeneficiaryDiscover />} />
+              {isSchoolAdminLike && (
+                <>
+                  <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
+                  <Route path="/partners" element={<SchoolBeneficiaries />} />
+                  <Route path="/discover" element={<BeneficiaryDiscover />} />
+                </>
+              )}
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />
-              <Route path="/launch" element={<LaunchCenter />} />
+              {isSchoolAdminLike && <Route path="/launch" element={<LaunchCenter />} />}
               <Route path="/messages" element={<SchoolMessages />} />
               <Route path="/settings" element={<SchoolSettings />} />
-              <Route path="/admin/impersonate" element={<ImpersonatePage />} />
+              {isSchoolAdminLike && <Route path="/admin/impersonate" element={<ImpersonatePage />} />}
             </>
           )}
 

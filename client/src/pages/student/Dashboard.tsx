@@ -9,6 +9,13 @@ interface Signup {
   verificationStatus: string;
   totalHours: number | null;
   createdAt: string;
+  updatedAt: string;
+  auditLogs: {
+    id: string;
+    action: string;
+    details: string | null;
+    createdAt: string;
+  }[];
   slot: {
     id: string;
     date: string;
@@ -29,6 +36,12 @@ interface SelfSubmission {
   organizationName: string;
   hours: number;
   date: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string | null;
+  revisionNote?: string | null;
+  rejectionReason?: string | null;
+  timesRevised?: number;
   category?: string | null;
 }
 
@@ -48,12 +61,141 @@ interface AvailableSlot {
   };
 }
 
+interface PastActivityItem {
+  id: string;
+  sortTime: number;
+  title: string;
+  subtitle: string;
+  meta: string;
+  hoursLabel: string;
+  status: string;
+}
+
+interface RecentActivityItem {
+  id: string;
+  sortTime: number;
+  title: string;
+  detail: string;
+  status: string;
+}
+
+function parseJsonDetails(raw: string | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function describeSignupAuditEvent(signup: Signup, audit: Signup["auditLogs"][number]): RecentActivityItem {
+  const details = parseJsonDetails(audit.details);
+  const dateLabel = new Date(audit.createdAt).toLocaleDateString();
+
+  if (audit.action === "SIGNUP_CONFIRMED") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Signed up on ${dateLabel}`,
+      status: "CONFIRMED",
+    };
+  }
+
+  if (audit.action === "SIGNUP_WAITLISTED") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Joined waitlist on ${dateLabel}`,
+      status: "WAITLISTED",
+    };
+  }
+
+  if (audit.action === "WAITLIST_PROMOTED") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Promoted off waitlist on ${dateLabel}`,
+      status: "CONFIRMED",
+    };
+  }
+
+  if (audit.action === "SIGNUP_CANCELLED") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Cancelled on ${dateLabel}`,
+      status: "CANCELLED",
+    };
+  }
+
+  if (audit.action === "APPROVE" || audit.action === "APPROVAL_UPDATED" || audit.action === "CAP_OVERRIDE") {
+    const approvedHours = typeof details.approvedHours === "number" ? `${details.approvedHours}h` : `${(signup.totalHours ?? signup.slot.durationHours).toFixed(1)}h`;
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Approved ${approvedHours} on ${dateLabel}`,
+      status: "APPROVED",
+    };
+  }
+
+  if (audit.action === "REJECT" || audit.action === "REJECTION_UPDATED") {
+    const reason = typeof details.reason === "string" ? ` · ${details.reason}` : "";
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Rejected on ${dateLabel}${reason}`,
+      status: "REJECTED",
+    };
+  }
+
+  if (audit.action === "REVIEW_RESET") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Review reset on ${dateLabel}`,
+      status: "PENDING",
+    };
+  }
+
+  if (audit.action === "NO_SHOW") {
+    return {
+      id: audit.id,
+      sortTime: new Date(audit.createdAt).getTime(),
+      title: signup.slot.opportunity.title,
+      detail: `${signup.slot.opportunity.beneficiary.name} · Marked no-show on ${dateLabel}`,
+      status: "NO_SHOW",
+    };
+  }
+
+  return {
+    id: audit.id,
+    sortTime: new Date(audit.createdAt).getTime(),
+    title: signup.slot.opportunity.title,
+    detail: `${signup.slot.opportunity.beneficiary.name} · ${audit.action} on ${dateLabel}`,
+    status: signup.verificationStatus,
+  };
+}
+
 /** Returns the effective service deadline: cohort override first, then school. */
 function resolveDeadline(user: any): Date | null {
   const cohortEnd = user?.cohort?.serviceEndDate;
   const schoolEnd = user?.school?.serviceEndDate ?? user?.cohort?.school?.serviceEndDate;
   const raw = cohortEnd ?? schoolEnd ?? null;
   return raw ? new Date(raw) : null;
+}
+
+function getSlotEndAt(slotDate: string, endTime: string): Date {
+  const [hours, minutes] = endTime.split(":").map(Number);
+  const endAt = new Date(slotDate);
+  endAt.setUTCHours(hours, minutes, 0, 0);
+  return endAt;
 }
 
 function DeadlineBanner({ deadline, approvedHours, requiredHours }: { deadline: Date; approvedHours: number; requiredHours: number }) {
@@ -160,9 +302,66 @@ export default function StudentDashboard() {
     .filter((s) => s.status === "CONFIRMED" && new Date(s.slot.date) >= now)
     .sort((a, b) => new Date(a.slot.date).getTime() - new Date(b.slot.date).getTime());
 
-  const recent = signups
-    .filter((s) => new Date(s.slot.date) < now || s.verificationStatus === "APPROVED")
-    .slice(0, 5);
+  const recentActivity: RecentActivityItem[] = [
+    ...signups.flatMap((s) => s.auditLogs.map((audit) => describeSignupAuditEvent(s, audit))),
+    ...selfSubs
+      .filter((s) => s.status !== "PENDING" || !!s.reviewedAt || !!s.revisionNote)
+      .map((s) => ({
+        id: `self-change-${s.id}`,
+        sortTime: new Date(s.reviewedAt || s.updatedAt || s.createdAt).getTime(),
+        title: s.organizationName,
+        detail: (() => {
+          const dateLabel = new Date(s.reviewedAt || s.updatedAt || s.createdAt).toLocaleDateString();
+          if (s.status === "REVISION_REQUESTED" && s.revisionNote) {
+            return `Self-submitted · Revision requested on ${dateLabel}: ${s.revisionNote}`;
+          }
+          if (s.status === "PENDING" && (s.timesRevised ?? 0) > 0) {
+            return `Self-submitted · Resubmitted as Revision ${s.timesRevised} on ${dateLabel}`;
+          }
+          if (s.status === "APPROVED") {
+            return `Self-submitted · Approved on ${dateLabel}`;
+          }
+          if (s.status === "REJECTED") {
+            return `Self-submitted · Rejected on ${dateLabel}${s.rejectionReason ? `: ${s.rejectionReason}` : ""}`;
+          }
+          if (s.status === "CANCELLED") {
+            return `Self-submitted · Cancelled on ${dateLabel}`;
+          }
+          return `Self-submitted · ${dateLabel}`;
+        })(),
+        status: s.status,
+      })),
+  ]
+    .sort((a, b) => b.sortTime - a.sortTime)
+    .slice(0, 6);
+
+  const pastActivities: PastActivityItem[] = [
+    ...signups
+      .filter((s) => s.status !== "CANCELLED" && s.status !== "WAITLISTED")
+      .filter((s) => getSlotEndAt(s.slot.date, s.slot.endTime).getTime() < Date.now() || s.verificationStatus === "APPROVED")
+      .map((s) => ({
+        id: `signup-${s.id}`,
+        sortTime: getSlotEndAt(s.slot.date, s.slot.endTime).getTime(),
+        title: s.slot.opportunity.title,
+        subtitle: s.slot.opportunity.beneficiary.name,
+        meta: `${new Date(s.slot.date).toLocaleDateString()} · ${s.slot.startTime}–${s.slot.endTime}`,
+        hoursLabel: `${(s.totalHours ?? s.slot.durationHours).toFixed(1)}h`,
+        status: s.verificationStatus,
+      })),
+    ...selfSubs
+      .filter((s) => s.status !== "CANCELLED")
+      .map((s) => ({
+        id: `self-${s.id}`,
+        sortTime: new Date(s.date).getTime(),
+        title: s.organizationName,
+        subtitle: "Self-submitted",
+        meta: new Date(s.date).toLocaleDateString(),
+        hoursLabel: `${s.hours.toFixed(1)}h`,
+        status: s.status,
+      })),
+  ]
+    .sort((a, b) => b.sortTime - a.sortTime)
+    .slice(0, 8);
 
   const revisionNeeded = selfSubs.filter((s) => s.status === "REVISION_REQUESTED");
   const signedUpSlotIds = new Set(signups.map((signup) => signup.slot.id));
@@ -362,37 +561,47 @@ export default function StudentDashboard() {
         {/* Recent activity */}
         <div>
           <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Recent Activity</h2>
-          {recent.length === 0 && selfSubs.length === 0 ? (
+          {recentActivity.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
-              No activity yet.
+              No recent status changes.
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              {recent.map((s, i, arr) => (
-                <div key={s.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 || selfSubs.length > 0 ? "border-b border-gray-200" : ""}`}>
+              {recentActivity.map((activity, i, arr) => (
+                <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                   <div>
-                    <div className="font-semibold text-[13.5px] text-gray-900">{s.slot.opportunity.title}</div>
-                    <div className="text-[12.5px] text-gray-500">{s.slot.opportunity.beneficiary.name}</div>
-                    {s.totalHours != null && (
-                      <div className="text-[12px] text-gray-400 mt-0.5">{s.totalHours}h verified</div>
-                    )}
+                    <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
+                    <div className="text-[12.5px] text-gray-500">{activity.detail}</div>
                   </div>
-                  <StatusBadge status={s.verificationStatus} />
-                </div>
-              ))}
-              {selfSubs.slice(0, 3).map((ss, i, arr) => (
-                <div key={ss.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
-                  <div>
-                    <div className="font-semibold text-[13.5px] text-gray-900">{ss.organizationName}</div>
-                    <div className="text-[12.5px] text-gray-500">Self-submitted · {new Date(ss.date).toLocaleDateString()}</div>
-                    <div className="text-[12px] text-gray-400 mt-0.5">{ss.hours}h</div>
-                  </div>
-                  <StatusBadge status={ss.status} />
+                  <StatusBadge status={activity.status} />
                 </div>
               ))}
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Past Activity</h2>
+        {pastActivities.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
+            No activity yet.
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {pastActivities.map((activity, i, arr) => (
+              <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                <div>
+                  <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
+                  <div className="text-[12.5px] text-gray-500">{activity.subtitle}</div>
+                  <div className="text-[12px] text-gray-400 mt-0.5">{activity.meta}</div>
+                  <div className="text-[12px] text-gray-400 mt-0.5">{activity.hoursLabel}</div>
+                </div>
+                <StatusBadge status={activity.status} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -407,6 +616,8 @@ function StatusBadge({ status }: { status: string }) {
     WAITLISTED:         { bg: "bg-amber-50",  text: "text-amber-600",  label: "Waitlisted" },
     REJECTED:           { bg: "bg-red-50",    text: "text-red-600",    label: "Rejected" },
     REVISION_REQUESTED: { bg: "bg-amber-50",  text: "text-amber-700",  label: "Needs Revision" },
+    CANCELLED:          { bg: "bg-gray-100",  text: "text-gray-600",   label: "Cancelled" },
+    NO_SHOW:            { bg: "bg-red-50",    text: "text-red-600",    label: "No Show" },
   };
   const { bg, text, label } = map[status] ?? { bg: "bg-gray-100", text: "text-gray-600", label: status };
   return (

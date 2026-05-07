@@ -8,13 +8,21 @@ interface Signup {
   status: string;
   verificationStatus: string;
   totalHours: number | null;
-  student: { label: string };
+  student: { id?: string; label: string };
   slot: {
     durationHours: number;
     opportunity: { title: string };
     startTime: string;
+    endTime: string;
     date: string;
   };
+}
+
+function getSlotEndAt(date: string, endTime: string): Date {
+  const [hours, minutes] = endTime.split(":").map(Number);
+  const endAt = new Date(date);
+  endAt.setUTCHours(hours, minutes, 0, 0);
+  return endAt;
 }
 
 interface Invitation {
@@ -47,7 +55,14 @@ export default function BeneficiaryDashboard() {
         api.get<Signup[]>(`/beneficiaries/${benId}/signups?status=PENDING`),
         api.get<Invitation[]>(`/beneficiaries/${benId}/invitations`).catch(() => [] as Invitation[]),
       ]);
-      setPendingSignups(signups);
+      setPendingSignups(
+        signups.filter(
+          (signup) =>
+            signup.status === "CONFIRMED" &&
+            signup.verificationStatus === "PENDING" &&
+            getSlotEndAt(signup.slot.date, signup.slot.endTime) <= new Date()
+        )
+      );
       setInvitations(invs);
     } catch {
       setError("Failed to load dashboard data.");

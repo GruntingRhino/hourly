@@ -4,7 +4,8 @@ import { parse as parseCsv } from "csv-parse/sync";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { resolveEffectiveRules, checkCategoryCap } from "../lib/schoolRules";
+import { resolveEffectiveRules, checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
+import { assertStudentAccessibleToStaff, buildCohortScopedStudentWhere, getStaffAccessScope } from "../lib/cohortAccess";
 import {
   sendSelfSubmissionApprovedEmail,
   sendSelfSubmissionRejectedEmail,
@@ -55,6 +56,16 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       return res.status(400).json({ error: `Service date must be on or before ${rules.serviceEndDate.toISOString().split("T")[0]}.` });
     }
 
+    const blockedCategoryKeys = await getBlockedCategoryKeysForStudent(user.id);
+    if (blockedCategoryKeys.has(normalizeCategoryKey(data.category))) {
+      const categoryLabel = data.category || "this category";
+      return res.status(403).json({
+        error: `Your school is preventing you from doing more ${categoryLabel}. You have already completed the maximum allowed hours in that category.`,
+        categoryBlocked: true,
+        category: categoryLabel,
+      });
+    }
+
     const submission = await prisma.selfSubmittedRequest.create({
       data: {
         studentId: user.id,
@@ -92,8 +103,8 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
   try {
     const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
 
-    const admin = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!admin?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
     let records: Record<string, string>[];
     try {
@@ -109,10 +120,7 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
     const schoolStudents = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { schoolId: admin.schoolId },
-          { cohort: { schoolId: admin.schoolId } },
-        ],
+        ...buildCohortScopedStudentWhere(scope),
       },
       select: { id: true, email: true, schoolId: true, cohortId: true },
     });
@@ -149,10 +157,10 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
         skipped.push({ row: rowNum, email, reason: "Student not found in your school" }); continue;
       }
 
-      let schoolId = student.schoolId ?? admin.schoolId;
+      let schoolId = student.schoolId ?? scope.schoolId;
       if (!schoolId && student.cohortId) {
         const cohort = await prisma.cohort.findUnique({ where: { id: student.cohortId }, select: { schoolId: true } });
-        schoolId = cohort?.schoolId ?? admin.schoolId;
+        schoolId = cohort?.schoolId ?? scope.schoolId;
       }
 
       const submission = await prisma.selfSubmittedRequest.create({
@@ -165,7 +173,7 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
           hours: hoursRaw,
           category,
           status: "APPROVED",
-          reviewedBy: admin.id,
+          reviewedBy: scope.userId,
           reviewedAt: new Date(),
         },
       });
@@ -175,11 +183,11 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
     await prisma.auditLog.create({
       data: {
         action: "BULK_HOURS_IMPORT",
-        actorId: admin.id,
+        actorId: scope.userId,
         details: JSON.stringify({
           imported: createdIds.length,
           skipped: skipped.length,
-          schoolId: admin.schoolId,
+          schoolId: scope.schoolId,
         }),
       },
     });
@@ -209,11 +217,13 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     }
 
     if (["SCHOOL_ADMIN", "TEACHER"].includes(user.role)) {
-      if (!user.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+      const scope = await getStaffAccessScope(req.user!.userId);
+      if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
       const statusFilter = req.query.status as string | undefined;
       const submissions = await prisma.selfSubmittedRequest.findMany({
         where: {
-          schoolId: user.schoolId,
+          schoolId: scope.schoolId,
+          ...(scope.isSchoolAdmin ? {} : { student: { cohortId: { in: scope.assignedCohortIds } } }),
           ...(statusFilter ? { status: statusFilter } : {}),
         },
         include: {
@@ -234,14 +244,16 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 // POST /api/self-submissions/:id/approve — school admin approves
 router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const scope = await getStaffAccessScope(req.user!.userId);
     const submission = await prisma.selfSubmittedRequest.findUnique({
       where: { id: req.params.id },
-      include: { student: { select: { email: true, name: true } } },
+      include: { student: { select: { id: true, email: true, name: true } } },
     });
 
     if (!submission) return res.status(404).json({ error: "Submission not found" });
-    if (submission.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    if (submission.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, submission.student.id) : false;
+    if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
     if (submission.status !== "PENDING") return res.status(400).json({ error: "Submission is not pending" });
 
     const { adjustedHours, overrideCap } = z.object({
@@ -317,14 +329,16 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
 // POST /api/self-submissions/:id/reject — school admin rejects
 router.post("/:id/reject", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const scope = await getStaffAccessScope(req.user!.userId);
     const submission = await prisma.selfSubmittedRequest.findUnique({
       where: { id: req.params.id },
-      include: { student: { select: { email: true, name: true } } },
+      include: { student: { select: { id: true, email: true, name: true } } },
     });
 
     if (!submission) return res.status(404).json({ error: "Submission not found" });
-    if (submission.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    if (submission.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, submission.student.id) : false;
+    if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
     if (submission.status !== "PENDING") return res.status(400).json({ error: "Submission is not pending" });
 
     const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body);
@@ -374,14 +388,16 @@ router.post("/:id/reject", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
 // POST /api/self-submissions/:id/request-revision — admin sends back for revision
 router.post("/:id/request-revision", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const scope = await getStaffAccessScope(req.user!.userId);
     const submission = await prisma.selfSubmittedRequest.findUnique({
       where: { id: req.params.id },
-      include: { student: { select: { email: true, name: true } } },
+      include: { student: { select: { id: true, email: true, name: true } } },
     });
 
     if (!submission) return res.status(404).json({ error: "Submission not found" });
-    if (submission.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    if (submission.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's submission" });
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, submission.student.id) : false;
+    if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
     if (submission.status !== "PENDING") return res.status(400).json({ error: "Only pending submissions can be sent for revision" });
 
     const { note } = z.object({ note: z.string().min(1).max(1000) }).parse(req.body);
@@ -420,6 +436,43 @@ router.post("/:id/request-revision", authenticate, requireRole("SCHOOL_ADMIN", "
   }
 });
 
+// POST /api/self-submissions/:id/cancel — student cancels their own pending/revision request
+router.post("/:id/cancel", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const submission = await prisma.selfSubmittedRequest.findUnique({ where: { id: req.params.id } });
+    if (!submission) return res.status(404).json({ error: "Submission not found" });
+    if (submission.studentId !== req.user!.userId) return res.status(403).json({ error: "Not your submission" });
+    if (!["PENDING", "REVISION_REQUESTED"].includes(submission.status)) {
+      return res.status(400).json({ error: "Only pending or revision-requested submissions can be cancelled" });
+    }
+
+    const updated = await prisma.selfSubmittedRequest.update({
+      where: { id: submission.id },
+      data: {
+        status: "CANCELLED",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "SELF_SUBMISSION_CANCELLED",
+        actorId: req.user!.userId,
+        details: JSON.stringify({
+          submissionId: submission.id,
+          studentId: submission.studentId,
+          previousStatus: submission.status,
+          orgName: submission.organizationName,
+        }),
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Cancel self submission error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // PUT /api/self-submissions/:id — student updates and resubmits a REVISION_REQUESTED submission
 router.put("/:id", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -451,6 +504,16 @@ router.put("/:id", authenticate, requireRole("STUDENT"), async (req: Request, re
       return res.status(400).json({ error: `Service date must be on or before ${rules.serviceEndDate.toISOString().split("T")[0]}.` });
     }
 
+    const nextCategory = data.category ?? submission.category;
+    const blockedCategoryKeys = await getBlockedCategoryKeysForStudent(req.user!.userId);
+    if (blockedCategoryKeys.has(normalizeCategoryKey(nextCategory))) {
+      return res.status(403).json({
+        error: `Your school is preventing you from doing more ${nextCategory || "this category"}. You have already completed the maximum allowed hours in that category.`,
+        categoryBlocked: true,
+        category: nextCategory || "this category",
+      });
+    }
+
     const updated = await prisma.selfSubmittedRequest.update({
       where: { id: req.params.id },
       data: {
@@ -461,9 +524,7 @@ router.put("/:id", authenticate, requireRole("STUDENT"), async (req: Request, re
         ...(data.evidenceNote !== undefined && { evidenceNote: data.evidenceNote || null }),
         ...(data.category && { category: data.category }),
         status: "PENDING",
-        revisionNote: null,
-        reviewedBy: null,
-        reviewedAt: null,
+        timesRevised: submission.timesRevised + 1,
         rejectionReason: null,
       },
     });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
+import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
 
 type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "data";
 
@@ -27,6 +28,8 @@ interface SchoolData {
 }
 
 type CapRow = { category: string; hours: string };
+const REQUIRED_CATEGORY_CAP = "Community Service";
+const CATEGORY_CAP_OPTIONS = [...OPPORTUNITY_CATEGORY_OPTIONS];
 
 interface SchoolSettingsData {
   schoolId: string;
@@ -34,11 +37,29 @@ interface SchoolSettingsData {
   partnerInviteTemplate?: string;
 }
 
+interface CategoryCapWarning {
+  studentId: string;
+  studentName: string;
+  category: string;
+  cap: number;
+  approvedHours: number;
+  message: string;
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  assignedCohorts: Array<{ id: string; name: string }>;
+}
+
 interface DataAccessLogEntry {
   id: string;
   action: string;
   targetType: string | null;
   targetId: string | null;
+  targetLabel?: string | null;
   details: string | null;
   createdAt: string;
   actor: {
@@ -47,6 +68,55 @@ interface DataAccessLogEntry {
     role: string;
     email: string;
   };
+}
+
+function isOpaqueIdLike(value: string): boolean {
+  return /^c[a-z0-9]{20,}$/i.test(value.trim());
+}
+
+function formatAccessDetailValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    const visibleValues = value
+      .filter((entry) => !(typeof entry === "string" && isOpaqueIdLike(entry)))
+      .map((entry) => String(entry))
+      .filter(Boolean);
+    return visibleValues.join(", ");
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([key, nestedValue]) => {
+        if (/id$/i.test(key) || /ids$/i.test(key)) return false;
+        if (typeof nestedValue === "string" && isOpaqueIdLike(nestedValue)) return false;
+        return true;
+      })
+      .map(([key, nestedValue]) => `${key}: ${formatAccessDetailValue(nestedValue)}`)
+      .join(", ");
+  }
+
+  return String(value);
+}
+
+function normalizeCapRows(input: CapRow[]): CapRow[] {
+  const byCategory = new Map<string, CapRow>();
+
+  for (const row of input) {
+    const category = row.category.trim();
+    if (!category) continue;
+    if (category === REQUIRED_CATEGORY_CAP) continue;
+    if (!byCategory.has(category)) {
+      byCategory.set(category, { category, hours: row.hours });
+    }
+  }
+
+  return Array.from(byCategory.values()).sort((a, b) => a.category.localeCompare(b.category));
+}
+
+function sumConfiguredCapHours(rows: CapRow[]): number {
+  return rows.reduce((total, row) => {
+    const parsed = Number.parseFloat(row.hours);
+    return Number.isFinite(parsed) && parsed > 0 ? total + parsed : total;
+  }, 0);
 }
 
 export default function SchoolSettings() {
@@ -85,6 +155,7 @@ export default function SchoolSettings() {
   const [savingRules, setSavingRules] = useState(false);
   const [rulesMessage, setRulesMessage] = useState("");
   const [rulesIsError, setRulesIsError] = useState(false);
+  const [categoryCapWarnings, setCategoryCapWarnings] = useState<CategoryCapWarning[]>([]);
 
   // Security
   const [currentPassword, setCurrentPassword] = useState("");
@@ -126,6 +197,11 @@ export default function SchoolSettings() {
   const [dataAccessLogs, setDataAccessLogs] = useState<DataAccessLogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState("");
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [transferTargetEmail, setTransferTargetEmail] = useState("");
+  const [transferringOwnership, setTransferringOwnership] = useState(false);
+  const [transferMessage, setTransferMessage] = useState("");
+  const [transferIsError, setTransferIsError] = useState(false);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -161,9 +237,11 @@ export default function SchoolSettings() {
         setRequireOrgVerification(schoolData.requireOrgVerification ?? false);
         try {
           const caps = schoolData.categoryHourCaps ? JSON.parse(schoolData.categoryHourCaps) : {};
-          setCapRows(Object.entries(caps).map(([category, hours]) => ({ category, hours: String(hours) })));
+          setCapRows(normalizeCapRows(
+            Object.entries(caps).map(([category, hours]) => ({ category, hours: String(hours) }))
+          ));
         } catch {
-          setCapRows([]);
+          setCapRows(normalizeCapRows([]));
         }
       }).finally(() => setLoading(false));
     } else {
@@ -180,6 +258,13 @@ export default function SchoolSettings() {
     const timeoutId = window.setTimeout(() => setJoinByCodeToast(null), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [joinByCodeToast]);
+
+  useEffect(() => {
+    if (!isAdmin || !user?.schoolId) return;
+    api.get<StaffMember[]>(`/schools/${user.schoolId}/staff`)
+      .then(setStaff)
+      .catch(() => {});
+  }, [isAdmin, user?.schoolId]);
 
   useEffect(() => {
     if (tab !== "data" || !isAdmin || !user?.schoolId) return;
@@ -201,22 +286,26 @@ export default function SchoolSettings() {
       const zipArray = zipCodes
         ? zipCodes.split(",").map((z) => z.trim()).filter(Boolean)
         : [];
-      await Promise.all([
-        api.put(`/schools/${user.schoolId}`, {
-          name: schoolName,
-          domain: domain || null,
-          requiredHours: parseFloat(requiredHours),
-          zipCodes: zipArray,
-          address: schoolAddress || null,
-          city: schoolCity || null,
-          state: schoolState || null,
-          zip: schoolZip || null,
-          partnerInviteTemplate: partnerInviteTemplate.trim() || null,
-        }),
-        adminName.trim() && adminName.trim() !== user?.name
-          ? api.put("/auth/profile", { name: adminName.trim() })
-          : Promise.resolve(null),
-      ]);
+      await Promise.all(
+        [
+          isAdmin
+            ? api.put(`/schools/${user.schoolId}`, {
+                name: schoolName,
+                domain: domain || null,
+                requiredHours: parseFloat(requiredHours),
+                zipCodes: zipArray,
+                address: schoolAddress || null,
+                city: schoolCity || null,
+                state: schoolState || null,
+                zip: schoolZip || null,
+                partnerInviteTemplate: partnerInviteTemplate.trim() || null,
+              })
+            : Promise.resolve(null),
+          adminName.trim() && adminName.trim() !== user?.name
+            ? api.put("/auth/profile", { name: adminName.trim() })
+            : Promise.resolve(null),
+        ]
+      );
       setMessage("Settings updated!");
       await refreshUser();
     } catch (err: any) {
@@ -224,6 +313,26 @@ export default function SchoolSettings() {
       setIsError(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOwnershipTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.schoolId) return;
+    setTransferringOwnership(true);
+    setTransferMessage("");
+    setTransferIsError(false);
+    try {
+      const result = await api.post<{ message: string }>(`/schools/${user.schoolId}/ownership-transfer`, {
+        targetEmail: transferTargetEmail,
+      });
+      setTransferMessage(result.message || "Transfer confirmation sent.");
+      setTransferTargetEmail("");
+    } catch (err: any) {
+      setTransferMessage(err.message || "Failed to start ownership transfer.");
+      setTransferIsError(true);
+    } finally {
+      setTransferringOwnership(false);
     }
   };
 
@@ -265,16 +374,34 @@ export default function SchoolSettings() {
     setSavingRules(true);
     setRulesMessage("");
     setRulesIsError(false);
+    setCategoryCapWarnings([]);
     try {
       if (serviceStartDate && serviceEndDate && new Date(serviceEndDate) <= new Date(serviceStartDate)) {
         setRulesMessage("End date must be after start date.");
         setRulesIsError(true);
         return;
       }
-      const categoryHourCaps: Record<string, number> | null = capRows.length > 0
-        ? Object.fromEntries(capRows.filter((r) => r.category.trim()).map((r) => [r.category.trim(), parseFloat(r.hours) || 0]))
+      const normalizedCapRows = normalizeCapRows(capRows);
+      setCapRows(normalizedCapRows);
+      const requiredHoursValue = Number.parseFloat(requiredHours);
+      const totalConfiguredCapHours = sumConfiguredCapHours(normalizedCapRows);
+      if (
+        Number.isFinite(requiredHoursValue)
+        && requiredHoursValue > 0
+        && totalConfiguredCapHours > requiredHoursValue
+      ) {
+        setRulesMessage(`Category caps cannot exceed the total required hours of ${requiredHoursValue}h.`);
+        setRulesIsError(true);
+        return;
+      }
+      const categoryHourCaps: Record<string, number> | null = normalizedCapRows.length > 0
+        ? Object.fromEntries(
+          normalizedCapRows
+            .filter((r) => r.category.trim() && r.hours.trim())
+            .map((r) => [r.category.trim(), parseFloat(r.hours) || 0])
+        )
         : null;
-      await api.put(`/schools/${user.schoolId}`, {
+      const updated = await api.put<{ categoryCapWarnings?: CategoryCapWarning[] }>(`/schools/${user.schoolId}`, {
         serviceStartDate: serviceStartDate ? new Date(serviceStartDate).toISOString() : null,
         serviceEndDate: serviceEndDate ? new Date(serviceEndDate).toISOString() : null,
         allowSelfSubmission,
@@ -282,7 +409,12 @@ export default function SchoolSettings() {
         requireOrgVerification,
         categoryHourCaps,
       });
-      setRulesMessage("Service rules saved!");
+      setCategoryCapWarnings(updated.categoryCapWarnings ?? []);
+      setRulesMessage(
+        updated.categoryCapWarnings?.length
+          ? "Service rules saved. Some students are already above one or more new category caps, so their current hours were kept and they are now blocked from adding more in those categories."
+          : "Service rules saved!",
+      );
     } catch (err: any) {
       setRulesMessage(err.message || "Failed to save rules");
       setRulesIsError(true);
@@ -405,10 +537,16 @@ export default function SchoolSettings() {
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       return Object.entries(parsed)
-        .map(([key, value]) => `${key}: ${String(value)}`)
+        .filter(([key, value]) => {
+          if (/id$/i.test(key) || /ids$/i.test(key)) return false;
+          if (typeof value === "string" && isOpaqueIdLike(value)) return false;
+          return true;
+        })
+        .map(([key, value]) => `${key}: ${formatAccessDetailValue(value)}`)
+        .filter((entry) => !entry.endsWith(": "))
         .join(" | ");
     } catch {
-      return raw;
+      return isOpaqueIdLike(raw) ? "" : raw;
     }
   };
 
@@ -417,15 +555,27 @@ export default function SchoolSettings() {
     { key: "hourApproval" as const, label: "Hour Approval Alert" },
     { key: "orgRequest" as const, label: "Org Request Alert" },
   ];
+  const requiredHoursValue = Number.parseFloat(requiredHours);
+  const totalConfiguredCapHours = sumConfiguredCapHours(capRows);
+  const remainingCapHours = Number.isFinite(requiredHoursValue)
+    ? Math.max(0, requiredHoursValue - totalConfiguredCapHours)
+    : 0;
+  const capHoursExceeded = Number.isFinite(requiredHoursValue)
+    && requiredHoursValue > 0
+    && totalConfiguredCapHours > requiredHoursValue;
 
   if (loading) return <div className="text-gray-500">Loading settings...</div>;
+
+  const visibleTabs: Tab[] = isAdmin
+    ? ["profile", "rules", "security", "notifications", "privacy", "data"]
+    : ["profile", "security", "notifications", "privacy"];
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
-        {(["profile", "rules", "security", "notifications", "privacy", "data"] as Tab[]).map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -488,6 +638,7 @@ export default function SchoolSettings() {
                 type="text"
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
+                disabled={!isAdmin}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
@@ -499,6 +650,7 @@ export default function SchoolSettings() {
                 type="text"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
+                disabled={!isAdmin}
                 placeholder="e.g. lincoln.edu"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
@@ -509,6 +661,7 @@ export default function SchoolSettings() {
                 type="number"
                 value={requiredHours}
                 onChange={(e) => setRequiredHours(e.target.value)}
+                disabled={!isAdmin}
                 min="0"
                 step="1"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -522,6 +675,7 @@ export default function SchoolSettings() {
                 type="text"
                 value={zipCodes}
                 onChange={(e) => setZipCodes(e.target.value)}
+                disabled={!isAdmin}
                 placeholder="e.g. 02101, 02102"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
@@ -536,6 +690,7 @@ export default function SchoolSettings() {
                 type="text"
                 value={schoolAddress}
                 onChange={(e) => setSchoolAddress(e.target.value)}
+                disabled={!isAdmin}
                 placeholder="123 Main St"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
               />
@@ -545,6 +700,7 @@ export default function SchoolSettings() {
                     type="text"
                     value={schoolCity}
                     onChange={(e) => setSchoolCity(e.target.value)}
+                    disabled={!isAdmin}
                     placeholder="City"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
@@ -554,6 +710,7 @@ export default function SchoolSettings() {
                     type="text"
                     value={schoolState}
                     onChange={(e) => setSchoolState(e.target.value)}
+                    disabled={!isAdmin}
                     placeholder="State"
                     maxLength={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm uppercase"
@@ -564,6 +721,7 @@ export default function SchoolSettings() {
                     type="text"
                     value={schoolZip}
                     onChange={(e) => setSchoolZip(e.target.value)}
+                    disabled={!isAdmin}
                     placeholder="ZIP"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
@@ -588,6 +746,7 @@ export default function SchoolSettings() {
               <textarea
                 value={partnerInviteTemplate}
                 onChange={(e) => setPartnerInviteTemplate(e.target.value)}
+                disabled={!isAdmin}
                 rows={5}
                 placeholder="Tell partners why your school is inviting them and what students need from the partnership."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -631,9 +790,51 @@ export default function SchoolSettings() {
               disabled={saving}
               className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving..." : isAdmin ? "Save Changes" : "Save Profile"}
             </button>
           </form>
+
+          {isAdmin && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-2">Transfer School Ownership</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Transfer this school admin role to an existing teacher account. A confirmation email will be sent to your current admin email before anything changes.
+              </p>
+              {transferMessage && (
+                <div className={`mb-4 p-3 rounded-md text-sm ${
+                  transferIsError
+                    ? "bg-red-50 border border-red-200 text-red-700"
+                    : "bg-green-50 border border-green-200 text-green-700"
+                }`}>
+                  {transferMessage}
+                </div>
+              )}
+              <form onSubmit={handleOwnershipTransfer} className="space-y-3">
+                <select
+                  value={transferTargetEmail}
+                  onChange={(e) => setTransferTargetEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  required
+                >
+                  <option value="">Select a teacher account</option>
+                  {staff
+                    .filter((member) => member.role === "TEACHER")
+                    .map((member) => (
+                      <option key={member.id} value={member.email}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={transferringOwnership}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {transferringOwnership ? "Sending..." : "Send Confirmation Email"}
+                </button>
+              </form>
+            </div>
+          )}
 
           <div className="mt-8 pt-6 border-t border-gray-200">
             <button onClick={logout} className="text-red-600 text-sm hover:underline">
@@ -655,6 +856,18 @@ export default function SchoolSettings() {
                 : "bg-green-50 border border-green-200 text-green-700"
             }`}>
               {rulesMessage}
+            </div>
+          )}
+          {!rulesIsError && categoryCapWarnings.length > 0 && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="font-medium mb-2">Students already above a new cap</div>
+              <div className="space-y-1">
+                {categoryCapWarnings.map((warning) => (
+                  <div key={`${warning.studentId}:${warning.category}`}>
+                    {warning.message}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -763,8 +976,27 @@ export default function SchoolSettings() {
             <div className="border-t border-gray-100 pt-5">
               <h3 className="text-sm font-semibold text-gray-800 mb-1">Category Hour Caps</h3>
               <p className="text-xs text-gray-500 mb-3">
-                Limit how many hours per category count toward a student's total. Leave empty for no caps.
+                Students need {requiredHoursValue || 0} total community service hours. The community service total is fixed by the school requirement below. Category caps carve up that same total and do not add extra hours on top. Leave hours blank for no cap.
               </p>
+              <div className="mb-3 grid grid-cols-[1fr_100px_32px] gap-2 items-center">
+                <div className="px-2 py-1.5 border border-gray-200 bg-gray-50 rounded text-sm text-gray-700">
+                  {REQUIRED_CATEGORY_CAP}
+                </div>
+                <div className="px-2 py-1.5 border border-gray-200 bg-gray-50 rounded text-sm text-gray-700 text-right">
+                  {requiredHoursValue || 0}
+                </div>
+                <div />
+              </div>
+              <div className={`mb-3 rounded-md border px-3 py-2 text-xs ${
+                capHoursExceeded
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-gray-50 text-gray-600"
+              }`}>
+                Configured cap hours: <strong>{totalConfiguredCapHours.toFixed(0)}h</strong>
+                {Number.isFinite(requiredHoursValue) && requiredHoursValue > 0 ? (
+                  <> of <strong>{requiredHoursValue}h</strong> total required hours · Remaining uncapped hours: <strong>{remainingCapHours.toFixed(0)}h</strong></>
+                ) : null}
+              </div>
               {capRows.length > 0 && (
                 <div className="mb-2 space-y-2">
                   <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-xs font-medium text-gray-500 uppercase tracking-wide px-1">
@@ -774,17 +1006,24 @@ export default function SchoolSettings() {
                   </div>
                   {capRows.map((row, i) => (
                     <div key={i} className="grid grid-cols-[1fr_100px_32px] gap-2 items-center">
-                      <input
-                        type="text"
+                      <select
                         value={row.category}
                         onChange={(e) => {
                           const next = [...capRows];
                           next[i] = { ...next[i], category: e.target.value };
-                          setCapRows(next);
+                          setCapRows(normalizeCapRows(next));
                         }}
-                        placeholder="e.g. environment"
                         className="px-2 py-1.5 border border-gray-300 rounded text-sm"
-                      />
+                      >
+                        <option value="">Select category</option>
+                        {CATEGORY_CAP_OPTIONS.filter((option) => (
+                          option === row.category || !capRows.some((capRow, index) => index !== i && capRow.category === option)
+                        )).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="number"
                         value={row.hours}
@@ -813,6 +1052,7 @@ export default function SchoolSettings() {
               <button
                 type="button"
                 onClick={() => setCapRows((rows) => [...rows, { category: "", hours: "" }])}
+                disabled={capRows.filter((row) => row.category.trim()).length >= CATEGORY_CAP_OPTIONS.length}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
                 + Add category cap
@@ -1100,8 +1340,7 @@ export default function SchoolSettings() {
                       </div>
                       <div className="mt-2 text-sm text-gray-700 break-words">
                         {entry.action.replaceAll("_", " ")}
-                        {entry.targetType ? ` · ${entry.targetType}` : ""}
-                        {entry.targetId ? ` · ${entry.targetId}` : ""}
+                        {entry.targetLabel ? ` · ${entry.targetLabel}` : ""}
                       </div>
                       {entry.details && (
                         <div className="mt-1 text-xs text-gray-500 break-words">

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
@@ -14,28 +15,34 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       return res.status(400).json({ error: "opportunityId is required" });
     }
 
-    const opp = await prisma.opportunity.findUnique({
-      where: { id: opportunityId },
-      include: { _count: { select: { signups: { where: { status: "CONFIRMED" } } } } },
-    });
-    if (!opp) return res.status(404).json({ error: "Opportunity not found" });
-    if (opp.status !== "ACTIVE") return res.status(400).json({ error: "Opportunity is not active" });
+    const result = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "Opportunity" WHERE id = ${opportunityId} FOR UPDATE`;
 
-    // Check for existing signup
-    const existing = await prisma.signup.findUnique({
-      where: { userId_opportunityId: { userId: req.user!.userId, opportunityId } },
-    });
-    if (existing) {
-      if (existing.status === "CANCELLED") {
-        // Re-signup
-        const confirmedCount = opp._count.signups;
-        const status = confirmedCount >= opp.capacity ? "WAITLISTED" : "CONFIRMED";
-        const updated = await prisma.signup.update({
+      const opp = await tx.opportunity.findUnique({
+        where: { id: opportunityId },
+        select: { id: true, title: true, status: true, capacity: true, durationHours: true, organizationId: true },
+      });
+      if (!opp) return { kind: "error" as const, status: 404, body: { error: "Opportunity not found" } };
+      if (opp.status !== "ACTIVE") return { kind: "error" as const, status: 400, body: { error: "Opportunity is not active" } };
+
+      const existing = await tx.signup.findUnique({
+        where: { userId_opportunityId: { userId: req.user!.userId, opportunityId } },
+      });
+      if (existing && existing.status !== "CANCELLED") {
+        return { kind: "error" as const, status: 409, body: { error: "Already signed up" } };
+      }
+
+      const confirmedCount = await tx.signup.count({
+        where: { opportunityId, status: "CONFIRMED" },
+      });
+      const status = confirmedCount >= opp.capacity ? "WAITLISTED" : "CONFIRMED";
+
+      if (existing) {
+        const updated = await tx.signup.update({
           where: { id: existing.id },
           data: { status },
         });
-        // Reset service session to a signup-ready state.
-        await prisma.serviceSession.updateMany({
+        await tx.serviceSession.updateMany({
           where: { userId: req.user!.userId, opportunityId },
           data: {
             status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
@@ -48,34 +55,36 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
             rejectionReason: null,
           },
         });
-        return res.json(updated);
+        return { kind: "success" as const, signup: updated, opp, status, httpStatus: 200 };
       }
-      return res.status(409).json({ error: "Already signed up" });
+
+      const signup = await tx.signup.create({
+        data: {
+          userId: req.user!.userId,
+          opportunityId,
+          status,
+        },
+      });
+
+      await tx.serviceSession.create({
+        data: {
+          userId: req.user!.userId,
+          opportunityId,
+          status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
+          totalHours: opp.durationHours,
+        },
+      });
+
+      return { kind: "success" as const, signup, opp, status, httpStatus: 201 };
+    });
+
+    if (result.kind === "error") {
+      return res.status(result.status).json(result.body);
     }
 
-    // Check capacity
-    const confirmedCount = opp._count.signups;
-    const status = confirmedCount >= opp.capacity ? "WAITLISTED" : "CONFIRMED";
+    const { signup, opp, status, httpStatus } = result;
 
-    const signup = await prisma.signup.create({
-      data: {
-        userId: req.user!.userId,
-        opportunityId,
-        status,
-      },
-    });
-
-    // Create a service session tied to signup state.
-    await prisma.serviceSession.create({
-      data: {
-        userId: req.user!.userId,
-        opportunityId,
-        status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
-        totalHours: opp.durationHours,
-      },
-    });
-
-    res.status(201).json(signup);
+    res.status(httpStatus).json(signup);
 
     // Keep core signup latency low; notifications are non-blocking side effects.
     void (async () => {
@@ -147,35 +156,63 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
       return res.status(403).json({ error: "Cannot cancel this signup" });
     }
 
-    const updated = await prisma.signup.update({
-      where: { id: req.params.id },
-      data: { status: "CANCELLED" },
+    const result = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "Opportunity" WHERE id = ${signup.opportunityId} FOR UPDATE`;
+
+      const liveSignup = await tx.signup.findUnique({
+        where: { id: req.params.id },
+      });
+      if (!liveSignup) return { kind: "error" as const, status: 404, body: { error: "Signup not found" } };
+      if (liveSignup.status === "CANCELLED") {
+        return { kind: "error" as const, status: 400, body: { error: "Already cancelled" } };
+      }
+
+      const updated = await tx.signup.update({
+        where: { id: req.params.id },
+        data: { status: "CANCELLED" },
+      });
+
+      await tx.serviceSession.updateMany({
+        where: { userId: liveSignup.userId, opportunityId: liveSignup.opportunityId },
+        data: { status: "CANCELLED" },
+      });
+
+      let promotedUserId: string | null = null;
+      if (liveSignup.status === "CONFIRMED") {
+        const firstWaitlisted = await tx.signup.findFirst({
+          where: { opportunityId: liveSignup.opportunityId, status: "WAITLISTED" },
+          orderBy: { createdAt: "asc" },
+        });
+        if (firstWaitlisted) {
+          await tx.signup.update({
+            where: { id: firstWaitlisted.id },
+            data: { status: "CONFIRMED" },
+          });
+          await tx.serviceSession.updateMany({
+            where: { userId: firstWaitlisted.userId, opportunityId: liveSignup.opportunityId },
+            data: { status: "PENDING_CHECKIN" },
+          });
+          promotedUserId = firstWaitlisted.userId;
+        }
+      }
+
+      return {
+        kind: "success" as const,
+        updated,
+        promotedUserId,
+      };
     });
 
-    await prisma.serviceSession.updateMany({
-      where: { userId: signup.userId, opportunityId: signup.opportunityId },
-      data: { status: "CANCELLED" },
-    });
+    if (result.kind === "error") {
+      return res.status(result.status).json(result.body);
+    }
 
-    // If a confirmed spot opens, promote first waitlisted
     const opp = await prisma.opportunity.findUnique({ where: { id: signup.opportunityId } });
     if (opp) {
-      const firstWaitlisted = await prisma.signup.findFirst({
-        where: { opportunityId: signup.opportunityId, status: "WAITLISTED" },
-        orderBy: { createdAt: "asc" },
-      });
-      if (firstWaitlisted) {
-        await prisma.signup.update({
-          where: { id: firstWaitlisted.id },
-          data: { status: "CONFIRMED" },
-        });
-        await prisma.serviceSession.updateMany({
-          where: { userId: firstWaitlisted.userId, opportunityId: signup.opportunityId },
-          data: { status: "PENDING_CHECKIN" },
-        });
+      if (result.promotedUserId) {
         await prisma.notification.create({
           data: {
-            userId: firstWaitlisted.userId,
+            userId: result.promotedUserId,
             type: "SIGNUP_CONFIRMED",
             title: "Spot Available!",
             body: `A spot opened up for "${opp.title}" — you're now confirmed!`,
@@ -200,7 +237,7 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
       }
     }
 
-    res.json(updated);
+    res.json(result.updated);
   } catch (err) {
     console.error("Cancel signup error:", err);
     res.status(500).json({ error: "Internal server error" });
