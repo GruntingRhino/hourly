@@ -83,8 +83,17 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
     // Alert school admins about new pending submission
     prisma.user.findMany({
       where: { schoolId, role: "SCHOOL_ADMIN" },
-      select: { email: true, name: true },
-    }).then((admins) => {
+      select: { id: true, email: true, name: true },
+    }).then(async (admins) => {
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: "SELF_SUBMISSION_REVIEW",
+          title: "New self-submitted hours request",
+          body: `${user.name} submitted ${data.hours}h for ${data.organizationName}.`,
+          data: JSON.stringify({ href: "/submissions" }),
+        })),
+      }).catch(() => {});
       for (const admin of admins) {
         sendNewSubmissionAlertEmail(admin.email, admin.name, user.name, data.organizationName, data.hours).catch(() => {});
       }
@@ -309,6 +318,7 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
         type: "VERIFICATION_UPDATE",
         title: "Self-Submitted Hours Approved",
         body: `Your ${hours} hours at "${submission.organizationName}" have been approved.`,
+        data: JSON.stringify({ href: "/submit" }),
       },
     });
 
@@ -367,6 +377,7 @@ router.post("/:id/reject", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
         type: "VERIFICATION_UPDATE",
         title: "Self-Submitted Hours Not Approved",
         body: `Your hours at "${submission.organizationName}" were not approved. Reason: ${reason}`,
+        data: JSON.stringify({ href: "/submit" }),
       },
     });
 
@@ -418,6 +429,7 @@ router.post("/:id/request-revision", authenticate, requireRole("SCHOOL_ADMIN", "
         type: "VERIFICATION_UPDATE",
         title: "Revision requested for your submission",
         body: `Your hours at "${submission.organizationName}" need revision. Note: ${note}`,
+        data: JSON.stringify({ href: "/submit" }),
       },
     });
 
@@ -532,9 +544,18 @@ router.put("/:id", authenticate, requireRole("STUDENT"), async (req: Request, re
     // Notify school admins again
     prisma.user.findMany({
       where: { schoolId: submission.schoolId, role: "SCHOOL_ADMIN" },
-      select: { email: true, name: true },
+      select: { id: true, email: true, name: true },
     }).then(async (admins) => {
       const student = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { name: true } });
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: "SELF_SUBMISSION_REVIEW",
+          title: "Revised self-submitted hours request",
+          body: `${student?.name ?? "A student"} resubmitted ${updated.hours}h for ${updated.organizationName}.`,
+          data: JSON.stringify({ href: "/submissions" }),
+        })),
+      }).catch(() => {});
       for (const admin of admins) {
         sendNewSubmissionAlertEmail(admin.email, admin.name, student?.name ?? "A student", updated.organizationName, updated.hours).catch(() => {});
       }

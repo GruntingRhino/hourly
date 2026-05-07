@@ -2180,8 +2180,8 @@ router.post("/:id/organizations/:orgId/block", authenticate, requireRole("SCHOOL
 // GET /api/schools/:id/students/at-risk — JSON list of at-risk students (optionally exportable)
 router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.schoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (scope?.schoolId !== req.params.id) {
       return res.status(403).json({ error: "Not your school" });
     }
 
@@ -2206,11 +2206,16 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       if (!cohort) {
         return res.status(404).json({ error: "Cohort not found for this school" });
       }
+      if (scope && !scope.isSchoolAdmin && !scope.assignedCohortIds.includes(cohortId)) {
+        return res.status(403).json({ error: "Not your cohort" });
+      }
     }
 
     const whereClause: any = { role: "STUDENT" };
     if (cohortId) {
       whereClause.cohortId = cohortId;
+    } else if (scope && !scope.isSchoolAdmin) {
+      whereClause.cohortId = { in: scope.assignedCohortIds };
     } else {
       whereClause.OR = [
         { classroom: { schoolId: req.params.id } },

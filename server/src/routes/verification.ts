@@ -91,6 +91,7 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
         type: "VERIFICATION_UPDATE",
         title: "Hours Approved",
         body: `Your ${hours} hours for "${session.opportunity.title}" have been approved.`,
+        data: JSON.stringify({ href: "/dashboard" }),
       },
     });
 
@@ -177,6 +178,7 @@ router.post("/:sessionId/reject", authenticate, requireRole("ORG_ADMIN", "SCHOOL
         type: "VERIFICATION_UPDATE",
         title: "Hours Rejected",
         body: `Your hours for "${session.opportunity.title}" were rejected: ${reason}`,
+        data: JSON.stringify({ href: "/dashboard" }),
       },
     });
 

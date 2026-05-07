@@ -36,6 +36,17 @@ interface TeacherImportResult {
   errors: TeacherImportIssue[];
 }
 
+interface SubmissionSummary {
+  id: string;
+  status: string;
+  organizationName: string;
+  date: string;
+  hours: number;
+  createdAt: string;
+  revisionNote: string | null;
+  student: { id: string; name: string; email: string };
+}
+
 export default function SchoolCohorts() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
@@ -52,12 +63,21 @@ export default function SchoolCohorts() {
   const [teacherCsvData, setTeacherCsvData] = useState("");
   const [teacherImporting, setTeacherImporting] = useState(false);
   const [teacherImportResult, setTeacherImportResult] = useState<TeacherImportResult | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
+  const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionSummary[]>([]);
+  const [revisionSubmissions, setRevisionSubmissions] = useState<SubmissionSummary[]>([]);
 
   const loadCohorts = async () => {
     setLoading(true);
     try {
-      const data = await api.get<Cohort[]>("/cohorts");
-      setCohorts(data);
+      const [cohortData, pendingData, revisionData] = await Promise.all([
+        api.get<Cohort[]>("/cohorts"),
+        api.get<SubmissionSummary[]>("/self-submissions?status=PENDING").catch(() => []),
+        api.get<SubmissionSummary[]>("/self-submissions?status=REVISION_REQUESTED").catch(() => []),
+      ]);
+      setCohorts(cohortData);
+      setPendingSubmissions(pendingData);
+      setRevisionSubmissions(revisionData);
     } catch {
       setError("Could not load cohorts. Please retry.");
     } finally {
@@ -118,20 +138,68 @@ export default function SchoolCohorts() {
     }
   };
 
+  const handleDownload = async (path: string, filename: string, label: string) => {
+    setDownloadingReport(label);
+    setError("");
+    try {
+      const blob = await api.download(path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || "Failed to export CSV.");
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
+
   if (loading) return <div className="text-gray-500 py-8 text-center">Loading cohorts...</div>;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-[22px] font-bold text-gray-900">{isTeacher ? "Assigned Cohorts" : "Cohorts"}</h1>
-        {isAdmin && (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85"
-          >
-            + New Cohort
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {user?.schoolId && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleDownload(`/schools/${user.schoolId}/export`, "all-students.csv", "students")}
+                disabled={downloadingReport !== null}
+                className="px-3 py-[7px] bg-white border border-gray-300 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {downloadingReport === "students" ? "Exporting..." : "Student CSV"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownload(`/cohorts/export`, isTeacher ? "assigned-cohorts.csv" : "school-cohorts.csv", "cohorts")}
+                disabled={downloadingReport !== null}
+                className="px-3 py-[7px] bg-white border border-gray-300 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {downloadingReport === "cohorts" ? "Exporting..." : "Cohort CSV"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownload(`/schools/${user.schoolId}/students/at-risk?format=csv`, "at-risk-students.csv", "at-risk")}
+                disabled={downloadingReport !== null}
+                className="px-3 py-[7px] bg-white border border-gray-300 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {downloadingReport === "at-risk" ? "Exporting..." : "At-Risk CSV"}
+              </button>
+            </>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85"
+            >
+              + New Cohort
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
@@ -202,6 +270,77 @@ export default function SchoolCohorts() {
         </div>
       )}
 
+      <div className="mb-6 bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-[15px] font-semibold text-gray-900">Self-Submitted Hours</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Review queue now sits alongside cohorts instead of consuming a dedicated top-level tab.
+            </p>
+          </div>
+          <Link
+            to="/submissions"
+            className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Open Review Queue
+          </Link>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 mb-4">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Pending Review</div>
+            <div className="mt-1 text-2xl font-bold text-gray-900">{pendingSubmissions.length}</div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700">Needs Revision</div>
+            <div className="mt-1 text-2xl font-bold text-amber-800">{revisionSubmissions.length}</div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Latest Activity</div>
+            <div className="mt-1 text-sm font-medium text-gray-900">
+              {(pendingSubmissions[0] || revisionSubmissions[0])
+                ? new Date((pendingSubmissions[0] || revisionSubmissions[0])!.createdAt).toLocaleDateString()
+                : "No active requests"}
+            </div>
+          </div>
+        </div>
+
+        {(pendingSubmissions.length > 0 || revisionSubmissions.length > 0) ? (
+          <div className="space-y-2">
+            {[...pendingSubmissions.slice(0, 3), ...revisionSubmissions.slice(0, 2)].map((submission) => (
+              <Link
+                key={submission.id}
+                to="/submissions"
+                className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 hover:bg-gray-50"
+              >
+                <div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {submission.student.name} · {submission.organizationName}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-0.5">
+                    {submission.hours}h · {new Date(submission.date).toLocaleDateString()}
+                  </div>
+                  {submission.revisionNote && (
+                    <div className="text-xs text-amber-700 mt-1">{submission.revisionNote}</div>
+                  )}
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                  submission.status === "REVISION_REQUESTED"
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-blue-50 text-blue-700"
+                }`}>
+                  {submission.status === "REVISION_REQUESTED" ? "Needs revision" : "Pending"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+            No active self-submitted hour requests.
+          </div>
+        )}
+      </div>
+
       {cohorts.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-[13.5px] text-gray-500">
           No cohorts yet. Create one to get started.
@@ -232,6 +371,26 @@ export default function SchoolCohorts() {
                   }`}>{cohort.status.toLowerCase()}</span>
                 </div>
                 <div className="flex gap-2">
+                  {user?.schoolId && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(`/schools/${user.schoolId}/export?cohortId=${cohort.id}`, `${cohort.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-students.csv`, `students-${cohort.id}`)}
+                        disabled={downloadingReport !== null}
+                        className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {downloadingReport === `students-${cohort.id}` ? "Exporting..." : "Students CSV"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(`/schools/${user.schoolId}/students/at-risk?cohortId=${cohort.id}&format=csv`, `${cohort.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-at-risk.csv`, `at-risk-${cohort.id}`)}
+                        disabled={downloadingReport !== null}
+                        className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {downloadingReport === `at-risk-${cohort.id}` ? "Exporting..." : "At-Risk CSV"}
+                      </button>
+                    </>
+                  )}
                   <Link
                     to={`/cohorts/${cohort.id}`}
                     className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50"

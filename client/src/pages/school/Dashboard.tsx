@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import { getNotificationHref } from "../../lib/notificationRouting";
+import type { AppNotification } from "../../lib/notificationRouting";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -70,8 +72,12 @@ export default function SchoolDashboard() {
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
+  const [runningReminders, setRunningReminders] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState("");
 
   const handleDismissOnboarding = async () => {
     setOnboardingDismissed(true);
@@ -86,14 +92,16 @@ export default function SchoolDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [c, b, s] = await Promise.all([
+      const [c, b, s, n] = await Promise.all([
         api.get<CohortSummary[]>("/cohorts"),
         api.get<Beneficiary[]>("/beneficiaries?status=APPROVED"),
         api.get<StudentRow[]>("/cohorts/school-students").catch(() => []),
+        api.get<AppNotification[]>("/messages/notifications").catch(() => []),
       ]);
       setCohorts(c);
       setBeneficiaries(b);
       setStudents(s);
+      setNotifications(n);
     } catch {
       setError("Failed to load dashboard. Please refresh.");
     } finally {
@@ -134,6 +142,39 @@ export default function SchoolDashboard() {
     } catch (err) {
       console.error(err);
       setError("Failed to export PDF report.");
+    }
+  };
+
+  const handleDownload = async (path: string, filename: string, label: string) => {
+    setDownloadingReport(label);
+    setError("");
+    try {
+      const blob = await api.download(path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || "Failed to export CSV report.");
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
+
+  const handleRunReminders = async () => {
+    setRunningReminders(true);
+    setError("");
+    setReminderMessage("");
+    try {
+      await api.post("/messages/reminders/run", {});
+      setReminderMessage("Reminder cycle completed.");
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to run reminders.");
+    } finally {
+      setRunningReminders(false);
     }
   };
 
@@ -219,6 +260,24 @@ export default function SchoolDashboard() {
           <h1 className="text-[22px] font-bold text-gray-900">{isTeacher ? "Teacher Dashboard" : "Dashboard"}</h1>
         </div>
         <div className="flex gap-2">
+          {user?.schoolId && (
+            <>
+              <button
+                onClick={() => handleDownload(`/schools/${user.schoolId}/export`, "all-students.csv", "students")}
+                disabled={downloadingReport !== null}
+                className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {downloadingReport === "students" ? "Exporting..." : "Export CSV"}
+              </button>
+              <button
+                onClick={() => handleDownload(`/schools/${user.schoolId}/students/at-risk?format=csv`, "at-risk-students.csv", "at-risk")}
+                disabled={downloadingReport !== null}
+                className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {downloadingReport === "at-risk" ? "Exporting..." : "At-Risk CSV"}
+              </button>
+            </>
+          )}
           <button onClick={handleExportPdf} className="px-4 py-[7px] bg-white border border-gray-200 rounded-md text-[13.5px] font-medium text-gray-700 hover:bg-gray-50">
             Export PDF
           </button>
@@ -251,6 +310,12 @@ export default function SchoolDashboard() {
         </div>
       </div>
 
+      {reminderMessage && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {reminderMessage}
+        </div>
+      )}
+
       {totalStudents === 0 && (
         <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
           <div className="font-semibold text-amber-900 mb-2">This school is not activated yet</div>
@@ -274,13 +339,13 @@ export default function SchoolDashboard() {
         </div>
       )}
 
-      {/* Quick links — 3×2 grid */}
-      <div className="grid grid-cols-3 gap-2.5 mb-6">
+      {/* Quick links */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 mb-6">
         {[
           { to: "/cohorts", label: "View All Cohorts", count: cohorts.length },
           { to: "/beneficiaries", label: "Partners Approved", count: beneficiaries.length },
-          { to: "/submissions", label: "Self-Submitted Hours", count: null },
           { to: "/students", label: "Student Roster", count: students.length },
+          { to: "/cohorts", label: "Pending Invites", count: pendingInvites },
           { to: "/students/on-track", label: "On-Track", count: cohorts.reduce((s, c) => s + (c.studentCount - c.atRiskCount), 0) },
           { to: "/students/off-track", label: "Off-Track", count: totalAtRisk },
         ].map((b) => (
@@ -295,6 +360,78 @@ export default function SchoolDashboard() {
             )}
           </Link>
         ))}
+      </div>
+
+      <div className="mb-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-[15px] font-semibold text-gray-900">Messages & Alerts</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Notifications, reminder runs, and school-wide communication now live here instead of a separate top-level tab.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/messages?tab=notifications"
+                className="px-3.5 py-[7px] bg-white border border-gray-200 rounded-md text-[13px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Open Inbox
+              </Link>
+              <button
+                onClick={handleRunReminders}
+                disabled={runningReminders}
+                className="px-3.5 py-[7px] bg-blue-600 text-white rounded-md text-[13px] font-medium hover:opacity-85 disabled:opacity-50"
+              >
+                {runningReminders ? "Running..." : "Run Reminders"}
+              </button>
+            </div>
+          </div>
+          {notifications.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+              No recent alerts.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {notifications.slice(0, 4).map((notification) => (
+                <Link
+                  key={notification.id}
+                  to={getNotificationHref(notification)}
+                  className={`block rounded-lg border px-4 py-3 transition-colors hover:border-blue-300 hover:bg-blue-50 ${
+                    notification.read ? "border-gray-200" : "border-blue-200 bg-blue-50/70"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{notification.title}</div>
+                      <div className="text-sm text-gray-600 mt-0.5">{notification.body}</div>
+                    </div>
+                    <div className="shrink-0 text-xs text-gray-400">
+                      {new Date(notification.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <h2 className="text-[15px] font-semibold text-gray-900">Communication Shortcuts</h2>
+          <div className="mt-4 space-y-3">
+            <Link to="/messages?tab=inbox" className="block rounded-lg border border-gray-200 px-4 py-3 hover:bg-gray-50">
+              <div className="text-sm font-medium text-gray-900">Direct messages</div>
+              <div className="text-sm text-gray-500 mt-1">Read school conversations and send follow-ups.</div>
+            </Link>
+            <Link to="/messages?tab=notifications" className="block rounded-lg border border-gray-200 px-4 py-3 hover:bg-gray-50">
+              <div className="text-sm font-medium text-gray-900">Notification feed</div>
+              <div className="text-sm text-gray-500 mt-1">Review automated alerts, reminders, and review notices.</div>
+            </Link>
+            <Link to="/messages" className="block rounded-lg border border-gray-200 px-4 py-3 hover:bg-gray-50">
+              <div className="text-sm font-medium text-gray-900">Announcement center</div>
+              <div className="text-sm text-gray-500 mt-1">Broadcast cohort or school-wide messages when needed.</div>
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Pending invites alert */}
@@ -322,7 +459,7 @@ export default function SchoolDashboard() {
         ) : (
           <div className="flex flex-col gap-2.5">
             {cohorts.map((c) => (
-              <Link key={c.id} to={`/cohorts/${c.id}`} className="block bg-white border border-gray-200 rounded-lg p-[18px] hover:border-blue-300 transition-colors">
+              <div key={c.id} className="bg-white border border-gray-200 rounded-lg p-[18px] hover:border-blue-300 transition-colors">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2.5">
                     <div>
@@ -361,7 +498,35 @@ export default function SchoolDashboard() {
                     <div className="text-[11.5px] text-gray-400 mt-1">{c.completionPercentage}% completed {c.requiredHours}h goal</div>
                   </>
                 )}
-              </Link>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    to={`/cohorts/${c.id}`}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-[12.5px] font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Manage Cohort
+                  </Link>
+                  {user?.schoolId && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(`/schools/${user.schoolId}/export?cohortId=${c.id}`, `${c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-students.csv`, `students-${c.id}`)}
+                        disabled={downloadingReport !== null}
+                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {downloadingReport === `students-${c.id}` ? "Exporting..." : "Students CSV"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(`/schools/${user.schoolId}/students/at-risk?cohortId=${c.id}&format=csv`, `${c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-at-risk.csv`, `at-risk-${c.id}`)}
+                        disabled={downloadingReport !== null}
+                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {downloadingReport === `at-risk-${c.id}` ? "Exporting..." : "At-Risk CSV"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}

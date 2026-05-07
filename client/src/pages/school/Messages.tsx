@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
+import { getNotificationHref } from "../../lib/notificationRouting";
+import type { AppNotification } from "../../lib/notificationRouting";
 
 interface Message {
   id: string;
@@ -10,15 +13,6 @@ interface Message {
   createdAt: string;
   sender: { id: string; name: string; role: string };
   receiver: { id: string; name: string; role: string };
-}
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  read: boolean;
-  createdAt: string;
 }
 
 interface CohortSummary {
@@ -37,10 +31,15 @@ interface ReminderSummary {
 }
 
 export default function SchoolMessages() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
-  const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">("inbox");
+  const initialFolder = searchParams.get("tab");
+  const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">(
+    initialFolder === "sent" || initialFolder === "notifications" ? initialFolder : "inbox"
+  );
   const [showCompose, setShowCompose] = useState(false);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [to, setTo] = useState("");
@@ -64,6 +63,13 @@ export default function SchoolMessages() {
   }, [folder]);
 
   useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "inbox" || tab === "sent" || tab === "notifications") {
+      setFolder(tab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     api.get<CohortSummary[]>("/cohorts").then(setCohorts).catch(() => {});
   }, []);
 
@@ -71,7 +77,7 @@ export default function SchoolMessages() {
     setLoading(true);
     try {
       if (folder === "notifications") {
-        const data = await api.get<Notification[]>("/messages/notifications");
+        const data = await api.get<AppNotification[]>("/messages/notifications");
         setNotifications(data);
       } else {
         const data = await api.get<Message[]>(`/messages?folder=${folder}`);
@@ -141,6 +147,25 @@ export default function SchoolMessages() {
     } finally {
       setRunningReminders(false);
     }
+  };
+
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+
+  const handleFolderChange = (nextFolder: "inbox" | "sent" | "notifications") => {
+    setFolder(nextFolder);
+    setSearchParams(nextFolder === "inbox" ? {} : { tab: nextFolder });
+  };
+
+  const openNotification = async (notification: AppNotification) => {
+    if (!notification.read) {
+      try {
+        await api.put(`/messages/notifications/${notification.id}/read`);
+        setNotifications((prev) =>
+          prev.map((item) => (item.id === notification.id ? { ...item, read: true } : item))
+        );
+      } catch {}
+    }
+    navigate(getNotificationHref(notification));
   };
 
   return (
@@ -278,21 +303,23 @@ export default function SchoolMessages() {
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             />
-            <label className="inline-flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={broadcastPriority}
-                onChange={(e) => setBroadcastPriority(e.target.checked)}
-              />
-              Mark as priority
-            </label>
-            <button
-              type="submit"
-              disabled={sendingBroadcast}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-            >
-              {sendingBroadcast ? "Sending..." : "Send Announcement"}
-            </button>
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={broadcastPriority}
+                  onChange={(e) => setBroadcastPriority(e.target.checked)}
+                />
+                Mark as priority
+              </label>
+              <button
+                type="submit"
+                disabled={sendingBroadcast}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 sm:self-start"
+              >
+                {sendingBroadcast ? "Sending..." : "Send Announcement"}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -329,12 +356,19 @@ export default function SchoolMessages() {
         {(["inbox", "sent", "notifications"] as const).map((f) => (
           <button
             key={f}
-            onClick={() => setFolder(f)}
+            onClick={() => handleFolderChange(f)}
             className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
               folder === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            {f}
+            <span className="inline-flex items-center gap-2">
+              <span>{f}</span>
+              {f === "notifications" && unreadNotificationCount > 0 && (
+                <span className="min-w-[18px] rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>
@@ -347,7 +381,12 @@ export default function SchoolMessages() {
             <div className="text-gray-500 text-center py-8">No notifications.</div>
           ) : (
             notifications.map((n) => (
-              <div key={n.id} className={`bg-white border rounded-lg p-4 ${n.read ? "border-gray-200" : "border-blue-300"}`}>
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => openNotification(n)}
+                className={`w-full text-left bg-white border rounded-lg p-4 transition-colors hover:border-blue-300 hover:bg-blue-50 ${n.read ? "border-gray-200" : "border-blue-300 bg-blue-50"}`}
+              >
                 <div className="flex justify-between">
                   <div>
                     <div className="font-medium text-sm">{n.title}</div>
@@ -355,7 +394,7 @@ export default function SchoolMessages() {
                   </div>
                   <div className="text-xs text-gray-400">{new Date(n.createdAt).toLocaleDateString()}</div>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
