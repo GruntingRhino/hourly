@@ -8,6 +8,7 @@ import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { runReminderCycle } from "../lib/reminders";
 
 const router = Router();
+const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
 
 const SCHOOL_ROLES = new Set(["SCHOOL_ADMIN", "TEACHER", "STUDENT"]);
 
@@ -144,6 +145,7 @@ router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Res
         type: "NEW_MESSAGE",
         title: "New Message",
         body: subject || "You have a new message",
+        data: JSON.stringify({ href: "/messages?tab=inbox" }),
       },
     });
 
@@ -177,13 +179,32 @@ router.put("/:id/read", authenticate, async (req: Request, res: Response) => {
 router.get("/notifications", authenticate, async (req: Request, res: Response) => {
   try {
     const notifications = await prisma.notification.findMany({
-      where: { userId: req.user!.userId },
+      where: {
+        userId: req.user!.userId,
+        NOT: { type: { startsWith: SYSTEM_NOTIFICATION_PREFIX } },
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
     res.json(notifications);
   } catch (err) {
     console.error("Notifications error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/notifications/unread-count", authenticate, async (req: Request, res: Response) => {
+  try {
+    const unread = await prisma.notification.count({
+      where: {
+        userId: req.user!.userId,
+        read: false,
+        NOT: { type: { startsWith: SYSTEM_NOTIFICATION_PREFIX } },
+      },
+    });
+    res.json({ unread });
+  } catch (err) {
+    console.error("Notification unread count error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -315,6 +336,7 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
         type: "SCHOOL_ANNOUNCEMENT",
         title: subject,
         body: body.body,
+        data: JSON.stringify({ href: "/messages?tab=notifications" }),
       })),
     });
 

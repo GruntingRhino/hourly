@@ -7,6 +7,8 @@ import {
 } from "../services/email";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const QUARTER_MS = 90 * DAY_MS;
+const SYSTEM_AT_RISK_EMAIL_SENT = "_SYSTEM_AT_RISK_EMAIL_SENT";
 
 export interface ReminderSummary {
   schoolId: string;
@@ -44,6 +46,30 @@ async function createNotificationIfFresh(userId: string, type: string, title: st
     },
   });
   return true;
+}
+
+async function hasRecentHiddenNotification(userId: string, type: string, withinMs: number): Promise<boolean> {
+  const since = new Date(Date.now() - withinMs);
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId,
+      type,
+      createdAt: { gte: since },
+    },
+    select: { id: true },
+  });
+  return Boolean(existing);
+}
+
+async function markHiddenNotification(userId: string, type: string): Promise<void> {
+  await prisma.notification.create({
+    data: {
+      userId,
+      type,
+      title: "system",
+      body: "system",
+    },
+  });
 }
 
 async function getPendingReviewCount(schoolId: string): Promise<number> {
@@ -133,6 +159,14 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
       );
       if (created) {
         deadlineReminders += 1;
+        await prisma.notification.updateMany({
+          where: {
+            userId: student.id,
+            type: "DEADLINE_REMINDER",
+            createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+          },
+          data: { data: JSON.stringify({ href: "/dashboard" }) },
+        });
         sendServiceDeadlineReminderEmail(
           student.email,
           student.name,
@@ -153,14 +187,26 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
       );
       if (created) {
         behindAlerts += 1;
-        sendBehindScheduleEmail(
-          student.email,
-          student.name,
-          school.name,
-          student.approvedHours,
-          student.requiredHours,
-          student.riskReasons
-        ).catch(() => {});
+        await prisma.notification.updateMany({
+          where: {
+            userId: student.id,
+            type: "AT_RISK_ALERT",
+            createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+          },
+          data: { data: JSON.stringify({ href: "/dashboard" }) },
+        });
+        const sentRecently = await hasRecentHiddenNotification(student.id, SYSTEM_AT_RISK_EMAIL_SENT, QUARTER_MS);
+        if (!sentRecently) {
+          sendBehindScheduleEmail(
+            student.email,
+            student.name,
+            school.name,
+            student.approvedHours,
+            student.requiredHours,
+            student.riskReasons
+          ).catch(() => {});
+          await markHiddenNotification(student.id, SYSTEM_AT_RISK_EMAIL_SENT);
+        }
       }
     }
   }
@@ -178,6 +224,14 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
       );
       if (created) {
         adminAlerts += 1;
+        await prisma.notification.updateMany({
+          where: {
+            userId: admin.id,
+            type: "ADMIN_PENDING_REVIEW_ALERT",
+            createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+          },
+          data: { data: JSON.stringify({ href: "/submissions" }) },
+        });
         sendAdminPendingReviewAlertEmail(
           admin.email,
           admin.name,

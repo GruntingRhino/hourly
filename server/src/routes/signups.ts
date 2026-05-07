@@ -96,6 +96,7 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
           body: status === "CONFIRMED"
             ? `You're signed up for "${opp.title}"`
             : `You've been waitlisted for "${opp.title}"`,
+          data: JSON.stringify({ href: "/dashboard" }),
         },
       });
 
@@ -216,6 +217,7 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response) => 
             type: "SIGNUP_CONFIRMED",
             title: "Spot Available!",
             body: `A spot opened up for "${opp.title}" — you're now confirmed!`,
+            data: JSON.stringify({ href: "/dashboard" }),
           },
         });
       }

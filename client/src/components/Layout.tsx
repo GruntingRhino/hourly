@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { api } from "../lib/api";
 
 const AVATAR_COLORS: Record<string, string> = {
   STUDENT: "#2563EB",
@@ -12,6 +14,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const handleLogout = () => {
     logout();
@@ -28,13 +31,36 @@ export default function Layout() {
 
   const avatarColor = AVATAR_COLORS[user?.role ?? ""] ?? "#2563EB";
 
+  useEffect(() => {
+    let active = true;
+
+    const loadUnreadCount = async () => {
+      try {
+        const result = await api.get<{ unread: number }>("/messages/notifications/unread-count");
+        if (active) setUnreadNotifications(result.unread);
+      } catch {
+        if (active) setUnreadNotifications(0);
+      }
+    };
+
+    void loadUnreadCount();
+    window.addEventListener("focus", loadUnreadCount);
+    const interval = window.setInterval(loadUnreadCount, 30000);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", loadUnreadCount);
+      window.clearInterval(interval);
+    };
+  }, [location.pathname, user?.id]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top nav — 58px, white, underline active indicator */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40" style={{ height: 58 }}>
-        <div className="max-w-[960px] mx-auto px-8 h-full flex items-center">
+        <div className="max-w-[1280px] mx-auto px-8 h-full relative flex items-center justify-between">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center shrink-0 mr-8">
+          <Link to="/dashboard" className="flex items-center shrink-0 relative z-10">
             <img
               src="/logo-full.png"
               alt="GoodHours"
@@ -48,7 +74,10 @@ export default function Layout() {
           </Link>
 
           {/* Nav links — underline active state */}
-          <nav className="flex items-stretch h-full gap-0.5 flex-1" aria-label="Main navigation">
+          <nav
+            className="absolute inset-y-0 left-1/2 hidden -translate-x-1/2 items-stretch justify-center gap-0.5 lg:flex"
+            aria-label="Main navigation"
+          >
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -65,8 +94,40 @@ export default function Layout() {
             ))}
           </nav>
 
+          <nav className="flex items-stretch h-full gap-0.5 lg:hidden" aria-label="Main navigation">
+            {navItems.slice(0, 4).map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                aria-label={item.label}
+                className={`flex items-center px-3 text-sm transition-colors border-b-2 ${
+                  isActive(item.path)
+                    ? "border-blue-600 text-blue-600 font-semibold"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
           {/* User profile */}
-          <div className="flex items-center gap-2.5 pl-4 border-l border-gray-200 shrink-0">
+          <div className="flex items-center gap-2.5 pl-4 border-l border-gray-200 shrink-0 relative z-10">
+            <button
+              onClick={() => navigate("/messages?tab=notifications")}
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Open notifications"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4a2 2 0 0 1-.6-1.4V11a6 6 0 1 0-12 0v3.2c0 .53-.21 1.04-.59 1.41L4 17h5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 17a2 2 0 1 0 4 0" />
+              </svg>
+              {unreadNotifications > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
+            </button>
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0 select-none"
               style={{ background: avatarColor }}
@@ -107,7 +168,6 @@ function getNavItems(role: string) {
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },
         { path: "/beneficiaries", label: "Partners" },
-        { path: "/submissions", label: "Submissions" },
         { path: "/launch", label: "Launch" },
         { path: "/settings", label: "Settings" },
         ...((import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development") && role === "SCHOOL_ADMIN"
@@ -118,13 +178,13 @@ function getNavItems(role: string) {
       return [
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },
-        { path: "/submissions", label: "Submissions" },
         { path: "/settings", label: "Settings" },
       ];
     case "BENEFICIARY_ADMIN":
       return [
         { path: "/dashboard", label: "Dashboard" },
         { path: "/opportunities", label: "Opportunities" },
+        { path: "/messages", label: "Messages" },
         { path: "/settings", label: "Settings" },
       ];
     default:

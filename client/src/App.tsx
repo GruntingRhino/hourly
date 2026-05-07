@@ -54,6 +54,7 @@ import ImpersonatePage from "./pages/admin/Impersonate";
 import BeneficiaryDashboard from "./pages/beneficiary/Dashboard";
 import BeneficiaryOpportunities from "./pages/beneficiary/Opportunities";
 import BeneficiarySettings from "./pages/beneficiary/Settings";
+import OrgMessages from "./pages/organization/Messages";
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
@@ -144,6 +145,7 @@ function AppRoutes() {
             <>
               <Route path="/dashboard" element={<BeneficiaryDashboard />} />
               <Route path="/opportunities" element={<BeneficiaryOpportunities />} />
+              <Route path="/messages" element={<OrgMessages />} />
               <Route path="/settings" element={<BeneficiarySettings />} />
             </>
           )}

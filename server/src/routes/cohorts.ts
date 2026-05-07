@@ -29,6 +29,25 @@ const COHORT_INVITE_AUDIT_ACTION = "COHORT_INVITE_DISPATCHED";
 const TEACHER_IMPORT_HEADERS = ["name", "email"] as const;
 const SCHOOL_TEACHER_IMPORT_HEADERS = ["name", "email", "cohort"] as const;
 
+type CohortSummary = {
+  id: string;
+  name: string;
+  status: string;
+  requiredHours: number;
+  startYear: number | null;
+  endYear: number | null;
+  publishedAt: Date | null;
+  studentCount: number;
+  invitationsSent: number;
+  invitationsAccepted: number;
+  invitationsPending: number;
+  totalHours: number;
+  completedCount: number;
+  atRiskCount: number;
+  completionPercentage: number;
+  teachers: Array<{ id: string; name: string; email: string }>;
+};
+
 function isMissingSchemaObjectError(err: unknown, objectName: string): boolean {
   return err instanceof Error && err.message.includes(objectName) && (
     err.message.includes("does not exist")
@@ -226,139 +245,202 @@ async function sendCohortInvitation(
   }
 }
 
+function csvCell(value: string | number | null | undefined): string {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof getStaffAccessScope>>>): Promise<CohortSummary[]> {
+  const school = await prisma.school.findUnique({
+    where: { id: scope.schoolId },
+    select: safeSchoolSelect,
+  });
+  const accessibleCohortIds = getAccessibleCohortIds(scope);
+
+  let cohorts: Array<any>;
+  try {
+    cohorts = await prisma.cohort.findMany({
+      where: {
+        schoolId: scope.schoolId,
+        ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
+      },
+      include: {
+        _count: { select: { students: true, invitations: true } },
+        invitations: { select: { status: true } },
+        teacherAssignments: {
+          include: {
+            teacher: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { teacher: { name: "asc" } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (err) {
+    if (
+      !isMissingSchemaObjectError(err, "CohortTeacherAssignment")
+      && !isMissingSchemaObjectError(err, "teacherAssignments")
+      && !isMissingSchemaObjectError(err, "Cohort.usesHouseField")
+      && !isMissingSchemaObjectError(err, "usesHouseField")
+    ) {
+      throw err;
+    }
+
+    cohorts = await prisma.cohort.findMany({
+      where: {
+        schoolId: scope.schoolId,
+        ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        requiredHours: true,
+        startYear: true,
+        endYear: true,
+        publishedAt: true,
+        createdAt: true,
+        _count: { select: { students: true, invitations: true } },
+        invitations: { select: { status: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }).then((rows) => rows.map((row) => ({ ...row, teacherAssignments: [] })));
+  }
+
+  const requiredHours = school?.requiredHours ?? 40;
+
+  const students = await prisma.user.findMany({
+    where: {
+      role: "STUDENT",
+      cohort: {
+        schoolId: scope.schoolId,
+        ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      grade: true,
+      cohortId: true,
+      cohort: {
+        select: {
+          id: true,
+          name: true,
+          requiredHours: true,
+          serviceStartDate: true,
+          serviceEndDate: true,
+        },
+      },
+    },
+  });
+
+  const progress = await buildStudentProgressRecords(students, {
+    requiredHours,
+    serviceStartDate: school?.serviceStartDate ?? null,
+    serviceEndDate: school?.serviceEndDate ?? null,
+  });
+  const progressByCohort = new Map<string, typeof progress>();
+  for (const student of progress) {
+    if (!student.cohortId) continue;
+    const list = progressByCohort.get(student.cohortId) ?? [];
+    list.push(student);
+    progressByCohort.set(student.cohortId, list);
+  }
+
+  return cohorts.map((c) => {
+    const cohortProgress = progressByCohort.get(c.id) ?? [];
+    const totalHours = cohortProgress.reduce((sum, student) => sum + student.approvedHours, 0);
+    const completedCount = cohortProgress.filter((student) => student.status === "COMPLETED").length;
+    const atRiskCount = cohortProgress.filter((student) => student.status === "AT_RISK").length;
+    const invAccepted = c.invitations.filter((i: { status: string }) => i.status === "ACCEPTED").length;
+    const invPending = c.invitations.filter((i: { status: string }) => i.status === "PENDING").length;
+    return {
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      requiredHours: c.requiredHours ?? requiredHours,
+      startYear: c.startYear,
+      endYear: c.endYear,
+      publishedAt: c.publishedAt,
+      studentCount: cohortProgress.length,
+      invitationsSent: c._count.invitations,
+      invitationsAccepted: invAccepted,
+      invitationsPending: invPending,
+      totalHours: Math.round(totalHours * 100) / 100,
+      completedCount,
+      atRiskCount,
+      completionPercentage: cohortProgress.length > 0 ? Math.round((completedCount / cohortProgress.length) * 100) : 0,
+      teachers: (c.teacherAssignments ?? []).map((assignment: any) => assignment.teacher),
+    };
+  });
+}
+
 // GET /api/cohorts — list cohorts for school
 router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const scope = await getStaffAccessScope(req.user!.userId);
     if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
-
-    const school = await prisma.school.findUnique({
-      where: { id: scope.schoolId },
-      select: safeSchoolSelect,
-    });
-    const accessibleCohortIds = getAccessibleCohortIds(scope);
-
-    let cohorts: Array<any>;
-    try {
-      cohorts = await prisma.cohort.findMany({
-        where: {
-          schoolId: scope.schoolId,
-          ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
-        },
-        include: {
-          _count: { select: { students: true, invitations: true } },
-          invitations: { select: { status: true } },
-          teacherAssignments: {
-            include: {
-              teacher: { select: { id: true, name: true, email: true } },
-            },
-            orderBy: { teacher: { name: "asc" } },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    } catch (err) {
-      if (
-        !isMissingSchemaObjectError(err, "CohortTeacherAssignment")
-        && !isMissingSchemaObjectError(err, "teacherAssignments")
-        && !isMissingSchemaObjectError(err, "Cohort.usesHouseField")
-        && !isMissingSchemaObjectError(err, "usesHouseField")
-      ) {
-        throw err;
-      }
-
-      cohorts = await prisma.cohort.findMany({
-        where: {
-          schoolId: scope.schoolId,
-          ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
-        },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          requiredHours: true,
-          startYear: true,
-          endYear: true,
-          publishedAt: true,
-          createdAt: true,
-          _count: { select: { students: true, invitations: true } },
-          invitations: { select: { status: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      }).then((rows) => rows.map((row) => ({ ...row, teacherAssignments: [] })));
-    }
-
-    const requiredHours = school?.requiredHours ?? 40;
-
-    const students = await prisma.user.findMany({
-      where: {
-        role: "STUDENT",
-        cohort: {
-          schoolId: scope.schoolId,
-          ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        grade: true,
-        cohortId: true,
-        cohort: {
-          select: {
-            id: true,
-            name: true,
-            requiredHours: true,
-            serviceStartDate: true,
-            serviceEndDate: true,
-          },
-        },
-      },
-    });
-
-    const progress = await buildStudentProgressRecords(students, {
-      requiredHours,
-      serviceStartDate: school?.serviceStartDate ?? null,
-      serviceEndDate: school?.serviceEndDate ?? null,
-    });
-    const progressByCohort = new Map<string, typeof progress>();
-    for (const student of progress) {
-      if (!student.cohortId) continue;
-      const list = progressByCohort.get(student.cohortId) ?? [];
-      list.push(student);
-      progressByCohort.set(student.cohortId, list);
-    }
-
-    const result = cohorts.map((c) => {
-      const cohortProgress = progressByCohort.get(c.id) ?? [];
-      const totalHours = cohortProgress.reduce((sum, student) => sum + student.approvedHours, 0);
-      const completedCount = cohortProgress.filter((student) => student.status === "COMPLETED").length;
-      const atRiskCount = cohortProgress.filter((student) => student.status === "AT_RISK").length;
-      const invAccepted = c.invitations.filter((i: { status: string }) => i.status === "ACCEPTED").length;
-      const invPending = c.invitations.filter((i: { status: string }) => i.status === "PENDING").length;
-      return {
-        id: c.id,
-        name: c.name,
-        status: c.status,
-        requiredHours: c.requiredHours ?? requiredHours,
-        startYear: c.startYear,
-        endYear: c.endYear,
-        publishedAt: c.publishedAt,
-        studentCount: cohortProgress.length,
-        invitationsSent: c._count.invitations,
-        invitationsAccepted: invAccepted,
-        invitationsPending: invPending,
-        totalHours: Math.round(totalHours * 100) / 100,
-        completedCount,
-        atRiskCount,
-        completionPercentage: cohortProgress.length > 0 ? Math.round((completedCount / cohortProgress.length) * 100) : 0,
-        teachers: (c.teacherAssignments ?? []).map((assignment: any) => assignment.teacher),
-      };
-    });
-
+    const result = await loadCohortSummaries(scope);
     res.json(result);
   } catch (err) {
     console.error("List cohorts error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/cohorts/export — export visible cohort summaries as CSV
+router.get("/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const cohorts = await loadCohortSummaries(scope);
+    const rows = [[
+      "Cohort Name",
+      "Status",
+      "Required Hours",
+      "Start Year",
+      "End Year",
+      "Published At",
+      "Student Count",
+      "Invitations Sent",
+      "Invitations Accepted",
+      "Invitations Pending",
+      "Total Hours",
+      "Completed Students",
+      "At-Risk Students",
+      "Completion Percentage",
+      "Teachers",
+    ]];
+
+    for (const cohort of cohorts) {
+      rows.push([
+        cohort.name,
+        cohort.status,
+        String(cohort.requiredHours),
+        cohort.startYear != null ? String(cohort.startYear) : "",
+        cohort.endYear != null ? String(cohort.endYear) : "",
+        cohort.publishedAt ? cohort.publishedAt.toISOString().split("T")[0] : "",
+        String(cohort.studentCount),
+        String(cohort.invitationsSent),
+        String(cohort.invitationsAccepted),
+        String(cohort.invitationsPending),
+        String(cohort.totalHours),
+        String(cohort.completedCount),
+        String(cohort.atRiskCount),
+        `${cohort.completionPercentage}%`,
+        cohort.teachers.map((teacher) => teacher.name).join("; "),
+      ]);
+    }
+
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+    const filename = scope.isSchoolAdmin ? "school-cohorts.csv" : "assigned-cohorts.csv";
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error("Cohort export error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
