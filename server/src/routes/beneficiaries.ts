@@ -1275,27 +1275,6 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
       }));
     }
 
-    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
-    let recurringGroupId: string | undefined;
-
-    if (data.recurrenceRule) {
-      recurringGroupId = crypto.randomUUID();
-      const fromDate = new Date(data.startDate);
-      const generated = generateRecurringSlots(data.recurrenceRule, fromDate);
-      if (generated.length === 0) {
-        return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
-      }
-      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId }));
-    } else {
-      slotsToCreate = data.timeSlots!.map((ts) => ({
-        date: new Date(ts.date),
-        startTime: ts.startTime,
-        endTime: ts.endTime,
-        durationHours: ts.durationHours,
-        capacity: ts.capacity,
-      }));
-    }
-
     const opp = await prisma.beneficiaryOpportunity.create({
       data: {
         title: data.title,
