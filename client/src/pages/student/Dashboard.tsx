@@ -229,11 +229,18 @@ function DeadlineBanner({ deadline, approvedHours, requiredHours }: { deadline: 
   );
 }
 
+interface HourTotals {
+  totalApprovedHours: number;
+  totalPendingHours: number;
+  requiredHours: number;
+}
+
 export default function StudentDashboard() {
   const { user } = useAuth();
   const [signups, setSignups] = useState<Signup[]>([]);
   const [selfSubs, setSelfSubs] = useState<SelfSubmission[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
+  const [hourTotals, setHourTotals] = useState<HourTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -242,14 +249,16 @@ export default function StudentDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [s, ss, slots] = await Promise.all([
+      const [s, ss, slots, report] = await Promise.all([
         api.get<Signup[]>("/beneficiaries/my-signups"),
         api.get<SelfSubmission[]>("/self-submissions").catch(() => [] as SelfSubmission[]),
         api.get<AvailableSlot[]>("/beneficiaries/available-slots").catch(() => [] as AvailableSlot[]),
+        api.get<HourTotals>("/reports/student").catch(() => null),
       ]);
       setSignups(s);
       setSelfSubs(ss);
       setAvailableSlots(slots);
+      setHourTotals(report);
     } catch {
       setError("Failed to load dashboard. Please refresh the page.");
     } finally {
@@ -278,23 +287,12 @@ export default function StudentDashboard() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  const approvedBenHours = signups
-    .filter((s) => s.verificationStatus === "APPROVED")
-    .reduce((sum, s) => sum + (s.totalHours ?? s.slot.durationHours), 0);
-  const approvedSelfHours = selfSubs
-    .filter((s) => s.status === "APPROVED")
-    .reduce((sum, s) => sum + s.hours, 0);
-  const totalApprovedHours = approvedBenHours + approvedSelfHours;
-
-  const pendingBenHours = signups
-    .filter((s) => s.verificationStatus === "PENDING" && s.status === "CONFIRMED")
-    .reduce((sum, s) => sum + s.slot.durationHours, 0);
-  const pendingSelfHours = selfSubs
-    .filter((s) => s.status === "PENDING" || s.status === "REVISION_REQUESTED")
-    .reduce((sum, s) => sum + s.hours, 0);
-  const totalPendingHours = pendingBenHours + pendingSelfHours;
-
-  const requiredHours = user?.cohort?.requiredHours ?? user?.school?.requiredHours ?? 40;
+  // Use server-computed totals so all three hour sources (BeneficiarySignup,
+  // SelfSubmittedRequest, ServiceSession) are included — matching school reports.
+  const fallbackRequired = user?.cohort?.requiredHours ?? user?.school?.requiredHours ?? 40;
+  const totalApprovedHours = hourTotals?.totalApprovedHours ?? 0;
+  const totalPendingHours = hourTotals?.totalPendingHours ?? 0;
+  const requiredHours = hourTotals?.requiredHours ?? fallbackRequired;
   const remainingHours = Math.max(0, requiredHours - totalApprovedHours);
   const deadline = resolveDeadline(user);
 

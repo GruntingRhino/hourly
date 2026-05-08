@@ -6,7 +6,7 @@
     { "source": "/api/:path*", "destination": "/api/index" }
   ],
   "crons": [
-    { "path": "/api/internal/reminders/run", "schedule": "0 8 * * *" }
+    { "path": "/api/internal/reminders/run", "schedule": "0 8 1 * *" }
   ],
   "functions": {
     "api/index.ts": {

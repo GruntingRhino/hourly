@@ -73,7 +73,7 @@ async function markHiddenNotification(userId: string, type: string): Promise<voi
 }
 
 async function getPendingReviewCount(schoolId: string): Promise<number> {
-  const [selfPending, legacyPending] = await Promise.all([
+  const [selfPending, legacyPending, benSignupPending] = await Promise.all([
     prisma.selfSubmittedRequest.count({
       where: { schoolId, status: "PENDING" },
     }),
@@ -89,9 +89,27 @@ async function getPendingReviewCount(schoolId: string): Promise<number> {
         },
       },
     }),
+    prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        OR: [
+          { classroom: { schoolId } },
+          { cohort: { schoolId } },
+        ],
+      },
+      select: { id: true },
+    }).then((rows) =>
+      prisma.beneficiarySignup.count({
+        where: {
+          verificationStatus: "PENDING",
+          status: "CONFIRMED",
+          studentId: { in: rows.map((r) => r.id) },
+        },
+      })
+    ),
   ]);
 
-  return selfPending + legacyPending;
+  return selfPending + legacyPending + benSignupPending;
 }
 
 async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary | null> {
