@@ -64,13 +64,6 @@ interface ImportIssue {
   reason: string;
 }
 
-interface TeacherImportResult {
-  assigned: number;
-  created: number;
-  skipped: number;
-  errors: ImportIssue[];
-}
-
 interface HourBreakdownActor {
   id: string;
   name: string;
