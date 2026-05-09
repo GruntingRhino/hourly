@@ -47,10 +47,6 @@ const PERSONAL_EMAIL_DOMAINS = new Set([
   "comcast.net", "att.net", "sbcglobal.net", "cox.net",
 ]);
 
-function isTestEmail(email: string): boolean {
-  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
-}
-
 function classifyEmailDomain(email: string): DomainStatus {
   const atIdx = email.indexOf("@");
   if (atIdx < 0) return null;
@@ -58,7 +54,7 @@ function classifyEmailDomain(email: string): DomainStatus {
   if (!domain || !domain.includes(".")) return null;
   // Personal emails are only blocked in production (not in dev deployment or local dev)
   const isProduction = import.meta.env.PROD && import.meta.env.VITE_APP_ENV !== "development";
-  if (isProduction && PERSONAL_EMAIL_DOMAINS.has(domain) && !isTestEmail(email)) {
+  if (isProduction && PERSONAL_EMAIL_DOMAINS.has(domain)) {
     return "personal";
   }
   if (domain.endsWith(".edu")) return "edu";

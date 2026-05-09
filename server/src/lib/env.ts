@@ -21,12 +21,24 @@ const OPTIONAL = [
   "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
   "CRON_SECRET",            // shared secret for scheduled internal jobs (e.g. Vercel cron)
   "APP_ENV",                // "production" | "development" — set explicitly per Vercel project
+  "DEV_DATABASE_URL",       // explicit development-only database URL; overrides DATABASE_URL when APP_ENV=development
+  "ALLOW_SHARED_DEV_DATABASE", // set true only if you intentionally want dev to use a shared remote database
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
 type OptionalEnv = (typeof OPTIONAL)[number];
 
 function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv, string>> {
+  const isDevelopmentLike =
+    process.env.APP_ENV === "development" ||
+    (process.env.APP_ENV !== "production" &&
+      process.env.NODE_ENV !== "production" &&
+      process.env.VERCEL_ENV !== "production");
+
+  if (isDevelopmentLike && process.env.DEV_DATABASE_URL?.trim()) {
+    process.env.DATABASE_URL = process.env.DEV_DATABASE_URL.trim();
+  }
+
   const missing: string[] = [];
 
   for (const key of REQUIRED) {
@@ -47,6 +59,22 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     process.env.APP_ENV === "production" ||
     (process.env.APP_ENV !== "development" &&
       (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production"));
+
+  if (isDevelopmentLike) {
+    const dbUrl = process.env.DATABASE_URL || "";
+    const allowSharedDevDatabase = process.env.ALLOW_SHARED_DEV_DATABASE === "true";
+    const pointsToRemoteHostedDb = /neon\.tech|aws\.neon\.tech|pooler\./i.test(dbUrl);
+    const looksNonProdDbName = /(?:\/|=)(?:[^/?#]*?(dev|test|local|staging|preview|sandbox)[^/?#]*)(?:\?|$)/i.test(dbUrl);
+    const pointsToLocalDb = /localhost|127\.0\.0\.1/i.test(dbUrl);
+
+    if (!allowSharedDevDatabase && pointsToRemoteHostedDb && !looksNonProdDbName && !pointsToLocalDb) {
+      console.error("❌ Development environment is pointing at a remote shared database.");
+      console.error("   Set DEV_DATABASE_URL to a separate development database/branch.");
+      console.error("   If this is intentional, set ALLOW_SHARED_DEV_DATABASE=true.");
+      process.exit(1);
+    }
+  }
+
   if (isProdLike) {
     const fieldKey = process.env.FIELD_ENCRYPTION_KEY;
     if (!fieldKey) {

@@ -17,14 +17,8 @@ import {
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
-// Strip +alias suffixes (e.g. user+tag@domain.com → user@domain.com) to block
-// duplicate account creation via address variants.
 function normalizeEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  if (at === -1) return email;
-  const local = email.slice(0, at).replace(/\+.*$/, "");
-  const domain = email.slice(at + 1);
-  return `${local}@${domain}`;
+  return email.trim().toLowerCase();
 }
 
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
@@ -163,11 +157,6 @@ const loginIpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
-  skip: (req) => {
-    if (IS_PROD_LIKE) return false;
-    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    return /^abhay\.sivaram\+\d+@gmail\.com$/.test(email);
-  },
 });
 
 // Login credential window: 8 failed attempts per IP/email pair per 15 minutes.
@@ -180,14 +169,6 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
-  // Skip rate limiting for Playwright test accounts in non-production only.
-  // These are seeded test-only accounts; rate limiting them prevents the E2E
-  // suite from completing within a single 15-minute window.
-  skip: (req) => {
-    if (IS_PROD_LIKE) return false;
-    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    return /^abhay\.sivaram\+\d+@gmail\.com$/.test(email);
-  },
 });
 
 const router = Router();
@@ -256,11 +237,6 @@ function isPersonalEmailDomain(email: string): boolean {
   return PERSONAL_EMAIL_DOMAINS.has(domain);
 }
 
-/** Playwright/QA test accounts — bypass all domain restrictions. */
-function isTestEmail(email: string): boolean {
-  return /^abhay\.sivaram(\+[^@]*)?@gmail\.com$/i.test(email);
-}
-
 /** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
 export function extractDomainFromWebsite(website: string): string | null {
   if (!website?.trim()) return null;
@@ -285,14 +261,14 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     data.email = normalizeEmail(data.email);
 
     if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
-      if (isPersonalEmailDomain(data.email) && !isTestEmail(data.email)) {
+      if (isPersonalEmailDomain(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
     }
 
     // If a directory school was selected, validate email domain against its known domain
     // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
-    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && data.role === "SCHOOL_ADMIN" && data.directorySchoolId && !isTestEmail(data.email)) {
+    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
       const dirEntry = await prisma.schoolDirectory.findUnique({
         where: { id: data.directorySchoolId },
         select: { emailDomain: true, website: true },
