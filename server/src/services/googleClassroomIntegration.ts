@@ -927,8 +927,8 @@ async function runGoogleClassroomSync(params: {
     }),
   ]);
 
-  const sectionMappingByExternalId = new Map(sectionMappings.map((mapping) => [mapping.externalId, mapping]));
-  const userMappingByExternalId = new Map(userMappings.map((mapping) => [mapping.externalId, mapping]));
+  const sectionMappingByExternalId = new Map<string, (typeof sectionMappings)[number]>(sectionMappings.map((mapping) => [mapping.externalId, mapping]));
+  const userMappingByExternalId = new Map<string, (typeof userMappings)[number]>(userMappings.map((mapping) => [mapping.externalId, mapping]));
 
   for (const plan of plans) {
     activeSectionIds.add(plan.sectionId);

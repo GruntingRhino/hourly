@@ -130,7 +130,7 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
       },
       select: { id: true, email: true, schoolId: true, cohortId: true },
     });
-    const studentByEmail = new Map(schoolStudents.map((s) => [s.email.toLowerCase(), s]));
+    const studentByEmail = new Map<string, (typeof schoolStudents)[number]>(schoolStudents.map((s) => [s.email.toLowerCase(), s]));
 
     const createdIds: string[] = [];
     const skipped: { row: number; email: string; reason: string }[] = [];

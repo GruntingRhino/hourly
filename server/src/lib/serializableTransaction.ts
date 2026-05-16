@@ -1,10 +1,11 @@
 import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import prisma from "./prisma";
 
 const MAX_RETRIES = 3;
 
 function isRetryableSerializationError(err: unknown): boolean {
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === "P2034") return true;
     if (err.code === "P2010" && (err.meta as { code?: string } | undefined)?.code === "40001") {
       return true;
@@ -19,7 +20,7 @@ export async function runSerializableTransaction<T>(
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
       return await prisma.$transaction(fn, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        isolationLevel: "Serializable",
       });
     } catch (err) {
       if (isRetryableSerializationError(err) && attempt < MAX_RETRIES) {

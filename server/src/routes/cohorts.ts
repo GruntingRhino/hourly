@@ -651,7 +651,7 @@ router.post("/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), async
       where: { schoolId: scope.schoolId, name: { in: cohortNames } },
       select: { id: true, name: true },
     });
-    const cohortByName = new Map(cohorts.map((cohort) => [cohort.name.trim().toLowerCase(), cohort]));
+    const cohortByName = new Map<string, (typeof cohorts)[number]>(cohorts.map((cohort) => [cohort.name.trim().toLowerCase(), cohort]));
 
     const result = {
       assigned: 0,

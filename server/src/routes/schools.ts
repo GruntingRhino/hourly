@@ -2183,9 +2183,9 @@ router.get("/:id/data-access-logs", authenticate, requireRole("SCHOOL_ADMIN"), a
         : Promise.resolve([]),
     ]);
 
-    const userLabelById = new Map(users.map((entry) => [entry.id, entry.name || entry.email]));
-    const schoolLabelById = new Map(schools.map((entry) => [entry.id, entry.name]));
-    const cohortLabelById = new Map(cohorts.map((entry) => [entry.id, entry.name]));
+    const userLabelById = new Map<string, string>(users.map((entry) => [entry.id, entry.name || entry.email]));
+    const schoolLabelById = new Map<string, string>(schools.map((entry) => [entry.id, entry.name]));
+    const cohortLabelById = new Map<string, string>(cohorts.map((entry) => [entry.id, entry.name]));
 
     res.json(logs.map((log) => {
       let targetLabel: string | null = null;

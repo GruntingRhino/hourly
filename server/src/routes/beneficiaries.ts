@@ -178,12 +178,12 @@ const geocodingStates = new Set<string>();
 
 async function geocodeStateBackground(state: string): Promise<void> {
   try {
-    const cities = await prisma.$queryRawUnsafe<{ city: string; state: string }[]>(
+    const cities = await prisma.$queryRawUnsafe(
       `SELECT DISTINCT city, state FROM "BeneficiaryDirectory"
        WHERE state = $1 AND active = true AND latitude IS NULL AND city IS NOT NULL
        ORDER BY city`,
       state
-    );
+    ) as Array<{ city: string; state: string }>;
     for (const { city, st } of cities.map(r => ({ city: r.city, st: r.state }))) {
       if (!geocodingStates.has(state)) break; // cancelled / server restart
       try {
@@ -334,7 +334,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     // Get true total count (unaffected by LIMIT)
     const countSql = `SELECT COUNT(*)::int as total FROM "BeneficiaryDirectory" ${whereClause}`;
-    const [countResult] = await prisma.$queryRawUnsafe<[{ total: number }]>(countSql, ...baseParams);
+    const [countResult] = (await prisma.$queryRawUnsafe(countSql, ...baseParams)) as Array<{ total: number }>;
     const total = Number(countResult.total);
 
     // Main query with LIMIT/OFFSET
@@ -381,10 +381,10 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     let geocodingInProgress = false;
     if (results.length === 0 && schoolState && !geocodingStates.has(schoolState)) {
       // Check if there are ungeocoded entries in this state
-      const [{ cnt }] = await prisma.$queryRawUnsafe<[{ cnt: string }]>(
+      const [{ cnt }] = (await prisma.$queryRawUnsafe(
         `SELECT COUNT(*) as cnt FROM "BeneficiaryDirectory" WHERE state = $1 AND latitude IS NULL LIMIT 1`,
         schoolState
-      );
+      )) as Array<{ cnt: string }>;
       if (parseInt(cnt) > 0) {
         geocodingStates.add(schoolState);
         geocodeStateBackground(schoolState); // fire and forget — no await
