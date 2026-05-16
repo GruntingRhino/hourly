@@ -57,6 +57,50 @@ function deadlineLabel(daysToDeadline?: number | null): string | null {
   return `${daysToDeadline}d left`;
 }
 
+type TriageMode = "ALL" | "URGENT" | "OVERDUE" | "PENDING_APPROVAL" | "NO_SHOWS";
+
+function riskLevelWeight(level?: "NONE" | "LOW" | "MEDIUM" | "HIGH"): number {
+  switch (level) {
+    case "HIGH":
+      return 3;
+    case "MEDIUM":
+      return 2;
+    case "LOW":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function triageScore(student: StudentInfo): number {
+  let score = 0;
+  score += riskLevelWeight(student.riskLevel) * 100;
+  if (student.status === "AT_RISK") score += 80;
+  if ((student.daysToDeadline ?? 9999) < 0) score += 90;
+  else if ((student.daysToDeadline ?? 9999) <= 7) score += 60;
+  else if ((student.daysToDeadline ?? 9999) <= 14) score += 40;
+  score += Math.min(40, (student.noShowCount ?? 0) * 15);
+  score += Math.min(30, Math.round(student.pendingHours ?? 0));
+  score += Math.min(25, (student.riskReasons?.length ?? 0) * 5);
+  score += Math.max(0, 20 - Math.round((student.percentComplete ?? 0) / 5));
+  return score;
+}
+
+function matchesTriageMode(student: StudentInfo, mode: TriageMode): boolean {
+  switch (mode) {
+    case "URGENT":
+      return student.status === "AT_RISK" || (student.daysToDeadline ?? 9999) <= 14 || (student.noShowCount ?? 0) > 0;
+    case "OVERDUE":
+      return (student.daysToDeadline ?? 9999) < 0;
+    case "PENDING_APPROVAL":
+      return (student.pendingHours ?? 0) > 0;
+    case "NO_SHOWS":
+      return (student.noShowCount ?? 0) > 0;
+    default:
+      return true;
+  }
+}
+
 export default function SchoolGroups() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,6 +112,7 @@ export default function SchoolGroups() {
   const [selectedStudent, setSelectedStudent] = useState<StudentInfo | AllStudent | null>(null);
   const [filter, setFilter] = useState(searchParams.get("filter")?.toUpperCase().replace(" ", "_") || "ALL");
   const [search, setSearch] = useState("");
+  const [triageMode, setTriageMode] = useState<TriageMode>("URGENT");
   const [loading, setLoading] = useState(true);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -171,10 +216,24 @@ export default function SchoolGroups() {
     }
   }, [displayStudents, selectedStudentParam]);
 
+  const triageCounts = {
+    urgent: displayStudents.filter((s) => matchesTriageMode(s, "URGENT")).length,
+    overdue: displayStudents.filter((s) => matchesTriageMode(s, "OVERDUE")).length,
+    pendingApproval: displayStudents.filter((s) => matchesTriageMode(s, "PENDING_APPROVAL")).length,
+    noShows: displayStudents.filter((s) => matchesTriageMode(s, "NO_SHOWS")).length,
+  };
+
   const filtered = displayStudents.filter((s) => {
     const statusMatch = filter === "ALL" || s.status === filter;
     const searchMatch = !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase());
-    return statusMatch && searchMatch;
+    return statusMatch && searchMatch && matchesTriageMode(s, triageMode);
+  }).sort((a, b) => {
+    const scoreDiff = triageScore(b) - triageScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    const deadlineA = a.daysToDeadline ?? Number.POSITIVE_INFINITY;
+    const deadlineB = b.daysToDeadline ?? Number.POSITIVE_INFINITY;
+    if (deadlineA !== deadlineB) return deadlineA - deadlineB;
+    return a.name.localeCompare(b.name);
   });
 
   const statusColors: Record<string, string> = {
@@ -280,6 +339,33 @@ export default function SchoolGroups() {
 
         {/* Center: Student list */}
         <div className="md:col-span-2">
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">Triage Queue</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "URGENT", label: "Urgent", count: triageCounts.urgent },
+                { id: "OVERDUE", label: "Overdue", count: triageCounts.overdue },
+                { id: "PENDING_APPROVAL", label: "Pending Approval", count: triageCounts.pendingApproval },
+                { id: "NO_SHOWS", label: "No-Shows", count: triageCounts.noShows },
+              ].map((queue) => (
+                <button
+                  key={queue.id}
+                  onClick={() => setTriageMode(queue.id as TriageMode)}
+                  className={`rounded-md border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-50 text-amber-800 hover:bg-white"}`}
+                >
+                  <div className="font-medium">{queue.label}</div>
+                  <div className="text-[11px] opacity-80">{queue.count} students</div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setTriageMode("ALL")}
+              className={`mt-2 text-xs ${triageMode === "ALL" ? "text-amber-900 font-medium" : "text-amber-700 hover:text-amber-900"}`}
+            >
+              Show full roster
+            </button>
+          </div>
+
           <div className="flex gap-2 mb-4">
             <input
               type="text"
@@ -380,6 +466,17 @@ export default function SchoolGroups() {
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="text-sm font-semibold mb-1">Current Queue</div>
+            <div className="text-xs text-gray-500">
+              {triageMode === "URGENT" && "Showing highest-priority students first: at-risk, near deadline, no-shows, and approval bottlenecks."}
+              {triageMode === "OVERDUE" && "Students whose service deadline has already passed and still need intervention."}
+              {triageMode === "PENDING_APPROVAL" && "Students blocked by approval backlog instead of pure participation."}
+              {triageMode === "NO_SHOWS" && "Students with recorded no-shows who may need behavior or attendance follow-up."}
+              {triageMode === "ALL" && "Full roster view, still sorted by urgency so the most actionable cases stay on top."}
             </div>
           </div>
 
