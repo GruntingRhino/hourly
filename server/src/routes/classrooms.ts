@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
+import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendStudentLeftClassroomEmail } from "../services/email";
@@ -76,32 +77,71 @@ router.get(
         where: whereClause,
         include: {
           teacher: { select: { id: true, name: true } },
-          students: {
-            select: {
-              id: true,
-              serviceSessions: {
-                where: { verificationStatus: "APPROVED" },
-                select: { totalHours: true },
-              },
-            },
-          },
         },
         orderBy: { name: "asc" },
       });
 
-      const requiredHours = school?.requiredHours || 40;
+      const students = await prisma.user.findMany({
+        where: {
+          role: "STUDENT",
+          classroomId: { in: classrooms.map((classroom) => classroom.id) },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          grade: true,
+          classroomId: true,
+          cohortId: true,
+          cohort: {
+            select: {
+              id: true,
+              name: true,
+              requiredHours: true,
+              serviceStartDate: true,
+              serviceEndDate: true,
+            },
+          },
+          cohortMemberships: {
+            where: { isActive: true },
+            orderBy: [{ updatedAt: "desc" }],
+            select: {
+              cohortId: true,
+              isActive: true,
+              cohort: {
+                select: {
+                  id: true,
+                  name: true,
+                  requiredHours: true,
+                  serviceStartDate: true,
+                  serviceEndDate: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const progress = await buildStudentProgressRecords(students, {
+        requiredHours: school?.requiredHours ?? 40,
+        serviceStartDate: school?.serviceStartDate ?? null,
+        serviceEndDate: school?.serviceEndDate ?? null,
+      });
+      const progressByClassroomId = new Map<string, typeof progress>();
+      for (const student of progress) {
+        const sourceStudent = students.find((row) => row.id === student.id);
+        if (!sourceStudent?.classroomId) continue;
+        const classroomProgress = progressByClassroomId.get(sourceStudent.classroomId) ?? [];
+        classroomProgress.push(student);
+        progressByClassroomId.set(sourceStudent.classroomId, classroomProgress);
+      }
 
       const result = classrooms.map((c) => {
-        const studentCount = c.students.length;
-        let totalHours = 0;
-        let completedCount = 0;
-        let atRiskCount = 0;
-        for (const s of c.students) {
-          const hours = s.serviceSessions.reduce((sum, ss) => sum + (ss.totalHours || 0), 0);
-          totalHours += hours;
-          if (hours >= requiredHours) completedCount++;
-          else if (hours < requiredHours * 0.5) atRiskCount++;
-        }
+        const classroomProgress = progressByClassroomId.get(c.id) ?? [];
+        const studentCount = classroomProgress.length;
+        const totalHours = classroomProgress.reduce((sum, student) => sum + student.approvedHours, 0);
+        const completedCount = classroomProgress.filter((student) => student.status === "COMPLETED").length;
+        const atRiskCount = classroomProgress.filter((student) => student.status === "AT_RISK").length;
         return {
           id: c.id,
           name: c.name,

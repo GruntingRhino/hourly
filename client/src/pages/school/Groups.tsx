@@ -32,6 +32,7 @@ interface AllStudent {
   grade: string | null;
   approvedHours: number;
   requiredHours: number;
+  status?: "COMPLETED" | "ON_TRACK" | "AT_RISK" | "NOT_STARTED";
   classroom: { id: string; name: string } | null;
 }
 
@@ -66,7 +67,7 @@ export default function SchoolGroups() {
         const cls = all.filter((s) => s.classroom?.id === selectedClassroom);
         setStudents(cls.map((s) => ({
           ...s,
-          status: calcStatus(s.approvedHours, s.requiredHours),
+          status: s.status ?? calcStatus(s.approvedHours, s.requiredHours),
         })));
       }).catch(() => setStudents([]));
     }
@@ -131,7 +132,7 @@ export default function SchoolGroups() {
     grade: s.grade,
     approvedHours: s.approvedHours,
     requiredHours: s.requiredHours,
-    status: calcStatus(s.approvedHours, s.requiredHours),
+    status: s.status ?? calcStatus(s.approvedHours, s.requiredHours),
   }));
 
   const displayStudents = selectedClassroom ? students : enrichedAll;
