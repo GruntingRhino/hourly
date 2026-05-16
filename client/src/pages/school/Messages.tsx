@@ -30,6 +30,25 @@ interface ReminderSummary {
   atRiskStudents: number;
 }
 
+interface InterventionCaseCard {
+  id: string;
+  status: string;
+  priority: string;
+  summary: string | null;
+  dueDate: string | null;
+  followUpSeen: boolean;
+  student: {
+    id: string;
+    name: string;
+    email: string;
+    remainingHours: number;
+    pendingHours: number;
+    riskReasons: string[];
+    cohortName: string | null;
+  };
+  owner?: { id: string; name: string; role: string; email?: string | null } | null;
+}
+
 export default function SchoolMessages() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,6 +76,7 @@ export default function SchoolMessages() {
   const [sendError, setSendError] = useState("");
   const [loading, setLoading] = useState(true);
   const [reminderSummary, setReminderSummary] = useState<ReminderSummary | null>(null);
+  const [activeCases, setActiveCases] = useState<InterventionCaseCard[]>([]);
 
   useEffect(() => {
     loadMessages();
@@ -71,6 +91,9 @@ export default function SchoolMessages() {
 
   useEffect(() => {
     api.get<CohortSummary[]>("/cohorts").then(setCohorts).catch(() => {});
+    api.get<{ cases: InterventionCaseCard[] }>("/messages/interventions/cases?limit=8")
+      .then((data) => setActiveCases(data.cases.filter((item) => item.status !== "RESOLVED")))
+      .catch(() => setActiveCases([]));
   }, []);
 
   const loadMessages = async () => {
@@ -203,6 +226,38 @@ export default function SchoolMessages() {
       {sendError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
           {sendError}
+        </div>
+      )}
+
+      {activeCases.length > 0 && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-red-700">Open Intervention Queue</div>
+              <div className="text-sm text-red-900">Students still blocking completion or requiring staff follow-up.</div>
+            </div>
+            <button onClick={() => navigate('/groups?triage=URGENT&view=MORNING_TRIAGE')} className="px-3 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700">
+              Open Triage Roster
+            </button>
+          </div>
+          <div className="space-y-2">
+            {activeCases.map((item) => (
+              <div key={item.id} className="rounded-md border border-red-100 bg-white p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-gray-900">{item.student.name}</div>
+                    <div className="text-xs text-gray-500">{item.student.cohortName || 'No cohort'} · {item.student.remainingHours.toFixed(1)}h remaining · {item.student.pendingHours.toFixed(1)}h pending</div>
+                    <div className="mt-1 text-xs text-gray-700">{item.summary || item.student.riskReasons?.[0] || 'Needs follow-up'}</div>
+                  </div>
+                  <div className="text-right text-xs text-gray-600">
+                    <div>{item.priority}</div>
+                    <div>{item.status.replaceAll('_', ' ')}</div>
+                    {item.owner?.name && <div>Owner: {item.owner.name}</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

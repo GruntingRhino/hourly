@@ -30,6 +30,18 @@ interface StudentInfo {
   noShowCount?: number;
   daysToDeadline?: number | null;
   classroom?: { id: string; name: string } | null;
+  interventionCase?: InterventionCaseSummary | null;
+}
+
+interface InterventionCaseSummary {
+  id: string;
+  status: string;
+  priority: string;
+  summary?: string | null;
+  dueDate?: string | null;
+  lastContactedAt?: string | null;
+  resolvedAt?: string | null;
+  owner?: { id: string; name: string; role: string } | null;
 }
 
 interface AllStudent {
@@ -47,6 +59,7 @@ interface AllStudent {
   riskReasons?: string[];
   noShowCount?: number;
   daysToDeadline?: number | null;
+  interventionCase?: InterventionCaseSummary | null;
   classroom: { id: string; name: string } | null;
 }
 
@@ -61,6 +74,24 @@ interface InterventionHistoryItem {
   followUpCount: number;
   recipientCount: number;
   actor: { id: string; name: string; role: string };
+}
+
+interface InterventionCaseDetail {
+  id?: string;
+  status: string;
+  priority: string;
+  reason: string;
+  summary: string;
+  nextStepForStudent: string;
+  nextStepForStaff: string;
+  staffNote: string;
+  studentMessage: string;
+  dueDate: string;
+  ownerId?: string;
+  owner?: { id: string; name: string; role: string; email?: string | null } | null;
+  lastContactedAt?: string | null;
+  lastStudentActionAt?: string | null;
+  followUpSeen?: boolean;
 }
 
 function deadlineLabel(daysToDeadline?: number | null): string | null {
@@ -221,6 +252,7 @@ export default function SchoolGroups() {
     riskReasons: s.riskReasons,
     noShowCount: s.noShowCount,
     daysToDeadline: s.daysToDeadline,
+    interventionCase: s.interventionCase,
     classroom: s.classroom,
   }));
 
@@ -680,6 +712,11 @@ export default function SchoolGroups() {
                             {s.noShowCount} no-show{s.noShowCount === 1 ? "" : "s"}
                           </span>
                         )}
+                        {s.interventionCase && (
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.interventionCase.status === "RESOLVED" ? "bg-green-50 text-green-700" : s.interventionCase.priority === "URGENT" ? "bg-red-100 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+                            {s.interventionCase.status.replaceAll("_", " ")}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -752,6 +789,14 @@ export default function SchoolGroups() {
                 <div className="text-gray-500">Saved view</div>
                 <div className="font-semibold text-gray-900">{savedView === "CUSTOM" ? "Custom" : savedView.replaceAll("_", " ")}</div>
               </div>
+              <div className="rounded bg-gray-50 p-2">
+                <div className="text-gray-500">Active cases</div>
+                <div className="font-semibold text-gray-900">{filtered.filter((student) => student.interventionCase && student.interventionCase.status !== "RESOLVED").length}</div>
+              </div>
+              <div className="rounded bg-gray-50 p-2">
+                <div className="text-gray-500">Hours remaining</div>
+                <div className="font-semibold text-gray-900">{filtered.reduce((sum, student) => sum + (student.remainingHours ?? 0), 0).toFixed(1)}h</div>
+              </div>
             </div>
           </div>
 
@@ -783,6 +828,7 @@ export default function SchoolGroups() {
               triageMode={triageMode}
               savedView={savedView}
               onRemoveHours={handleRemoveHours}
+              onCaseSaved={() => { void loadData(); }}
               removing={removing}
               statusColors={statusColors}
               statusLabels={statusLabels}
@@ -794,12 +840,13 @@ export default function SchoolGroups() {
   );
 }
 
-function StudentDetail({ student, requiredHours, triageMode, savedView, onRemoveHours, removing, statusColors, statusLabels }: {
+function StudentDetail({ student, requiredHours, triageMode, savedView, onRemoveHours, onCaseSaved, removing, statusColors, statusLabels }: {
   student: StudentInfo;
   requiredHours: number;
   triageMode: TriageMode;
   savedView: SavedView;
   onRemoveHours: (sessionId: string, name: string) => void;
+  onCaseSaved: () => void;
   removing: string | null;
   statusColors: Record<string, string>;
   statusLabels: Record<string, string>;
@@ -814,6 +861,20 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   const [reminderBody, setReminderBody] = useState("");
   const [interventions, setInterventions] = useState<InterventionHistoryItem[]>([]);
   const [loadingInterventions, setLoadingInterventions] = useState(false);
+  const [caseForm, setCaseForm] = useState<InterventionCaseDetail>({
+    status: student.interventionCase?.status || "OPEN",
+    priority: student.interventionCase?.priority || "MEDIUM",
+    reason: "",
+    summary: student.interventionCase?.summary || "",
+    nextStepForStudent: "",
+    nextStepForStaff: "",
+    staffNote: "",
+    studentMessage: "",
+    dueDate: student.interventionCase?.dueDate ? student.interventionCase.dueDate.slice(0, 10) : "",
+    ownerId: student.interventionCase?.owner?.id,
+    owner: student.interventionCase?.owner || null,
+  });
+  const [savingCase, setSavingCase] = useState(false);
 
   useEffect(() => {
     setReminderBody(
@@ -821,6 +882,19 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
     );
     setShowReminderCompose(false);
     setShowHistory(true);
+    setCaseForm({
+      status: student.interventionCase?.status || "OPEN",
+      priority: student.interventionCase?.priority || "MEDIUM",
+      reason: student.riskReasons?.[0] || "",
+      summary: student.interventionCase?.summary || `${student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h remaining toward graduation goal`,
+      nextStepForStudent: "",
+      nextStepForStaff: "",
+      staffNote: "",
+      studentMessage: "",
+      dueDate: student.interventionCase?.dueDate ? student.interventionCase.dueDate.slice(0, 10) : "",
+      ownerId: student.interventionCase?.owner?.id,
+      owner: student.interventionCase?.owner || null,
+    });
   }, [student.id, student.name, student.approvedHours, requiredHours]);
 
   const loadHistory = async () => {
@@ -838,12 +912,64 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   const loadInterventions = async () => {
     setLoadingInterventions(true);
     try {
-      const data = await api.get<{ campaigns: InterventionHistoryItem[] }>(`/messages/interventions/history?studentId=${student.id}&limit=8`);
-      setInterventions(data.campaigns || []);
+      const [caseData, historyData] = await Promise.all([
+        api.get<{ cases: Array<InterventionCaseDetail & { owner?: InterventionCaseDetail["owner"] }> }>(`/messages/interventions/cases?studentId=${student.id}&limit=1`),
+        api.get<{ campaigns: InterventionHistoryItem[] }>(`/messages/interventions/history?studentId=${student.id}&limit=8`),
+      ]);
+      setInterventions(historyData.campaigns || []);
+      const caseItem = caseData.cases?.[0];
+      if (caseItem) {
+        setCaseForm({
+          id: caseItem.id,
+          status: caseItem.status || "OPEN",
+          priority: caseItem.priority || "MEDIUM",
+          reason: caseItem.reason || "",
+          summary: caseItem.summary || "",
+          nextStepForStudent: caseItem.nextStepForStudent || "",
+          nextStepForStaff: caseItem.nextStepForStaff || "",
+          staffNote: caseItem.staffNote || "",
+          studentMessage: caseItem.studentMessage || "",
+          dueDate: caseItem.dueDate ? String(caseItem.dueDate).slice(0, 10) : "",
+          ownerId: caseItem.owner?.id,
+          owner: caseItem.owner || null,
+          lastContactedAt: caseItem.lastContactedAt || null,
+          lastStudentActionAt: caseItem.lastStudentActionAt || null,
+          followUpSeen: caseItem.followUpSeen || false,
+        });
+      }
     } catch {
       setInterventions([]);
     } finally {
       setLoadingInterventions(false);
+    }
+  };
+
+  const saveCase = async () => {
+    setSavingCase(true);
+    try {
+      const updated = await api.put<InterventionCaseDetail>(`/messages/interventions/cases/${student.id}`, {
+        status: caseForm.status,
+        priority: caseForm.priority,
+        reason: caseForm.reason,
+        summary: caseForm.summary,
+        nextStepForStudent: caseForm.nextStepForStudent,
+        nextStepForStaff: caseForm.nextStepForStaff,
+        staffNote: caseForm.staffNote,
+        studentMessage: caseForm.studentMessage,
+        dueDate: caseForm.dueDate ? new Date(`${caseForm.dueDate}T00:00:00.000Z`).toISOString() : "",
+        ownerId: caseForm.ownerId || "",
+      });
+      setCaseForm((current) => ({
+        ...current,
+        id: updated.id,
+        owner: updated.owner || current.owner || null,
+      }));
+      onCaseSaved();
+      void loadInterventions();
+    } catch {
+      // ignore
+    } finally {
+      setSavingCase(false);
     }
   };
 
@@ -936,6 +1062,51 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
           </ul>
         </div>
       )}
+
+      <div className="mb-3 rounded border border-blue-100 bg-blue-50 p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold text-blue-800">Intervention Case</div>
+            <div className="text-[11px] text-blue-700">Track the case, next steps, and whether this student still blocks graduation progress.</div>
+          </div>
+          <button
+            onClick={saveCase}
+            disabled={savingCase}
+            className="px-2.5 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {savingCase ? "Saving..." : "Save Case"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <select value={caseForm.status} onChange={(e) => setCaseForm((current) => ({ ...current, status: e.target.value }))} className="px-2 py-1.5 text-xs border border-blue-200 rounded bg-white">
+            {['OPEN','WAITING_ON_STUDENT','WAITING_ON_SCHOOL','MONITORING','RESOLVED'].map((option) => (
+              <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
+            ))}
+          </select>
+          <select value={caseForm.priority} onChange={(e) => setCaseForm((current) => ({ ...current, priority: e.target.value }))} className="px-2 py-1.5 text-xs border border-blue-200 rounded bg-white">
+            {['LOW','MEDIUM','HIGH','URGENT'].map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+        <input value={caseForm.summary} onChange={(e) => setCaseForm((current) => ({ ...current, summary: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Short intervention summary" />
+        <input value={caseForm.reason} onChange={(e) => setCaseForm((current) => ({ ...current, reason: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Why this student needs intervention" />
+        <input value={caseForm.nextStepForStudent} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStudent: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Next step for student" />
+        <input value={caseForm.nextStepForStaff} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStaff: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Next step for staff" />
+        <textarea value={caseForm.studentMessage} onChange={(e) => setCaseForm((current) => ({ ...current, studentMessage: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" rows={2} placeholder="Student-facing message shown in their dashboard/messages" />
+        <textarea value={caseForm.staffNote} onChange={(e) => setCaseForm((current) => ({ ...current, staffNote: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" rows={3} placeholder="Internal staff note" />
+        <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+          <label className="space-y-1">
+            <span className="block">Follow-up date</span>
+            <input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((current) => ({ ...current, dueDate: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" />
+          </label>
+          <div className="rounded border border-blue-100 bg-white p-2 text-[11px] text-blue-700">
+            <div>Last contacted: {caseForm.lastContactedAt ? new Date(caseForm.lastContactedAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
+            <div>Last student action: {caseForm.lastStudentActionAt ? new Date(caseForm.lastStudentActionAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
+            <div>New hour activity since outreach: {caseForm.followUpSeen ? 'Yes' : 'No'}</div>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-3 space-y-2">
         <button

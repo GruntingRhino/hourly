@@ -12,6 +12,15 @@ interface Student {
   cohortName: string;
   approvedHours: number;
   requiredHours: number;
+  remainingHours?: number;
+  pendingHours?: number;
+  interventionCase?: {
+    id: string;
+    status: string;
+    priority: string;
+    summary?: string | null;
+    dueDate?: string | null;
+  } | null;
   status: "COMPLETED" | "ON_TRACK" | "AT_RISK";
   riskReasons?: string[];
 }
@@ -268,8 +277,10 @@ export default function StudentList() {
                   <th className="text-left px-4 py-2 font-medium text-gray-600">Email</th>
                   {!cohortId && <th className="text-left px-4 py-2 font-medium text-gray-600">Cohort</th>}
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Hours</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Remaining</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Required</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Status</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600">Intervention</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Inspect</th>
                 </tr>
               </thead>
@@ -280,6 +291,7 @@ export default function StudentList() {
                     <td className="px-4 py-2 text-gray-500 text-xs">{s.email}</td>
                     {!cohortId && <td className="px-4 py-2 text-gray-500 text-xs">{s.cohortName}</td>}
                     <td className="px-4 py-2 text-right font-medium">{s.approvedHours.toFixed(1)}</td>
+                    <td className="px-4 py-2 text-right font-medium text-red-700">{(s.remainingHours ?? Math.max(0, s.requiredHours - s.approvedHours)).toFixed(1)}h</td>
                     <td className="px-4 py-2 text-right text-gray-400">{s.requiredHours}h</td>
                     <td className="px-4 py-2 text-right">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -287,6 +299,16 @@ export default function StudentList() {
                         s.status === "ON_TRACK" ? "bg-blue-50 text-blue-700" :
                         "bg-red-50 text-red-600"
                       }`}>{s.status.replace("_", " ")}</span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-600">
+                      {s.interventionCase ? (
+                        <div>
+                          <div className={`inline-flex px-2 py-0.5 rounded-full font-medium ${s.interventionCase.status === 'RESOLVED' ? 'bg-green-50 text-green-700' : s.interventionCase.priority === 'URGENT' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{s.interventionCase.status.replaceAll('_', ' ')}</div>
+                          {s.interventionCase.summary && <div className="mt-1 text-gray-500">{s.interventionCase.summary}</div>}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">No case</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="inline-flex gap-2">

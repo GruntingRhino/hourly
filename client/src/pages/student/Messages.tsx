@@ -21,6 +21,23 @@ interface Notification {
   createdAt: string;
 }
 
+interface StudentSupportSummary {
+  totalApprovedHours: number;
+  totalPendingHours: number;
+  requiredHours: number;
+  interventionCase?: {
+    id: string;
+    status: string;
+    priority: string;
+    summary: string | null;
+    reason: string | null;
+    studentMessage: string | null;
+    nextStepForStudent: string | null;
+    dueDate: string | null;
+    owner?: { id: string; name: string; role: string; email?: string | null } | null;
+  } | null;
+}
+
 type SenderFilter = "all" | "students" | "organizations" | "schools";
 
 const SENDER_ROLE_MAP: Record<SenderFilter, string[]> = {
@@ -36,6 +53,7 @@ export default function StudentMessages() {
   const [folder, setFolder] = useState<"inbox" | "sent" | "notifications">("inbox");
   const [senderFilter, setSenderFilter] = useState<SenderFilter>("all");
   const [showCompose, setShowCompose] = useState(false);
+  const [supportSummary, setSupportSummary] = useState<StudentSupportSummary | null>(null);
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -46,6 +64,10 @@ export default function StudentMessages() {
   useEffect(() => {
     loadMessages();
   }, [folder]);
+
+  useEffect(() => {
+    api.get<StudentSupportSummary>("/reports/student").then(setSupportSummary).catch(() => setSupportSummary(null));
+  }, []);
 
   const loadMessages = async () => {
     setLoading(true);
@@ -98,6 +120,45 @@ export default function StudentMessages() {
           {showCompose ? "Cancel" : "New Message"}
         </button>
       </div>
+
+      {/* Compose */}
+      {supportSummary?.interventionCase && supportSummary.interventionCase.status !== "RESOLVED" && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">School Follow-Up Active</div>
+              <div className="font-semibold text-red-900">{supportSummary.interventionCase.summary || "Your school needs a response from you"}</div>
+              <div className="mt-1 text-sm text-red-800">
+                {supportSummary.interventionCase.studentMessage || supportSummary.interventionCase.reason || "Check your remaining hours and message your school if you need help completing them."}
+              </div>
+              {supportSummary.interventionCase.nextStepForStudent && (
+                <div className="mt-2 text-sm text-red-900">Next step: <strong>{supportSummary.interventionCase.nextStepForStudent}</strong></div>
+              )}
+              <div className="mt-2 text-xs text-red-700 flex flex-wrap gap-3">
+                <span>Priority: {supportSummary.interventionCase.priority}</span>
+                <span>{Math.max(0, supportSummary.requiredHours - supportSummary.totalApprovedHours).toFixed(1)}h remaining</span>
+                {supportSummary.interventionCase.dueDate && <span>Follow up by {new Date(supportSummary.interventionCase.dueDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>}
+                {supportSummary.interventionCase.owner?.name && <span>Owner: {supportSummary.interventionCase.owner.name}</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowCompose(true);
+                if (supportSummary.interventionCase?.owner?.email) {
+                  setTo(supportSummary.interventionCase.owner.email);
+                }
+                setSubject(supportSummary.interventionCase?.summary || "Need help with service hours");
+                setBody(supportSummary.interventionCase?.nextStepForStudent
+                  ? `Hi, I'm following up on my service hours. ${supportSummary.interventionCase.nextStepForStudent}`
+                  : "Hi, I need help understanding my remaining service-hour requirements.");
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
+            >
+              Message School Now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Compose */}
       {showCompose && (

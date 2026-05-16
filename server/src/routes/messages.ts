@@ -17,6 +17,107 @@ function buildBodyPreview(body: string): string {
   return body.trim().replace(/\s+/g, " ").slice(0, 280);
 }
 
+function inferCasePriority(queueType?: string | null, priority?: boolean): string {
+  if (priority || queueType === "URGENT" || queueType === "OVERDUE") return "URGENT";
+  if (queueType === "NO_SHOWS") return "HIGH";
+  if (queueType === "PENDING_APPROVAL") return "MEDIUM";
+  return "MEDIUM";
+}
+
+function inferCaseReason(queueType?: string | null, audienceType?: string): string {
+  switch (queueType) {
+    case "OVERDUE":
+      return "Student is past the service deadline and still has hours remaining.";
+    case "PENDING_APPROVAL":
+      return "Student has pending hours awaiting approval and may be blocked from progress.";
+    case "NO_SHOWS":
+      return "Student has no-show history and may need attendance follow-up.";
+    case "URGENT":
+      return "Student surfaced in the urgent triage queue and needs immediate attention.";
+    default:
+      return audienceType === "DIRECT_STUDENT"
+        ? "Student received direct outreach and needs follow-up tracking."
+        : "Student was included in staff outreach and should be tracked until resolved.";
+  }
+}
+
+function inferStudentNextStep(queueType?: string | null): string {
+  switch (queueType) {
+    case "PENDING_APPROVAL":
+      return "Check your submitted hours and message your school if anything still needs approval details.";
+    case "NO_SHOWS":
+      return "Review upcoming commitments and contact your school if you need help getting back on track.";
+    case "OVERDUE":
+      return "Message your school administrator today and ask what path remains to complete your requirement.";
+    default:
+      return "Review your remaining hours, then either sign up for an opportunity or submit eligible hours this week.";
+  }
+}
+
+function inferStaffNextStep(queueType?: string | null): string {
+  switch (queueType) {
+    case "PENDING_APPROVAL":
+      return "Clear approval blockers or request missing evidence so hours can convert quickly.";
+    case "NO_SHOWS":
+      return "Confirm attendance context and decide whether behavior or scheduling intervention is needed.";
+    case "OVERDUE":
+      return "Escalate with a deadline recovery plan and document whether an extension or exception is needed.";
+    default:
+      return "Monitor student response and update the case after the next follow-up or progress change.";
+  }
+}
+
+async function upsertInterventionCasesFromCampaign(input: {
+  schoolId: string;
+  actorId: string;
+  queueType?: string | null;
+  audienceType: string;
+  subject?: string | null;
+  body: string;
+  priority?: boolean;
+  recipients: Array<{ studentId: string }>;
+  createdAt: Date;
+}) {
+  if (!input.recipients.length) return;
+  const reason = inferCaseReason(input.queueType, input.audienceType);
+  const priority = inferCasePriority(input.queueType, input.priority);
+  const summary = input.subject?.trim() || "Staff outreach sent";
+  const studentMessage = buildBodyPreview(input.body);
+  const nextStepForStudent = inferStudentNextStep(input.queueType);
+  const nextStepForStaff = inferStaffNextStep(input.queueType);
+
+  await prisma.$transaction(
+    input.recipients.map((recipient) => prisma.interventionCase.upsert({
+      where: { schoolId_studentId: { schoolId: input.schoolId, studentId: recipient.studentId } },
+      create: {
+        schoolId: input.schoolId,
+        studentId: recipient.studentId,
+        ownerId: input.actorId,
+        status: "WAITING_ON_STUDENT",
+        priority,
+        reason,
+        summary,
+        nextStepForStudent,
+        nextStepForStaff,
+        studentMessage,
+        lastContactedAt: input.createdAt,
+      },
+      update: {
+        ownerId: input.actorId,
+        status: "WAITING_ON_STUDENT",
+        priority,
+        reason,
+        summary,
+        nextStepForStudent,
+        nextStepForStaff,
+        studentMessage,
+        lastContactedAt: input.createdAt,
+        resolvedAt: null,
+      },
+    }))
+  );
+}
+
 async function logInterventionCampaign(input: {
   schoolId: string;
   actorId: string;
@@ -31,7 +132,7 @@ async function logInterventionCampaign(input: {
   recipients: Array<{ studentId: string; messageId?: string | null }>;
 }) {
   if (!input.recipients.length) return null;
-  return prisma.interventionCampaign.create({
+  const campaign = await prisma.interventionCampaign.create({
     data: {
       schoolId: input.schoolId,
       actorId: input.actorId,
@@ -51,7 +152,22 @@ async function logInterventionCampaign(input: {
         })),
       },
     },
+    select: { id: true, createdAt: true },
   });
+
+  await upsertInterventionCasesFromCampaign({
+    schoolId: input.schoolId,
+    actorId: input.actorId,
+    queueType: input.queueType,
+    audienceType: input.audienceType,
+    subject: input.subject,
+    body: input.body,
+    priority: input.priority,
+    recipients: input.recipients,
+    createdAt: campaign.createdAt,
+  });
+
+  return campaign;
 }
 
 /** Returns the school ID for any user regardless of how they're enrolled. */
@@ -232,7 +348,7 @@ router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Res
       },
     });
     const actorSchoolId = actorProfile ? resolveSchoolId(actorProfile) : null;
-    if (actorSchoolId) {
+    if (actorSchoolId && receiver.role === "STUDENT") {
       await logInterventionCampaign({
         schoolId: actorSchoolId,
         actorId: req.user!.userId,
@@ -322,6 +438,246 @@ router.put("/notifications/:id/read", authenticate, async (req: Request, res: Re
     res.json(updated);
   } catch (err) {
     console.error("Read notification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/interventions/cases", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const query = z.object({
+      studentId: z.string().optional(),
+      status: z.string().optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    }).parse(req.query);
+
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        schoolId: true,
+        cohort: { select: { schoolId: true } },
+        classroom: { select: { schoolId: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true } } },
+        },
+      },
+    });
+    const actorSchoolId = actor ? resolveSchoolId(actor) : null;
+    if (!actorSchoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const school = await prisma.school.findUnique({
+      where: { id: actorSchoolId },
+      select: { id: true, requiredHours: true, serviceStartDate: true, serviceEndDate: true },
+    });
+    if (!school) return res.status(404).json({ error: "School not found" });
+
+    const cases = await prisma.interventionCase.findMany({
+      where: {
+        schoolId: actorSchoolId,
+        ...(query.studentId ? { studentId: query.studentId } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      include: {
+        owner: { select: { id: true, name: true, role: true, email: true } },
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            grade: true,
+            cohortId: true,
+            cohort: { select: { id: true, name: true, requiredHours: true, serviceStartDate: true, serviceEndDate: true } },
+            cohortMemberships: {
+              where: { isActive: true },
+              orderBy: [{ updatedAt: "desc" }],
+              select: { cohortId: true, isActive: true, cohort: { select: { id: true, name: true, requiredHours: true, serviceStartDate: true, serviceEndDate: true } } },
+            },
+          },
+        },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: query.limit ?? 50,
+    });
+
+    const progress = await buildStudentProgressRecords(cases.map((item) => item.student), {
+      requiredHours: school.requiredHours,
+      serviceStartDate: school.serviceStartDate,
+      serviceEndDate: school.serviceEndDate,
+    });
+    const progressById = new Map(progress.map((item) => [item.id, item]));
+
+    const followUpSessions = cases.length
+      ? await prisma.serviceSession.findMany({
+          where: {
+            userId: { in: cases.map((item) => item.studentId) },
+          },
+          select: { userId: true, submittedAt: true, checkInTime: true, checkOutTime: true },
+          orderBy: { updatedAt: "desc" },
+        })
+      : [];
+
+    const latestActionByStudent = new Map<string, Date>();
+    for (const session of followUpSessions) {
+      const candidate = [session.submittedAt, session.checkInTime, session.checkOutTime]
+        .filter((value): value is Date => value instanceof Date)
+        .sort((a, b) => b.getTime() - a.getTime())[0];
+      if (!candidate) continue;
+      const prior = latestActionByStudent.get(session.userId);
+      if (!prior || candidate.getTime() > prior.getTime()) {
+        latestActionByStudent.set(session.userId, candidate);
+      }
+    }
+
+    res.json({
+      cases: cases.map((item) => {
+        const studentProgress = progressById.get(item.studentId);
+        const lastStudentActionAt = latestActionByStudent.get(item.studentId) ?? item.lastStudentActionAt ?? null;
+        const followUpSeen = !!(lastStudentActionAt && item.lastContactedAt && lastStudentActionAt.getTime() > item.lastContactedAt.getTime());
+        return {
+          id: item.id,
+          studentId: item.studentId,
+          schoolId: item.schoolId,
+          status: item.status,
+          priority: item.priority,
+          reason: item.reason,
+          summary: item.summary,
+          nextStepForStudent: item.nextStepForStudent,
+          nextStepForStaff: item.nextStepForStaff,
+          staffNote: item.staffNote,
+          studentMessage: item.studentMessage,
+          dueDate: item.dueDate,
+          lastContactedAt: item.lastContactedAt,
+          lastStudentActionAt,
+          resolvedAt: item.resolvedAt,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          followUpSeen,
+          owner: item.owner,
+          student: {
+            id: item.student.id,
+            name: item.student.name,
+            email: item.student.email,
+            grade: item.student.grade,
+            approvedHours: studentProgress?.approvedHours ?? 0,
+            pendingHours: studentProgress?.pendingHours ?? 0,
+            requiredHours: studentProgress?.requiredHours ?? school.requiredHours,
+            remainingHours: studentProgress?.remainingHours ?? Math.max(0, school.requiredHours - (studentProgress?.approvedHours ?? 0)),
+            percentComplete: studentProgress?.percentComplete ?? 0,
+            status: studentProgress?.status ?? "ON_TRACK",
+            riskLevel: studentProgress?.riskLevel ?? "NONE",
+            riskReasons: studentProgress?.riskReasons ?? [],
+            noShowCount: studentProgress?.noShowCount ?? 0,
+            daysToDeadline: studentProgress?.daysToDeadline ?? null,
+            cohortName: studentProgress?.cohortName ?? item.student.cohort?.name ?? null,
+          },
+        };
+      }),
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Intervention cases error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/interventions/cases/:studentId", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const body = z.object({
+      status: z.enum(["OPEN", "WAITING_ON_STUDENT", "WAITING_ON_SCHOOL", "MONITORING", "RESOLVED"]),
+      priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
+      reason: z.string().max(500).optional().or(z.literal("")),
+      summary: z.string().max(500).optional().or(z.literal("")),
+      nextStepForStudent: z.string().max(1000).optional().or(z.literal("")),
+      nextStepForStaff: z.string().max(1000).optional().or(z.literal("")),
+      staffNote: z.string().max(4000).optional().or(z.literal("")),
+      studentMessage: z.string().max(1000).optional().or(z.literal("")),
+      dueDate: z.string().datetime().optional().or(z.literal("")),
+      ownerId: z.string().optional().or(z.literal("")),
+    }).parse(req.body);
+
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        schoolId: true,
+        cohort: { select: { schoolId: true } },
+        classroom: { select: { schoolId: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true } } },
+        },
+      },
+    });
+    const actorSchoolId = actor ? resolveSchoolId(actor) : null;
+    if (!actorSchoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const student = await prisma.user.findFirst({
+      where: {
+        id: req.params.studentId,
+        role: "STUDENT",
+        OR: [
+          { schoolId: actorSchoolId },
+          { cohort: { schoolId: actorSchoolId } },
+          { classroom: { schoolId: actorSchoolId } },
+          { cohortMemberships: { some: { isActive: true, cohort: { schoolId: actorSchoolId } } } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!student) return res.status(404).json({ error: "Student not found for this school" });
+
+    if (body.ownerId) {
+      const owner = await prisma.user.findFirst({
+        where: { id: body.ownerId, schoolId: actorSchoolId, role: { in: ["SCHOOL_ADMIN", "TEACHER"] } },
+        select: { id: true },
+      });
+      if (!owner) return res.status(404).json({ error: "Owner not found for this school" });
+    }
+
+    const interventionCase = await prisma.interventionCase.upsert({
+      where: { schoolId_studentId: { schoolId: actorSchoolId, studentId: student.id } },
+      create: {
+        schoolId: actorSchoolId,
+        studentId: student.id,
+        ownerId: body.ownerId || req.user!.userId,
+        status: body.status,
+        priority: body.priority,
+        reason: body.reason || null,
+        summary: body.summary || null,
+        nextStepForStudent: body.nextStepForStudent || null,
+        nextStepForStaff: body.nextStepForStaff || null,
+        staffNote: body.staffNote || null,
+        studentMessage: body.studentMessage || null,
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        resolvedAt: body.status === "RESOLVED" ? new Date() : null,
+      },
+      update: {
+        ownerId: body.ownerId || req.user!.userId,
+        status: body.status,
+        priority: body.priority,
+        reason: body.reason || null,
+        summary: body.summary || null,
+        nextStepForStudent: body.nextStepForStudent || null,
+        nextStepForStaff: body.nextStepForStaff || null,
+        staffNote: body.staffNote || null,
+        studentMessage: body.studentMessage || null,
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        resolvedAt: body.status === "RESOLVED" ? new Date() : null,
+      },
+      include: {
+        owner: { select: { id: true, name: true, role: true, email: true } },
+      },
+    });
+
+    res.json(interventionCase);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Update intervention case error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

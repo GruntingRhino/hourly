@@ -131,6 +131,19 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     });
 
     const school = resolveSchoolFromUserAssociations(user);
+    const interventionCase = school
+      ? await prisma.interventionCase.findUnique({
+          where: { schoolId_studentId: { schoolId: school.id, studentId: userId } },
+          include: { owner: { select: { id: true, name: true, role: true, email: true } } },
+        }).catch(() => null)
+      : null;
+
+    const lastStudentActionAt = sessions.length
+      ? sessions
+          .flatMap((session) => [session.updatedAt, session.submittedAt, session.verifiedAt, session.checkInTime, session.checkOutTime])
+          .filter((value): value is Date => value instanceof Date)
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+      : null;
 
     res.json({
       totalApprovedHours: Math.round(studentHours.approved * 100) / 100,
@@ -143,6 +156,22 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       pending,
       committed,
       rejected,
+      interventionCase: interventionCase ? {
+        id: interventionCase.id,
+        status: interventionCase.status,
+        priority: interventionCase.priority,
+        reason: interventionCase.reason,
+        summary: interventionCase.summary,
+        nextStepForStudent: interventionCase.nextStepForStudent,
+        nextStepForStaff: interventionCase.nextStepForStaff,
+        staffNote: req.user!.role === "STUDENT" && userId === req.user!.userId ? null : interventionCase.staffNote,
+        studentMessage: interventionCase.studentMessage,
+        dueDate: interventionCase.dueDate,
+        lastContactedAt: interventionCase.lastContactedAt,
+        lastStudentActionAt,
+        resolvedAt: interventionCase.resolvedAt,
+        owner: interventionCase.owner,
+      } : null,
     });
   } catch (err) {
     console.error("Student report error:", err);

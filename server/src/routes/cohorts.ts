@@ -585,7 +585,20 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
       serviceEndDate: school?.serviceEndDate ?? null,
     });
 
-    res.json(progress.map((student) => ({
+    const cases = await prisma.interventionCase.findMany({
+      where: {
+        schoolId: scope.schoolId,
+        studentId: { in: progress.map((student) => student.id) },
+      },
+      include: {
+        owner: { select: { id: true, name: true, role: true } },
+      },
+    }).catch(() => []);
+    const casesByStudentId = new Map(cases.map((item) => [item.studentId, item]));
+
+    res.json(progress.map((student) => {
+      const currentCase = casesByStudentId.get(student.id) as any;
+      return {
       id: student.id,
       name: student.name,
       email: student.email,
@@ -595,11 +608,24 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
       approvedHours: student.approvedHours,
       pendingHours: student.pendingHours,
       requiredHours: student.requiredHours,
+      remainingHours: student.remainingHours,
+      percentComplete: student.percentComplete,
       status: student.status,
+      riskLevel: student.riskLevel,
       riskReasons: student.riskReasons,
       noShowCount: student.noShowCount,
       daysToDeadline: student.daysToDeadline,
-    })));
+      interventionCase: currentCase ? {
+        id: currentCase.id,
+        status: currentCase.status,
+        priority: currentCase.priority,
+        summary: currentCase.summary,
+        dueDate: currentCase.dueDate,
+        lastContactedAt: currentCase.lastContactedAt,
+        resolvedAt: currentCase.resolvedAt,
+        owner: currentCase.owner,
+      } : null,
+    }}));
   } catch (err) {
     console.error("School students error:", err);
     res.status(500).json({ error: "Internal server error" });

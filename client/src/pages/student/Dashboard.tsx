@@ -234,6 +234,22 @@ interface HourTotals {
   totalApprovedHours: number;
   totalPendingHours: number;
   requiredHours: number;
+  interventionCase?: {
+    id: string;
+    status: string;
+    priority: string;
+    reason: string | null;
+    summary: string | null;
+    nextStepForStudent: string | null;
+    nextStepForStaff: string | null;
+    staffNote: string | null;
+    studentMessage: string | null;
+    dueDate: string | null;
+    lastContactedAt: string | null;
+    lastStudentActionAt: string | null;
+    resolvedAt: string | null;
+    owner?: { id: string; name: string; role: string; email?: string | null } | null;
+  } | null;
 }
 
 export default function StudentDashboard() {
@@ -420,6 +436,38 @@ export default function StudentDashboard() {
         <DeadlineBanner deadline={deadline} approvedHours={totalApprovedHours} requiredHours={requiredHours} />
       )}
 
+      {hourTotals?.interventionCase && hourTotals.interventionCase.status !== "RESOLVED" && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-900">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">School Follow-Up Active</div>
+              <div className="font-semibold">{hourTotals.interventionCase.summary || `${remainingHours.toFixed(1)}h still remaining`}</div>
+              <div className="mt-1 text-red-800">
+                {hourTotals.interventionCase.studentMessage || hourTotals.interventionCase.reason || `You still need ${remainingHours.toFixed(1)}h to finish your requirement.`}
+              </div>
+              {hourTotals.interventionCase.nextStepForStudent && (
+                <div className="mt-2 text-red-900">
+                  Next step: <strong>{hourTotals.interventionCase.nextStepForStudent}</strong>
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-red-700">
+                <span>Priority: {hourTotals.interventionCase.priority}</span>
+                {hourTotals.interventionCase.dueDate && <span>Follow up by {new Date(hourTotals.interventionCase.dueDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>}
+                {hourTotals.interventionCase.owner?.name && <span>Owner: {hourTotals.interventionCase.owner.name}</span>}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/browse" className="rounded-md bg-red-600 px-3 py-2 text-white text-sm font-medium hover:bg-red-700">
+                Find Hours
+              </Link>
+              <Link to="/messages" className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
+                Contact School
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {revisionNeeded.length > 0 && (
         <div className="mb-4 px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
           <strong>{revisionNeeded.length} submission{revisionNeeded.length > 1 ? "s" : ""} need revision.</strong>{" "}
@@ -453,7 +501,7 @@ export default function StudentDashboard() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Hours Remaining</div>
-          <div className="text-3xl font-bold text-gray-900 leading-none">{remainingHours.toFixed(1)}h</div>
+          <div className={`text-3xl font-bold leading-none ${remainingHours > 0 ? "text-red-700" : "text-gray-900"}`}>{remainingHours.toFixed(1)}h</div>
           <div className="text-xs text-gray-400 mt-1">needed to reach goal</div>
         </div>
       </div>

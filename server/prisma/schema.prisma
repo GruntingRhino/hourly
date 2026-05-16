@@ -89,6 +89,8 @@ model User {
   receivedMessages     Message[]        @relation("ReceivedMessages")
   interventionCampaigns InterventionCampaign[] @relation("InterventionActor")
   interventionRecipients InterventionRecipient[] @relation("InterventionStudent")
+  interventionOwnedCases InterventionCase[] @relation("InterventionOwner")
+  interventionStudentCases InterventionCase[] @relation("InterventionStudentCase")
   notifications        Notification[]
   auditLogs            AuditLog[]       @relation("AuditActor")
   dataAccessLogs       DataAccessLog[]  @relation("DataAccessActor")
@@ -162,6 +164,7 @@ model School {
   integrationSyncErrors  IntegrationSyncError[]
   integrationMappings    IntegrationExternalMapping[]
   interventionCampaigns  InterventionCampaign[]
+  interventionCases      InterventionCase[]
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────
@@ -841,6 +844,35 @@ model InterventionRecipient {
 
   @@unique([campaignId, studentId])
   @@index([studentId, createdAt])
+}
+
+model InterventionCase {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  studentId           String
+  ownerId             String?
+  status              String   @default("OPEN")
+  priority            String   @default("MEDIUM")
+  reason              String?
+  summary             String?
+  nextStepForStudent  String?
+  nextStepForStaff    String?
+  staffNote           String?
+  studentMessage      String?
+  dueDate             DateTime?
+  lastContactedAt     DateTime?
+  lastStudentActionAt DateTime?
+  resolvedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  school              School   @relation(fields: [schoolId], references: [id])
+  student             User     @relation("InterventionStudentCase", fields: [studentId], references: [id])
+  owner               User?    @relation("InterventionOwner", fields: [ownerId], references: [id])
+
+  @@unique([schoolId, studentId])
+  @@index([schoolId, status, priority])
+  @@index([studentId, updatedAt])
 }
 
 // ─── Notifications ──────────────────────────────────────────────
