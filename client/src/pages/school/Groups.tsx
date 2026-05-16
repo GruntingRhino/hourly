@@ -20,8 +20,15 @@ interface StudentInfo {
   email: string;
   grade: string | null;
   approvedHours: number;
+  pendingHours?: number;
   requiredHours: number;
+  remainingHours?: number;
+  percentComplete?: number;
   status: "COMPLETED" | "ON_TRACK" | "AT_RISK" | "NOT_STARTED";
+  riskLevel?: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  riskReasons?: string[];
+  noShowCount?: number;
+  daysToDeadline?: number | null;
   classroom?: { id: string; name: string } | null;
 }
 
@@ -31,9 +38,23 @@ interface AllStudent {
   email: string;
   grade: string | null;
   approvedHours: number;
+  pendingHours?: number;
   requiredHours: number;
+  remainingHours?: number;
+  percentComplete?: number;
   status?: "COMPLETED" | "ON_TRACK" | "AT_RISK" | "NOT_STARTED";
+  riskLevel?: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  riskReasons?: string[];
+  noShowCount?: number;
+  daysToDeadline?: number | null;
   classroom: { id: string; name: string } | null;
+}
+
+function deadlineLabel(daysToDeadline?: number | null): string | null {
+  if (daysToDeadline == null) return null;
+  if (daysToDeadline < 0) return `${Math.abs(daysToDeadline)}d overdue`;
+  if (daysToDeadline === 0) return "Due today";
+  return `${daysToDeadline}d left`;
 }
 
 export default function SchoolGroups() {
@@ -47,7 +68,6 @@ export default function SchoolGroups() {
   const [selectedStudent, setSelectedStudent] = useState<StudentInfo | AllStudent | null>(null);
   const [filter, setFilter] = useState(searchParams.get("filter")?.toUpperCase().replace(" ", "_") || "ALL");
   const [search, setSearch] = useState("");
-  const [requiredHours, setRequiredHours] = useState(40);
   const [loading, setLoading] = useState(true);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -76,14 +96,12 @@ export default function SchoolGroups() {
   const loadData = async () => {
     if (!schoolId) return;
     try {
-      const [cls, all, school] = await Promise.all([
+      const [cls, all] = await Promise.all([
         api.get<Classroom[]>(`/classrooms`),
         api.get<AllStudent[]>(`/schools/${schoolId}/students`),
-        api.get<{ requiredHours: number }>(`/schools/${schoolId}`),
       ]);
       setClassrooms(cls);
       setAllStudents(all);
-      setRequiredHours(school.requiredHours);
     } catch (err) {
       console.error(err);
     } finally {
@@ -131,8 +149,16 @@ export default function SchoolGroups() {
     email: s.email,
     grade: s.grade,
     approvedHours: s.approvedHours,
+    pendingHours: s.pendingHours,
     requiredHours: s.requiredHours,
+    remainingHours: s.remainingHours,
+    percentComplete: s.percentComplete,
     status: s.status ?? calcStatus(s.approvedHours, s.requiredHours),
+    riskLevel: s.riskLevel,
+    riskReasons: s.riskReasons,
+    noShowCount: s.noShowCount,
+    daysToDeadline: s.daysToDeadline,
+    classroom: s.classroom,
   }));
 
   const displayStudents = selectedClassroom ? students : enrichedAll;
@@ -291,9 +317,29 @@ export default function SchoolGroups() {
                       {'classroom' in s && s.classroom && (
                         <div className="text-xs text-gray-400">{s.classroom.name}</div>
                       )}
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {typeof s.pendingHours === "number" && s.pendingHours > 0 && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                            {s.pendingHours}h pending
+                          </span>
+                        )}
+                        {deadlineLabel(s.daysToDeadline) && (
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.daysToDeadline != null && s.daysToDeadline <= 14 ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                            {deadlineLabel(s.daysToDeadline)}
+                          </span>
+                        )}
+                        {typeof s.noShowCount === "number" && s.noShowCount > 0 && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-50 text-red-700">
+                            {s.noShowCount} no-show{s.noShowCount === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-bold">{s.approvedHours}h</div>
+                      {typeof s.remainingHours === "number" && s.status !== "COMPLETED" && (
+                        <div className="text-[11px] text-gray-400">{s.remainingHours}h left</div>
+                      )}
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${statusColors[s.status]}`}>
                         {statusLabels[s.status]}
                       </span>
@@ -302,9 +348,14 @@ export default function SchoolGroups() {
                   <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className="bg-blue-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (s.approvedHours / requiredHours) * 100)}%` }}
+                      style={{ width: `${Math.min(100, s.percentComplete ?? (s.approvedHours / Math.max(1, s.requiredHours)) * 100)}%` }}
                     />
                   </div>
+                  {!!s.riskReasons?.length && (
+                    <div className="mt-2 text-[11px] text-gray-500 line-clamp-2">
+                      {s.riskReasons.slice(0, 2).join(" • ")}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -388,7 +439,7 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
 
   useEffect(() => {
     setReminderBody(
-      `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h of ${requiredHours}h required.`,
+      `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h approved${student.pendingHours ? `, ${student.pendingHours}h pending approval,` : ""} and ${student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h left toward your ${requiredHours}h requirement.${student.daysToDeadline != null ? ` Deadline status: ${deadlineLabel(student.daysToDeadline)}.` : ""}`,
     );
     setShowReminderCompose(false);
     setShowHistory(true);
@@ -443,14 +494,53 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
             className="bg-blue-500 h-2 rounded-full"
-            style={{ width: `${Math.min(100, (student.approvedHours / requiredHours) * 100)}%` }}
+            style={{ width: `${Math.min(100, student.percentComplete ?? (student.approvedHours / Math.max(1, requiredHours)) * 100)}%` }}
           />
         </div>
       </div>
 
-      <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusColors[student.status]}`}>
-        {statusLabels[student.status]}
-      </span>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusColors[student.status]}`}>
+          {statusLabels[student.status]}
+        </span>
+        {typeof student.pendingHours === "number" && student.pendingHours > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded font-medium bg-amber-50 text-amber-700">
+            {student.pendingHours}h pending
+          </span>
+        )}
+        {deadlineLabel(student.daysToDeadline) && (
+          <span className={`text-xs px-2 py-0.5 rounded font-medium ${student.daysToDeadline != null && student.daysToDeadline <= 14 ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+            {deadlineLabel(student.daysToDeadline)}
+          </span>
+        )}
+        {typeof student.noShowCount === "number" && student.noShowCount > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded font-medium bg-red-50 text-red-700">
+            {student.noShowCount} no-show{student.noShowCount === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+        <div className="bg-gray-50 rounded p-2">
+          <div className="text-gray-500">Remaining</div>
+          <div className="font-medium text-gray-800">{student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h</div>
+        </div>
+        <div className="bg-gray-50 rounded p-2">
+          <div className="text-gray-500">Completion</div>
+          <div className="font-medium text-gray-800">{student.percentComplete ?? Math.min(100, Math.round((student.approvedHours / Math.max(1, requiredHours)) * 100))}%</div>
+        </div>
+      </div>
+
+      {!!student.riskReasons?.length && (
+        <div className="mb-3 rounded border border-red-100 bg-red-50 p-3">
+          <div className="text-xs font-semibold text-red-800 mb-1">Why this student is flagged</div>
+          <ul className="list-disc pl-4 text-xs text-red-700 space-y-1">
+            {student.riskReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-3 space-y-2">
         <button
