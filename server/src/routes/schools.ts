@@ -14,6 +14,7 @@ import {
 import {
   buildRequestAuditMetadata,
   logDataAccess,
+  resolveStudentSchoolId,
   summarizeStudentSubjects,
 } from "../lib/dataAccessLog";
 import { getCategoryCapStatusesForStudent, resolveEffectiveRules } from "../lib/schoolRules";
@@ -58,6 +59,7 @@ async function buildCategoryCapWarningsForSchool(schoolId: string): Promise<Cate
         { schoolId },
         { cohort: { schoolId } },
         { classroom: { schoolId } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId } } } },
       ],
     },
     select: { id: true, name: true },
@@ -982,6 +984,23 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
             serviceEndDate: true,
           },
         },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
+          },
+        },
         classroomId: true,
         classroom: { select: { id: true, name: true } },
       },
@@ -1057,6 +1076,11 @@ router.get("/:id/students/:studentId/verification-history", authenticate, requir
         role: true,
         classroom: { select: { schoolId: true } },
         cohort: { select: { schoolId: true, name: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true, name: true } } },
+        },
       },
     });
     if (!student) return res.status(404).json({ error: "Student not found" });
@@ -1149,6 +1173,11 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         role: true,
         classroom: { select: { schoolId: true, name: true } },
         cohort: { select: { schoolId: true, name: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true, name: true } } },
+        },
       },
     });
     if (!student) return res.status(404).json({ error: "Student not found" });
@@ -1407,6 +1436,23 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), a
             requiredHours: true,
             serviceStartDate: true,
             serviceEndDate: true,
+          },
+        },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
           },
         },
       },
@@ -1718,9 +1764,9 @@ router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_A
     // Verify the student belongs to this school
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { role: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: { role: true },
     });
-    const studentSchoolId = student?.classroom?.schoolId ?? student?.cohort?.schoolId ?? student?.schoolId ?? null;
+    const studentSchoolId = await resolveStudentSchoolId(studentId);
     if (!student || student.role !== "STUDENT" || studentSchoolId !== req.params.id) {
       return res.status(403).json({ error: "Student is not enrolled in your school" });
     }
@@ -1832,13 +1878,7 @@ router.post("/:id/remove-hours", authenticate, requireRole("SCHOOL_ADMIN", "TEAC
     if (!session) return res.status(404).json({ error: "Session not found" });
 
     // Verify the session's student belongs to this school regardless of role
-    const sessionStudentSchoolId = await (async () => {
-      const s = await prisma.user.findUnique({
-        where: { id: session.userId },
-        select: { schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
-      });
-      return s?.classroom?.schoolId ?? s?.cohort?.schoolId ?? s?.schoolId ?? null;
-    })();
+    const sessionStudentSchoolId = await resolveStudentSchoolId(session.userId);
     if (sessionStudentSchoolId !== req.params.id) {
       return res.status(403).json({ error: "Student is not enrolled in your school" });
     }
@@ -1938,13 +1978,20 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
       role: "STUDENT",
     };
     if (cohortId) {
-      whereClause.cohortId = cohortId;
+      whereClause.OR = [
+        { cohortId },
+        { cohortMemberships: { some: { isActive: true, cohortId } } },
+      ];
     } else if (scope && !scope.isSchoolAdmin) {
-      whereClause.cohortId = { in: scope.assignedCohortIds };
+      whereClause.OR = [
+        { cohortId: { in: scope.assignedCohortIds } },
+        { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
+      ];
     } else {
       whereClause.OR = [
         { classroom: { schoolId: req.params.id } },
         { cohort: { schoolId: req.params.id } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: req.params.id } } } },
       ];
     }
 
@@ -2054,7 +2101,7 @@ router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMI
     if (!student) return res.status(404).json({ error: "Student not found" });
     if (student.role !== "STUDENT") return res.status(400).json({ error: "User is not a student" });
 
-    const studentSchoolId = student.classroom?.schoolId ?? student.cohort?.schoolId ?? null;
+    const studentSchoolId = await resolveStudentSchoolId(student.id);
     if (studentSchoolId !== req.params.id) {
       return res.status(403).json({ error: "Student is not enrolled in your school" });
     }
@@ -2084,6 +2131,10 @@ router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMI
         cohortId: null,
         classroomId: null,
       },
+    });
+    await prisma.studentCohortMembership.updateMany({
+      where: { studentId: req.params.studentId, isActive: true },
+      data: { isActive: false },
     });
 
     res.json({ message: "Student data removed" });
@@ -2216,13 +2267,20 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
 
     const whereClause: any = { role: "STUDENT" };
     if (cohortId) {
-      whereClause.cohortId = cohortId;
+      whereClause.OR = [
+        { cohortId },
+        { cohortMemberships: { some: { isActive: true, cohortId } } },
+      ];
     } else if (scope && !scope.isSchoolAdmin) {
-      whereClause.cohortId = { in: scope.assignedCohortIds };
+      whereClause.OR = [
+        { cohortId: { in: scope.assignedCohortIds } },
+        { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
+      ];
     } else {
       whereClause.OR = [
         { classroom: { schoolId: req.params.id } },
         { cohort: { schoolId: req.params.id } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: req.params.id } } } },
       ];
     }
 

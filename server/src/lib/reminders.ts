@@ -135,6 +135,7 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
       OR: [
         { classroom: { schoolId } },
         { cohort: { schoolId } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId } } } },
       ],
     },
     select: {
@@ -150,6 +151,23 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
           requiredHours: true,
           serviceStartDate: true,
           serviceEndDate: true,
+        },
+      },
+      cohortMemberships: {
+        where: { isActive: true },
+        orderBy: [{ createdAt: "asc" }],
+        select: {
+          cohortId: true,
+          isActive: true,
+          cohort: {
+            select: {
+              id: true,
+              name: true,
+              requiredHours: true,
+              serviceStartDate: true,
+              serviceEndDate: true,
+            },
+          },
         },
       },
     },

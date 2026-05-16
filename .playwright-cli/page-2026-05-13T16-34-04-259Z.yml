@@ -1,0 +1,202 @@
+- generic [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - text:  
+    - banner [ref=e191]:
+      - link [ref=e192] [cursor=pointer]:
+        - /url: "#content"
+        - text: Skip To Content
+      - region [ref=e193]:
+        - link [ref=e194] [cursor=pointer]:
+          - /url: http://127.0.0.1:3100/
+          - generic [ref=e9]: Dashboard
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - button [ref=e195] [cursor=pointer]:
+              - img [ref=e15]
+              - generic: Account
+          - listitem [ref=e16]:
+            - button [ref=e196] [cursor=pointer]:
+              - img [ref=e19]
+              - generic: Admin
+          - listitem [ref=e21]:
+            - link [ref=e197] [cursor=pointer]:
+              - /url: http://127.0.0.1:3100/
+              - img [ref=e24]
+              - generic: Dashboard
+          - listitem [ref=e26]:
+            - button [ref=e198] [cursor=pointer]:
+              - img [ref=e29]
+              - generic: Courses
+          - listitem [ref=e31]:
+            - link [ref=e199] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e34]
+              - generic: Calendar
+          - listitem [ref=e36]:
+            - link [ref=e200] [cursor=pointer]:
+              - /url: /conversations
+              - img [ref=e40]
+              - generic: Inbox
+          - listitem [ref=e42]:
+            - button [ref=e201] [cursor=pointer]:
+              - img [ref=e44]
+              - generic: Help
+      - list [ref=e47]:
+        - listitem [ref=e48]:
+          - button [ref=e202] [cursor=pointer]:
+            - img [ref=e51]
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - button [ref=e203] [cursor=pointer]:
+          - generic [ref=e56]: 
+        - navigation [ref=e204]:
+          - list [ref=e59]:
+            - listitem [ref=e60]:
+              - link [ref=e205] [cursor=pointer]:
+                - /url: /accounts/site_admin
+                - text: Site Admin
+            - listitem [ref=e62]: Developer Keys
+      - generic [ref=e63]:
+        - navigation [ref=e206]:
+          - list [ref=e68]:
+            - listitem [ref=e69]:
+              - link [ref=e207] [cursor=pointer]:
+                - /url: /accounts/site_admin/users
+                - text: People
+            - listitem [ref=e71]:
+              - link [ref=e208] [cursor=pointer]:
+                - /url: /accounts/site_admin/permissions
+                - text: Permissions
+            - listitem [ref=e73]:
+              - link [ref=e209] [cursor=pointer]:
+                - /url: /accounts/site_admin/sub_accounts
+                - text: Sub-Accounts
+            - listitem [ref=e75]:
+              - link [ref=e210] [cursor=pointer]:
+                - /url: /accounts/site_admin/authentication_providers
+                - text: Authentication
+            - listitem [ref=e77]:
+              - link [ref=e211] [cursor=pointer]:
+                - /url: /plugins
+                - text: Plugins
+            - listitem [ref=e79]:
+              - link [ref=e212] [cursor=pointer]:
+                - /url: /jobs
+                - text: Jobs
+            - listitem [ref=e81]:
+              - link [ref=e213] [cursor=pointer]:
+                - /url: /accounts/site_admin/brand_configs
+                - text: Themes
+            - listitem [ref=e83]:
+              - link [ref=e214] [cursor=pointer]:
+                - /url: /accounts/site_admin/developer_keys
+                - text: Developer Keys
+            - listitem [ref=e85]:
+              - link [ref=e215] [cursor=pointer]:
+                - /url: /accounts/site_admin/apps
+                - text: Apps
+            - listitem [ref=e87]:
+              - link [ref=e216] [cursor=pointer]:
+                - /url: /accounts/site_admin/eportfolio_moderation
+                - text: ePortfolio Moderation
+            - listitem [ref=e89]:
+              - link [ref=e217] [cursor=pointer]:
+                - /url: /accounts/site_admin/settings
+                - text: Settings
+        - main [ref=e93]:
+          - generic [ref=e95]:
+            - heading [level=1] [ref=e218]: Developer Keys
+            - generic [ref=e98]:
+              - img [ref=e100]
+              - generic [ref=e104]:
+                - text: LTI tool management is now live in
+                - link [ref=e219] [cursor=pointer]:
+                  - /url: /accounts/2/apps/manage
+                  - text: Canvas Apps
+                - text: "! Changes sync between both pages as we develop more features for Apps. From now on, Apps is the primary home for LTI tools."
+            - generic [ref=e106]:
+              - tablist [ref=e108]:
+                - tab [selected] [ref=e220]: Account
+              - tabpanel [ref=e221]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]:
+                    - generic [ref=e115]:
+                      - generic [ref=e118]:
+                        - generic [ref=e120]: Filter by
+                        - generic [ref=e124]:
+                          - combobox [ref=e222]: All
+                          - img [ref=e128]
+                      - generic [ref=e131]:
+                        - generic [ref=e133]: Search Developer Keys
+                        - generic [ref=e136]:
+                          - img [ref=e137]
+                          - searchbox [ref=e223]
+                      - button [ref=e224] [cursor=pointer]:
+                        - generic:
+                          - generic: Clear
+                    - button [ref=e225] [cursor=pointer]:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - img
+                          - generic:
+                            - generic:
+                              - generic: Create a
+                              - text: Developer Key
+                  - table [ref=e226]:
+                    - generic [ref=e149]: Developer Keys
+                    - rowgroup [ref=e150]:
+                      - row [ref=e227]:
+                        - columnheader [ref=e228]:
+                          - button [ref=e229] [cursor=pointer]:
+                            - generic [ref=e154]:
+                              - generic [ref=e155]: Name
+                              - img [ref=e156]
+                        - columnheader [ref=e230]:
+                          - button [ref=e231] [cursor=pointer]:
+                            - generic [ref=e160]:
+                              - generic [ref=e161]: Owner Email
+                              - img [ref=e162]
+                        - columnheader [ref=e232]:
+                          - button [ref=e233] [cursor=pointer]:
+                            - generic [ref=e166]:
+                              - generic [ref=e167]: Details
+                              - img [ref=e168]
+                        - columnheader [ref=e234]:
+                          - button [ref=e235] [cursor=pointer]:
+                            - generic [ref=e172]:
+                              - generic [ref=e173]: Stats
+                              - img [ref=e174]
+                        - columnheader [ref=e236]:
+                          - button [ref=e237] [cursor=pointer]:
+                            - generic [ref=e178]:
+                              - generic [ref=e179]: Type
+                              - img [ref=e180]
+                        - columnheader [ref=e238]:
+                          - button [ref=e239] [cursor=pointer]:
+                            - generic [ref=e184]:
+                              - generic [ref=e185]: State
+                              - img [ref=e186]
+                        - columnheader [ref=e240]: Actions
+                  - generic [ref=e189]: Nothing here yet
+  - menu "Create a Developer Key" [ref=e244]:
+    - menuitem "Create an API Key" [active] [ref=e245] [cursor=pointer]:
+      - generic [ref=e248]:
+        - img [ref=e250]
+        - generic [ref=e252]:
+          - generic [ref=e253]: Create an
+          - text: API Key
+    - menuitem "Create an LTI Key" [ref=e254] [cursor=pointer]:
+      - generic [ref=e257]:
+        - img [ref=e259]
+        - generic [ref=e261]:
+          - generic [ref=e262]: Create an
+          - text: LTI Key
+    - menuitem "Create an LTI Registration" [ref=e263] [cursor=pointer]:
+      - generic [ref=e266]:
+        - img [ref=e268]
+        - generic [ref=e270]:
+          - generic [ref=e271]: Create an
+          - text: LTI Registration

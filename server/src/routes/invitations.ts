@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
+import { ensureStudentCohortMembership } from "../lib/studentCohorts";
 
 const router = Router();
 
@@ -83,18 +84,38 @@ router.post("/student/accept", async (req: Request, res: Response) => {
         await prisma.user.update({
           where: { id: existing.id },
           data: {
-            cohortId: inv.cohortId,
             schoolId: inv.cohort.schoolId,
             grade: existing.grade ?? inv.grade,
             house: existing.house ?? inv.house,
           },
         });
+        await ensureStudentCohortMembership({
+          studentId: existing.id,
+          cohortId: inv.cohortId,
+          source: "INVITATION",
+          forcePrimary: !existing.cohortId,
+          schoolId: inv.cohort.schoolId,
+        });
         await prisma.studentInvitation.update({
           where: { id: inv.id },
           data: { status: "ACCEPTED", acceptedAt: new Date() },
         });
+        if (inv.startingHours && inv.startingHours > 0) {
+          await prisma.selfSubmittedRequest.create({
+            data: {
+              studentId: existing.id,
+              schoolId: inv.cohort.schoolId,
+              organizationName: "Prior Service Record",
+              description: "Hours credited from school import",
+              date: new Date(),
+              hours: inv.startingHours,
+              status: "APPROVED",
+              reviewedAt: new Date(),
+            },
+          });
+        }
         const token = signToken({ userId: existing.id, email: existing.email, role: existing.role });
-        return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, cohortId: inv.cohortId, schoolId: inv.cohort.schoolId } });
+        return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, cohortId: existing.cohortId ?? inv.cohortId, schoolId: inv.cohort.schoolId } });
       }
       return res.status(409).json({ error: "An account with this email already exists with a different role." });
     }
@@ -115,11 +136,33 @@ router.post("/student/accept", async (req: Request, res: Response) => {
         status: "ACTIVE",
       },
     });
+    await ensureStudentCohortMembership({
+      studentId: user.id,
+      cohortId: inv.cohortId,
+      source: "INVITATION",
+      forcePrimary: true,
+      schoolId: inv.cohort.schoolId,
+    });
 
     await prisma.studentInvitation.update({
       where: { id: inv.id },
       data: { status: "ACCEPTED", acceptedAt: new Date() },
     });
+
+    if (inv.startingHours && inv.startingHours > 0) {
+      await prisma.selfSubmittedRequest.create({
+        data: {
+          studentId: user.id,
+          schoolId: inv.cohort.schoolId,
+          organizationName: "Prior Service Record",
+          description: "Hours credited from school import",
+          date: new Date(),
+          hours: inv.startingHours,
+          status: "APPROVED",
+          reviewedAt: new Date(),
+        },
+      });
+    }
 
     const jwtToken = signToken({ userId: user.id, email: user.email, role: user.role });
 

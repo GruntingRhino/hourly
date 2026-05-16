@@ -8,6 +8,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum IntegrationProvider {
+  CANVAS
+  GOOGLE_CLASSROOM
+}
+
+enum IntegrationConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+enum IntegrationSyncMode {
+  PREVIEW
+  APPLY
+}
+
+enum IntegrationSyncJobStatus {
+  RUNNING
+  COMPLETED
+  PARTIAL_FAILED
+  FAILED
+}
+
+enum IntegrationExternalObjectType {
+  COURSE
+  SECTION
+  USER
+  ENROLLMENT
+}
+
 // ─── Users & Identity ───────────────────────────────────────────
 
 model User {
@@ -65,6 +95,10 @@ model User {
   taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
   selfSubmissions      SelfSubmittedRequest[]
   assignedCohorts      CohortTeacherAssignment[]
+  cohortMemberships    StudentCohortMembership[]
+  integrationConnectionsCreated IntegrationConnection[] @relation("IntegrationConnectionCreator")
+  integrationConnectionsUpdated IntegrationConnection[] @relation("IntegrationConnectionUpdater")
+  integrationSyncJobsStarted    IntegrationSyncJob[]    @relation("IntegrationSyncJobStarter")
 }
 
 // ─── Schools ────────────────────────────────────────────────────
@@ -121,6 +155,10 @@ model School {
   verifiedDomains  VerifiedDomain[]
   selfSubmissions  SelfSubmittedRequest[]
   launchBugs       SchoolLaunchBug[]
+  integrationConnections IntegrationConnection[]
+  integrationSyncJobs    IntegrationSyncJob[]
+  integrationSyncErrors  IntegrationSyncError[]
+  integrationMappings    IntegrationExternalMapping[]
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────
@@ -183,8 +221,26 @@ model Cohort {
   updatedAt     DateTime @updatedAt
 
   students      User[]            @relation("CohortStudents")
+  memberships   StudentCohortMembership[]
   invitations   StudentInvitation[]
   teacherAssignments CohortTeacherAssignment[]
+}
+
+model StudentCohortMembership {
+  id        String   @id @default(cuid())
+  studentId String
+  cohortId  String
+  source    String   @default("MANUAL") // MANUAL, INVITATION, CANVAS
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student   User     @relation(fields: [studentId], references: [id])
+  cohort    Cohort   @relation(fields: [cohortId], references: [id])
+
+  @@unique([studentId, cohortId])
+  @@index([cohortId, isActive])
+  @@index([studentId, isActive])
 }
 
 model CohortTeacherAssignment {
@@ -202,20 +258,117 @@ model CohortTeacherAssignment {
 // ─── Student Invitations ─────────────────────────────────────────
 
 model StudentInvitation {
-  id         String   @id @default(cuid())
-  cohortId   String
-  cohort     Cohort   @relation(fields: [cohortId], references: [id])
-  email      String
-  name       String?
-  grade      String?
-  house      String?
-  token      String   @unique
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  status     String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  cohortId      String
+  cohort        Cohort   @relation(fields: [cohortId], references: [id])
+  email         String
+  name          String?
+  grade         String?
+  house         String?
+  startingHours Float?   // pre-existing hours to credit as approved on join
+  token         String   @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  status        String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  createdAt     DateTime @default(now())
 
   @@unique([cohortId, email])
+}
+
+model IntegrationConnection {
+  id                 String                      @id @default(cuid())
+  provider           IntegrationProvider
+  schoolId           String
+  school             School                      @relation(fields: [schoolId], references: [id])
+  status             IntegrationConnectionStatus @default(CONNECTED)
+  displayName        String?
+  baseUrl            String?
+  credentialsEncrypted String?
+  config             String?
+  lastSyncedAt       DateTime?
+  lastSyncStatus     IntegrationSyncJobStatus?
+  lastSyncJobId      String?
+  createdById        String
+  createdBy          User                        @relation("IntegrationConnectionCreator", fields: [createdById], references: [id])
+  updatedById        String?
+  updatedBy          User?                       @relation("IntegrationConnectionUpdater", fields: [updatedById], references: [id])
+  connectedAt        DateTime                    @default(now())
+  disconnectedAt     DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  mappings           IntegrationExternalMapping[]
+  syncJobs           IntegrationSyncJob[]
+  syncErrors         IntegrationSyncError[]
+
+  @@unique([provider, schoolId])
+  @@index([schoolId, provider])
+}
+
+model IntegrationExternalMapping {
+  id                 String                      @id @default(cuid())
+  connectionId       String
+  connection         IntegrationConnection       @relation(fields: [connectionId], references: [id])
+  provider           IntegrationProvider
+  schoolId           String
+  school             School                      @relation(fields: [schoolId], references: [id])
+  externalType       IntegrationExternalObjectType
+  externalId         String
+  externalParentId   String?
+  externalName       String?
+  localType          String
+  localId            String
+  isActive           Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@unique([connectionId, externalType, externalId])
+  @@index([schoolId, provider, localType, localId])
+}
+
+model IntegrationSyncJob {
+  id                 String                   @id @default(cuid())
+  connectionId       String
+  connection         IntegrationConnection    @relation(fields: [connectionId], references: [id])
+  provider           IntegrationProvider
+  schoolId           String
+  school             School                   @relation(fields: [schoolId], references: [id])
+  mode               IntegrationSyncMode
+  status             IntegrationSyncJobStatus @default(RUNNING)
+  startedById        String
+  startedBy          User                     @relation("IntegrationSyncJobStarter", fields: [startedById], references: [id])
+  summary            String?
+  startedAt          DateTime                 @default(now())
+  finishedAt         DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  errors             IntegrationSyncError[]
+
+  @@index([connectionId, createdAt])
+  @@index([schoolId, provider, createdAt])
+}
+
+model IntegrationSyncError {
+  id                 String                      @id @default(cuid())
+  syncJobId          String
+  syncJob            IntegrationSyncJob          @relation(fields: [syncJobId], references: [id])
+  connectionId       String
+  connection         IntegrationConnection       @relation(fields: [connectionId], references: [id])
+  provider           IntegrationProvider
+  schoolId           String
+  school             School                      @relation(fields: [schoolId], references: [id])
+  externalType       IntegrationExternalObjectType?
+  externalId         String?
+  localType          String?
+  localId            String?
+  code               String
+  message            String
+  details            String?
+  createdAt          DateTime                    @default(now())
+
+  @@index([syncJobId, createdAt])
+  @@index([schoolId, provider, createdAt])
 }
 
 // ─── Beneficiaries ──────────────────────────────────────────────

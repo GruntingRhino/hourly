@@ -1,0 +1,100 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]: 
+    - text: You are logged in at GoodHours Local Canvas using your credentials from Site Admin
+    - button [ref=e5] [cursor=pointer]:
+      - generic [ref=e6]: 
+  - alert [ref=e7]: You are logged in at GoodHours Local Canvas using your credentials from Site Admin
+  - generic [ref=e8]:
+    - text: 
+    - banner "Global Header" [ref=e9]:
+      - link "Skip To Content" [ref=e10] [cursor=pointer]:
+        - /url: "#content"
+      - region "Global Navigation" [ref=e11]:
+        - link "Dashboard" [ref=e13] [cursor=pointer]:
+          - /url: http://127.0.0.1:3100/
+          - generic [ref=e14]: Dashboard
+        - list [ref=e15]:
+          - listitem [ref=e16]:
+            - button "Account" [ref=e17] [cursor=pointer]:
+              - img [ref=e20]
+              - generic: Account
+          - listitem [ref=e21]:
+            - button "Admin" [ref=e22] [cursor=pointer]:
+              - img [ref=e24]
+              - generic: Admin
+          - listitem [ref=e26]:
+            - link "Dashboard" [ref=e27] [cursor=pointer]:
+              - /url: http://127.0.0.1:3100/
+              - img [ref=e29]
+              - generic: Dashboard
+          - listitem [ref=e31]:
+            - button "Courses" [ref=e32] [cursor=pointer]:
+              - img [ref=e34]
+              - generic: Courses
+          - listitem [ref=e36]:
+            - link "Calendar" [ref=e37] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic: Calendar
+          - listitem [ref=e41]:
+            - link "Inbox" [ref=e42] [cursor=pointer]:
+              - /url: /conversations
+              - img [ref=e45]
+              - generic: Inbox
+          - listitem [ref=e47]:
+            - button "Help" [ref=e48] [cursor=pointer]:
+              - img [ref=e49]
+              - generic: Help
+      - list [ref=e52]:
+        - listitem [ref=e53]:
+          - button "Minimize global navigation" [ref=e54] [cursor=pointer]:
+            - img [ref=e56]
+    - generic [ref=e58]:
+      - generic [ref=e61]:
+        - main [ref=e63]:
+          - generic [ref=e64]:
+            - heading "Dashboard" [level=1] [ref=e65]
+            - generic [ref=e66]:
+              - generic [ref=e67]: 
+              - generic [ref=e68]: information
+              - generic [ref=e70]:
+                - heading "Welcome to Canvas!" [level=4] [ref=e71]
+                - generic [ref=e72]: You don't have any courses, so this page won't be very exciting for now. Once you've created or signed up for courses, you'll start to see conversations from all of your classes.
+            - generic [ref=e73]:
+              - generic [ref=e74]: 
+              - generic [ref=e75]: information
+              - generic [ref=e76]:
+                - generic [ref=e77]:
+                  - heading "Notifications." [level=4] [ref=e78]
+                  - text: Tell us how and when you would like to be notified of events in Canvas.
+                - button "Notification Preferences" [ref=e80] [cursor=pointer]
+            - generic [ref=e83]:
+              - generic [ref=e85]: Dashboard
+              - button "Dashboard Options" [ref=e90] [cursor=pointer]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic: Dashboard Options
+        - complementary [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - heading "Coming Up" [level=2] [ref=e97]
+              - link " View Calendar" [ref=e98] [cursor=pointer]:
+                - /url: http://127.0.0.1:3100/calendar
+            - list [ref=e99]:
+              - listitem [ref=e100]:
+                - generic [ref=e101]: Nothing for the next week
+          - generic [ref=e102]:
+            - button "Start a New Course" [ref=e103] [cursor=pointer]
+            - link "View Grades" [ref=e104] [cursor=pointer]:
+              - /url: /grades
+      - contentinfo [ref=e105]:
+        - link "By Instructure" [ref=e106] [cursor=pointer]:
+          - /url: http://www.instructure.com
+          - generic [ref=e107]: By Instructure
+        - link "Open Source LMS" [ref=e109] [cursor=pointer]:
+          - /url: http://instructure.com
+    - alert

@@ -23,14 +23,14 @@ export default function ParentProgress() {
   useEffect(() => {
     const token = params.get("token");
     if (!token) {
-      setError("Missing parent progress token.");
+      setError("Parent or guardian progress links are disabled.");
       setLoading(false);
       return;
     }
 
     api.get<ParentProgressData>(`/reports/parent-progress?token=${encodeURIComponent(token)}`)
       .then(setData)
-      .catch((err: any) => setError(err.message || "Failed to load parent progress view."))
+      .catch((err: any) => setError(err.message || "Parent or guardian progress links are disabled."))
       .finally(() => setLoading(false));
   }, [params]);
 
@@ -43,7 +43,10 @@ export default function ParentProgress() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white border border-red-200 rounded-xl p-6 text-center">
           <div className="text-lg font-semibold text-red-700">Unable to open parent progress</div>
-          <div className="text-sm text-red-600 mt-2">{error || "Invalid parent progress link."}</div>
+          <div className="text-sm text-red-600 mt-2">{error || "Parent or guardian progress links are disabled."}</div>
+          <div className="text-sm text-gray-600 mt-3">
+            Progress sharing must be initiated through a school-controlled workflow.
+          </div>
           <Link to="/" className="inline-block mt-4 text-sm text-blue-600 hover:underline">
             Return to GoodHours
           </Link>

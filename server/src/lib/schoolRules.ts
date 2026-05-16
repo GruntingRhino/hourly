@@ -1,4 +1,5 @@
 import prisma from "./prisma";
+import { resolveSchoolIdFromUserAssociations } from "./userAssociations";
 
 export interface EffectiveRules {
   schoolId: string;
@@ -141,15 +142,27 @@ export async function resolveEffectiveRules(userId: string): Promise<EffectiveRu
         },
       },
       classroom: { select: { schoolId: true } },
+      cohortMemberships: {
+        where: { isActive: true },
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        select: {
+          cohort: {
+            select: {
+              schoolId: true,
+              serviceStartDate: true,
+              serviceEndDate: true,
+              allowSelfSubmission: true,
+              categoryHourCaps: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!user) return null;
 
-  const schoolId =
-    user.schoolId ??
-    user.cohort?.schoolId ??
-    user.classroom?.schoolId ??
-    null;
+  const effectiveCohort = user.cohort ?? user.cohortMemberships[0]?.cohort ?? null;
+  const schoolId = resolveSchoolIdFromUserAssociations(user);
   if (!schoolId) return null;
 
   const school = await prisma.school.findUnique({
@@ -165,7 +178,7 @@ export async function resolveEffectiveRules(userId: string): Promise<EffectiveRu
   });
   if (!school) return null;
 
-  const cohort = user.cohort;
+  const cohort = effectiveCohort;
 
   return {
     schoolId,

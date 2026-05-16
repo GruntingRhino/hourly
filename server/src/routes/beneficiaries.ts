@@ -210,7 +210,16 @@ async function geocodeStateBackground(state: string): Promise<void> {
 // For beneficiary admins: their own beneficiary
 router.get("/", authenticate, async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        id: true,
+        role: true,
+        schoolId: true,
+        cohortId: true,
+        beneficiaryId: true,
+      },
+    });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (user.role === "BENEFICIARY_ADMIN") {
@@ -219,11 +228,9 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
       return res.json(ben ? [ben] : []);
     }
 
-    const schoolId = user.schoolId ?? (
-      user.role === "STUDENT" && user.cohortId
-        ? (await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } }))?.schoolId
-        : null
-    );
+    const schoolId = user.role === "STUDENT"
+      ? await resolveStudentSchoolId(user.id)
+      : user.schoolId;
 
     if (!schoolId) return res.json([]);
 
@@ -634,15 +641,10 @@ router.get("/my-signups", authenticate, requireRole("STUDENT"), async (req: Requ
 // GET /api/beneficiaries/available-slots — future slots from school-approved beneficiaries (student)
 router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { id: true, schoolId: true } });
     let schoolId = user?.schoolId ?? null;
-    if (!schoolId && user?.cohortId) {
-      const cohort = await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } });
-      schoolId = cohort?.schoolId ?? null;
-    }
-    if (!schoolId && user?.classroomId) {
-      const classroom = await prisma.classroom.findUnique({ where: { id: user.classroomId }, select: { schoolId: true } });
-      schoolId = classroom?.schoolId ?? null;
+    if (!schoolId && user) {
+      schoolId = await resolveStudentSchoolId(user.id);
     }
     if (!schoolId) return res.json([]);
 
@@ -776,7 +778,7 @@ router.get("/slots/:slotId", authenticate, async (req: Request, res: Response) =
 
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: { id: true, role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
     });
 
     if (user?.role === "BENEFICIARY_ADMIN") {
@@ -784,7 +786,7 @@ router.get("/slots/:slotId", authenticate, async (req: Request, res: Response) =
         return res.status(403).json({ error: "Not your beneficiary's slot" });
       }
     } else {
-      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      const schoolId = user ? await resolveStudentSchoolId(user.id) ?? user.schoolId : null;
       if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
       const approval = await prisma.schoolBeneficiaryApproval.findFirst({
         where: { schoolId, beneficiaryId: slot.opportunity.beneficiary.id, status: "APPROVED" },
@@ -827,14 +829,14 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: { id: true, role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
     });
 
     if (user?.role === "BENEFICIARY_ADMIN") {
       if (user.beneficiaryId !== ben.id) return res.status(403).json({ error: "Not your beneficiary" });
     } else {
       // School staff and students: require an APPROVED school-beneficiary relationship
-      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      const schoolId = user ? await resolveStudentSchoolId(user.id) ?? user.schoolId : null;
       if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
       const approval = await prisma.schoolBeneficiaryApproval.findFirst({
         where: { schoolId, beneficiaryId: ben.id, status: "APPROVED" },
@@ -1187,13 +1189,13 @@ router.get("/:id/opportunities", authenticate, async (req: Request, res: Respons
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: { id: true, role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
     });
 
     if (user?.role === "BENEFICIARY_ADMIN") {
       if (user.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
     } else {
-      const schoolId = user?.classroom?.schoolId ?? user?.cohort?.schoolId ?? user?.schoolId ?? null;
+      const schoolId = user ? await resolveStudentSchoolId(user.id) ?? user.schoolId : null;
       if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
       const approval = await prisma.schoolBeneficiaryApproval.findFirst({
         where: { schoolId, beneficiaryId: req.params.id, status: "APPROVED" },
@@ -1260,7 +1262,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
     if (data.recurrenceRule) {
       recurringGroupId = crypto.randomUUID();
       const fromDate = new Date(data.startDate);
-      const generated = generateRecurringSlots(data.recurrenceRule, fromDate);
+      const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, fromDate);
       if (generated.length === 0) {
         return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
       }
@@ -1383,7 +1385,7 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
         await prisma.beneficiaryTimeSlot.deleteMany({ where: { id: { in: toDelete } } });
       }
 
-      const generated = generateRecurringSlots(data.recurrenceRule, new Date());
+      const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, new Date());
       if (generated.length > 0) {
         await prisma.beneficiaryTimeSlot.createMany({
           data: generated.map((s) => ({ opportunityId: req.params.oppId, recurringGroupId, ...s })),
@@ -1756,11 +1758,7 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     if (slot.opportunity.status !== "ACTIVE") return res.status(400).json({ error: "This opportunity is no longer active" });
 
     // Resolve the student's school
-    const studentUser = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
-    });
-    const studentSchoolId = studentUser?.classroom?.schoolId ?? studentUser?.cohort?.schoolId ?? studentUser?.schoolId ?? null;
+    const studentSchoolId = await resolveStudentSchoolId(req.user!.userId);
     if (!studentSchoolId) {
       return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }

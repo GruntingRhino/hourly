@@ -443,7 +443,11 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
     prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [{ classroom: { schoolId } }, { cohort: { schoolId } }],
+        OR: [
+          { classroom: { schoolId } },
+          { cohort: { schoolId } },
+          { cohortMemberships: { some: { isActive: true, cohort: { schoolId } } } },
+        ],
       },
       select: {
         id: true,
@@ -460,6 +464,23 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
             serviceEndDate: true,
           },
         },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ createdAt: "asc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.selfSubmittedRequest.count({ where: { schoolId, status: "PENDING" } }),
@@ -468,7 +489,11 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
         status: "PENDING_VERIFICATION",
         verificationStatus: "PENDING",
         user: {
-          OR: [{ classroom: { schoolId } }, { cohort: { schoolId } }],
+          OR: [
+            { classroom: { schoolId } },
+            { cohort: { schoolId } },
+            { cohortMemberships: { some: { isActive: true, cohort: { schoolId } } } },
+          ],
         },
       },
     }),

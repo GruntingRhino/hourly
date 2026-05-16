@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import prisma from "../lib/prisma";
 
 // JWT_SECRET must be set. env.ts calls process.exit(1) at startup if missing,
 // so this cast is safe — but we still refuse to fall back to any default.
@@ -26,13 +27,28 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 
   const token = header.slice(7);
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
+  void (async () => {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true, email: true, role: true, status: true },
+      });
+
+      if (!user || user.status !== "ACTIVE") {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      req.user = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      };
+      next();
+    } catch {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+  })();
 }
 
 export function signToken(payload: object, options?: { expiresIn?: string }): string {

@@ -2757,45 +2757,36 @@ test.describe.serial('37 — Parent Progress Link', () => {
   });
   test.afterAll(() => st1Ctx.close());
 
-  test('POST /reports/parent-link generates a 30-day token and URL', async () => {
+  test('POST /reports/parent-link is disabled for students', async () => {
     const res = await apiRawPost(st1Page, '/reports/parent-link', {});
-    expect(res.status()).toBe(200);
+    expect(res.status()).toBe(403);
     const body = await res.json();
-    expect(body.token).toBeTruthy();
-    expect(body.url).toContain('/parent-progress?token=');
-    parentToken_ = body.token;
-    parentUrl = body.url;
+    expect(body.error).toMatch(/disabled|school-managed|ferpa/i);
   });
 
-  test('GET /reports/parent-progress?token= returns student progress (no auth required)', async () => {
-    if (!parentToken_) { test.skip(true, 'No parent token'); return; }
-    // Use an unauthenticated request — this is a public endpoint
+  test('GET /reports/parent-progress is disabled', async () => {
     const anonCtx = await st1Page.context().browser()!.newContext();
     const anonPage = await anonCtx.newPage();
-    const res = await anonPage.request.get(`${BASE}/api/reports/parent-progress?token=${encodeURIComponent(parentToken_)}`);
-    expect(res.status()).toBe(200);
+    const res = await anonPage.request.get(`${BASE}/api/reports/parent-progress?token=not-a-real-token`);
+    expect(res.status()).toBe(403);
     const body = await res.json();
-    expect(body.student).toBeDefined();
-    expect(body.student.name).toBe('PW Student 1');
-    expect(typeof body.approvedHours).toBe('number');
-    expect(typeof body.requiredHours).toBe('number');
-    expect(typeof body.percentComplete).toBe('number');
+    expect(body.error).toMatch(/disabled|school-managed|ferpa/i);
     await anonCtx.close();
   });
 
-  test('parent-progress with invalid token returns 400', async () => {
+  test('parent-progress with invalid token remains disabled', async () => {
     const anonCtx = await st1Page.context().browser()!.newContext();
     const anonPage = await anonCtx.newPage();
     const res = await anonPage.request.get(`${BASE}/api/reports/parent-progress?token=not-a-valid-token`);
-    expect(res.status()).toBe(400);
+    expect(res.status()).toBe(403);
     await anonCtx.close();
   });
 
-  test('parent-progress with missing token returns 400', async () => {
+  test('parent-progress with missing token remains disabled', async () => {
     const anonCtx = await st1Page.context().browser()!.newContext();
     const anonPage = await anonCtx.newPage();
     const res = await anonPage.request.get(`${BASE}/api/reports/parent-progress`);
-    expect(res.status()).toBe(400);
+    expect(res.status()).toBe(403);
     await anonCtx.close();
   });
 
@@ -2808,16 +2799,13 @@ test.describe.serial('37 — Parent Progress Link', () => {
     await schCtx.close();
   });
 
-  test('/parent-progress UI page loads with valid token', async () => {
-    if (!parentToken_) { test.skip(true, 'No parent token'); return; }
+  test('/parent-progress UI shows disabled sharing message', async () => {
     const anonCtx = await st1Page.context().browser()!.newContext();
     const anonPage = await anonCtx.newPage();
-    await anonPage.goto(`${BASE}/parent-progress?token=${encodeURIComponent(parentToken_)}`, {
+    await anonPage.goto(`${BASE}/parent-progress?token=not-a-real-token`, {
       waitUntil: 'networkidle',
     });
-    // Page should load student name and hours, not an error
-    await expect(anonPage.locator('text=/PW Student 1/i').first()).toBeVisible({ timeout: 10_000 });
-    await expect(anonPage.locator('text=/failed to load|invalid|error/i')).toHaveCount(0);
+    await expect(anonPage.locator('text=/progress sharing must be initiated through a school-controlled workflow/i').first()).toBeVisible({ timeout: 10_000 });
     await anonCtx.close();
   });
 });

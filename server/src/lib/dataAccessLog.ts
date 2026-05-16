@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import prisma from "./prisma";
+import { resolveSchoolIdFromUserAssociations } from "./userAssociations";
 
 /**
  * Log a data access event for FERPA audit purposes.
@@ -40,10 +41,17 @@ export async function resolveStudentSchoolId(studentId: string): Promise<string 
       schoolId: true,
       cohort: { select: { schoolId: true } },
       classroom: { select: { schoolId: true } },
+      cohortMemberships: {
+        where: { isActive: true },
+        orderBy: [{ createdAt: "asc" }],
+        select: {
+          cohort: { select: { schoolId: true } },
+        },
+      },
     },
   });
   if (!student) return null;
-  return student.classroom?.schoolId ?? student.cohort?.schoolId ?? student.schoolId ?? null;
+  return resolveSchoolIdFromUserAssociations(student);
 }
 
 export function buildRequestAuditMetadata(req: Request): Record<string, unknown> {

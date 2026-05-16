@@ -3,6 +3,46 @@ import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
+type FieldTarget = "name" | "email" | "grade" | "house" | "hours" | "skip";
+type ImportStep = "upload" | "map";
+const FIELD_ORDER: Exclude<FieldTarget, "skip">[] = ["name", "email", "grade", "house", "hours"];
+const FIELD_ALIASES: Record<Exclude<FieldTarget, "skip">, string[]> = {
+  name:  ["name", "studentname", "fullname", "pupilname", "student"],
+  email: ["email", "emailaddress", "studentemail", "mail", "emailaddr"],
+  grade: ["grade", "gradelevel", "year", "class", "yr", "form", "gradeyear"],
+  house: ["house", "homeroom", "group", "team", "section", "advisory", "formgroup"],
+  hours: ["hours", "hrs", "servicehours", "hourscompleted", "completedhours", "totalhours", "volunteerhours", "startinghours"],
+};
+const FIELD_LABELS: Record<Exclude<FieldTarget, "skip">, string> = {
+  name: "Name", email: "Email", grade: "Grade", house: "House / Homeroom", hours: "Starting Hours",
+};
+
+function suggestMapping(headers: string[]): Record<string, FieldTarget> {
+  const mapping: Record<string, FieldTarget> = {};
+  const used = new Set<FieldTarget>();
+  for (const header of headers) {
+    const normalized = header.toLowerCase().replace(/[\s_\-\.]+/g, "");
+    let matched: FieldTarget = "skip";
+    for (const [field, aliases] of Object.entries(FIELD_ALIASES) as [Exclude<FieldTarget, "skip">, string[]][]) {
+      if (!used.has(field) && aliases.some((a) => normalized === a || normalized.startsWith(a) || a.startsWith(normalized))) {
+        matched = field;
+        used.add(field);
+        break;
+      }
+    }
+    mapping[header] = matched;
+  }
+  return mapping;
+}
+
+function parseHeadersAndPreview(raw: string): { headers: string[]; rows: string[][] } {
+  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  const rows = lines.slice(1, 6).map((line) => line.split(",").map((c) => c.trim().replace(/^"|"$/g, "")));
+  return { headers, rows };
+}
+
 interface Student {
   id: string;
   name: string;
@@ -144,6 +184,10 @@ export default function CohortDetail() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importIssues, setImportIssues] = useState<ImportIssue[]>([]);
   const [importErrorMessage, setImportErrorMessage] = useState("");
+  const [importStep, setImportStep] = useState<ImportStep>("upload");
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvPreviewRows, setCsvPreviewRows] = useState<string[][]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, FieldTarget>>({});
   const [addEmail, setAddEmail] = useState("");
   const [addName, setAddName] = useState("");
   const [addGrade, setAddGrade] = useState("");
@@ -178,9 +222,33 @@ export default function CohortDetail() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
     const reader = new FileReader();
-    reader.onload = (ev) => setCsvData((ev.target?.result as string) || "");
+    reader.onload = (ev) => {
+      const raw = (ev.target?.result as string) || "";
+      setCsvData(raw);
+      setImportResult(null);
+      setImportIssues([]);
+      setImportErrorMessage("");
+      const { headers, rows } = parseHeadersAndPreview(raw);
+      setCsvHeaders(headers);
+      setCsvPreviewRows(rows);
+      setColumnMapping(suggestMapping(headers));
+      setImportStep("map");
+    };
     reader.readAsText(file);
+  };
+
+  const handleBackToUpload = () => {
+    setImportStep("upload");
+    setCsvData("");
+    setCsvHeaders([]);
+    setCsvPreviewRows([]);
+    setColumnMapping({});
+    setImportResult(null);
+    setImportIssues([]);
+    setImportErrorMessage("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleImport = async () => {
@@ -190,11 +258,11 @@ export default function CohortDetail() {
     setImportIssues([]);
     setImportErrorMessage("");
     try {
-      const result = await api.post<ImportResult>(`/cohorts/${id}/import`, { csvData });
+      const result = await api.post<ImportResult>(`/cohorts/${id}/import`, { csvData, columnMapping });
       setImportResult(result);
       setImportIssues(result.errors ?? []);
       if ((result.errors ?? []).length === 0) {
-        setCsvData("");
+        handleBackToUpload();
       }
       void load();
     } catch (err: any) {
@@ -387,17 +455,9 @@ export default function CohortDetail() {
   const pendingInvitations = cohort.invitations.filter((i) => i.status === "PENDING").length;
   const cohortFilename = cohort.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const showHouseField = cohort.usesHouseField;
-  const csvHeaderLabel = includeHouseColumn ? "name, email, grade, house" : "name, email, grade";
   const csvExample = includeHouseColumn
     ? 'name,email,grade,house\nJohn Smith,john@school.edu,10th,Red\nJane Doe,jane@school.edu,11th,Blue'
     : 'name,email,grade\nJohn Smith,john@school.edu,10th\nJane Doe,jane@school.edu,11th';
-  const csvPreviewLines = csvData ? csvData.split(/\r?\n/) : [];
-  const issueRows = new Map<number, string[]>();
-  for (const issue of importIssues) {
-    const existing = issueRows.get(issue.row) ?? [];
-    existing.push(issue.reason);
-    issueRows.set(issue.row, existing);
-  }
 
   return (
     <div>
@@ -874,128 +934,149 @@ export default function CohortDetail() {
         </div>
       )}
 
-      {tab === "import" && isAdmin && (
-        <div className="max-w-lg">
-          <h2 className="font-semibold mb-3">CSV Import</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Upload a CSV file with columns: <code className="bg-gray-100 px-1 rounded">{csvHeaderLabel}</code> (name and email required).
-          </p>
+      {tab === "import" && isAdmin && (() => {
+        const activeMapped = FIELD_ORDER
+          .filter((f) => Object.values(columnMapping).includes(f))
+          .map((f) => ({ target: f, col: Object.entries(columnMapping).find(([, v]) => v === f)![0] }));
+        const nonSkipTargets = Object.values(columnMapping).filter((v) => v !== "skip");
+        const mappingErrors: string[] = [];
+        if (!nonSkipTargets.includes("name")) mappingErrors.push("Map a column to Name (required)");
+        if (!nonSkipTargets.includes("email")) mappingErrors.push("Map a column to Email (required)");
+        if (new Set(nonSkipTargets).size < nonSkipTargets.length) mappingErrors.push("Each field can only be mapped to one column");
 
-          <label className="mb-4 flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={includeHouseColumn}
-              onChange={(e) => void handleHouseFieldToggle(e.target.checked)}
-              disabled={savingHouseField}
-              className="rounded border-gray-300"
-            />
-            Include optional <code className="bg-gray-100 px-1 rounded">house</code> column
-            {savingHouseField && <span className="text-xs text-gray-400">Saving...</span>}
-          </label>
+        return (
+          <div className="max-w-2xl">
+            <h2 className="font-semibold mb-4">CSV Import</h2>
 
-          {importResult && (
-            <div className={`mb-4 p-3 rounded text-sm border ${importResult.errors?.length ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"}`}>
-              <div>
-                Import complete: <strong>{importResult.added}</strong> added, <strong>{importResult.skipped}</strong> skipped.
-                {importResult.preview && (
-                  <span className="text-gray-500"> ({importResult.preview.totalRows} rows processed)</span>
-                )}
-              </div>
-              {importResult.errors?.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-xs font-semibold text-amber-800 mb-1">Rows that need attention</div>
-                  <ul className="space-y-1 text-xs text-amber-900">
-                    {importResult.errors.slice(0, 10).map((entry) => (
-                      <li key={`${entry.row}-${entry.email ?? "missing"}`}>
-                        Row {entry.row}{entry.email ? ` (${entry.email})` : ""}: {entry.reason}
-                      </li>
+            {importResult && (
+              <div className={`mb-4 p-3 rounded text-sm border ${importResult.errors?.length ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"}`}>
+                <div>
+                  Import complete: <strong>{importResult.added}</strong> added, <strong>{importResult.skipped}</strong> skipped.
+                  {importResult.preview && <span className="text-gray-500"> ({importResult.preview.totalRows} rows processed)</span>}
+                </div>
+                {importResult.errors?.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900">
+                    {importResult.errors.slice(0, 10).map((e) => (
+                      <li key={`${e.row}-${e.email ?? "x"}`}>Row {e.row}{e.email ? ` (${e.email})` : ""}: {e.reason}</li>
                     ))}
+                    {importResult.errors.length > 10 && <li className="text-amber-700">…and {importResult.errors.length - 10} more</li>}
                   </ul>
-                  {importResult.errors.length > 10 && (
-                    <div className="mt-2 text-xs text-amber-700">
-                      Showing first 10 issues of {importResult.errors.length}.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {importErrorMessage && (
-            <div className="mb-4 p-3 rounded text-sm border bg-red-50 border-red-200 text-red-700">
-              <div className="font-medium">{importErrorMessage}</div>
-              {importIssues.length > 0 && (
-                <div className="mt-1 text-xs">
-                  {importIssues.length} problem{importIssues.length === 1 ? "" : "s"} found.
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div>
-              <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-              <div className="flex gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-                  Choose CSV File
-                </button>
-                <button onClick={downloadTemplate} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-                  Download Template
-                </button>
-              </div>
-            </div>
-            {csvData && (
-              <div>
-                {importIssues.length > 0 ? (
-                  <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3">
-                    <div className="text-xs font-semibold text-amber-800 mb-2">
-                      {importIssues.length} problem{importIssues.length === 1 ? "" : "s"} found
-                    </div>
-                    <div className="max-h-56 overflow-auto rounded border border-amber-100 bg-white">
-                      {csvPreviewLines.map((line, index) => {
-                        const rowNumber = index + 1;
-                        const rowIssues = issueRows.get(rowNumber) ?? [];
-                        return (
-                          <div
-                            key={rowNumber}
-                            className={`px-3 py-2 border-b border-gray-100 text-xs font-mono ${
-                              rowIssues.length > 0 ? "bg-red-50" : ""
-                            }`}
-                          >
-                            <div className="flex gap-3">
-                              <span className={`w-8 shrink-0 ${rowIssues.length > 0 ? "text-red-700 font-semibold" : "text-gray-400"}`}>
-                                {rowNumber}
-                              </span>
-                              <span className="whitespace-pre-wrap break-all text-gray-700">{line || " "}</span>
-                            </div>
-                            {rowIssues.length > 0 && (
-                              <div className="mt-1 pl-11 text-red-700 space-y-1">
-                                {rowIssues.map((reason, issueIndex) => (
-                                  <div key={`${rowNumber}-${issueIndex}`}>{reason}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500 mb-2">Preview (first 200 chars): {csvData.slice(0, 200)}{csvData.length > 200 ? "..." : ""}</p>
                 )}
-                <button onClick={handleImport} disabled={importing} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50">
-                  {importing ? "Importing..." : "Import Students"}
-                </button>
               </div>
             )}
-          </div>
 
-          <div className="mt-6 p-3 bg-gray-50 rounded text-xs text-gray-600">
-            <p className="font-medium mb-1">CSV Format Example:</p>
-            <pre className="font-mono whitespace-pre-wrap">{csvExample}</pre>
+            {importErrorMessage && (
+              <div className="mb-4 p-3 rounded text-sm border bg-red-50 border-red-200 text-red-700">
+                <div className="font-medium">{importErrorMessage}</div>
+                {importIssues.length > 0 && <div className="mt-1 text-xs">{importIssues.length} problem{importIssues.length === 1 ? "" : "s"} found.</div>}
+              </div>
+            )}
+
+            {importStep === "upload" && (
+              <>
+                <p className="text-sm text-gray-600 mb-4">Upload a CSV file — any format. You'll map the columns before importing.</p>
+                <label className="mb-4 flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" checked={includeHouseColumn} onChange={(e) => void handleHouseFieldToggle(e.target.checked)} disabled={savingHouseField} className="rounded border-gray-300" />
+                  Include <code className="bg-gray-100 px-1 rounded">house</code> column in template
+                  {savingHouseField && <span className="text-xs text-gray-400 ml-1">Saving...</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+                  <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Choose CSV File</button>
+                  <button onClick={downloadTemplate} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Download Template</button>
+                </div>
+                <div className="mt-6 p-3 bg-gray-50 rounded text-xs text-gray-600">
+                  <p className="font-medium mb-1">Example format (any column names work):</p>
+                  <pre className="font-mono whitespace-pre-wrap">{csvExample}</pre>
+                </div>
+              </>
+            )}
+
+            {importStep === "map" && (
+              <>
+                <button onClick={handleBackToUpload} className="text-sm text-blue-600 hover:underline mb-4 block">← Choose a different file</button>
+
+                <h3 className="text-sm font-semibold mb-2">Map your columns</h3>
+                <p className="text-xs text-gray-500 mb-3">We guessed the mapping from your headers. Adjust any that are wrong, and skip columns you don't need.</p>
+                <div className="rounded border border-gray-200 overflow-hidden mb-6">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">CSV Column</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Sample Values</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs w-44">Maps To</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvHeaders.map((header) => {
+                        const idx = csvHeaders.indexOf(header);
+                        const samples = csvPreviewRows.slice(0, 3).map((r) => r[idx]).filter(Boolean).join(", ");
+                        return (
+                          <tr key={header} className="border-t border-gray-100">
+                            <td className="px-3 py-2 font-mono text-xs text-gray-800">{header}</td>
+                            <td className="px-3 py-2 text-xs text-gray-400 max-w-[160px] truncate">{samples || "—"}</td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={columnMapping[header] ?? "skip"}
+                                onChange={(e) => setColumnMapping((prev) => ({ ...prev, [header]: e.target.value as FieldTarget }))}
+                                className="text-xs border border-gray-300 rounded px-2 py-1 w-full bg-white"
+                              >
+                                {FIELD_ORDER.map((f) => <option key={f} value={f}>{FIELD_LABELS[f]}</option>)}
+                                <option value="skip">— Skip —</option>
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {activeMapped.length > 0 && csvPreviewRows.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-2">Preview <span className="font-normal text-gray-400">(first {csvPreviewRows.length} rows)</span></h3>
+                    <div className="overflow-x-auto rounded border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            {activeMapped.map(({ target }) => (
+                              <th key={target} className="text-left px-3 py-2 font-medium text-gray-600 capitalize">{FIELD_LABELS[target]}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvPreviewRows.map((row, ri) => (
+                            <tr key={ri} className="border-t border-gray-100">
+                              {activeMapped.map(({ target, col }) => {
+                                const ci = csvHeaders.indexOf(col);
+                                return <td key={target} className="px-3 py-2 text-gray-700 font-mono">{ci >= 0 ? (row[ci] || "—") : "—"}</td>;
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {mappingErrors.length > 0 && (
+                  <div className="mb-4 p-3 rounded border border-red-200 bg-red-50 text-sm text-red-700 space-y-1">
+                    {mappingErrors.map((e, i) => <div key={i}>{e}</div>)}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleImport}
+                  disabled={importing || mappingErrors.length > 0}
+                  className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50"
+                >
+                  {importing ? "Importing..." : "Import Students"}
+                </button>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

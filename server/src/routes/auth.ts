@@ -7,6 +7,7 @@ import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
+import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -454,6 +455,11 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
         school: { select: schoolAuthSelect },
         classroom: { include: { school: { select: schoolAuthSelect } } },
         cohort: { include: { school: { select: schoolAuthSelect } } },
+        cohortMemberships: {
+          where: { isActive: true },
+          include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
+          orderBy: { updatedAt: "desc" },
+        },
         beneficiary: true,
       },
     });
@@ -476,8 +482,8 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
     // Derive school info: from direct association, classroom, or cohort
-    const studentSchool = user.school || user.classroom?.school || user.cohort?.school || null;
-    const schoolId = user.schoolId || user.classroom?.school?.id || user.cohort?.school?.id || null;
+    const studentSchool = resolveSchoolFromUserAssociations(user);
+    const schoolId = resolveSchoolIdFromUserAssociations(user);
 
     res.json({
       token,
@@ -495,6 +501,12 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
         classroom: user.classroom,
         cohortId: user.cohortId,
         cohort: user.cohort,
+        cohorts: user.cohortMemberships.map((membership) => ({
+          id: membership.cohort.id,
+          name: membership.cohort.name,
+          source: membership.source,
+          serviceEndDate: membership.cohort.serviceEndDate,
+        })),
         beneficiaryId: user.beneficiaryId,
         beneficiary: user.beneficiary,
       },
@@ -518,13 +530,18 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
         school: { select: schoolAuthSelect },
         classroom: { include: { school: { select: schoolAuthSelect } } },
         cohort: { include: { school: { select: schoolAuthSelect } } },
+        cohortMemberships: {
+          where: { isActive: true },
+          include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
+          orderBy: { updatedAt: "desc" },
+        },
         beneficiary: true,
       },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const studentSchool = user.school || user.classroom?.school || user.cohort?.school || null;
-    const schoolId = user.schoolId || user.classroom?.school?.id || user.cohort?.school?.id || null;
+    const studentSchool = resolveSchoolFromUserAssociations(user);
+    const schoolId = resolveSchoolIdFromUserAssociations(user);
 
     res.json({
       id: user.id,
@@ -544,6 +561,12 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       classroom: user.classroom,
       cohortId: user.cohortId,
       cohort: user.cohort,
+      cohorts: user.cohortMemberships.map((membership) => ({
+        id: membership.cohort.id,
+        name: membership.cohort.name,
+        source: membership.source,
+        serviceEndDate: membership.cohort.serviceEndDate,
+      })),
       beneficiaryId: user.beneficiaryId,
       beneficiary: user.beneficiary,
     });
@@ -904,6 +927,11 @@ if (!IS_PROD_LIKE) {
         include: {
           school: { select: schoolAuthSelect },
           cohort: { include: { school: { select: schoolAuthSelect } } },
+          cohortMemberships: {
+            where: { isActive: true },
+            include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
+            orderBy: { updatedAt: "desc" },
+          },
           beneficiary: true,
         },
       });
@@ -913,8 +941,8 @@ if (!IS_PROD_LIKE) {
 
       const token = signToken({ userId: target.id, email: target.email, role: target.role });
 
-      const studentSchool = target.school || target.cohort?.school || null;
-      const schoolId = target.schoolId || target.cohort?.school?.id || null;
+      const studentSchool = resolveSchoolFromUserAssociations(target);
+      const schoolId = resolveSchoolIdFromUserAssociations(target);
 
       res.json({
         token,
@@ -930,6 +958,12 @@ if (!IS_PROD_LIKE) {
           school: studentSchool,
           cohortId: target.cohortId,
           cohort: target.cohort,
+          cohorts: target.cohortMemberships.map((membership) => ({
+            id: membership.cohort.id,
+            name: membership.cohort.name,
+            source: membership.source,
+            serviceEndDate: membership.cohort.serviceEndDate,
+          })),
           beneficiaryId: target.beneficiaryId,
           beneficiary: target.beneficiary,
         },

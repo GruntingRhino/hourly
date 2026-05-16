@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import SessionPrefBanner from "./components/SessionPrefBanner";
@@ -60,10 +60,12 @@ const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const [showPrefBanner, setShowPrefBanner] = useState(() => getSessionPref() === null);
   const isSchoolAdminLike = user?.role === "SCHOOL_ADMIN";
   const needsSchoolOnboarding =
     isSchoolAdminLike && user.school?.onboardingComplete === false;
+  const suppressPrefBanner = location.pathname === "/settings";
 
   if (loading) {
     return (
@@ -170,7 +172,7 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       )}
     </Routes>
-    {user && showPrefBanner && (
+    {user && showPrefBanner && !suppressPrefBanner && (
       <SessionPrefBanner onDismiss={() => setShowPrefBanner(false)} />
     )}
     </>

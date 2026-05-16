@@ -12,6 +12,7 @@ import { calculateStudentHours } from "../lib/hoursCalculator";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 import { safeSchoolSelect } from "../lib/schoolSelect";
+import { resolveSchoolFromUserAssociations } from "../lib/userAssociations";
 import {
   assertStudentAccessibleToStaff,
   buildCohortScopedStudentWhere,
@@ -120,11 +121,16 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       include: {
         classroom: { include: { school: true } },
         cohort: { include: { school: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          include: { cohort: { include: { school: true } } },
+          orderBy: { updatedAt: "desc" },
+        },
         school: true,
       },
     });
 
-    const school = user?.classroom?.school || user?.cohort?.school || user?.school;
+    const school = resolveSchoolFromUserAssociations(user);
 
     res.json({
       totalApprovedHours: Math.round(studentHours.approved * 100) / 100,
@@ -241,6 +247,23 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
             requiredHours: true,
             serviceStartDate: true,
             serviceEndDate: true,
+          },
+        },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
           },
         },
       },
@@ -449,7 +472,7 @@ router.get("/audit/:sessionId", authenticate, async (req: Request, res: Response
     if (session.userId !== actorId) {
       if (SCHOOL_ROLES.includes(actorRole)) {
         const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { schoolId: true } });
-        const studentSchoolId = session.user.classroom?.schoolId ?? session.user.cohort?.schoolId ?? null;
+        const studentSchoolId = await resolveStudentSchoolId(session.user.id);
         if (!actor?.schoolId || studentSchoolId !== actor.schoolId) {
           return res.status(403).json({ error: "Not authorized to view this audit log" });
         }

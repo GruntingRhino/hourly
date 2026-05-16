@@ -23,6 +23,21 @@ const OPTIONAL = [
   "APP_ENV",                // "production" | "development" — set explicitly per Vercel project
   "DEV_DATABASE_URL",       // explicit development-only database URL; overrides DATABASE_URL when APP_ENV=development
   "ALLOW_SHARED_DEV_DATABASE", // set true only if you intentionally want dev to use a shared remote database
+  "CANVAS_CLIENT_ID",
+  "CANVAS_CLIENT_SECRET",
+  "CANVAS_CALLBACK_URL",
+  "CANVAS_ENABLE_MOCK",
+  "CANVAS_REQUEST_TIMEOUT_MS",
+  "CANVAS_PAGE_SIZE",
+  "GOOGLE_CLASSROOM_CLIENT_ID",
+  "GOOGLE_CLASSROOM_CLIENT_SECRET",
+  "GOOGLE_CLASSROOM_CALLBACK_URL",
+  "GOOGLE_CLASSROOM_ENABLE_MOCK",
+  "GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS",
+  "GOOGLE_CLASSROOM_PAGE_SIZE",
+  "GOOGLE_CLASSROOM_API_BASE_URL",
+  "GOOGLE_CLASSROOM_AUTH_BASE_URL",
+  "GOOGLE_CLASSROOM_TOKEN_BASE_URL",
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
@@ -89,6 +104,46 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     if (!process.env.CRON_SECRET) {
       console.error("❌ CRON_SECRET is required in production to secure internal scheduled endpoints.");
       process.exit(1);
+    }
+
+    const canvasMockEnabled = process.env.CANVAS_ENABLE_MOCK === "true";
+    if (canvasMockEnabled) {
+      console.error("❌ CANVAS_ENABLE_MOCK=true is not allowed in production.");
+      process.exit(1);
+    }
+
+    const hasAnyCanvasOAuthConfig = Boolean(
+      process.env.CANVAS_CLIENT_ID || process.env.CANVAS_CLIENT_SECRET || process.env.CANVAS_CALLBACK_URL
+    );
+    if (hasAnyCanvasOAuthConfig) {
+      if (!process.env.CANVAS_CLIENT_ID || !process.env.CANVAS_CLIENT_SECRET || !process.env.CANVAS_CALLBACK_URL) {
+        console.error("❌ Canvas production configuration is incomplete. Set CANVAS_CLIENT_ID, CANVAS_CLIENT_SECRET, and CANVAS_CALLBACK_URL together.");
+        process.exit(1);
+      }
+      if (!/^https:\/\//i.test(process.env.CANVAS_CALLBACK_URL)) {
+        console.error("❌ CANVAS_CALLBACK_URL must use HTTPS in production.");
+        process.exit(1);
+      }
+    }
+
+    const classroomMockEnabled = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true";
+    if (classroomMockEnabled) {
+      console.error("❌ GOOGLE_CLASSROOM_ENABLE_MOCK=true is not allowed in production.");
+      process.exit(1);
+    }
+
+    const hasAnyGoogleClassroomOAuthConfig = Boolean(
+      process.env.GOOGLE_CLASSROOM_CLIENT_ID || process.env.GOOGLE_CLASSROOM_CLIENT_SECRET || process.env.GOOGLE_CLASSROOM_CALLBACK_URL
+    );
+    if (hasAnyGoogleClassroomOAuthConfig) {
+      if (!process.env.GOOGLE_CLASSROOM_CLIENT_ID || !process.env.GOOGLE_CLASSROOM_CLIENT_SECRET || !process.env.GOOGLE_CLASSROOM_CALLBACK_URL) {
+        console.error("❌ Google Classroom production configuration is incomplete. Set GOOGLE_CLASSROOM_CLIENT_ID, GOOGLE_CLASSROOM_CLIENT_SECRET, and GOOGLE_CLASSROOM_CALLBACK_URL together.");
+        process.exit(1);
+      }
+      if (!/^https:\/\//i.test(process.env.GOOGLE_CLASSROOM_CALLBACK_URL)) {
+        console.error("❌ GOOGLE_CLASSROOM_CALLBACK_URL must use HTTPS in production.");
+        process.exit(1);
+      }
     }
   }
 

@@ -42,6 +42,17 @@ type StudentForProgress = {
         serviceEndDate: Date | null;
       }
     | null;
+  cohortMemberships?: Array<{
+    cohortId: string;
+    isActive: boolean;
+    cohort: {
+      id: string;
+      name: string;
+      requiredHours: number | null;
+      serviceStartDate: Date | null;
+      serviceEndDate: Date | null;
+    };
+  }>;
 };
 
 type SchoolDefaults = {
@@ -64,6 +75,11 @@ function pluralize(label: string, count: number): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
+function getEffectiveCohort(student: StudentForProgress) {
+  if (student.cohort) return student.cohort;
+  return student.cohortMemberships?.find((membership) => membership.isActive)?.cohort ?? null;
+}
+
 function assessStudentProgress(
   student: StudentForProgress,
   schoolDefaults: SchoolDefaults,
@@ -71,9 +87,10 @@ function assessStudentProgress(
   pendingHours: number,
   noShowCount: number
 ): StudentProgressRecord {
-  const requiredHours = Math.max(1, student.cohort?.requiredHours ?? schoolDefaults.requiredHours ?? 40);
-  const serviceStartDate = student.cohort?.serviceStartDate ?? schoolDefaults.serviceStartDate ?? null;
-  const serviceEndDate = student.cohort?.serviceEndDate ?? schoolDefaults.serviceEndDate ?? null;
+  const effectiveCohort = getEffectiveCohort(student);
+  const requiredHours = Math.max(1, effectiveCohort?.requiredHours ?? schoolDefaults.requiredHours ?? 40);
+  const serviceStartDate = effectiveCohort?.serviceStartDate ?? schoolDefaults.serviceStartDate ?? null;
+  const serviceEndDate = effectiveCohort?.serviceEndDate ?? schoolDefaults.serviceEndDate ?? null;
   const approved = toRoundedHours(approvedHours);
   const pending = toRoundedHours(pendingHours);
   const remainingHours = Math.max(0, toRoundedHours(requiredHours - approved));
@@ -144,8 +161,8 @@ function assessStudentProgress(
     name: student.name,
     email: student.email,
     grade: student.grade,
-    cohortId: student.cohortId,
-    cohortName: student.cohort?.name ?? null,
+    cohortId: student.cohortId ?? effectiveCohort?.id ?? null,
+    cohortName: effectiveCohort?.name ?? null,
     approvedHours: approved,
     pendingHours: pending,
     requiredHours,

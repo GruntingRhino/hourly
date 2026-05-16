@@ -5,6 +5,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
+import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import { extractDomainFromWebsite } from "./auth";
 
@@ -100,8 +101,8 @@ function isEduDomain(email: string): boolean {
 }
 
 function buildUserPayload(user: any) {
-  const studentSchool = user.school || user.cohort?.school || null;
-  const schoolId = user.schoolId || user.cohort?.school?.id || null;
+  const studentSchool = resolveSchoolFromUserAssociations(user);
+  const schoolId = resolveSchoolIdFromUserAssociations(user);
   return {
     id: user.id,
     email: user.email,
@@ -111,6 +112,12 @@ function buildUserPayload(user: any) {
     school: studentSchool,
     cohortId: user.cohortId,
     cohort: user.cohort,
+    cohorts: (user.cohortMemberships ?? []).map((membership: any) => ({
+      id: membership.cohort.id,
+      name: membership.cohort.name,
+      source: membership.source,
+      serviceEndDate: membership.cohort.serviceEndDate ?? null,
+    })),
     beneficiaryId: user.beneficiaryId,
     beneficiary: user.beneficiary,
     emailVerified: true,
@@ -143,6 +150,11 @@ async function handleGoogleIdentity(params: {
   const userIncludes = {
     school: true,
     cohort: { include: { school: true } },
+    cohortMemberships: {
+      where: { isActive: true },
+      include: { cohort: { include: { school: true } } },
+      orderBy: { updatedAt: "desc" as const },
+    },
     beneficiary: true,
   };
 

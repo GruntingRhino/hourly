@@ -43,6 +43,12 @@ export interface User {
     serviceEndDate?: string | null;
     allowSelfSubmission?: boolean | null;
   };
+  cohorts?: Array<{
+    id: string;
+    name: string;
+    source?: string;
+    serviceEndDate?: string | null;
+  }>;
   beneficiaryId?: string;
   beneficiary?: { id: string; name: string };
   // Legacy fields (kept for compatibility with existing settings/browse pages)

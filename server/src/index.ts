@@ -23,6 +23,7 @@ import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
 import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
+import integrationRoutes from "./routes/integrations";
 import { startReminderScheduler } from "./lib/reminders";
 
 const app = express();
@@ -75,6 +76,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
 app.use("/api/internal", internalRoutes);
+app.use("/api/integrations", integrationRoutes);
 
 // New architecture routes
 app.use("/api/cohorts", cohortRoutes);

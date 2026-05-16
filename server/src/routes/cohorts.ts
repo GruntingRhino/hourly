@@ -17,12 +17,30 @@ import {
   getAccessibleCohortIds,
   getStaffAccessScope,
 } from "../lib/cohortAccess";
+import { deactivateStudentCohortMembership } from "../lib/studentCohorts";
 import bcrypt from "bcryptjs";
 
 const router = Router();
-const BASE_IMPORT_HEADERS = ["name", "email", "grade"] as const;
-const HOUSE_IMPORT_HEADERS = [...BASE_IMPORT_HEADERS, "house"] as const;
 type ImportCsvIssue = { row: number; email: string | null; reason: string };
+type FieldTarget = "name" | "email" | "grade" | "house" | "hours" | "skip";
+
+const FIELD_ALIASES: Record<Exclude<FieldTarget, "skip">, string[]> = {
+  name:  ["name", "studentname", "fullname", "pupilname", "student"],
+  email: ["email", "emailaddress", "studentemail", "mail", "emailaddr"],
+  grade: ["grade", "gradelevel", "year", "class", "yr", "form", "gradeyear"],
+  house: ["house", "homeroom", "group", "team", "section", "advisory", "formgroup"],
+  hours: ["hours", "hrs", "servicehours", "hourscompleted", "completedhours", "totalhours", "volunteerhours", "startinghours"],
+};
+
+function fuzzyMatchField(header: string): FieldTarget {
+  const normalized = header.toLowerCase().replace(/[\s_\-\.]+/g, "");
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES) as [Exclude<FieldTarget, "skip">, string[]][]) {
+    if (aliases.some((a) => normalized === a || normalized.startsWith(a) || a.startsWith(normalized))) {
+      return field;
+    }
+  }
+  return "skip";
+}
 type TeacherImportIssue = { row: number; email: string | null; reason: string };
 const COHORT_INVITE_LIMIT_PER_HOUR = 20;
 const COHORT_INVITE_AUDIT_ACTION = "COHORT_INVITE_DISPATCHED";
@@ -308,14 +326,24 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
   }
 
   const requiredHours = school?.requiredHours ?? 40;
+  const assignedCohortIds = accessibleCohortIds ?? [];
 
   const students = await prisma.user.findMany({
     where: {
       role: "STUDENT",
-      cohort: {
-        schoolId: scope.schoolId,
-        ...(accessibleCohortIds ? { id: { in: accessibleCohortIds } } : {}),
-      },
+      ...(scope.isSchoolAdmin
+        ? {
+            OR: [
+              { cohort: { schoolId: scope.schoolId } },
+              { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
+            ],
+          }
+        : {
+            OR: [
+              { cohortId: { in: assignedCohortIds } },
+              { cohortMemberships: { some: { isActive: true, cohortId: { in: assignedCohortIds } } } },
+            ],
+          }),
     },
     select: {
       id: true,
@@ -332,6 +360,23 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
           serviceEndDate: true,
         },
       },
+      cohortMemberships: {
+        where: { isActive: true },
+        orderBy: [{ updatedAt: "desc" }],
+        select: {
+          cohortId: true,
+          isActive: true,
+          cohort: {
+            select: {
+              id: true,
+              name: true,
+              requiredHours: true,
+              serviceStartDate: true,
+              serviceEndDate: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -342,10 +387,17 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
   });
   const progressByCohort = new Map<string, typeof progress>();
   for (const student of progress) {
-    if (!student.cohortId) continue;
-    const list = progressByCohort.get(student.cohortId) ?? [];
-    list.push(student);
-    progressByCohort.set(student.cohortId, list);
+    const sourceStudent = students.find((row) => row.id === student.id);
+    const targetCohortIds = new Set<string>();
+    if (student.cohortId) targetCohortIds.add(student.cohortId);
+    for (const membership of sourceStudent?.cohortMemberships ?? []) {
+      targetCohortIds.add(membership.cohortId);
+    }
+    for (const targetCohortId of targetCohortIds) {
+      const list = progressByCohort.get(targetCohortId) ?? [];
+      list.push(student);
+      progressByCohort.set(targetCohortId, list);
+    }
   }
 
   return cohorts.map((c) => {
@@ -504,6 +556,23 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
             requiredHours: true,
             serviceStartDate: true,
             serviceEndDate: true,
+          },
+        },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
           },
         },
       },
@@ -716,8 +785,44 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     if (cohort.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
     if (scope && !canAccessCohort(scope, cohort.id)) return res.status(403).json({ error: "You do not control this cohort" });
 
+    const cohortStudents = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        OR: [
+          { cohortId: cohort.id },
+          { cohortMemberships: { some: { isActive: true, cohortId: cohort.id } } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        house: true,
+        cohortId: true,
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ name: "asc" }],
+    });
+
     const requiredHours = cohort.requiredHours ?? cohort.school.requiredHours ?? 40;
-    const studentsForProgress = cohort.students.map((student: any) => ({
+    const studentsForProgress = cohortStudents.map((student: any) => ({
       ...student,
       cohortId: cohort.id,
       cohort: {
@@ -734,8 +839,8 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
       serviceEndDate: cohort.school.serviceEndDate ?? null,
     });
     const progressMap = new Map(progress.map((student) => [student.id, student]));
-    const studentIds = cohort.students.map((student: any) => student.id);
-    const studentsWithHours = cohort.students.map((student: any) => ({
+    const studentIds = cohortStudents.map((student: any) => student.id);
+    const studentsWithHours = cohortStudents.map((student: any) => ({
       ...student,
       approvedHours: progressMap.get(student.id)?.approvedHours ?? 0,
       pendingHours: progressMap.get(student.id)?.pendingHours ?? 0,
@@ -759,7 +864,7 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     res.json({
       ...cohort,
       usesHouseField:
-        cohort.usesHouseField || inferUsesHouseField({ students: cohort.students, invitations: cohort.invitations }),
+        cohort.usesHouseField || inferUsesHouseField({ students: cohortStudents, invitations: cohort.invitations }),
       students: studentsWithHours,
       invitations: cohort.invitations.filter((invitation: { status: string }) => invitation.status !== "ACCEPTED"),
       requiredHours,
@@ -847,17 +952,16 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
     if (cohort.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
     if (scope && !canAccessCohort(scope, cohort.id)) return res.status(403).json({ error: "You do not control this cohort" });
 
-    // Expect { csvData: "name,email,grade\n..." } or { csvData: "name,email,grade,house\n..." }
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, columnMapping: rawColumnMapping } = z.object({
+      csvData: z.string().min(1),
+      columnMapping: z.record(z.string()).optional(),
+    }).parse(req.body);
 
+    // Parse header row
     let headerRow: string[];
     try {
-      const parsedHeader = parse(csvData, {
-        to_line: 1,
-        skip_empty_lines: true,
-        trim: true,
-      }) as string[][];
-      headerRow = (parsedHeader[0] ?? []).map((value) => String(value).trim().toLowerCase());
+      const parsedHeader = parse(csvData, { to_line: 1, skip_empty_lines: true, trim: true }) as string[][];
+      headerRow = (parsedHeader[0] ?? []).map((v) => String(v).trim());
     } catch (parseErr: any) {
       const row = Number(parseErr?.lines ?? 1) || 1;
       return res.status(400).json({
@@ -866,32 +970,39 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       });
     }
 
-    const matchesBaseHeaders =
-      headerRow.length === BASE_IMPORT_HEADERS.length &&
-      BASE_IMPORT_HEADERS.every((header, index) => headerRow[index] === header);
-    const matchesHouseHeaders =
-      headerRow.length === HOUSE_IMPORT_HEADERS.length &&
-      HOUSE_IMPORT_HEADERS.every((header, index) => headerRow[index] === header);
-    const usesHouseField = matchesHouseHeaders;
+    // Build column mapping: use client-provided mapping or fall back to fuzzy matching
+    const mapping: Record<string, FieldTarget> = {};
+    if (rawColumnMapping && Object.keys(rawColumnMapping).length > 0) {
+      for (const [col, target] of Object.entries(rawColumnMapping)) {
+        mapping[col] = (target as FieldTarget) || "skip";
+      }
+    } else {
+      const used = new Set<FieldTarget>();
+      for (const header of headerRow) {
+        const field = fuzzyMatchField(header);
+        mapping[header] = (field !== "skip" && !used.has(field)) ? (used.add(field), field) : "skip";
+      }
+    }
 
-    if (!matchesBaseHeaders && !matchesHouseHeaders) {
+    const nameCol  = Object.entries(mapping).find(([, v]) => v === "name")?.[0];
+    const emailCol = Object.entries(mapping).find(([, v]) => v === "email")?.[0];
+    const gradeCol = Object.entries(mapping).find(([, v]) => v === "grade")?.[0];
+    const houseCol = Object.entries(mapping).find(([, v]) => v === "house")?.[0];
+    const hoursCol = Object.entries(mapping).find(([, v]) => v === "hours")?.[0];
+
+    if (!nameCol || !emailCol) {
       return res.status(400).json({
-        error: 'CSV headers must be exactly "name,email,grade" or "name,email,grade,house".',
-        errors: [{
-          row: 1,
-          email: null,
-          reason: `Header row was "${headerRow.join(",") || "(empty)"}". Expected exactly "name,email,grade" or "name,email,grade,house".`,
-        }] satisfies ImportCsvIssue[],
+        error: "Column mapping must include a name column and an email column.",
+        errors: [{ row: 1, email: null, reason: "Could not detect name/email columns. Use the mapping UI to assign them." }] satisfies ImportCsvIssue[],
       });
     }
 
+    const usesHouseField = !!houseCol;
+
+    // Parse all records
     let records: any[];
     try {
-      records = parse(csvData, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
+      records = parse(csvData, { columns: true, skip_empty_lines: true, trim: true });
     } catch (parseErr: any) {
       const row = Number(parseErr?.lines ?? 1) || 1;
       return res.status(400).json({
@@ -921,10 +1032,14 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
 
     for (const [index, row] of records.entries()) {
       const rowNumber = index + 2;
-      const email = (row.email || "").trim().toLowerCase();
-      const name = (row.name || "").trim();
-      const grade = (row.grade || "").trim();
-      const house = (row.house || "").trim();
+      const email = ((row[emailCol] ?? "") as string).trim().toLowerCase();
+      const name  = ((row[nameCol]  ?? "") as string).trim();
+      const grade = gradeCol ? ((row[gradeCol] ?? "") as string).trim() : "";
+      const house = houseCol ? ((row[houseCol] ?? "") as string).trim() : "";
+      const hoursRaw = hoursCol ? ((row[hoursCol] ?? "") as string).trim() : "";
+      const startingHours = hoursRaw ? parseFloat(hoursRaw) : null;
+      const validHours = startingHours !== null && !isNaN(startingHours) && startingHours > 0 ? startingHours : null;
+
       if (!email || !name) {
         results.errors.push({ row: rowNumber, email: email || null, reason: "Missing required name or email" });
         results.skipped++;
@@ -942,7 +1057,6 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
         results.skipped++;
         continue;
       }
-      // Upsert invitation record
       const existing = await prisma.studentInvitation.findUnique({
         where: { cohortId_email: { cohortId: cohort.id, email } },
       });
@@ -959,7 +1073,8 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
         source: "IMPORT",
       });
       if (!budget.allowed) {
-        results.errors.push({ row: rowNumber, email, reason: budget.message });
+        const reason = "message" in budget ? budget.message : getCohortInviteLimitMessage(cohort.name);
+        results.errors.push({ row: rowNumber, email, reason });
         results.skipped++;
         continue;
       }
@@ -972,6 +1087,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
           name: name || null,
           grade: grade || null,
           house: usesHouseField ? house || null : null,
+          startingHours: validHours,
           token,
           expiresAt,
           status: "PENDING",
@@ -989,7 +1105,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       data: {
         status: "PUBLISHED",
         publishedAt: cohort.publishedAt ?? new Date(),
-        usesHouseField,
+        ...(usesHouseField ? { usesHouseField: true } : {}),
       },
     });
 
@@ -1111,8 +1227,9 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       source: "ADD_STUDENT",
     });
     if (!budget.allowed) {
+      const errorMessage = "message" in budget ? budget.message : getCohortInviteLimitMessage(cohort.name);
       return res.status(429).json({
-        error: budget.message,
+        error: errorMessage,
         inviteLimit: {
           perHour: COHORT_INVITE_LIMIT_PER_HOUR,
           usedLastHour: budget.used,
@@ -1338,14 +1455,42 @@ router.delete("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Req
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     const cohort = await prisma.cohort.findUnique({
       where: { id: req.params.id },
-      include: { _count: { select: { students: true } } },
+      include: {
+        _count: { select: { students: true, memberships: true, invitations: true, teacherAssignments: true } },
+        memberships: {
+          where: { isActive: true },
+          select: { studentId: true },
+        },
+        invitations: { select: { id: true } },
+      },
     });
     if (!cohort) return res.status(404).json({ error: "Cohort not found" });
     if (cohort.schoolId !== user?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
 
-    // Remove all students from cohort first, then delete
-    await prisma.user.updateMany({ where: { cohortId: cohort.id }, data: { cohortId: null } });
-    await prisma.cohort.delete({ where: { id: cohort.id } });
+    await prisma.$transaction(async (tx) => {
+      for (const membership of cohort.memberships) {
+        await deactivateStudentCohortMembership({
+          studentId: membership.studentId,
+          cohortId: cohort.id,
+          clearPrimaryIfMatches: true,
+          db: tx,
+        });
+      }
+
+      await tx.integrationExternalMapping.deleteMany({
+        where: {
+          OR: [
+            { localType: "Cohort", localId: cohort.id },
+            { localType: "StudentInvitation", localId: { in: cohort.invitations.map((invitation) => invitation.id) } },
+          ],
+        },
+      });
+      await tx.studentCohortMembership.deleteMany({ where: { cohortId: cohort.id } });
+      await tx.cohortTeacherAssignment.deleteMany({ where: { cohortId: cohort.id } });
+      await tx.studentInvitation.deleteMany({ where: { cohortId: cohort.id } });
+      await tx.user.updateMany({ where: { cohortId: cohort.id }, data: { cohortId: null } });
+      await tx.cohort.delete({ where: { id: cohort.id } });
+    });
 
     await logDataAccess({
       actorId: req.user!.userId,
@@ -1353,7 +1498,13 @@ router.delete("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Req
       targetType: "Cohort",
       targetId: cohort.id,
       schoolId: cohort.schoolId,
-      details: { cohortName: cohort.name, studentCount: cohort._count.students },
+      details: {
+        cohortName: cohort.name,
+        studentCount: cohort._count.students,
+        membershipCount: cohort._count.memberships,
+        invitationCount: cohort._count.invitations,
+        teacherAssignmentCount: cohort._count.teacherAssignments,
+      },
     });
 
     res.status(204).send();
@@ -1378,13 +1529,26 @@ router.delete("/:id/students/:studentId", authenticate, requireRole("SCHOOL_ADMI
       : false;
     if (!studentAccessible) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
 
-    const student = await prisma.user.findUnique({ where: { id: req.params.studentId }, select: { role: true, cohortId: true } });
-    if (!student || student.role !== "STUDENT") return res.status(404).json({ error: "Student not found" });
-    if (student.cohortId !== req.params.id) return res.status(403).json({ error: "Student is not enrolled in this cohort" });
-
-    await prisma.user.update({
+    const student = await prisma.user.findUnique({
       where: { id: req.params.studentId },
-      data: { cohortId: null },
+      select: {
+        role: true,
+        cohortId: true,
+        cohortMemberships: {
+          where: { isActive: true },
+          select: { cohortId: true },
+        },
+      },
+    });
+    if (!student || student.role !== "STUDENT") return res.status(404).json({ error: "Student not found" });
+    const isEnrolledInCohort = student.cohortId === req.params.id
+      || student.cohortMemberships.some((membership) => membership.cohortId === req.params.id);
+    if (!isEnrolledInCohort) return res.status(403).json({ error: "Student is not enrolled in this cohort" });
+
+    await deactivateStudentCohortMembership({
+      studentId: req.params.studentId,
+      cohortId: req.params.id,
+      clearPrimaryIfMatches: true,
     });
     res.json({ message: "Student removed from cohort" });
   } catch (err) {

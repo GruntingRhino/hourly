@@ -326,6 +326,7 @@ router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
       OR: [
         { classroom: { schoolId: user.schoolId } },
         { cohort: { schoolId: user.schoolId } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: user.schoolId } } } },
       ],
     };
     const where: any = { user: schoolScope };

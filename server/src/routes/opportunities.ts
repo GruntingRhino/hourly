@@ -167,9 +167,6 @@ router.get("/:id", async (req: Request, res: Response) => {
       include: {
         organization: { select: { id: true, name: true, description: true } },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
-        signups: {
-          include: { user: { select: { id: true, name: true } } },
-        },
       },
     });
     if (!opp) return res.status(404).json({ error: "Opportunity not found" });
@@ -203,9 +200,20 @@ router.post("/", authenticate, requireRole("ORG_ADMIN"), async (req: Request, re
 
     const opp = await prisma.opportunity.create({
       data: {
-        ...data,
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        address: data.address,
         latitude,
         longitude,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        durationHours: data.durationHours,
+        capacity: data.capacity,
+        ageRequirement: data.ageRequirement,
+        gradeRequirement: data.gradeRequirement,
+        isRecurring: data.isRecurring,
+        recurringPattern: data.recurringPattern,
         tags: data.tags ? JSON.stringify(data.tags) : null,
         date: new Date(data.date),
         organizationId: user.organizationId,

@@ -6,6 +6,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { runReminderCycle } from "../lib/reminders";
+import { resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 
 const router = Router();
 const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
@@ -13,19 +14,46 @@ const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
 const SCHOOL_ROLES = new Set(["SCHOOL_ADMIN", "TEACHER", "STUDENT"]);
 
 /** Returns the school ID for any user regardless of how they're enrolled. */
-function resolveSchoolId(u: { schoolId: string | null; cohort?: { schoolId: string } | null; classroom?: { schoolId: string } | null }): string | null {
-  return u.schoolId ?? u.cohort?.schoolId ?? u.classroom?.schoolId ?? null;
+function resolveSchoolId(u: {
+  schoolId: string | null;
+  cohort?: { schoolId: string } | null;
+  classroom?: { schoolId: string } | null;
+  cohortMemberships?: Array<{ cohort: { schoolId: string } }>;
+}): string | null {
+  return resolveSchoolIdFromUserAssociations(u);
 }
 
 async function canSendMessage(senderId: string, receiverId: string): Promise<boolean> {
   const [sender, receiver] = await Promise.all([
     prisma.user.findUnique({
       where: { id: senderId },
-      select: { role: true, schoolId: true, beneficiaryId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: {
+        role: true,
+        schoolId: true,
+        beneficiaryId: true,
+        cohort: { select: { schoolId: true } },
+        classroom: { select: { schoolId: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true } } },
+        },
+      },
     }),
     prisma.user.findUnique({
       where: { id: receiverId },
-      select: { role: true, schoolId: true, beneficiaryId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+      select: {
+        role: true,
+        schoolId: true,
+        beneficiaryId: true,
+        cohort: { select: { schoolId: true } },
+        classroom: { select: { schoolId: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true } } },
+        },
+      },
     }),
   ]);
   if (!sender || !receiver) return false;
@@ -278,8 +306,16 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
         OR: [
           { classroom: { schoolId: school.id } },
           { cohort: { schoolId: school.id } },
+          { cohortMemberships: { some: { isActive: true, cohort: { schoolId: school.id } } } },
         ],
-        ...(body.cohortId ? { cohortId: body.cohortId } : {}),
+        ...(body.cohortId ? {
+          AND: [{
+            OR: [
+              { cohortId: body.cohortId },
+              { cohortMemberships: { some: { isActive: true, cohortId: body.cohortId } } },
+            ],
+          }],
+        } : {}),
       },
       select: {
         id: true,
@@ -294,6 +330,23 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
             requiredHours: true,
             serviceStartDate: true,
             serviceEndDate: true,
+          },
+        },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
           },
         },
       },

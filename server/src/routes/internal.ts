@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { runReminderCycle } from "../lib/reminders";
+import { getCanvasOperationalStatus } from "../services/canvasIntegration";
+import { getGoogleClassroomOperationalStatus } from "../services/googleClassroomIntegration";
 
 const router = Router();
 
@@ -48,6 +50,56 @@ router.get("/reminders/run", (req, res) => {
 
 router.post("/reminders/run", (req, res) => {
   void handleReminderRun(req, res);
+});
+
+async function handleCanvasOps(req: Request, res: Response): Promise<void> {
+  if (!hasValidCronSecret(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (isProdLike() && !process.env.CRON_SECRET) {
+    res.status(503).json({ error: "CRON_SECRET is required in production" });
+    return;
+  }
+
+  try {
+    const schoolId = typeof req.query.schoolId === "string" ? req.query.schoolId : undefined;
+    const status = await getCanvasOperationalStatus({ schoolId });
+    res.json({ ok: true, ...status });
+  } catch (err) {
+    console.error("Internal Canvas ops error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.get("/canvas/ops", (req, res) => {
+  void handleCanvasOps(req, res);
+});
+
+async function handleGoogleClassroomOps(req: Request, res: Response): Promise<void> {
+  if (!hasValidCronSecret(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (isProdLike() && !process.env.CRON_SECRET) {
+    res.status(503).json({ error: "CRON_SECRET is required in production" });
+    return;
+  }
+
+  try {
+    const schoolId = typeof req.query.schoolId === "string" ? req.query.schoolId : undefined;
+    const status = await getGoogleClassroomOperationalStatus({ schoolId });
+    res.json({ ok: true, ...status });
+  } catch (err) {
+    console.error("Internal Google Classroom ops error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.get("/googleClassroom/ops", (req, res) => {
+  void handleGoogleClassroomOps(req, res);
 });
 
 export default router;

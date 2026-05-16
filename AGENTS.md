@@ -1,46 +1,15 @@
 <claude-mem-context>
 # Memory Context
 
-# [GoodHours] recent context, 2026-05-08 10:19am EDT
+# [GoodHours] recent context, 2026-05-15 9:52pm EDT
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (18,864t read) | 856,226t work | 98% savings
+Stats: 50 obs (19,917t read) | 778,789t work | 97% savings
 
-### May 3, 2026
-111 9:35a 🔵 BeneficiarySignup Status Enum Values Confirmed — Capacity Floor Check Uses Correct Status
-112 9:36a 🔵 calcDurationHours Can Return 0 for Same or Inverted Start/End Times
-113 " 🔵 Server Not Running Locally — Bug Is Production-Only
-114 " 🔵 Dev Server Started Locally Against Production Neon Database
-115 " 🔵 Seed BENEFICIARY_ADMIN Credentials Found for Local Reproduction
-116 " 🔵 Seed Slots Are in the Past — Cannot Reproduce 500 via Seed Data Directly
-117 9:37a 🔵 Slot PATCH Succeeds for Seed Data — 500 Is Data-Specific to Production Slot
-118 " 🔵 Serializable Transaction with FOR UPDATE Works on Neon — Mechanism Not the Root Cause
-119 9:38a 🔵 Failing Slot Data Is Valid — Admin User Identified for Exact Reproduction
-120 " 🔵 Direct DB Transaction on Failing Slot Succeeds — Root Cause Is in HTTP Route Layer Not DB
-121 9:39a 🔵 normalizeEmail Strips Plus-Addressing — Login Fails for Plus-Addressed Accounts
-122 " 🔵 openEditSlot Initializes slotForm Date via toISOString — Date String Format Is Always Valid
-123 " 🔵 Slot Edit Routes Are Uncommitted Local Changes — May Not Be Deployed to Production
-124 9:41a 🔵 Committed Code Uses Plain prisma.update for Slot Edits — Working Directory Adds runSerializableTransaction
-### May 4, 2026
-192 1:00p 🔴 Student Browse Feed: Slots Hidden Too Early Due to Inverted 1-Hour Filter
-193 1:01p 🔴 Available-Slots Endpoint: Date Filter Excluded Today's Future Slots
-225 1:02p 🟣 Waitlist Support Added to Student Slot Signup Flow
-226 " 🟣 Weighted Smart Search Scoring Added to Student Browse Page
 ### May 5, 2026
-227 9:55a 🔵 SelfSubmittedRequest System Architecture Mapped for Cancel Feature
-228 " 🟣 Student Self-Submission Cancel Endpoint Added
-229 " 🟣 Cancel Button Added to Student Self-Submit UI
-230 9:56a 🔵 School SelfSubmissions Admin Page Doesn't Show CANCELLED Status
-231 9:57a 🔵 Hour-Breakdown Endpoint Shows CANCELLED Self-Submissions to Admins But Counts Zero Hours
-232 " 🔴 Resubmit Preserves Audit Fields (reviewedBy/reviewedAt/revisionNote)
-233 " 🟣 Self-Submission Cancel Feature + Dashboard Activity Feed Complete
-234 " 🟣 New User Request: Customizable CSV Student Import Headers (Field House Toggle)
-235 10:10a 🔵 CSV Student Import Architecture Mapped for Field House Toggle Feature
-236 " 🟣 CSV Import Header Validation Added — Accepts name/email/grade or name/email/grade/house
-237 " 🟣 CohortDetail CSV Import UI Gets Field House Toggle Checkbox
 238 10:11a 🔵 CohortDetail House Toggle Implementation Verified — All References Consistent
 ### May 8, 2026
 251 9:51a 🔵 GoodHours Report/Dashboard/Export File Locations
@@ -59,20 +28,50 @@ Stats: 50 obs (18,864t read) | 856,226t work | 98% savings
 264 9:56a 🔵 Reminder getPendingReviewCount Misses BeneficiarySignup Pending Reviews
 265 " 🔴 Reminder Admin Alert Count Now Includes Pending BeneficiarySignup Reviews
 266 " 🔵 BeneficiarySignup Has No `student` Relation in Prisma Schema — Only `studentId` Scalar
-S15 Verify totals match across student dashboard, school dashboard, reports, and exports — full audit complete, two bugs fixed, one operational gap identified (May 8 at 9:57 AM)
-S17 Verify totals match across student dashboard, school dashboard, reports, and exports — all bugs fixed, cron infrastructure confirmed complete (May 8 at 9:58 AM)
 267 9:59a 🔵 GoodHours Server Architecture: Express App with Internal Routes and Reminder Scheduler
 268 " 🔵 Vercel Cron and Internal Reminder Endpoint Were Already Implemented
-S16 Verify totals match across student dashboard, school dashboard, reports, and exports — full audit and fixes complete, cron schedule adjusted (May 8 at 9:59 AM)
 S18 GoodHours hour consistency audit — verify totals match across student dashboard, school dashboard, reports, and exports; fix all discrepancies (May 8 at 9:59 AM)
 S19 GoodHours security audit — investigating dev-only endpoints and production guards across auth, impersonation, and internal cron routes (May 8 at 10:00 AM)
 S20 GoodHours security audit — reviewing production guards, dev-only backdoors, unauthenticated routes, and hardcoded secrets across all server routes (May 8 at 10:02 AM)
 S21 GoodHours security audit — deep review of production guards, dev backdoors, unauthenticated routes, field encryption, RBAC, and sensitive data logging (May 8 at 10:02 AM)
 S22 GoodHours security audit — dependency review and rate limiter skip function enumeration (May 8 at 10:03 AM)
 S23 GoodHours security audit — fixing schools.ts tempPassword guard to use IS_PROD_LIKE instead of NODE_ENV-only check (May 8 at 10:03 AM)
-S24 GoodHours security audit and fix — comprehensive audit of dev shortcuts leaking to production; one genuine fix applied to schools.ts tempPassword guard (May 8 at 10:04 AM)
+S24 GoodHours security audit and fix — comprehensive audit of dev shortcuts leaking to production; one genuine fix applied to schools.ts tempPassword guard (May 8 at 10:03 AM)
+S25 Smart CSV Import — handling mismatched column formats from different school systems (May 8 at 10:04 AM)
 269 10:14a 🔵 GoodHours Repository-Wide Security Audit Initiated
 270 10:15a 🚨 Production Credentials Committed in server/.env
+### May 9, 2026
+271 5:46p 🔵 GoodHours Repo Structure and Current State
+272 " 🔵 GoodHours Auth System and Classroom Infrastructure
+S26 Smart CSV Import — evaluating LLM-assisted column mapping (Option C) and deciding against it (May 9 at 5:47 PM)
+273 5:47p 🔵 GoodHours Complete Data Model and API Architecture
+274 5:50p ⚖️ GoodHours SIS/LMS Integration Research Plan Initiated
+276 " 🟣 docs/integrations-feasibility.md Created — Full SIS/LMS Research Report
+275 5:51p 🔵 GoodHours Auth System: Google OAuth + Registration Token Flow
+277 5:53p ⚖️ Smart CSV Import — Final Feature Scope Defined
+S27 Smart CSV Import — full feature scope finalized across 7 capabilities before implementation begins (May 9 at 5:53 PM)
+278 5:54p 🔵 CSV Import — Existing Server Routes and Strict Header Validation Discovered
+279 " 🔵 Student Import Route — Full Implementation Details Mapped
+280 5:55p 🔵 Import Tab UI Architecture — Raw CSV String Sent Directly to Server
+281 " 🔵 StudentInvitation Schema — No Hours Field, Migration Required
+282 " 🔵 Hours Data Type Pattern — Float Used in SelfSubmittedRequest
+283 5:56p 🔵 Invitation Acceptance — Exact Integration Point for initialHours Seeding
+284 5:59p ⚖️ GoodHours LMS Integration Scope Narrowed to Canvas + Google Classroom
+285 " 🔵 GoodHours Audit Log System: logDataAccess + prisma.auditLog Pattern
+286 " 🔵 GoodHours logDataAccess: FERPA Audit Helper — Non-Blocking, Swallows Failures
+287 " 🔵 Cohort Creation and Teacher CSV Import Internal Mechanics
+288 6:00p 🟣 StudentInvitation Schema — startingHours Field Added
+290 " 🟣 Fuzzy Header Matching — Server-Side Normalization Implemented
+293 " 🟣 POST /:id/import — Refactored to Support Flexible Column Mapping and Hours Field
+289 " 🟣 docs/lms-integration-plan.md Created — Canvas + Google Classroom Implementation Plan
+291 6:01p 🔵 No Existing LMS/OAuth Integration Code in GoodHours Codebase
+292 " 🔵 GoodHours Prisma Schema: Full Data Model Confirmed, No Integration Tables Exist
+294 " 🔵 Server Package Has passport-google-oauth20 Already Installed; google_oAuth_secrets.json Present at Repo Root
+295 " 🔐 Real Google OAuth Client Secret Exposed in google_oAuth_secrets.json at Repo Root
+296 6:02p 🔵 google_oAuth_secrets.json Is Git-Ignored — Credential Not Committed to Repo History
+297 " 🔵 TypeScript Build Fails: startingHours Field in Code But Missing from Prisma-Generated Types
+298 " 🔴 Prisma Client Regenerated — Server TypeScript Build Restored to Clean State
+299 6:03p 🟣 Three QA/Security Report Files Created Documenting LMS Implementation Gap
 
-Access 856k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 779k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

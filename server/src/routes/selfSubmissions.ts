@@ -6,6 +6,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { resolveEffectiveRules, checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { assertStudentAccessibleToStaff, buildCohortScopedStudentWhere, getStaffAccessScope } from "../lib/cohortAccess";
+import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 import {
   sendSelfSubmissionApprovedEmail,
   sendSelfSubmissionRejectedEmail,
@@ -35,11 +36,7 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
     const rules = await resolveEffectiveRules(user.id);
 
     // Get school ID from rules or cohort fallback
-    let schoolId = rules?.schoolId ?? user.schoolId;
-    if (!schoolId && user.cohortId) {
-      const cohort = await prisma.cohort.findUnique({ where: { id: user.cohortId }, select: { schoolId: true } });
-      schoolId = cohort?.schoolId || null;
-    }
+    const schoolId = rules?.schoolId ?? await resolveStudentSchoolId(user.id);
     if (!schoolId) return res.status(400).json({ error: "You must be enrolled in a school cohort to submit hours." });
 
     // Check self-submission is allowed
@@ -166,11 +163,7 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
         skipped.push({ row: rowNum, email, reason: "Student not found in your school" }); continue;
       }
 
-      let schoolId = student.schoolId ?? scope.schoolId;
-      if (!schoolId && student.cohortId) {
-        const cohort = await prisma.cohort.findUnique({ where: { id: student.cohortId }, select: { schoolId: true } });
-        schoolId = cohort?.schoolId ?? scope.schoolId;
-      }
+      const schoolId = (await resolveStudentSchoolId(student.id)) ?? scope.schoolId;
 
       const submission = await prisma.selfSubmittedRequest.create({
         data: {
@@ -232,7 +225,14 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
       const submissions = await prisma.selfSubmittedRequest.findMany({
         where: {
           schoolId: scope.schoolId,
-          ...(scope.isSchoolAdmin ? {} : { student: { cohortId: { in: scope.assignedCohortIds } } }),
+          ...(scope.isSchoolAdmin ? {} : {
+            student: {
+              OR: [
+                { cohortId: { in: scope.assignedCohortIds } },
+                { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
+              ],
+            },
+          }),
           ...(statusFilter ? { status: statusFilter } : {}),
         },
         include: {

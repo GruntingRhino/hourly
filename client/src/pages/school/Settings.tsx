@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
 
-type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "data";
+type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "integrations" | "data";
 
 interface SchoolData {
   id: string;
@@ -70,6 +71,88 @@ interface DataAccessLogEntry {
   };
 }
 
+type IntegrationProvider = "CANVAS" | "GOOGLE_CLASSROOM";
+
+interface IntegrationConnectionStatus {
+  id: string;
+  provider: IntegrationProvider;
+  status: "CONNECTED" | "DISCONNECTED" | "ERROR";
+  displayName: string | null;
+  baseUrl: string | null;
+  connectedAt: string;
+  disconnectedAt: string | null;
+  lastSyncedAt: string | null;
+  lastSyncStatus: "COMPLETED" | "PARTIAL_FAILED" | "FAILED" | "RUNNING" | null;
+  scenario: string;
+  mode: "MOCK" | "OAUTH";
+}
+
+interface IntegrationSyncCounts {
+  cohortsCreated: number;
+  cohortsUpdated: number;
+  cohortsArchived: number;
+  teacherAssignmentsCreated: number;
+  invitationsCreated: number;
+  invitationsUpdated: number;
+  existingUsersLinked: number;
+  usersAssignedToCohort: number;
+  skipped: number;
+  errors: number;
+}
+
+interface IntegrationSyncSummary {
+  provider: IntegrationProvider;
+  mode: "PREVIEW" | "APPLY";
+  scenario: string;
+  counts: IntegrationSyncCounts;
+  operations: Array<{ type: string; target: string; action: string; detail?: string }>;
+}
+
+interface IntegrationSyncJob {
+  id: string;
+  mode: "PREVIEW" | "APPLY";
+  status: "RUNNING" | "COMPLETED" | "PARTIAL_FAILED" | "FAILED";
+  summary: IntegrationSyncSummary | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+interface IntegrationSyncErrorEntry {
+  id: string;
+  code: string;
+  message: string;
+  externalType: string | null;
+  externalId: string | null;
+  localType: string | null;
+  localId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+  syncJobId: string;
+}
+
+interface IntegrationStatusResponse {
+  capabilities?: {
+    mockAllowed: boolean;
+    oauthConfigured: boolean;
+    requestTimeoutMs: number;
+    integrationScope: "SINGLE_SCHOOL";
+  };
+  ops?: {
+    connected: boolean;
+    mode: "MOCK" | "OAUTH" | null;
+    lastSyncAt: string | null;
+    lastSyncStatus: "COMPLETED" | "PARTIAL_FAILED" | "FAILED" | "RUNNING" | null;
+    recentJobFailures24h: number;
+    recentSyncErrors24h: number;
+    tokenRefreshFailures24h: number;
+    hasRepeatedFailures: boolean;
+    staleSync: boolean;
+    warnings: string[];
+  };
+  connection: IntegrationConnectionStatus | null;
+  jobs: IntegrationSyncJob[];
+}
+
 function isOpaqueIdLike(value: string): boolean {
   return /^c[a-z0-9]{20,}$/i.test(value.trim());
 }
@@ -121,6 +204,7 @@ function sumConfiguredCapHours(rows: CapRow[]): number {
 
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
   const [tab, setTab] = useState<Tab>("profile");
   const [school, setSchool] = useState<SchoolData | null>(null);
@@ -202,6 +286,24 @@ export default function SchoolSettings() {
   const [transferringOwnership, setTransferringOwnership] = useState(false);
   const [transferMessage, setTransferMessage] = useState("");
   const [transferIsError, setTransferIsError] = useState(false);
+  const [canvasStatus, setCanvasStatus] = useState<IntegrationStatusResponse | null>(null);
+  const [canvasErrors, setCanvasErrors] = useState<IntegrationSyncErrorEntry[]>([]);
+  const [canvasScenario, setCanvasScenario] = useState<"default" | "renamed" | "archived" | "deleted" | "student_removed">("default");
+  const [canvasConnectMode, setCanvasConnectMode] = useState<"MOCK" | "OAUTH">("MOCK");
+  const [canvasBaseUrl, setCanvasBaseUrl] = useState("https://canvas.mock.local");
+  const [canvasBusyAction, setCanvasBusyAction] = useState<"" | "connect" | "disconnect" | "preview" | "apply">("");
+  const [canvasMessage, setCanvasMessage] = useState("");
+  const [canvasIsError, setCanvasIsError] = useState(false);
+  const [canvasPreview, setCanvasPreview] = useState<IntegrationSyncSummary | null>(null);
+  const [googleClassroomStatus, setGoogleClassroomStatus] = useState<IntegrationStatusResponse | null>(null);
+  const [googleClassroomErrors, setGoogleClassroomErrors] = useState<IntegrationSyncErrorEntry[]>([]);
+  const [googleClassroomScenario, setGoogleClassroomScenario] = useState<"default" | "renamed" | "archived" | "deleted" | "student_removed">("default");
+  const [googleClassroomConnectMode, setGoogleClassroomConnectMode] = useState<"MOCK" | "OAUTH">("MOCK");
+  const [googleClassroomBaseUrl, setGoogleClassroomBaseUrl] = useState("https://classroom.googleapis.com");
+  const [googleClassroomBusyAction, setGoogleClassroomBusyAction] = useState<"" | "connect" | "disconnect" | "preview" | "apply">("");
+  const [googleClassroomMessage, setGoogleClassroomMessage] = useState("");
+  const [googleClassroomIsError, setGoogleClassroomIsError] = useState(false);
+  const [googleClassroomPreview, setGoogleClassroomPreview] = useState<IntegrationSyncSummary | null>(null);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -275,6 +377,268 @@ export default function SchoolSettings() {
       .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
       .finally(() => setLogsLoading(false));
   }, [tab, isAdmin, user?.schoolId]);
+
+  useEffect(() => {
+    if (tab !== "integrations" || !isAdmin || !user?.schoolId) return;
+    Promise.all([
+      api.get<IntegrationStatusResponse>("/integrations/canvas/status"),
+      api.get<IntegrationSyncErrorEntry[]>("/integrations/canvas/errors"),
+      api.get<IntegrationStatusResponse>("/integrations/googleClassroom/status"),
+      api.get<IntegrationSyncErrorEntry[]>("/integrations/googleClassroom/errors"),
+    ])
+      .then(([canvas, canvasErrs, classroom, classroomErrs]) => {
+        setCanvasStatus(canvas);
+        setCanvasErrors(canvasErrs);
+        setCanvasScenario(
+          canvas.connection?.mode === "MOCK"
+            ? (canvas.connection.scenario as "default" | "renamed" | "archived" | "deleted" | "student_removed")
+            : "default"
+        );
+        setCanvasConnectMode(canvas.connection?.mode ?? (canvas.capabilities?.mockAllowed === false ? "OAUTH" : "MOCK"));
+        setCanvasBaseUrl(canvas.connection?.baseUrl ?? "https://canvas.mock.local");
+        setGoogleClassroomStatus(classroom);
+        setGoogleClassroomErrors(classroomErrs);
+        setGoogleClassroomScenario(
+          classroom.connection?.mode === "MOCK"
+            ? (classroom.connection.scenario as "default" | "renamed" | "archived" | "deleted" | "student_removed")
+            : "default"
+        );
+        setGoogleClassroomConnectMode(classroom.connection?.mode ?? (classroom.capabilities?.mockAllowed === false ? "OAUTH" : "MOCK"));
+        setGoogleClassroomBaseUrl(classroom.connection?.baseUrl ?? "https://classroom.googleapis.com");
+      })
+      .catch((err: any) => {
+        setCanvasMessage(err.message || "Failed to load integration status");
+        setCanvasIsError(true);
+        setGoogleClassroomMessage(err.message || "Failed to load integration status");
+        setGoogleClassroomIsError(true);
+      });
+  }, [tab, isAdmin, user?.schoolId]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab === "integrations" && isAdmin) {
+      setTab("integrations");
+    }
+
+    const canvasStatusParam = searchParams.get("canvas");
+    const canvasErrorParam = searchParams.get("canvasError");
+    const googleClassroomStatusParam = searchParams.get("googleClassroom");
+    const googleClassroomErrorParam = searchParams.get("googleClassroomError");
+    if (canvasStatusParam === "connected") {
+      setCanvasMessage("Canvas OAuth connection established.");
+      setCanvasIsError(false);
+    } else if (canvasErrorParam) {
+      setCanvasMessage(canvasErrorParam);
+      setCanvasIsError(true);
+    }
+    if (googleClassroomStatusParam === "connected") {
+      setGoogleClassroomMessage("Google Classroom OAuth connection established.");
+      setGoogleClassroomIsError(false);
+    } else if (googleClassroomErrorParam) {
+      setGoogleClassroomMessage(googleClassroomErrorParam);
+      setGoogleClassroomIsError(true);
+    }
+    if (!canvasStatusParam && !canvasErrorParam && !googleClassroomStatusParam && !googleClassroomErrorParam) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("canvas");
+    next.delete("canvasError");
+    next.delete("googleClassroom");
+    next.delete("googleClassroomError");
+    setSearchParams(next, { replace: true });
+  }, [isAdmin, searchParams, setSearchParams]);
+
+  const reloadCanvasState = async () => {
+    const [status, errors] = await Promise.all([
+      api.get<IntegrationStatusResponse>("/integrations/canvas/status"),
+      api.get<IntegrationSyncErrorEntry[]>("/integrations/canvas/errors"),
+    ]);
+    setCanvasStatus(status);
+    setCanvasErrors(errors);
+    setCanvasScenario(
+      status.connection?.mode === "MOCK"
+        ? (status.connection.scenario as "default" | "renamed" | "archived" | "deleted" | "student_removed")
+        : canvasScenario
+    );
+    setCanvasConnectMode(status.connection?.mode ?? (status.capabilities?.mockAllowed === false ? "OAUTH" : canvasConnectMode));
+    setCanvasBaseUrl(status.connection?.baseUrl ?? canvasBaseUrl);
+  };
+
+  const reloadGoogleClassroomState = async () => {
+    const [status, errors] = await Promise.all([
+      api.get<IntegrationStatusResponse>("/integrations/googleClassroom/status"),
+      api.get<IntegrationSyncErrorEntry[]>("/integrations/googleClassroom/errors"),
+    ]);
+    setGoogleClassroomStatus(status);
+    setGoogleClassroomErrors(errors);
+    setGoogleClassroomScenario(
+      status.connection?.mode === "MOCK"
+        ? (status.connection.scenario as "default" | "renamed" | "archived" | "deleted" | "student_removed")
+        : googleClassroomScenario
+    );
+    setGoogleClassroomConnectMode(status.connection?.mode ?? (status.capabilities?.mockAllowed === false ? "OAUTH" : googleClassroomConnectMode));
+    setGoogleClassroomBaseUrl(status.connection?.baseUrl ?? googleClassroomBaseUrl);
+  };
+
+  const handleCanvasConnect = async () => {
+    setCanvasBusyAction("connect");
+    setCanvasMessage("");
+    setCanvasIsError(false);
+    try {
+      if (canvasConnectMode === "OAUTH") {
+        const result = await api.get<{ url: string }>(
+          `/integrations/canvas/oauth/url?baseUrl=${encodeURIComponent(canvasBaseUrl)}&displayName=${encodeURIComponent("Canvas Sandbox")}`
+        );
+        window.location.assign(result.url);
+        return;
+      }
+
+      await api.post("/integrations/canvas/connect", {
+        mode: "MOCK",
+        displayName: "Canvas Mock Sandbox",
+        baseUrl: canvasBaseUrl,
+        mockScenario: canvasScenario,
+      });
+      setCanvasMessage("Canvas mock connection created.");
+      await reloadCanvasState();
+    } catch (err: any) {
+      setCanvasMessage(err.message || "Failed to connect Canvas");
+      setCanvasIsError(true);
+    } finally {
+      setCanvasBusyAction("");
+    }
+  };
+
+  const handleCanvasDisconnect = async () => {
+    setCanvasBusyAction("disconnect");
+    setCanvasMessage("");
+    setCanvasIsError(false);
+    try {
+      await api.post("/integrations/canvas/disconnect");
+      setCanvasPreview(null);
+      setCanvasMessage("Canvas disconnected.");
+      await reloadCanvasState();
+    } catch (err: any) {
+      setCanvasMessage(err.message || "Failed to disconnect Canvas");
+      setCanvasIsError(true);
+    } finally {
+      setCanvasBusyAction("");
+    }
+  };
+
+  const handleCanvasPreview = async () => {
+    setCanvasBusyAction("preview");
+    setCanvasMessage("");
+    setCanvasIsError(false);
+    try {
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/preview");
+      setCanvasPreview(result.summary);
+      setCanvasMessage("Canvas preview complete.");
+      await reloadCanvasState();
+    } catch (err: any) {
+      setCanvasMessage(err.message || "Failed to preview Canvas sync");
+      setCanvasIsError(true);
+    } finally {
+      setCanvasBusyAction("");
+    }
+  };
+
+  const handleCanvasApply = async () => {
+    setCanvasBusyAction("apply");
+    setCanvasMessage("");
+    setCanvasIsError(false);
+    try {
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/apply");
+      setCanvasPreview(result.summary);
+      setCanvasMessage("Canvas sync applied.");
+      await reloadCanvasState();
+    } catch (err: any) {
+      setCanvasMessage(err.message || "Failed to apply Canvas sync");
+      setCanvasIsError(true);
+    } finally {
+      setCanvasBusyAction("");
+    }
+  };
+
+  const handleGoogleClassroomConnect = async () => {
+    setGoogleClassroomBusyAction("connect");
+    setGoogleClassroomMessage("");
+    setGoogleClassroomIsError(false);
+    try {
+      if (googleClassroomConnectMode === "OAUTH") {
+        const result = await api.get<{ url: string }>(
+          `/integrations/googleClassroom/oauth/url?baseUrl=${encodeURIComponent(googleClassroomBaseUrl)}&displayName=${encodeURIComponent("Google Classroom")}`
+        );
+        window.location.assign(result.url);
+        return;
+      }
+
+      await api.post("/integrations/googleClassroom/connect", {
+        mode: "MOCK",
+        displayName: "Google Classroom Mock Sandbox",
+        baseUrl: googleClassroomBaseUrl,
+        mockScenario: googleClassroomScenario,
+      });
+      setGoogleClassroomMessage("Google Classroom mock connection created.");
+      await reloadGoogleClassroomState();
+    } catch (err: any) {
+      setGoogleClassroomMessage(err.message || "Failed to connect Google Classroom");
+      setGoogleClassroomIsError(true);
+    } finally {
+      setGoogleClassroomBusyAction("");
+    }
+  };
+
+  const handleGoogleClassroomDisconnect = async () => {
+    setGoogleClassroomBusyAction("disconnect");
+    setGoogleClassroomMessage("");
+    setGoogleClassroomIsError(false);
+    try {
+      await api.post("/integrations/googleClassroom/disconnect");
+      setGoogleClassroomPreview(null);
+      setGoogleClassroomMessage("Google Classroom disconnected.");
+      await reloadGoogleClassroomState();
+    } catch (err: any) {
+      setGoogleClassroomMessage(err.message || "Failed to disconnect Google Classroom");
+      setGoogleClassroomIsError(true);
+    } finally {
+      setGoogleClassroomBusyAction("");
+    }
+  };
+
+  const handleGoogleClassroomPreview = async () => {
+    setGoogleClassroomBusyAction("preview");
+    setGoogleClassroomMessage("");
+    setGoogleClassroomIsError(false);
+    try {
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/preview");
+      setGoogleClassroomPreview(result.summary);
+      setGoogleClassroomMessage("Google Classroom preview complete.");
+      await reloadGoogleClassroomState();
+    } catch (err: any) {
+      setGoogleClassroomMessage(err.message || "Failed to preview Google Classroom sync");
+      setGoogleClassroomIsError(true);
+    } finally {
+      setGoogleClassroomBusyAction("");
+    }
+  };
+
+  const handleGoogleClassroomApply = async () => {
+    setGoogleClassroomBusyAction("apply");
+    setGoogleClassroomMessage("");
+    setGoogleClassroomIsError(false);
+    try {
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/apply");
+      setGoogleClassroomPreview(result.summary);
+      setGoogleClassroomMessage("Google Classroom sync applied.");
+      await reloadGoogleClassroomState();
+    } catch (err: any) {
+      setGoogleClassroomMessage(err.message || "Failed to apply Google Classroom sync");
+      setGoogleClassroomIsError(true);
+    } finally {
+      setGoogleClassroomBusyAction("");
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -567,7 +931,7 @@ export default function SchoolSettings() {
   if (loading) return <div className="text-gray-500">Loading settings...</div>;
 
   const visibleTabs: Tab[] = isAdmin
-    ? ["profile", "rules", "security", "notifications", "privacy", "data"]
+    ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data"]
     : ["profile", "security", "notifications", "privacy"];
 
   return (
@@ -591,7 +955,7 @@ export default function SchoolSettings() {
       </div>
 
       {tab === "profile" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div data-testid="canvas-integration-card" className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 bg-blue-700 rounded-full flex items-center justify-center text-xl font-semibold text-white select-none">
               {user?.name ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() : "?"}
@@ -845,7 +1209,7 @@ export default function SchoolSettings() {
       )}
 
       {tab === "rules" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div data-testid="google-classroom-integration-card" className="bg-white border border-gray-200 rounded-lg p-6">
           <h2 className="font-semibold text-lg mb-1">Service Rules</h2>
           <p className="text-sm text-gray-500 mb-6">Configure requirements and restrictions for your school's service hours program.</p>
 
@@ -1353,6 +1717,412 @@ export default function SchoolSettings() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "integrations" && isAdmin && (
+        <div className="space-y-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h3 className="font-semibold text-gray-900">Canvas Integration</h3>
+              <p className="text-sm text-gray-500">
+                Canvas sync is optional. CSV onboarding remains the default path. Each GoodHours school connects to one Canvas school tenant.
+              </p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-medium ${
+              canvasStatus?.connection?.status === "CONNECTED"
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-600"
+            }`}>
+              {canvasStatus?.connection?.status ?? "DISCONNECTED"}
+            </div>
+          </div>
+
+          {canvasMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              canvasIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {canvasMessage}
+            </div>
+          )}
+
+          {(canvasStatus?.ops?.warnings?.length ?? 0) > 0 && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {canvasStatus?.ops?.warnings.map((warning, index) => (
+                <div key={`${warning}-${index}`}>{warning}</div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-[220px_1fr] mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mock Scenario</label>
+              <select
+                data-testid="canvas-scenario"
+                value={canvasScenario}
+                onChange={(e) => setCanvasScenario(e.target.value as typeof canvasScenario)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                disabled={canvasConnectMode !== "MOCK" || canvasStatus?.capabilities?.mockAllowed === false}
+              >
+            <option value="default">Default</option>
+            <option value="renamed">Renamed Courses</option>
+            <option value="archived">Archived Course</option>
+            <option value="deleted">Deleted Section</option>
+            <option value="student_removed">Student Removed</option>
+          </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Connection Mode</label>
+              <select
+                data-testid="canvas-mode"
+                value={canvasConnectMode}
+                onChange={(e) => setCanvasConnectMode(e.target.value as "MOCK" | "OAUTH")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                {(canvasStatus?.capabilities?.mockAllowed ?? true) && <option value="MOCK">Mock Sandbox</option>}
+                <option value="OAUTH">Real OAuth</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Canvas Base URL</label>
+              <input
+                data-testid="canvas-base-url"
+                type="url"
+                value={canvasBaseUrl}
+                onChange={(e) => setCanvasBaseUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="https://schoolname.instructure.com"
+              />
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              <div><strong>Connection:</strong> {canvasStatus?.connection?.displayName ?? "Not connected"}</div>
+              <div><strong>Base URL:</strong> {canvasStatus?.connection?.baseUrl ?? "N/A"}</div>
+              <div><strong>Mode:</strong> {canvasStatus?.connection?.mode ?? canvasConnectMode}</div>
+              <div><strong>Last Sync:</strong> {canvasStatus?.connection?.lastSyncedAt ? new Date(canvasStatus.connection.lastSyncedAt).toLocaleString() : "Never"}</div>
+              <div><strong>Last Status:</strong> {canvasStatus?.connection?.lastSyncStatus ?? "N/A"}</div>
+              <div><strong>Mock Mode:</strong> {canvasStatus?.capabilities?.mockAllowed === false ? "Disabled" : "Available"}</div>
+              <div><strong>Scope:</strong> {canvasStatus?.capabilities?.integrationScope === "SINGLE_SCHOOL" ? "Single school" : "N/A"}</div>
+              <div><strong>Failures (24h):</strong> {canvasStatus?.ops?.recentJobFailures24h ?? 0}</div>
+              <div><strong>Sync Errors (24h):</strong> {canvasStatus?.ops?.recentSyncErrors24h ?? 0}</div>
+              <div><strong>Token Refresh Failures (24h):</strong> {canvasStatus?.ops?.tokenRefreshFailures24h ?? 0}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              data-testid="canvas-connect"
+              type="button"
+              onClick={handleCanvasConnect}
+              disabled={canvasBusyAction !== ""}
+              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
+            >
+              {canvasBusyAction === "connect" ? "Connecting..." : canvasConnectMode === "OAUTH" ? "Connect With Canvas OAuth" : "Connect Canvas"}
+            </button>
+            <button
+              data-testid="canvas-disconnect"
+              type="button"
+              onClick={handleCanvasDisconnect}
+              disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+            >
+              {canvasBusyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
+            </button>
+            <button
+              data-testid="canvas-preview"
+              type="button"
+              onClick={handleCanvasPreview}
+              disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
+              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-50 disabled:opacity-50"
+            >
+              {canvasBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
+            </button>
+            <button
+              data-testid="canvas-apply"
+              type="button"
+              onClick={handleCanvasApply}
+              disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
+              className="px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50"
+            >
+              {canvasBusyAction === "apply" ? "Applying..." : "Apply Sync"}
+            </button>
+          </div>
+
+          {canvasPreview && (
+            <div className="mb-6 rounded-lg border border-gray-200 p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Latest Preview Result</h4>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-gray-700 mb-3">
+                <div>Cohorts created: {canvasPreview.counts.cohortsCreated}</div>
+                <div>Cohorts updated: {canvasPreview.counts.cohortsUpdated}</div>
+                <div>Cohorts archived: {canvasPreview.counts.cohortsArchived}</div>
+                <div>Teacher assignments: {canvasPreview.counts.teacherAssignmentsCreated}</div>
+                <div>Invitations created: {canvasPreview.counts.invitationsCreated}</div>
+                <div>Invitations updated: {canvasPreview.counts.invitationsUpdated}</div>
+                <div>Existing users linked: {canvasPreview.counts.existingUsersLinked}</div>
+                <div>Users assigned: {canvasPreview.counts.usersAssignedToCohort}</div>
+                <div>Errors: {canvasPreview.counts.errors}</div>
+              </div>
+              <div className="max-h-64 overflow-auto rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+                {canvasPreview.operations.map((operation, index) => (
+                  <div key={`${operation.type}-${index}`}>
+                    <strong>{operation.type}</strong> · {operation.action} · {operation.target}
+                    {operation.detail ? ` · ${operation.detail}` : ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-6">
+            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
+            <div className="space-y-2">
+              {(canvasStatus?.jobs ?? []).map((job) => (
+                <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <strong>{job.mode}</strong> · {job.status}
+                    </div>
+                    <div className="text-gray-500">
+                      {new Date(job.startedAt).toLocaleString()}
+                    </div>
+                  </div>
+                  {job.summary && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(!canvasStatus?.jobs || canvasStatus.jobs.length === 0) && (
+                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                  No Canvas sync jobs yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
+            <div className="space-y-2">
+              {canvasErrors.map((error) => (
+                <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div><strong>{error.code}</strong> · {error.message}</div>
+                  <div className="text-xs mt-1">
+                    {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+                  </div>
+                </div>
+              ))}
+              {canvasErrors.length === 0 && (
+                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                  No Canvas sync errors recorded.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h3 className="font-semibold text-gray-900">Google Classroom Integration</h3>
+              <p className="text-sm text-gray-500">
+                Google Classroom sync is optional. CSV onboarding remains the default path. Each GoodHours school connects to one Google Classroom school tenant.
+              </p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-medium ${
+              googleClassroomStatus?.connection?.status === "CONNECTED"
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-600"
+            }`}>
+              {googleClassroomStatus?.connection?.status ?? "DISCONNECTED"}
+            </div>
+          </div>
+
+          {googleClassroomMessage && (
+            <div className={`mb-4 p-3 rounded-md text-sm ${
+              googleClassroomIsError
+                ? "bg-red-50 border border-red-200 text-red-700"
+                : "bg-green-50 border border-green-200 text-green-700"
+            }`}>
+              {googleClassroomMessage}
+            </div>
+          )}
+
+          {(googleClassroomStatus?.ops?.warnings?.length ?? 0) > 0 && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {googleClassroomStatus?.ops?.warnings.map((warning, index) => (
+                <div key={`${warning}-${index}`}>{warning}</div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-[220px_1fr] mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mock Scenario</label>
+              <select
+                data-testid="google-classroom-scenario"
+                value={googleClassroomScenario}
+                onChange={(e) => setGoogleClassroomScenario(e.target.value as typeof googleClassroomScenario)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                disabled={googleClassroomConnectMode !== "MOCK" || googleClassroomStatus?.capabilities?.mockAllowed === false}
+              >
+                <option value="default">Default</option>
+                <option value="renamed">Renamed Classes</option>
+                <option value="archived">Archived Class</option>
+                <option value="deleted">Deleted Class</option>
+                <option value="student_removed">Student Removed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Connection Mode</label>
+              <select
+                data-testid="google-classroom-mode"
+                value={googleClassroomConnectMode}
+                onChange={(e) => setGoogleClassroomConnectMode(e.target.value as "MOCK" | "OAUTH")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                {(googleClassroomStatus?.capabilities?.mockAllowed ?? true) && <option value="MOCK">Mock Sandbox</option>}
+                <option value="OAUTH">Real OAuth</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Google Classroom Base URL</label>
+              <input
+                data-testid="google-classroom-base-url"
+                type="url"
+                value={googleClassroomBaseUrl}
+                onChange={(e) => setGoogleClassroomBaseUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="https://classroom.googleapis.com"
+              />
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              <div><strong>Connection:</strong> {googleClassroomStatus?.connection?.displayName ?? "Not connected"}</div>
+              <div><strong>Base URL:</strong> {googleClassroomStatus?.connection?.baseUrl ?? "N/A"}</div>
+              <div><strong>Mode:</strong> {googleClassroomStatus?.connection?.mode ?? googleClassroomConnectMode}</div>
+              <div><strong>Last Sync:</strong> {googleClassroomStatus?.connection?.lastSyncedAt ? new Date(googleClassroomStatus.connection.lastSyncedAt).toLocaleString() : "Never"}</div>
+              <div><strong>Last Status:</strong> {googleClassroomStatus?.connection?.lastSyncStatus ?? "N/A"}</div>
+              <div><strong>Mock Mode:</strong> {googleClassroomStatus?.capabilities?.mockAllowed === false ? "Disabled" : "Available"}</div>
+              <div><strong>Scope:</strong> {googleClassroomStatus?.capabilities?.integrationScope === "SINGLE_SCHOOL" ? "Single school" : "N/A"}</div>
+              <div><strong>Failures (24h):</strong> {googleClassroomStatus?.ops?.recentJobFailures24h ?? 0}</div>
+              <div><strong>Sync Errors (24h):</strong> {googleClassroomStatus?.ops?.recentSyncErrors24h ?? 0}</div>
+              <div><strong>Token Refresh Failures (24h):</strong> {googleClassroomStatus?.ops?.tokenRefreshFailures24h ?? 0}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              data-testid="google-classroom-connect"
+              type="button"
+              onClick={handleGoogleClassroomConnect}
+              disabled={googleClassroomBusyAction !== ""}
+              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
+            >
+              {googleClassroomBusyAction === "connect" ? "Connecting..." : googleClassroomConnectMode === "OAUTH" ? "Connect With Google Classroom OAuth" : "Connect Google Classroom"}
+            </button>
+            <button
+              data-testid="google-classroom-disconnect"
+              type="button"
+              onClick={handleGoogleClassroomDisconnect}
+              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+            >
+              {googleClassroomBusyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
+            </button>
+            <button
+              data-testid="google-classroom-preview"
+              type="button"
+              onClick={handleGoogleClassroomPreview}
+              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
+              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-50 disabled:opacity-50"
+            >
+              {googleClassroomBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
+            </button>
+            <button
+              data-testid="google-classroom-apply"
+              type="button"
+              onClick={handleGoogleClassroomApply}
+              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
+              className="px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50"
+            >
+              {googleClassroomBusyAction === "apply" ? "Applying..." : "Apply Sync"}
+            </button>
+          </div>
+
+          {googleClassroomPreview && (
+            <div className="mb-6 rounded-lg border border-gray-200 p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Latest Preview Result</h4>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-gray-700 mb-3">
+                <div>Cohorts created: {googleClassroomPreview.counts.cohortsCreated}</div>
+                <div>Cohorts updated: {googleClassroomPreview.counts.cohortsUpdated}</div>
+                <div>Cohorts archived: {googleClassroomPreview.counts.cohortsArchived}</div>
+                <div>Teacher assignments: {googleClassroomPreview.counts.teacherAssignmentsCreated}</div>
+                <div>Invitations created: {googleClassroomPreview.counts.invitationsCreated}</div>
+                <div>Invitations updated: {googleClassroomPreview.counts.invitationsUpdated}</div>
+                <div>Existing users linked: {googleClassroomPreview.counts.existingUsersLinked}</div>
+                <div>Users assigned: {googleClassroomPreview.counts.usersAssignedToCohort}</div>
+                <div>Errors: {googleClassroomPreview.counts.errors}</div>
+              </div>
+              <div className="max-h-64 overflow-auto rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+                {googleClassroomPreview.operations.map((operation, index) => (
+                  <div key={`${operation.type}-${index}`}>
+                    <strong>{operation.type}</strong> · {operation.action} · {operation.target}
+                    {operation.detail ? ` · ${operation.detail}` : ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-6">
+            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
+            <div className="space-y-2">
+              {(googleClassroomStatus?.jobs ?? []).map((job) => (
+                <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <strong>{job.mode}</strong> · {job.status}
+                    </div>
+                    <div className="text-gray-500">
+                      {new Date(job.startedAt).toLocaleString()}
+                    </div>
+                  </div>
+                  {job.summary && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(!googleClassroomStatus?.jobs || googleClassroomStatus.jobs.length === 0) && (
+                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                  No Google Classroom sync jobs yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
+            <div className="space-y-2">
+              {googleClassroomErrors.map((error) => (
+                <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div><strong>{error.code}</strong> · {error.message}</div>
+                  <div className="text-xs mt-1">
+                    {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+                  </div>
+                </div>
+              ))}
+              {googleClassroomErrors.length === 0 && (
+                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                  No Google Classroom sync errors recorded.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         </div>
       )}
 

@@ -1,0 +1,120 @@
+- generic [ref=e1]:
+  - alert [ref=e7]
+  - generic [ref=e8]:
+    - text: 
+    - banner [ref=e110]:
+      - link [ref=e111] [cursor=pointer]:
+        - /url: "#content"
+        - text: Skip To Content
+      - region [ref=e112]:
+        - link [ref=e113] [cursor=pointer]:
+          - /url: http://127.0.0.1:3100/
+          - generic [ref=e14]: Dashboard
+        - list [ref=e15]:
+          - listitem [ref=e16]:
+            - button [ref=e114] [cursor=pointer]:
+              - img [ref=e20]
+              - generic: Account
+          - listitem [ref=e21]:
+            - button [ref=e115] [cursor=pointer]:
+              - img [ref=e24]
+              - generic: Admin
+          - listitem [ref=e26]:
+            - link [ref=e116] [cursor=pointer]:
+              - /url: http://127.0.0.1:3100/
+              - img [ref=e29]
+              - generic: Dashboard
+          - listitem [ref=e31]:
+            - button [ref=e117] [cursor=pointer]:
+              - img [ref=e34]
+              - generic: Courses
+          - listitem [ref=e36]:
+            - link [ref=e118] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic: Calendar
+          - listitem [ref=e41]:
+            - link [ref=e119] [cursor=pointer]:
+              - /url: /conversations
+              - img [ref=e45]
+              - generic: Inbox
+          - listitem [ref=e47]:
+            - button [ref=e120] [cursor=pointer]:
+              - img [ref=e49]
+              - generic: Help
+      - list [ref=e52]:
+        - listitem [ref=e53]:
+          - button [ref=e121] [cursor=pointer]:
+            - img [ref=e56]
+    - generic [ref=e58]:
+      - generic [ref=e61]:
+        - main [ref=e63]:
+          - generic [ref=e64]:
+            - heading [level=1] [ref=e122]: Dashboard
+            - generic [ref=e66]:
+              - generic [ref=e67]: 
+              - generic [ref=e68]: information
+              - generic [ref=e70]:
+                - heading [level=4] [ref=e123]: Welcome to Canvas!
+                - generic [ref=e72]: You don't have any courses, so this page won't be very exciting for now. Once you've created or signed up for courses, you'll start to see conversations from all of your classes.
+            - generic [ref=e73]:
+              - generic [ref=e74]: 
+              - generic [ref=e75]: information
+              - generic [ref=e76]:
+                - generic [ref=e77]:
+                  - heading [level=4] [ref=e124]: Notifications.
+                  - text: Tell us how and when you would like to be notified of events in Canvas.
+                - button [ref=e125] [cursor=pointer]: Notification Preferences
+            - generic [ref=e83]:
+              - generic [ref=e85]: Dashboard
+              - button [ref=e126] [cursor=pointer]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic: Dashboard Options
+        - complementary [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - heading [level=2] [ref=e127]: Coming Up
+              - link [ref=e128] [cursor=pointer]:
+                - /url: http://127.0.0.1:3100/calendar
+                - text:  View Calendar
+            - list [ref=e99]:
+              - listitem [ref=e100]:
+                - generic [ref=e101]: Nothing for the next week
+          - generic [ref=e102]:
+            - button [ref=e129] [cursor=pointer]: Start a New Course
+            - link [ref=e130] [cursor=pointer]:
+              - /url: /grades
+              - text: View Grades
+      - contentinfo [ref=e105]:
+        - link [ref=e131] [cursor=pointer]:
+          - /url: http://www.instructure.com
+          - generic [ref=e107]: By Instructure
+        - link [ref=e132] [cursor=pointer]:
+          - /url: http://instructure.com
+          - text: Open Source LMS
+  - dialog "Admin tray" [ref=e134]:
+    - generic [ref=e136]:
+      - button "Close" [active] [ref=e138] [cursor=pointer]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - img
+              - generic: Close
+      - generic [ref=e140]:
+        - heading "Admin" [level=2] [ref=e141]
+        - list [ref=e142]:
+          - listitem [ref=e143]:
+            - link "All Accounts" [ref=e144] [cursor=pointer]:
+              - /url: /accounts
+          - listitem [ref=e145]
+          - listitem [ref=e146]:
+            - link "GoodHours Local Canvas" [ref=e147] [cursor=pointer]:
+              - /url: /accounts/1
+          - listitem [ref=e148]:
+            - link "Site Admin" [ref=e149] [cursor=pointer]:
+              - /url: /accounts/2

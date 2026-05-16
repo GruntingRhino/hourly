@@ -1,4 +1,5 @@
 import prisma from "./prisma";
+import { resolveSchoolIdFromUserAssociations } from "./userAssociations";
 
 export type StaffAccessScope = {
   userId: string;
@@ -71,12 +72,16 @@ export function buildCohortScopedStudentWhere(scope: StaffAccessScope): Record<s
       OR: [
         { classroom: { schoolId: scope.schoolId } },
         { cohort: { schoolId: scope.schoolId } },
+        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
       ],
     };
   }
 
   return {
-    cohortId: { in: scope.assignedCohortIds },
+    OR: [
+      { cohortId: { in: scope.assignedCohortIds } },
+      { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
+    ],
   };
 }
 
@@ -91,16 +96,24 @@ export async function assertStudentAccessibleToStaff(
       schoolId: true,
       cohortId: true,
       cohort: { select: { schoolId: true } },
+      cohortMemberships: {
+        where: { isActive: true },
+        select: {
+          cohortId: true,
+          cohort: { select: { schoolId: true } },
+        },
+      },
       classroom: { select: { schoolId: true } },
     },
   });
   if (!student || student.role !== "STUDENT") return false;
 
-  const studentSchoolId = student.schoolId ?? student.cohort?.schoolId ?? student.classroom?.schoolId ?? null;
+  const studentSchoolId = resolveSchoolIdFromUserAssociations(student);
   if (studentSchoolId !== scope.schoolId) return false;
 
   if (scope.isSchoolAdmin) return true;
-  return !!student.cohortId && scope.assignedCohortIds.includes(student.cohortId);
+  if (student.cohortId && scope.assignedCohortIds.includes(student.cohortId)) return true;
+  return student.cohortMemberships.some((membership) => scope.assignedCohortIds.includes(membership.cohortId));
 }
 
 export async function getAccessibleTeacherCohorts(scope: StaffAccessScope): Promise<Array<{ id: string; name: string }>> {

@@ -186,8 +186,9 @@ function describeSignupAuditEvent(signup: Signup, audit: Signup["auditLogs"][num
 /** Returns the effective service deadline: cohort override first, then school. */
 function resolveDeadline(user: any): Date | null {
   const cohortEnd = user?.cohort?.serviceEndDate;
+  const firstLinkedCohortEnd = user?.cohorts?.[0]?.serviceEndDate ?? null;
   const schoolEnd = user?.school?.serviceEndDate ?? user?.cohort?.school?.serviceEndDate;
-  const raw = cohortEnd ?? schoolEnd ?? null;
+  const raw = cohortEnd ?? firstLinkedCohortEnd ?? schoolEnd ?? null;
   return raw ? new Date(raw) : null;
 }
 

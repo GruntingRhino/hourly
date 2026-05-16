@@ -217,6 +217,8 @@ export default function StudentSettings() {
     }
   };
 
+  const activeCohorts = user?.cohorts ?? [];
+
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordMessage("");
@@ -366,6 +368,25 @@ export default function StudentSettings() {
             </div>
           </div>
 
+          {activeCohorts.length > 0 && (
+            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <h3 className="font-semibold text-gray-900">Active Cohorts</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {activeCohorts.map((cohort) => (
+                  <div
+                    key={cohort.id}
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700"
+                  >
+                    {cohort.name}
+                    {cohort.serviceEndDate
+                      ? ` • ends ${new Date(cohort.serviceEndDate).toLocaleDateString()}`
+                      : ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {message && (
             <div className={`mb-4 p-3 rounded-md text-sm ${
               isError
@@ -466,6 +487,15 @@ export default function StudentSettings() {
                 : "bg-green-50 border border-green-200 text-green-700"
             }`}>
               {classroomMessage}
+            </div>
+          )}
+
+          {activeCohorts.length > 0 && (
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="text-sm font-medium text-gray-900">Linked Cohorts</div>
+              <div className="mt-2 text-sm text-gray-600">
+                {activeCohorts.map((cohort) => cohort.name).join(", ")}
+              </div>
             </div>
           )}
 

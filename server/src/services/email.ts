@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient: Resend | null | undefined;
 
 const FROM = process.env.EMAIL_FROM;
 const MAILINATOR_FROM = process.env.MAILINATOR_EMAIL_FROM;
@@ -36,7 +36,7 @@ function shouldLogOnlyEmailDelivery(to: string): boolean {
   const mode = getEmailDeliveryMode();
   if (mode === "send") return false;
   if (mode === "log") return true;
-  return isDevEnv() && (!process.env.RESEND_API_KEY || !FROM);
+  return isDevEnv() && (!process.env.RESEND_API_KEY || !FROM || !!devProviderSuppressedReason);
 }
 
 type CapturedEmail = {
@@ -49,6 +49,40 @@ type CapturedEmail = {
 
 const capturedMailinatorEmails: CapturedEmail[] = [];
 const MAX_CAPTURED_MAILINATOR_EMAILS = 800;
+let devProviderSuppressedReason: string | null = null;
+let devProviderSuppressedLogged = false;
+
+function getResendClient(): Resend | null {
+  if (resendClient !== undefined) return resendClient;
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  resendClient = apiKey ? new Resend(apiKey) : null;
+  return resendClient;
+}
+
+function shouldSuppressProviderInDev(err: any): boolean {
+  if (!isDevEnv()) return false;
+  const status = Number(err?.statusCode ?? err?.status ?? 0);
+  const msg = String(err?.message ?? "").toLowerCase();
+  return (
+    status === 401 ||
+    msg.includes("api key is invalid") ||
+    msg.includes("invalid api key") ||
+    msg.includes("unauthorized") ||
+    msg.includes("forbidden")
+  );
+}
+
+function noteDevProviderSuppressed(err: any): void {
+  if (!shouldSuppressProviderInDev(err)) return;
+  devProviderSuppressedReason = String(err?.message ?? "provider rejected development email configuration");
+  if (devProviderSuppressedLogged) return;
+  devProviderSuppressedLogged = true;
+  console.warn("[email:dev] Disabling provider email delivery for this process; falling back to log-only mode.", {
+    message: err?.message,
+    statusCode: err?.statusCode ?? err?.status,
+    code: err?.code,
+  });
+}
 
 if (process.env.VERCEL_ENV === "production") {
   if (!process.env.RESEND_API_KEY) {
@@ -159,6 +193,12 @@ async function send(to: string, subject: string, html: string): Promise<void> {
   // In explicitly log-only mode, or in auto mode without real provider config,
   // keep local/dev flows usable without silently pretending delivery succeeded.
   if (shouldLogOnlyEmailDelivery(to)) {
+    if (devProviderSuppressedReason && !devProviderSuppressedLogged) {
+      devProviderSuppressedLogged = true;
+      console.warn("[email:dev] Provider email delivery suppressed in this process.", {
+        reason: devProviderSuppressedReason,
+      });
+    }
     console.info(
       `[email:dev] Would send "${subject}" → ${to}\n` +
       `  from: ${defaultFrom}\n` +
@@ -180,6 +220,13 @@ async function send(to: string, subject: string, html: string): Promise<void> {
       return;
     }
     const msg = "[email] RESEND_API_KEY is not set";
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  const resend = getResendClient();
+  if (!resend) {
+    const msg = "[email] Email provider is unavailable because RESEND_API_KEY is not configured";
     console.error(msg);
     throw new Error(msg);
   }
@@ -253,6 +300,15 @@ async function send(to: string, subject: string, html: string): Promise<void> {
       return;
     } catch (err: any) {
       lastError = err;
+      noteDevProviderSuppressed(err);
+      if (devProviderSuppressedReason) {
+        console.info(
+          `[email:dev] Would send "${subject}" → ${to}\n` +
+          `  from: ${defaultFrom}\n` +
+          `  body: ${html.replace(/<[^>]+>/g, "").slice(0, 200).trim()}…`
+        );
+        return;
+      }
       const willRetry = attempt < retryDelaysMs.length - 1 && isRetryableEmailError(err);
       console.error(
         `[email] Send attempt ${attempt + 1}/${retryDelaysMs.length} failed for "${subject}" to ${to}`,

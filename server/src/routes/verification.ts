@@ -242,10 +242,14 @@ router.get("/school-pending", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER
                 OR: [
                   { classroom: { schoolId: scope.schoolId } },
                   { cohort: { schoolId: scope.schoolId } },
+                  { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
                 ],
               }
             : {
-                cohortId: { in: scope.assignedCohortIds },
+                OR: [
+                  { cohortId: { in: scope.assignedCohortIds } },
+                  { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
+                ],
               }),
         },
       },

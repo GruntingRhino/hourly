@@ -12,6 +12,7 @@
  *   +5  abhay.sivaram+5@gmail.com  STUDENT        → School A, Cohort A
  *   +6  abhay.sivaram+6@gmail.com  STUDENT        → School A, Cohort A
  *   +7  abhay.sivaram+7@gmail.com  STUDENT        → School B, Cohort B
+ *   +8  abhay.sivaram+8@gmail.com  STUDENT        → School A, no cohort (Canvas link edge case)
  *
  * Password for all accounts: Playwright1!
  *
@@ -236,7 +237,7 @@ async function main() {
     ["abhay.sivaram+6@gmail.com", "PW Student 2", cohortA.id],
     ["abhay.sivaram+7@gmail.com", "PW Student 3", cohortB.id],
   ] as [string, string, string][]) {
-    await prisma.user.upsert({
+    const student = await prisma.user.upsert({
       where: { email },
       update: { passwordHash, isTestAccount: true, emailVerified: true, cohortId },
       create: {
@@ -249,7 +250,32 @@ async function main() {
         cohortId,
       },
     });
+    await prisma.studentCohortMembership.upsert({
+      where: { studentId_cohortId: { studentId: student.id, cohortId } },
+      update: { isActive: true, source: "MANUAL" },
+      create: { studentId: student.id, cohortId, isActive: true, source: "MANUAL" },
+    });
   }
+
+  await prisma.user.upsert({
+    where: { email: "abhay.sivaram+8@gmail.com" },
+    update: {
+      passwordHash,
+      isTestAccount: true,
+      emailVerified: true,
+      schoolId: schoolA.id,
+      cohortId: null,
+    },
+    create: {
+      email: "abhay.sivaram+8@gmail.com",
+      name: "PW Existing Canvas Student",
+      role: "STUDENT",
+      passwordHash,
+      emailVerified: true,
+      isTestAccount: true,
+      schoolId: schoolA.id,
+    },
+  });
 
   // ── School ↔ Org approvals ───────────────────────────────────────────────────
   // School A ↔ Org A (APPROVED so students can browse Org A opportunities)
