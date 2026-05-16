@@ -58,6 +58,7 @@ function deadlineLabel(daysToDeadline?: number | null): string | null {
 }
 
 type TriageMode = "ALL" | "URGENT" | "OVERDUE" | "PENDING_APPROVAL" | "NO_SHOWS";
+type SavedView = "ADMIN_MORNING" | "DEADLINE_ESCALATIONS" | "APPROVAL_BOTTLENECKS" | "ATTENDANCE_WATCH" | "FULL_ROSTER" | "CUSTOM";
 
 function riskLevelWeight(level?: "NONE" | "LOW" | "MEDIUM" | "HIGH"): number {
   switch (level) {
@@ -105,6 +106,8 @@ export default function SchoolGroups() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedStudentParam = searchParams.get("student") || "";
+  const initialTriageMode = (searchParams.get("triage") as TriageMode | null) ?? "URGENT";
+  const initialSavedView = (searchParams.get("view") as SavedView | null) ?? "ADMIN_MORNING";
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [allStudents, setAllStudents] = useState<AllStudent[]>([]);
@@ -112,7 +115,13 @@ export default function SchoolGroups() {
   const [selectedStudent, setSelectedStudent] = useState<StudentInfo | AllStudent | null>(null);
   const [filter, setFilter] = useState(searchParams.get("filter")?.toUpperCase().replace(" ", "_") || "ALL");
   const [search, setSearch] = useState("");
-  const [triageMode, setTriageMode] = useState<TriageMode>("URGENT");
+  const [triageMode, setTriageMode] = useState<TriageMode>(initialTriageMode);
+  const [savedView, setSavedView] = useState<SavedView>(initialSavedView);
+  const [showBulkCompose, setShowBulkCompose] = useState(false);
+  const [bulkSubject, setBulkSubject] = useState("");
+  const [bulkBody, setBulkBody] = useState("");
+  const [sendingBulk, setSendingBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -157,11 +166,7 @@ export default function SchoolGroups() {
   const handleSelectClassroom = (id: string) => {
     setSelectedClassroom(id);
     setSelectedStudent(null);
-    const next = new URLSearchParams(searchParams);
-    if (id) next.set("classroom", id);
-    else next.delete("classroom");
-    next.delete("student");
-    setSearchParams(next);
+    syncSearchParams({ classroom: id || null, student: null, triage: triageMode, filter, view: savedView === "CUSTOM" ? null : savedView });
   };
 
   const handleRemoveHours = (sessionId: string, studentName: string) => {
@@ -235,6 +240,150 @@ export default function SchoolGroups() {
     if (deadlineA !== deadlineB) return deadlineA - deadlineB;
     return a.name.localeCompare(b.name);
   });
+
+  const syncSearchParams = (nextValues: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(nextValues)) {
+      if (value == null || value === "") next.delete(key);
+      else next.set(key, value);
+    }
+    setSearchParams(next);
+  };
+
+  const applySavedView = (view: SavedView) => {
+    setSavedView(view);
+    setBulkResult("");
+    switch (view) {
+      case "ADMIN_MORNING":
+        setTriageMode("URGENT");
+        setFilter("ALL");
+        syncSearchParams({ view, triage: "URGENT", filter: "ALL" });
+        break;
+      case "DEADLINE_ESCALATIONS":
+        setTriageMode("OVERDUE");
+        setFilter("ALL");
+        syncSearchParams({ view, triage: "OVERDUE", filter: "ALL" });
+        break;
+      case "APPROVAL_BOTTLENECKS":
+        setTriageMode("PENDING_APPROVAL");
+        setFilter("ALL");
+        syncSearchParams({ view, triage: "PENDING_APPROVAL", filter: "ALL" });
+        break;
+      case "ATTENDANCE_WATCH":
+        setTriageMode("NO_SHOWS");
+        setFilter("ALL");
+        syncSearchParams({ view, triage: "NO_SHOWS", filter: "ALL" });
+        break;
+      case "FULL_ROSTER":
+        setTriageMode("ALL");
+        setFilter("ALL");
+        syncSearchParams({ view, triage: "ALL", filter: "ALL" });
+        break;
+      default:
+        syncSearchParams({ view: null });
+    }
+  };
+
+  const queueLabel = triageMode === "URGENT"
+    ? "Urgent intervention queue"
+    : triageMode === "OVERDUE"
+      ? "Overdue deadline escalations"
+      : triageMode === "PENDING_APPROVAL"
+        ? "Approval bottlenecks"
+        : triageMode === "NO_SHOWS"
+          ? "Attendance watch"
+          : "Full roster";
+
+  const draftBulkMessage = () => {
+    const count = filtered.length;
+    const subject = triageMode === "OVERDUE"
+      ? "Action needed: your service deadline has passed"
+      : triageMode === "PENDING_APPROVAL"
+        ? "Update on your pending service hours"
+        : triageMode === "NO_SHOWS"
+          ? "Please follow up on missed service commitments"
+          : "Service hours follow-up";
+    const body = triageMode === "OVERDUE"
+      ? `Hi, this is a school follow-up regarding your community service requirement. Our records show that your deadline has passed and you still need action on your hours. Please review your remaining hours, outstanding submissions, and next available opportunities as soon as possible.`
+      : triageMode === "PENDING_APPROVAL"
+        ? `Hi, this is a quick update from your school team. You have pending community service hours awaiting review. Please check whether any required verification details are missing so your hours can be approved promptly.`
+        : triageMode === "NO_SHOWS"
+          ? `Hi, this is a follow-up from your school team about recent missed or incomplete service commitments. Please review your service plan and reach out if you need help getting back on track.`
+          : `Hi, this is a reminder from your school team to review your community service progress. Please check your approved hours, any pending submissions, and your remaining requirement so you can stay on track.`;
+    setBulkSubject(subject);
+    setBulkBody(body);
+    setShowBulkCompose(true);
+    setBulkResult(count === 0 ? "No students are currently in this queue." : "");
+  };
+
+  const handleBulkSend = async () => {
+    if (!schoolId || filtered.length === 0 || !bulkBody.trim()) return;
+    setSendingBulk(true);
+    setBulkResult("");
+    try {
+      const response = await api.post<{ recipientCount: number }>("/messages/bulk", {
+        receiverIds: filtered.map((student) => student.id),
+        subject: bulkSubject.trim() || undefined,
+        body: bulkBody.trim(),
+        priority: triageMode === "OVERDUE" || triageMode === "URGENT",
+      });
+      setBulkResult(`Sent to ${response.recipientCount} students from the ${queueLabel.toLowerCase()}.`);
+      setShowBulkCompose(false);
+    } catch (err: any) {
+      setBulkResult(err?.message || "Failed to send bulk follow-up.");
+    } finally {
+      setSendingBulk(false);
+    }
+  };
+
+  const handleQueueExport = () => {
+    if (filtered.length === 0) {
+      setBulkResult("No students are currently in this queue.");
+      return;
+    }
+    const rows = [[
+      "Name",
+      "Email",
+      "Grade",
+      "Classroom",
+      "Approved Hours",
+      "Pending Hours",
+      "Required Hours",
+      "Remaining Hours",
+      "% Complete",
+      "Status",
+      "Risk Level",
+      "Risk Reasons",
+      "No-Shows",
+      "Deadline Status",
+    ]];
+    for (const student of filtered) {
+      rows.push([
+        student.name,
+        student.email,
+        student.grade ?? "",
+        student.classroom?.name ?? "",
+        String(student.approvedHours),
+        String(student.pendingHours ?? 0),
+        String(student.requiredHours),
+        String(student.remainingHours ?? Math.max(0, student.requiredHours - student.approvedHours)),
+        `${student.percentComplete ?? Math.min(100, Math.round((student.approvedHours / Math.max(1, student.requiredHours)) * 100))}%`,
+        statusLabels[student.status],
+        student.riskLevel ?? "",
+        student.riskReasons?.join("; ") ?? "",
+        String(student.noShowCount ?? 0),
+        deadlineLabel(student.daysToDeadline) ?? "",
+      ]);
+    }
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll("\"", '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${queueLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const statusColors: Record<string, string> = {
     COMPLETED: "text-green-600 bg-green-50",
@@ -339,6 +488,27 @@ export default function SchoolGroups() {
 
         {/* Center: Student list */}
         <div className="md:col-span-2">
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-blue-800 mb-2">Saved Admin Views</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                { id: "ADMIN_MORNING", title: "Morning Triage", note: "Highest-risk students across deadline, pace, and attendance" },
+                { id: "DEADLINE_ESCALATIONS", title: "Deadline Escalations", note: "Students already overdue and needing direct intervention" },
+                { id: "APPROVAL_BOTTLENECKS", title: "Approval Bottlenecks", note: "Students waiting on review instead of participation" },
+                { id: "ATTENDANCE_WATCH", title: "Attendance Watch", note: "Students with no-shows or follow-up concerns" },
+              ].map((view) => (
+                <button
+                  key={view.id}
+                  onClick={() => applySavedView(view.id as SavedView)}
+                  className={`rounded-md border px-3 py-2 text-left ${savedView === view.id ? "border-blue-300 bg-white" : "border-blue-100 bg-blue-50 hover:bg-white"}`}
+                >
+                  <div className="text-sm font-medium text-gray-900">{view.title}</div>
+                  <div className="text-[11px] text-gray-500 mt-1">{view.note}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">Triage Queue</div>
             <div className="grid grid-cols-2 gap-2">
@@ -350,7 +520,11 @@ export default function SchoolGroups() {
               ].map((queue) => (
                 <button
                   key={queue.id}
-                  onClick={() => setTriageMode(queue.id as TriageMode)}
+                  onClick={() => {
+                    setSavedView("CUSTOM");
+                    setTriageMode(queue.id as TriageMode);
+                    syncSearchParams({ triage: queue.id, view: null, filter, classroom: selectedClassroom || null });
+                  }}
                   className={`rounded-md border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-50 text-amber-800 hover:bg-white"}`}
                 >
                   <div className="font-medium">{queue.label}</div>
@@ -359,7 +533,11 @@ export default function SchoolGroups() {
               ))}
             </div>
             <button
-              onClick={() => setTriageMode("ALL")}
+              onClick={() => {
+                setSavedView("FULL_ROSTER");
+                setTriageMode("ALL");
+                syncSearchParams({ triage: "ALL", view: "FULL_ROSTER", filter, classroom: selectedClassroom || null });
+              }}
               className={`mt-2 text-xs ${triageMode === "ALL" ? "text-amber-900 font-medium" : "text-amber-700 hover:text-amber-900"}`}
             >
               Show full roster
@@ -374,7 +552,73 @@ export default function SchoolGroups() {
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <button
+              onClick={draftBulkMessage}
+              disabled={filtered.length === 0}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              Message Queue
+            </button>
+            <button
+              onClick={handleQueueExport}
+              disabled={filtered.length === 0}
+              className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Export Queue
+            </button>
           </div>
+
+          {bulkResult && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {bulkResult}
+            </div>
+          )}
+
+          {showBulkCompose && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">Bulk Follow-Up Composer</div>
+                  <div className="text-xs text-gray-500 mt-1">Send one polished follow-up to {filtered.length} students in the {queueLabel.toLowerCase()}.</div>
+                </div>
+                <button
+                  onClick={() => setShowBulkCompose(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+              <input
+                type="text"
+                value={bulkSubject}
+                onChange={(e) => setBulkSubject(e.target.value)}
+                placeholder="Subject"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2"
+              />
+              <textarea
+                value={bulkBody}
+                onChange={(e) => setBulkBody(e.target.value)}
+                rows={4}
+                placeholder="Message body"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBulkSend}
+                  disabled={sendingBulk || !bulkBody.trim() || filtered.length === 0}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {sendingBulk ? "Sending..." : `Send to ${filtered.length}`}
+                </button>
+                <button
+                  onClick={() => setShowBulkCompose(false)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {filtered.length === 0 ? (
             <div className="text-gray-500 text-sm text-center py-8">No students found.</div>
@@ -385,11 +629,13 @@ export default function SchoolGroups() {
                   key={s.id}
                   onClick={() => {
                     setSelectedStudent(s);
-                    const next = new URLSearchParams(searchParams);
-                    next.set("student", s.id);
-                    if (selectedClassroom) next.set("classroom", selectedClassroom);
-                    else next.delete("classroom");
-                    setSearchParams(next);
+                    syncSearchParams({
+                      student: s.id,
+                      classroom: selectedClassroom || null,
+                      triage: triageMode,
+                      filter,
+                      view: savedView === "CUSTOM" ? null : savedView,
+                    });
                   }}
                   className={`w-full text-left bg-white border rounded-lg p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-gray-200"}`}
                 >
@@ -456,7 +702,11 @@ export default function SchoolGroups() {
               {["ALL", "COMPLETED", "ON_TRACK", "AT_RISK", "NOT_STARTED"].map((f) => (
                 <button
                   key={f}
-                  onClick={() => setFilter(f)}
+                  onClick={() => {
+                    setFilter(f);
+                    setSavedView("CUSTOM");
+                    syncSearchParams({ filter: f, view: null, triage: triageMode, classroom: selectedClassroom || null });
+                  }}
                   aria-label={`${f === "ALL" ? "All" : statusLabels[f]}${f === "ALL" ? displayStudents.length : displayStudents.filter((s) => s.status === f).length}`}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === f ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"}`}
                 >
@@ -471,12 +721,22 @@ export default function SchoolGroups() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
             <div className="text-sm font-semibold mb-1">Current Queue</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 mb-2">
               {triageMode === "URGENT" && "Showing highest-priority students first: at-risk, near deadline, no-shows, and approval bottlenecks."}
               {triageMode === "OVERDUE" && "Students whose service deadline has already passed and still need intervention."}
               {triageMode === "PENDING_APPROVAL" && "Students blocked by approval backlog instead of pure participation."}
               {triageMode === "NO_SHOWS" && "Students with recorded no-shows who may need behavior or attendance follow-up."}
               {triageMode === "ALL" && "Full roster view, still sorted by urgency so the most actionable cases stay on top."}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded bg-gray-50 p-2">
+                <div className="text-gray-500">Students in queue</div>
+                <div className="font-semibold text-gray-900">{filtered.length}</div>
+              </div>
+              <div className="rounded bg-gray-50 p-2">
+                <div className="text-gray-500">Saved view</div>
+                <div className="font-semibold text-gray-900">{savedView === "CUSTOM" ? "Custom" : savedView.replaceAll("_", " ")}</div>
+              </div>
             </div>
           </div>
 

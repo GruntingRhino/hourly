@@ -41,6 +41,22 @@ interface StudentRow {
   status: "COMPLETED" | "ON_TRACK" | "AT_RISK";
 }
 
+interface AtRiskStudent {
+  id: string;
+  name: string;
+  email: string;
+  cohort: string | null;
+  approvedHours: number;
+  pendingHours: number;
+  requiredHours: number;
+  remainingHours: number;
+  percentComplete: number;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  riskReasons: string[];
+  noShowCount: number;
+  daysToDeadline: number | null;
+}
+
 interface SchoolReportStudent {
   name: string;
   email: string;
@@ -63,6 +79,7 @@ interface SchoolReportResponse {
 
 export default function SchoolDashboard() {
   const { user } = useAuth();
+  const schoolId = user?.schoolId;
   const isAdmin = user?.role === "SCHOOL_ADMIN";
   const isTeacher = user?.role === "TEACHER";
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -72,6 +89,7 @@ export default function SchoolDashboard() {
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,16 +110,18 @@ export default function SchoolDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [c, b, s, n] = await Promise.all([
+      const [c, b, s, n, atRisk] = await Promise.all([
         api.get<CohortSummary[]>("/cohorts"),
         api.get<Beneficiary[]>("/beneficiaries?status=APPROVED"),
         api.get<StudentRow[]>("/cohorts/school-students").catch(() => []),
         api.get<AppNotification[]>("/messages/notifications").catch(() => []),
+        schoolId ? api.get<{ total: number; students: AtRiskStudent[] }>(`/schools/${schoolId}/students/at-risk`).catch(() => ({ total: 0, students: [] })) : Promise.resolve({ total: 0, students: [] }),
       ]);
       setCohorts(c);
       setBeneficiaries(b);
       setStudents(s);
       setNotifications(n);
+      setAtRiskStudents(atRisk.students || []);
     } catch {
       setError("Failed to load dashboard. Please refresh.");
     } finally {
@@ -187,6 +207,16 @@ export default function SchoolDashboard() {
   const totalCompleted = cohorts.reduce((s, c) => s + c.completedCount, 0);
   const totalAtRisk = cohorts.reduce((s, c) => s + c.atRiskCount, 0);
   const pendingInvites = cohorts.reduce((s, c) => s + c.invitationsPending, 0);
+  const topAtRisk = [...atRiskStudents]
+    .sort((a, b) => {
+      const riskWeight = (student: AtRiskStudent) => (student.riskLevel === "HIGH" ? 3 : student.riskLevel === "MEDIUM" ? 2 : 1);
+      const riskDiff = riskWeight(b) - riskWeight(a);
+      if (riskDiff !== 0) return riskDiff;
+      const deadlineDiff = (a.daysToDeadline ?? Number.POSITIVE_INFINITY) - (b.daysToDeadline ?? Number.POSITIVE_INFINITY);
+      if (deadlineDiff !== 0) return deadlineDiff;
+      return (b.noShowCount ?? 0) - (a.noShowCount ?? 0);
+    })
+    .slice(0, 5);
 
   return (
     <div>
@@ -309,6 +339,73 @@ export default function SchoolDashboard() {
           <div className="text-xs text-gray-400 mt-1">deadline, pace, or attendance</div>
         </div>
       </div>
+
+      {topAtRisk.length > 0 && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-amber-50 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-sm font-semibold text-red-700 mb-1">Administrator Intervention Center</div>
+              <h2 className="text-lg font-bold text-gray-900">Students who need action now</h2>
+              <p className="text-sm text-gray-600 mt-1">Prioritized for admins and teachers: overdue deadlines, approval bottlenecks, and attendance concerns.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
+                Open Triage Queue
+              </Link>
+              {schoolId && (
+                <button
+                  onClick={() => handleDownload(`/schools/${schoolId}/students/at-risk?format=csv`, "at-risk-priority-queue.csv", "admin-at-risk")}
+                  disabled={downloadingReport !== null}
+                  className="px-3 py-2 bg-white border border-red-200 rounded-md text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {downloadingReport === "admin-at-risk" ? "Exporting..." : "Export At-Risk CSV"}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-5">
+            {topAtRisk.map((student) => (
+              <Link
+                key={student.id}
+                to={`/students?view=ADMIN_MORNING&triage=URGENT&filter=AT_RISK&student=${student.id}`}
+                className="rounded-lg border border-white/80 bg-white/90 p-3 hover:border-red-200 hover:bg-white"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{student.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{student.cohort || "No cohort"}</div>
+                  </div>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${student.riskLevel === "HIGH" ? "bg-red-100 text-red-700" : student.riskLevel === "MEDIUM" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                    {student.riskLevel}
+                  </span>
+                </div>
+                <div className="mt-3 text-xs text-gray-600 space-y-1">
+                  <div>{student.approvedHours.toFixed(1)}h approved · {student.remainingHours.toFixed(1)}h left</div>
+                  {student.daysToDeadline != null && <div>{student.daysToDeadline < 0 ? `${Math.abs(student.daysToDeadline)}d overdue` : `${student.daysToDeadline}d to deadline`}</div>}
+                  {student.pendingHours > 0 && <div>{student.pendingHours.toFixed(1)}h pending approval</div>}
+                  {student.noShowCount > 0 && <div>{student.noShowCount} no-show{student.noShowCount === 1 ? "" : "s"}</div>}
+                </div>
+                {!!student.riskReasons?.length && (
+                  <div className="mt-3 text-[11px] text-gray-500 line-clamp-3">
+                    {student.riskReasons.slice(0, 2).join(" • ")}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs">
+            <Link to="/students?view=DEADLINE_ESCALATIONS&triage=OVERDUE&filter=ALL" className="px-3 py-1.5 rounded-full bg-white border border-red-200 text-red-700 hover:bg-red-50">
+              Deadline Escalations
+            </Link>
+            <Link to="/students?view=APPROVAL_BOTTLENECKS&triage=PENDING_APPROVAL&filter=ALL" className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-700 hover:bg-amber-50">
+              Approval Bottlenecks
+            </Link>
+            <Link to="/students?view=ATTENDANCE_WATCH&triage=NO_SHOWS&filter=ALL" className="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">
+              Attendance Watch
+            </Link>
+          </div>
+        </div>
+      )}
 
       {reminderMessage && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">

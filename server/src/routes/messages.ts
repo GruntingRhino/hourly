@@ -259,12 +259,17 @@ router.put("/notifications/:id/read", authenticate, async (req: Request, res: Re
 router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
     const body = z.object({
-      audience: z.enum(["ALL_STUDENTS", "AT_RISK_STUDENTS", "COHORT_STUDENTS"]),
+      audience: z.enum(["ALL_STUDENTS", "AT_RISK_STUDENTS", "COHORT_STUDENTS"]).optional(),
       cohortId: z.string().optional(),
+      receiverIds: z.array(z.string()).max(500).optional(),
       subject: z.string().max(255).optional(),
       body: z.string().min(1).max(5000),
       priority: z.boolean().optional(),
     }).parse(req.body);
+
+    if (!body.audience && (!body.receiverIds || body.receiverIds.length === 0)) {
+      return res.status(400).json({ error: "Either audience or receiverIds is required" });
+    }
 
     const actor = await prisma.user.findUnique({
       where: { id: req.user!.userId },
@@ -353,15 +358,22 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
       orderBy: { name: "asc" },
     });
 
-    const recipients = body.audience === "AT_RISK_STUDENTS"
-      ? (await buildStudentProgressRecords(students, {
-          requiredHours: school.requiredHours,
-          serviceStartDate: school.serviceStartDate,
-          serviceEndDate: school.serviceEndDate,
-        }))
-          .filter((student) => student.status === "AT_RISK")
-          .map((student) => ({ id: student.id }))
-      : students.map((student) => ({ id: student.id }));
+    const recipientPool = new Map(students.map((student) => [student.id, student]));
+
+    const recipients = body.receiverIds?.length
+      ? body.receiverIds
+          .filter((id, index, arr) => arr.indexOf(id) === index)
+          .filter((id) => recipientPool.has(id))
+          .map((id) => ({ id }))
+      : body.audience === "AT_RISK_STUDENTS"
+        ? (await buildStudentProgressRecords(students, {
+            requiredHours: school.requiredHours,
+            serviceStartDate: school.serviceStartDate,
+            serviceEndDate: school.serviceEndDate,
+          }))
+            .filter((student) => student.status === "AT_RISK")
+            .map((student) => ({ id: student.id }))
+        : students.map((student) => ({ id: student.id }));
 
     if (recipients.length === 0) {
       return res.json({ recipientCount: 0, message: "No matching recipients found" });
@@ -370,7 +382,9 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
     const subject = body.subject?.trim() || (
       body.audience === "AT_RISK_STUDENTS"
         ? `${school.name}: reminder to review your service hours`
-        : `${school.name} announcement`
+        : body.receiverIds?.length
+          ? `${school.name}: staff follow-up`
+          : `${school.name} announcement`
     );
 
     await prisma.message.createMany({
@@ -396,7 +410,7 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
     res.status(201).json({
       recipientCount: recipients.length,
       subject,
-      audience: body.audience,
+      audience: body.audience ?? "CUSTOM_SELECTION",
       sender: actor.name,
     });
   } catch (err) {
