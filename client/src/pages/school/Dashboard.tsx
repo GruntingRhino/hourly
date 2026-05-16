@@ -57,6 +57,21 @@ interface AtRiskStudent {
   daysToDeadline: number | null;
 }
 
+interface InterventionCampaign {
+  id: string;
+  actionType: string;
+  audienceType: string;
+  queueType: string | null;
+  savedView: string | null;
+  subject: string | null;
+  bodyPreview: string | null;
+  priority: boolean;
+  recipientCount: number;
+  createdAt: string;
+  followUpCount: number;
+  actor: { id: string; name: string; role: string };
+}
+
 interface SchoolReportStudent {
   name: string;
   email: string;
@@ -90,6 +105,7 @@ export default function SchoolDashboard() {
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
+  const [interventions, setInterventions] = useState<InterventionCampaign[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,18 +126,20 @@ export default function SchoolDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [c, b, s, n, atRisk] = await Promise.all([
+      const [c, b, s, n, atRisk, interventionHistory] = await Promise.all([
         api.get<CohortSummary[]>("/cohorts"),
         api.get<Beneficiary[]>("/beneficiaries?status=APPROVED"),
         api.get<StudentRow[]>("/cohorts/school-students").catch(() => []),
         api.get<AppNotification[]>("/messages/notifications").catch(() => []),
         schoolId ? api.get<{ total: number; students: AtRiskStudent[] }>(`/schools/${schoolId}/students/at-risk`).catch(() => ({ total: 0, students: [] })) : Promise.resolve({ total: 0, students: [] }),
+        api.get<{ campaigns: InterventionCampaign[] }>("/messages/interventions/history?limit=6").catch(() => ({ campaigns: [] })),
       ]);
       setCohorts(c);
       setBeneficiaries(b);
       setStudents(s);
       setNotifications(n);
       setAtRiskStudents(atRisk.students || []);
+      setInterventions(interventionHistory.campaigns || []);
     } catch {
       setError("Failed to load dashboard. Please refresh.");
     } finally {
@@ -403,6 +421,49 @@ export default function SchoolDashboard() {
             <Link to="/students?view=ATTENDANCE_WATCH&triage=NO_SHOWS&filter=ALL" className="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">
               Attendance Watch
             </Link>
+          </div>
+        </div>
+      )}
+
+      {interventions.length > 0 && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Recent Outreach & Intervention History</div>
+              <p className="text-sm text-gray-500 mt-1">See who was contacted, from which queue, who sent it, and whether students showed follow-up activity after outreach.</p>
+            </div>
+            <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="text-sm font-medium text-blue-600 hover:text-blue-800">
+              Open roster workflow
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {interventions.map((campaign) => (
+              <div key={campaign.id} className="rounded-lg border border-gray-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-gray-900">{campaign.subject || "School outreach"}</span>
+                      {campaign.priority && <span className="rounded bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Priority</span>}
+                      {campaign.queueType && <span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">{campaign.queueType.replaceAll("_", " ")}</span>}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Sent by {campaign.actor.name} · {new Date(campaign.createdAt).toLocaleString()} · {campaign.recipientCount} student{campaign.recipientCount === 1 ? "" : "s"}
+                    </div>
+                    {campaign.bodyPreview && <div className="mt-2 text-sm text-gray-600 line-clamp-2">{campaign.bodyPreview}</div>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs min-w-[180px]">
+                    <div className="rounded bg-gray-50 p-2">
+                      <div className="text-gray-500">Follow-up</div>
+                      <div className="font-semibold text-gray-900">{campaign.followUpCount}/{campaign.recipientCount}</div>
+                    </div>
+                    <div className="rounded bg-gray-50 p-2">
+                      <div className="text-gray-500">View</div>
+                      <div className="font-semibold text-gray-900">{campaign.savedView ? campaign.savedView.replaceAll("_", " ") : "Direct"}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -50,6 +50,19 @@ interface AllStudent {
   classroom: { id: string; name: string } | null;
 }
 
+interface InterventionHistoryItem {
+  id: string;
+  actionType: string;
+  queueType: string | null;
+  savedView: string | null;
+  subject: string | null;
+  bodyPreview: string | null;
+  createdAt: string;
+  followUpCount: number;
+  recipientCount: number;
+  actor: { id: string; name: string; role: string };
+}
+
 function deadlineLabel(daysToDeadline?: number | null): string | null {
   if (daysToDeadline == null) return null;
   if (daysToDeadline < 0) return `${Math.abs(daysToDeadline)}d overdue`;
@@ -326,6 +339,8 @@ export default function SchoolGroups() {
         subject: bulkSubject.trim() || undefined,
         body: bulkBody.trim(),
         priority: triageMode === "OVERDUE" || triageMode === "URGENT",
+        queueType: triageMode,
+        savedView,
       });
       setBulkResult(`Sent to ${response.recipientCount} students from the ${queueLabel.toLowerCase()}.`);
       setShowBulkCompose(false);
@@ -765,6 +780,8 @@ export default function SchoolGroups() {
             <StudentDetail
               student={selectedStudent as StudentInfo}
               requiredHours={(selectedStudent as StudentInfo).requiredHours}
+              triageMode={triageMode}
+              savedView={savedView}
               onRemoveHours={handleRemoveHours}
               removing={removing}
               statusColors={statusColors}
@@ -777,9 +794,11 @@ export default function SchoolGroups() {
   );
 }
 
-function StudentDetail({ student, requiredHours, onRemoveHours, removing, statusColors, statusLabels }: {
+function StudentDetail({ student, requiredHours, triageMode, savedView, onRemoveHours, removing, statusColors, statusLabels }: {
   student: StudentInfo;
   requiredHours: number;
+  triageMode: TriageMode;
+  savedView: SavedView;
   onRemoveHours: (sessionId: string, name: string) => void;
   removing: string | null;
   statusColors: Record<string, string>;
@@ -793,6 +812,8 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
   const [showReminderCompose, setShowReminderCompose] = useState(false);
   const [reminderSubject, setReminderSubject] = useState("Service Hours Reminder");
   const [reminderBody, setReminderBody] = useState("");
+  const [interventions, setInterventions] = useState<InterventionHistoryItem[]>([]);
+  const [loadingInterventions, setLoadingInterventions] = useState(false);
 
   useEffect(() => {
     setReminderBody(
@@ -814,6 +835,18 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
     }
   };
 
+  const loadInterventions = async () => {
+    setLoadingInterventions(true);
+    try {
+      const data = await api.get<{ campaigns: InterventionHistoryItem[] }>(`/messages/interventions/history?studentId=${student.id}&limit=8`);
+      setInterventions(data.campaigns || []);
+    } catch {
+      setInterventions([]);
+    } finally {
+      setLoadingInterventions(false);
+    }
+  };
+
   const handleSendReminder = async () => {
     setSendingReminder(true);
     try {
@@ -821,9 +854,13 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
         receiverId: student.id,
         subject: reminderSubject,
         body: reminderBody,
+        queueType: triageMode,
+        savedView,
+        actionSource: "QUEUE_REMINDER",
       });
       setReminderSent(true);
       setShowReminderCompose(false);
+      void loadInterventions();
       setTimeout(() => setReminderSent(false), 3000);
     } catch {
       // ignore
@@ -836,6 +873,7 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
     if (showHistory) {
       loadHistory();
     }
+    void loadInterventions();
   }, [showHistory, student.id]);
 
   return (
@@ -950,6 +988,43 @@ function StudentDetail({ student, requiredHours, onRemoveHours, removing, status
           </div>
         </div>
       )}
+
+      <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <div className="text-xs font-semibold text-gray-800">Outreach History</div>
+            <div className="text-[11px] text-gray-500">Track who followed up after staff outreach and which queue triggered the message.</div>
+          </div>
+        </div>
+        {loadingInterventions ? (
+          <div className="text-xs text-gray-400">Loading outreach history...</div>
+        ) : interventions.length === 0 ? (
+          <div className="text-xs text-gray-400">No outreach has been logged for this student yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {interventions.map((item) => (
+              <div key={item.id} className="rounded bg-white border border-gray-200 p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-medium text-gray-900">{item.subject || "Student outreach"}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">
+                      {item.actor.name} · {new Date(item.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${item.followUpCount > 0 ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                    {item.followUpCount > 0 ? "Follow-up seen" : "Awaiting follow-up"}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {item.queueType && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.queueType.replaceAll("_", " ")}</span>}
+                  {item.savedView && <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{item.savedView.replaceAll("_", " ")}</span>}
+                </div>
+                {item.bodyPreview && <div className="mt-2 text-[11px] text-gray-600 line-clamp-2">{item.bodyPreview}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {showHistory && (
         <div className="mt-3 space-y-2">

@@ -87,6 +87,8 @@ model User {
   serviceSessions      ServiceSession[]
   sentMessages         Message[]        @relation("SentMessages")
   receivedMessages     Message[]        @relation("ReceivedMessages")
+  interventionCampaigns InterventionCampaign[] @relation("InterventionActor")
+  interventionRecipients InterventionRecipient[] @relation("InterventionStudent")
   notifications        Notification[]
   auditLogs            AuditLog[]       @relation("AuditActor")
   dataAccessLogs       DataAccessLog[]  @relation("DataAccessActor")
@@ -159,6 +161,7 @@ model School {
   integrationSyncJobs    IntegrationSyncJob[]
   integrationSyncErrors  IntegrationSyncError[]
   integrationMappings    IntegrationExternalMapping[]
+  interventionCampaigns  InterventionCampaign[]
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────
@@ -799,6 +802,45 @@ model Message {
 
   sender      User     @relation("SentMessages", fields: [senderId], references: [id])
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  interventionRecipient InterventionRecipient?
+}
+
+model InterventionCampaign {
+  id             String   @id @default(cuid())
+  schoolId       String
+  actorId        String
+  actionType     String
+  audienceType   String
+  queueType      String?
+  savedView      String?
+  subject        String?
+  bodyPreview    String?
+  priority       Boolean  @default(false)
+  recipientCount Int      @default(0)
+  metadata       String?
+  createdAt      DateTime @default(now())
+
+  school         School   @relation(fields: [schoolId], references: [id])
+  actor          User     @relation("InterventionActor", fields: [actorId], references: [id])
+  recipients     InterventionRecipient[]
+
+  @@index([schoolId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model InterventionRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  studentId  String
+  messageId  String?  @unique
+  createdAt  DateTime @default(now())
+
+  campaign   InterventionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  student    User                 @relation("InterventionStudent", fields: [studentId], references: [id])
+  message    Message?             @relation(fields: [messageId], references: [id])
+
+  @@unique([campaignId, studentId])
+  @@index([studentId, createdAt])
 }
 
 // ─── Notifications ──────────────────────────────────────────────

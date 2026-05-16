@@ -13,6 +13,47 @@ const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
 
 const SCHOOL_ROLES = new Set(["SCHOOL_ADMIN", "TEACHER", "STUDENT"]);
 
+function buildBodyPreview(body: string): string {
+  return body.trim().replace(/\s+/g, " ").slice(0, 280);
+}
+
+async function logInterventionCampaign(input: {
+  schoolId: string;
+  actorId: string;
+  actionType: string;
+  audienceType: string;
+  subject?: string | null;
+  body: string;
+  priority?: boolean;
+  queueType?: string | null;
+  savedView?: string | null;
+  metadata?: Record<string, unknown> | null;
+  recipients: Array<{ studentId: string; messageId?: string | null }>;
+}) {
+  if (!input.recipients.length) return null;
+  return prisma.interventionCampaign.create({
+    data: {
+      schoolId: input.schoolId,
+      actorId: input.actorId,
+      actionType: input.actionType,
+      audienceType: input.audienceType,
+      queueType: input.queueType ?? null,
+      savedView: input.savedView ?? null,
+      subject: input.subject?.trim() || null,
+      bodyPreview: buildBodyPreview(input.body),
+      priority: Boolean(input.priority),
+      recipientCount: input.recipients.length,
+      metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+      recipients: {
+        create: input.recipients.map((recipient) => ({
+          studentId: recipient.studentId,
+          messageId: recipient.messageId ?? null,
+        })),
+      },
+    },
+  });
+}
+
 /** Returns the school ID for any user regardless of how they're enrolled. */
 function resolveSchoolId(u: {
   schoolId: string | null;
@@ -135,7 +176,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 // POST /api/messages — send a message
 router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Response) => {
   try {
-    const { receiverId, receiverEmail, subject, body, priority } = req.body;
+    const { receiverId, receiverEmail, subject, body, priority, queueType, savedView, actionSource } = req.body;
     if ((!receiverId && !receiverEmail) || !body) {
       return res.status(400).json({ error: "Recipient and body are required" });
     }
@@ -176,6 +217,36 @@ router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Res
         data: JSON.stringify({ href: "/messages?tab=inbox" }),
       },
     });
+
+    const actorProfile = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        schoolId: true,
+        cohort: { select: { schoolId: true } },
+        classroom: { select: { schoolId: true } },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: { cohort: { select: { schoolId: true } } },
+        },
+      },
+    });
+    const actorSchoolId = actorProfile ? resolveSchoolId(actorProfile) : null;
+    if (actorSchoolId) {
+      await logInterventionCampaign({
+        schoolId: actorSchoolId,
+        actorId: req.user!.userId,
+        actionType: actionSource === "QUEUE_REMINDER" ? "QUEUE_REMINDER" : "DIRECT_MESSAGE",
+        audienceType: "DIRECT_STUDENT",
+        queueType: queueType || null,
+        savedView: savedView || null,
+        subject,
+        body,
+        priority,
+        metadata: { receiverId: receiver.id },
+        recipients: [{ studentId: receiver.id, messageId: message.id }],
+      });
+    }
 
     res.status(201).json(message);
   } catch (err) {
@@ -255,6 +326,96 @@ router.put("/notifications/:id/read", authenticate, async (req: Request, res: Re
   }
 });
 
+router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+  try {
+    const query = z.object({
+      studentId: z.string().optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    }).parse(req.query);
+
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    if (!actor?.schoolId) {
+      return res.status(400).json({ error: "Not associated with a school" });
+    }
+
+    const campaigns = await prisma.interventionCampaign.findMany({
+      where: {
+        schoolId: actor.schoolId,
+        ...(query.studentId ? { recipients: { some: { studentId: query.studentId } } } : {}),
+      },
+      include: {
+        actor: { select: { id: true, name: true, role: true } },
+        recipients: {
+          include: {
+            student: { select: { id: true, name: true, email: true } },
+            message: { select: { id: true, createdAt: true, subject: true, priority: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: query.limit ?? 25,
+    });
+
+    const summaries = await Promise.all(campaigns.map(async (campaign) => {
+      const recipientIds = campaign.recipients.map((recipient) => recipient.studentId);
+      const followUpSessions = recipientIds.length
+        ? await prisma.serviceSession.findMany({
+            where: {
+              userId: { in: recipientIds },
+              OR: [
+                { updatedAt: { gt: campaign.createdAt } },
+                { submittedAt: { gt: campaign.createdAt } },
+                { verifiedAt: { gt: campaign.createdAt } },
+                { checkInTime: { gt: campaign.createdAt } },
+                { checkOutTime: { gt: campaign.createdAt } },
+              ],
+            },
+            select: { userId: true },
+            distinct: ["userId"],
+          })
+        : [];
+      const followUpIds = new Set(followUpSessions.map((session) => session.userId));
+      const recipients = campaign.recipients.map((recipient) => ({
+        id: recipient.id,
+        studentId: recipient.student.id,
+        studentName: recipient.student.name,
+        studentEmail: recipient.student.email,
+        messageId: recipient.message?.id ?? null,
+        messagedAt: recipient.message?.createdAt ?? recipient.createdAt,
+        followUpAfterSend: followUpIds.has(recipient.student.id),
+      }));
+      return {
+        id: campaign.id,
+        actionType: campaign.actionType,
+        audienceType: campaign.audienceType,
+        queueType: campaign.queueType,
+        savedView: campaign.savedView,
+        subject: campaign.subject,
+        bodyPreview: campaign.bodyPreview,
+        priority: campaign.priority,
+        recipientCount: campaign.recipientCount,
+        metadata: campaign.metadata ? JSON.parse(campaign.metadata) : null,
+        createdAt: campaign.createdAt,
+        actor: campaign.actor,
+        followUpCount: recipients.filter((recipient) => recipient.followUpAfterSend).length,
+        recipients,
+      };
+    }));
+
+    res.json({ campaigns: summaries });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
+    console.error("Intervention history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/messages/bulk — school-wide announcements and mass reminders
 router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
@@ -265,6 +426,8 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
       subject: z.string().max(255).optional(),
       body: z.string().min(1).max(5000),
       priority: z.boolean().optional(),
+      queueType: z.string().max(100).optional(),
+      savedView: z.string().max(100).optional(),
     }).parse(req.body);
 
     if (!body.audience && (!body.receiverIds || body.receiverIds.length === 0)) {
@@ -387,15 +550,18 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
           : `${school.name} announcement`
     );
 
-    await prisma.message.createMany({
-      data: recipients.map((recipient) => ({
-        senderId: actor.id,
-        receiverId: recipient.id,
-        subject,
-        body: body.body,
-        priority: Boolean(body.priority),
-      })),
-    });
+    const createdMessages = await prisma.$transaction(
+      recipients.map((recipient) => prisma.message.create({
+        data: {
+          senderId: actor.id,
+          receiverId: recipient.id,
+          subject,
+          body: body.body,
+          priority: Boolean(body.priority),
+        },
+        select: { id: true, receiverId: true },
+      }))
+    );
 
     await prisma.notification.createMany({
       data: recipients.map((recipient) => ({
@@ -405,6 +571,20 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
         body: body.body,
         data: JSON.stringify({ href: "/messages?tab=notifications" }),
       })),
+    });
+
+    await logInterventionCampaign({
+      schoolId: school.id,
+      actorId: actor.id,
+      actionType: "BULK_MESSAGE",
+      audienceType: body.audience ?? "CUSTOM_SELECTION",
+      queueType: body.queueType ?? null,
+      savedView: body.savedView ?? null,
+      subject,
+      body: body.body,
+      priority: body.priority,
+      metadata: body.cohortId ? { cohortId: body.cohortId } : null,
+      recipients: createdMessages.map((message) => ({ studentId: message.receiverId, messageId: message.id })),
     });
 
     res.status(201).json({
