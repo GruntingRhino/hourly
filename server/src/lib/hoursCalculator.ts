@@ -53,11 +53,12 @@ export async function calculateStudentHours(
 
   for (const bs of benSignups) {
     const entry = get(bs.studentId);
+    const slotHours = bs.slot?.durationHours ?? 0;
     if (bs.verificationStatus === "APPROVED") {
-      entry.approved += bs.totalHours ?? bs.slot.durationHours;
+      entry.approved += bs.totalHours ?? slotHours;
     } else if (bs.status === "CONFIRMED") {
       // Only count as pending if the student's spot is confirmed (not waitlisted)
-      entry.pending += bs.slot.durationHours;
+      entry.pending += slotHours;
     }
   }
 

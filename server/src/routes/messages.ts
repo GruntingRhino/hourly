@@ -11,6 +11,16 @@ import { resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 const router = Router();
 const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
 
+function safeJsonParse<T>(value: string | null | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch (err) {
+    console.warn("[messages] Failed to parse JSON metadata:", err);
+    return null;
+  }
+}
+
 const SCHOOL_ROLES = new Set(["SCHOOL_ADMIN", "TEACHER", "STUDENT"]);
 
 function buildBodyPreview(body: string): string {
@@ -754,7 +764,7 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
         bodyPreview: campaign.bodyPreview,
         priority: campaign.priority,
         recipientCount: campaign.recipientCount,
-        metadata: campaign.metadata ? JSON.parse(campaign.metadata) : null,
+        metadata: safeJsonParse<Record<string, unknown>>(campaign.metadata),
         createdAt: campaign.createdAt,
         actor: campaign.actor,
         followUpCount: recipients.filter((recipient) => recipient.followUpAfterSend).length,
