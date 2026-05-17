@@ -404,7 +404,9 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
       },
     });
 
-    // If signing up as a school admin, create the school and link
+    // If signing up as a school admin, create the school first and keep
+    // follow-up setup best-effort so a downstream helper failure can't abort
+    // the whole signup after the user record already exists.
     if (data.role === "SCHOOL_ADMIN") {
       const directorySchool = data.directorySchoolId
         ? await prisma.schoolDirectory.findUnique({
@@ -429,7 +431,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         const existingSchool = await tx.school.findFirst({
           where: { createdById: user.id },
         });
-        const school = existingSchool ?? await tx.school.create({
+        const createdSchool = existingSchool ?? await tx.school.create({
           data: {
             name: directorySchool?.name || data.schoolName || data.name,
             domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
@@ -447,13 +449,23 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           },
         });
 
-        // Create a default "General" classroom
-        const existingClassroom = await tx.classroom.findFirst({
+        await tx.user.update({
+          where: { id: user.id },
+          data: { schoolId: createdSchool.id },
+        });
+
+        return createdSchool;
+      });
+
+      schoolId = school.id;
+
+      try {
+        const existingClassroom = await prisma.classroom.findFirst({
           where: { schoolId: school.id, name: "General" },
         });
         if (!existingClassroom) {
           const inviteCode = crypto.randomBytes(4).toString("hex");
-          await tx.classroom.create({
+          await prisma.classroom.create({
             data: {
               name: "General",
               schoolId: school.id,
@@ -462,17 +474,14 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
             },
           });
         }
+      } catch (err) {
+        console.error("[signup] Failed to create default classroom:", err);
+      }
 
-        // Associate the admin with their school
-        await tx.user.update({
-          where: { id: user.id },
-          data: { schoolId: school.id },
-        });
-
-        // Auto-create a private beneficiary for this school so students can sign up for school-run opportunities
-        const schoolBeneficiary = await tx.beneficiary.findFirst({
+      try {
+        const schoolBeneficiary = await prisma.beneficiary.findFirst({
           where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
-        }) ?? await tx.beneficiary.create({
+        }) ?? await prisma.beneficiary.create({
           data: {
             name: school.name,
             visibility: "PRIVATE",
@@ -480,11 +489,11 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
             createdBySchoolId: school.id,
           },
         });
-        const existingApproval = await tx.schoolBeneficiaryApproval.findFirst({
+        const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
           where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
         });
         if (!existingApproval) {
-          await tx.schoolBeneficiaryApproval.create({
+          await prisma.schoolBeneficiaryApproval.create({
             data: {
               schoolId: school.id,
               beneficiaryId: schoolBeneficiary.id,
@@ -493,11 +502,9 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
             },
           });
         }
-
-        return school;
-      });
-
-      schoolId = school.id;
+      } catch (err) {
+        console.error("[signup] Failed to create default school beneficiary:", err);
+      }
 
       // Link to BeneficiaryDirectory if a directory school was chosen
       try {
