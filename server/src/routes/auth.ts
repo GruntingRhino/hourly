@@ -174,6 +174,97 @@ const loginLimiter = rateLimit({
 
 const router = Router();
 
+const loginProfileInclude = {
+  organization: true,
+  school: { select: schoolAuthSelect },
+  classroom: { include: { school: { select: schoolAuthSelect } } },
+  cohort: { include: { school: { select: schoolAuthSelect } } },
+  cohortMemberships: {
+    where: { isActive: true },
+    include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
+    orderBy: { updatedAt: "desc" },
+  },
+  beneficiary: true,
+} as const;
+
+async function loadLoginProfile(userId: string) {
+  try {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      include: loginProfileInclude,
+    });
+  } catch (err) {
+    console.warn("[auth] Login profile enrichment failed:", err);
+    return null;
+  }
+}
+
+function serializeCohortMemberships(
+  memberships: Array<{ cohort?: { id: string; name: string; serviceEndDate: Date | null } | null; source: string }> | null | undefined,
+) {
+  return (memberships ?? [])
+    .filter((membership): membership is { cohort: { id: string; name: string; serviceEndDate: Date | null }; source: string } => Boolean(membership?.cohort))
+    .map((membership) => ({
+      id: membership.cohort.id,
+      name: membership.cohort.name,
+      source: membership.source,
+      serviceEndDate: membership.cohort.serviceEndDate,
+    }));
+}
+
+function buildLoginUserPayload(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  emailVerified: boolean;
+  organizationId: string | null;
+  schoolId: string | null;
+  classroomId: string | null;
+  cohortId: string | null;
+  beneficiaryId: string | null;
+}, profile: Awaited<ReturnType<typeof loadLoginProfile>> | null) {
+  const enriched = profile ?? null;
+  let studentSchool = null;
+  let schoolId = user.schoolId;
+
+  try {
+    studentSchool = enriched ? resolveSchoolFromUserAssociations(enriched) : null;
+    schoolId = enriched ? resolveSchoolIdFromUserAssociations(enriched) : user.schoolId;
+  } catch (err) {
+    console.warn("[auth] Failed to resolve school associations for login payload:", err);
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    emailVerified: user.emailVerified,
+    organizationId: user.organizationId,
+    organization: enriched?.organization ?? null,
+    schoolId,
+    school: studentSchool,
+    classroomId: user.classroomId,
+    classroom: enriched?.classroom ?? null,
+    cohortId: user.cohortId,
+    cohort: enriched?.cohort ?? null,
+    cohorts: serializeCohortMemberships(enriched?.cohortMemberships),
+    beneficiaryId: user.beneficiaryId,
+    beneficiary: enriched?.beneficiary ?? null,
+  };
+}
+
+async function safeBcryptCompare(plain: string, hash: string): Promise<boolean> {
+  try {
+    return await bcrypt.compare(plain, hash);
+  } catch (err) {
+    console.warn("[auth] bcrypt compare failed for stored password hash:", err);
+    return false;
+  }
+}
+
+
 if (!IS_PROD_LIKE) {
   router.get("/__test-email", (req: Request, res: Response) => {
     const inbox = String(req.query.inbox || "").trim().toLowerCase();
@@ -334,59 +425,79 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           })
         : null;
 
-      const school = await prisma.school.create({
-        data: {
-          name: directorySchool?.name || data.schoolName || data.name,
-          domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
-          directoryId: data.directorySchoolId || null,
-          type: directorySchool?.type || null,
-          address: directorySchool?.address || null,
-          city: directorySchool?.city || null,
-          state: directorySchool?.state || null,
-          zip: directorySchool?.zip || null,
-          latitude: directorySchool?.latitude || null,
-          longitude: directorySchool?.longitude || null,
-          verified: false,
-          createdById: user.id,
-          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
-        },
+      const school = await prisma.$transaction(async (tx) => {
+        const existingSchool = await tx.school.findFirst({
+          where: { createdById: user.id },
+        });
+        const school = existingSchool ?? await tx.school.create({
+          data: {
+            name: directorySchool?.name || data.schoolName || data.name,
+            domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
+            directoryId: data.directorySchoolId || null,
+            type: directorySchool?.type || null,
+            address: directorySchool?.address || null,
+            city: directorySchool?.city || null,
+            state: directorySchool?.state || null,
+            zip: directorySchool?.zip || null,
+            latitude: directorySchool?.latitude || null,
+            longitude: directorySchool?.longitude || null,
+            verified: false,
+            createdById: user.id,
+            zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
+          },
+        });
+
+        // Create a default "General" classroom
+        const existingClassroom = await tx.classroom.findFirst({
+          where: { schoolId: school.id, name: "General" },
+        });
+        if (!existingClassroom) {
+          const inviteCode = crypto.randomBytes(4).toString("hex");
+          await tx.classroom.create({
+            data: {
+              name: "General",
+              schoolId: school.id,
+              teacherId: user.id,
+              inviteCode,
+            },
+          });
+        }
+
+        // Associate the admin with their school
+        await tx.user.update({
+          where: { id: user.id },
+          data: { schoolId: school.id },
+        });
+
+        // Auto-create a private beneficiary for this school so students can sign up for school-run opportunities
+        const schoolBeneficiary = await tx.beneficiary.findFirst({
+          where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
+        }) ?? await tx.beneficiary.create({
+          data: {
+            name: school.name,
+            visibility: "PRIVATE",
+            status: "ACTIVE",
+            createdBySchoolId: school.id,
+          },
+        });
+        const existingApproval = await tx.schoolBeneficiaryApproval.findFirst({
+          where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
+        });
+        if (!existingApproval) {
+          await tx.schoolBeneficiaryApproval.create({
+            data: {
+              schoolId: school.id,
+              beneficiaryId: schoolBeneficiary.id,
+              status: "APPROVED",
+              approvedAt: new Date(),
+            },
+          });
+        }
+
+        return school;
       });
+
       schoolId = school.id;
-
-      // Create a default "General" classroom
-      const inviteCode = crypto.randomBytes(4).toString("hex");
-      await prisma.classroom.create({
-        data: {
-          name: "General",
-          schoolId: school.id,
-          teacherId: user.id,
-          inviteCode,
-        },
-      });
-
-      // Associate the admin with their school
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { schoolId: school.id },
-      });
-
-      // Auto-create a private beneficiary for this school so students can sign up for school-run opportunities
-      const schoolBeneficiary = await prisma.beneficiary.create({
-        data: {
-          name: school.name,
-          visibility: "PRIVATE",
-          status: "ACTIVE",
-          createdBySchoolId: school.id,
-        },
-      });
-      await prisma.schoolBeneficiaryApproval.create({
-        data: {
-          schoolId: school.id,
-          beneficiaryId: schoolBeneficiary.id,
-          status: "APPROVED",
-          approvedAt: new Date(),
-        },
-      });
 
       // Link to BeneficiaryDirectory if a directory school was chosen
       try {
@@ -450,17 +561,19 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
 
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      include: {
-        organization: true,
-        school: { select: schoolAuthSelect },
-        classroom: { include: { school: { select: schoolAuthSelect } } },
-        cohort: { include: { school: { select: schoolAuthSelect } } },
-        cohortMemberships: {
-          where: { isActive: true },
-          include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
-          orderBy: { updatedAt: "desc" },
-        },
-        beneficiary: true,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        passwordHash: true,
+        emailVerified: true,
+        organizationId: true,
+        schoolId: true,
+        classroomId: true,
+        cohortId: true,
+        beneficiaryId: true,
       },
     });
     if (!user) {
@@ -474,43 +587,21 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
       return res.status(401).json({ error: "This account uses Google Sign-In. Please use that method." });
     }
 
-    const valid = await bcrypt.compare(data.password, user.passwordHash);
+    const valid = await safeBcryptCompare(data.password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
-    // Derive school info: from direct association, classroom, or cohort
-    const studentSchool = resolveSchoolFromUserAssociations(user);
-    const schoolId = resolveSchoolIdFromUserAssociations(user);
+    const profile = await loadLoginProfile(user.id);
+    const payload = buildLoginUserPayload(user, profile);
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        emailVerified: user.emailVerified,
-        organizationId: user.organizationId,
-        organization: user.organization,
-        schoolId,
-        school: studentSchool,
-        classroomId: user.classroomId,
-        classroom: user.classroom,
-        cohortId: user.cohortId,
-        cohort: user.cohort,
-        cohorts: user.cohortMemberships.map((membership) => ({
-          id: membership.cohort.id,
-          name: membership.cohort.name,
-          source: membership.source,
-          serviceEndDate: membership.cohort.serviceEndDate,
-        })),
-        beneficiaryId: user.beneficiaryId,
-        beneficiary: user.beneficiary,
-      },
+      user: payload,
     });
+
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: err.errors });
@@ -525,51 +616,36 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      include: {
-        organization: true,
-        school: { select: schoolAuthSelect },
-        classroom: { include: { school: { select: schoolAuthSelect } } },
-        cohort: { include: { school: { select: schoolAuthSelect } } },
-        cohortMemberships: {
-          where: { isActive: true },
-          include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
-          orderBy: { updatedAt: "desc" },
-        },
-        beneficiary: true,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        grade: true,
+        house: true,
+        status: true,
+        emailVerified: true,
+        organizationId: true,
+        schoolId: true,
+        classroomId: true,
+        cohortId: true,
+        beneficiaryId: true,
       },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const studentSchool = resolveSchoolFromUserAssociations(user);
-    const schoolId = resolveSchoolIdFromUserAssociations(user);
+    const profile = await loadLoginProfile(user.id);
+    const payload = buildLoginUserPayload(user, profile);
 
     res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
+      ...payload,
       phone: decryptField(user.phone),
       grade: user.grade,
       house: user.house,
       status: user.status,
-      emailVerified: user.emailVerified,
-      organizationId: user.organizationId,
-      organization: user.organization,
-      schoolId,
-      school: studentSchool,
-      classroomId: user.classroomId,
-      classroom: user.classroom,
-      cohortId: user.cohortId,
-      cohort: user.cohort,
-      cohorts: user.cohortMemberships.map((membership) => ({
-        id: membership.cohort.id,
-        name: membership.cohort.name,
-        source: membership.source,
-        serviceEndDate: membership.cohort.serviceEndDate,
-      })),
-      beneficiaryId: user.beneficiaryId,
-      beneficiary: user.beneficiary,
     });
+
   } catch (err) {
     console.error("Me error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -596,7 +672,7 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
     if (!user.passwordHash) {
       return res.status(400).json({ error: "This account uses Google Sign-In. Password cannot be changed here." });
     }
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    const valid = await safeBcryptCompare(currentPassword, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Current password is incorrect" });
     }

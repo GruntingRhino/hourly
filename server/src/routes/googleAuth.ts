@@ -100,6 +100,17 @@ function isEduDomain(email: string): boolean {
   return getEmailDomain(email).endsWith(".edu");
 }
 
+function serializeCohorts(memberships: Array<{ cohort?: { id: string; name: string; serviceEndDate?: Date | null } | null; source?: string }> | null | undefined) {
+  return (memberships ?? [])
+    .filter((membership): membership is { cohort: { id: string; name: string; serviceEndDate?: Date | null }; source?: string } => Boolean(membership?.cohort))
+    .map((membership) => ({
+      id: membership.cohort.id,
+      name: membership.cohort.name,
+      source: membership.source,
+      serviceEndDate: membership.cohort.serviceEndDate ?? null,
+    }));
+}
+
 function buildUserPayload(user: any) {
   const studentSchool = resolveSchoolFromUserAssociations(user);
   const schoolId = resolveSchoolIdFromUserAssociations(user);
@@ -112,12 +123,7 @@ function buildUserPayload(user: any) {
     school: studentSchool,
     cohortId: user.cohortId,
     cohort: user.cohort,
-    cohorts: (user.cohortMemberships ?? []).map((membership: any) => ({
-      id: membership.cohort.id,
-      name: membership.cohort.name,
-      source: membership.source,
-      serviceEndDate: membership.cohort.serviceEndDate ?? null,
-    })),
+    cohorts: serializeCohorts(user.cohortMemberships),
     beneficiaryId: user.beneficiaryId,
     beneficiary: user.beneficiary,
     emailVerified: true,
@@ -565,13 +571,22 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       });
 
       const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
-      await sendSchoolRegistrationMagicLink(contactEmail, school!.name, magicLink);
+      let emailDeliveryFailed = false;
+      try {
+        await sendSchoolRegistrationMagicLink(contactEmail, school!.name, magicLink);
+      } catch (emailErr) {
+        emailDeliveryFailed = true;
+        console.error("[register-school] Failed to resend magic link:", emailErr);
+      }
 
       return res.json({
-        message: "A new registration link has been sent. Please check your inbox.",
+        message: emailDeliveryFailed
+          ? "A new registration link was saved, but the email could not be delivered. Please contact support or try again."
+          : "A new registration link has been sent. Please check your inbox.",
         schoolId: school!.id,
         schoolName: school!.name,
         sentTo: contactEmail,
+        emailDeliveryFailed,
       });
     }
 
@@ -641,13 +656,22 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
 
     // Send magic link to contact email
     const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
-    await sendSchoolRegistrationMagicLink(data.contactEmail, school.name, magicLink);
+    let emailDeliveryFailed = false;
+    try {
+      await sendSchoolRegistrationMagicLink(data.contactEmail, school.name, magicLink);
+    } catch (emailErr) {
+      emailDeliveryFailed = true;
+      console.error("[register-school] Failed to send magic link:", emailErr);
+    }
 
     res.json({
-      message: "Registration link sent to the school email address. Please check the inbox to complete registration.",
+      message: emailDeliveryFailed
+        ? "Registration saved, but the magic-link email could not be delivered. Please contact support or try again."
+        : "Registration link sent to the school email address. Please check the inbox to complete registration.",
       schoolId: school.id,
       schoolName: school.name,
       sentTo: data.contactEmail,
+      emailDeliveryFailed,
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
