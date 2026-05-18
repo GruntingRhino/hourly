@@ -459,6 +459,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           latitude: directorySchool?.latitude || null,
           longitude: directorySchool?.longitude || null,
           verified: false,
+          createdById: user.id,
           zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
         },
       });
