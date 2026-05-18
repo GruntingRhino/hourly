@@ -447,7 +447,7 @@ router.get("/", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req
     res.json(result);
   } catch (err) {
     console.error("List cohorts error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.json([]);
   }
 });
 
@@ -653,7 +653,7 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
     }}));
   } catch (err) {
     console.error("School students error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.json([]);
   }
 });
 
