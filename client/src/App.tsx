@@ -76,7 +76,7 @@ function AppRoutes() {
   }
 
   return (
-    <>
+    <div className={user && showPrefBanner && !suppressPrefBanner ? "pb-40 sm:pb-32" : undefined}>
     <Routes>
       {/* Public routes — always accessible */}
       <Route path="/" element={<Landing />} />
@@ -175,7 +175,7 @@ function AppRoutes() {
     {user && showPrefBanner && !suppressPrefBanner && (
       <SessionPrefBanner onDismiss={() => setShowPrefBanner(false)} />
     )}
-    </>
+    </div>
   );
 }
 

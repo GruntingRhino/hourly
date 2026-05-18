@@ -139,18 +139,20 @@ test.describe.serial('School join-by-code gate', () => {
     await leaveClassroomIfNeeded(request, studentToken);
 
     await loginViaUi(page, STUDENT.email, STUDENT.password);
-    await expect(page.getByRole('heading', { name: 'Join a Classroom' })).toBeVisible();
+    await page.goto(`${WEB_BASE_URL}/settings`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /^classroom$/i }).click();
+    await expect(page.getByText(/Enter an invite code from your teacher to join a classroom/i)).toBeVisible();
 
     await page.locator('input[maxlength="8"]').first().fill(inviteCode.toLowerCase());
 
     const [joinResponse] = await Promise.all([
       page.waitForResponse((response) => response.url().includes('/api/classrooms/join')),
-      page.getByRole('button', { name: /join classroom/i }).click(),
+      page.getByRole('button', { name: /^join$/i }).click(),
     ]);
 
     expect(joinResponse.status()).toBe(403);
     await expect(page.getByText(DISABLED_MESSAGE)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Join a Classroom' })).toBeVisible();
+    await expect(page.getByText(/Enter an invite code from your teacher to join a classroom/i)).toBeVisible();
 
     const classroomId = await getStudentClassroomId(request);
     expect(classroomId).toBeNull();
@@ -163,17 +165,19 @@ test.describe.serial('School join-by-code gate', () => {
     await leaveClassroomIfNeeded(request, studentToken);
 
     await loginViaUi(page, STUDENT.email, STUDENT.password);
-    await expect(page.getByRole('heading', { name: 'Join a Classroom' })).toBeVisible();
+    await page.goto(`${WEB_BASE_URL}/settings`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /^classroom$/i }).click();
+    await expect(page.getByText(/Enter an invite code from your teacher to join a classroom/i)).toBeVisible();
 
     await page.locator('input[maxlength="8"]').first().fill(inviteCode.toLowerCase());
 
     const [joinResponse] = await Promise.all([
       page.waitForResponse((response) => response.url().includes('/api/classrooms/join')),
-      page.getByRole('button', { name: /join classroom/i }).click(),
+      page.getByRole('button', { name: /^join$/i }).click(),
     ]);
 
     expect(joinResponse.status()).toBe(200);
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByText(/Joined classroom successfully!/i)).toBeVisible();
 
     const classroomId = await getStudentClassroomId(request);
     expect(classroomId).toBeTruthy();

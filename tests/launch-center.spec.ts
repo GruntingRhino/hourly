@@ -26,7 +26,7 @@ test("school admin can manage the launch center", async ({ page }) => {
   await page.goto(`${BASE}/launch`, { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Launch Center" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Monitoring" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Monitoring", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Support" }).click();
   await page.getByLabel("Support owner").fill("Launch Owner");

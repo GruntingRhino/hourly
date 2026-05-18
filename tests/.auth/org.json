@@ -2,15 +2,19 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "http://localhost:5173",
+      "origin": "http://127.0.0.1:5174",
       "localStorage": [
         {
+          "name": "goodhours_auth_sync_request",
+          "value": "{\"requestId\":\"39b5a775-1b90-4ffa-b065-b8bd7b76d1d2\",\"requesterTabId\":\"915613ca-644f-4e47-961d-1649259b7b77\",\"ts\":1779112047824}"
+        },
+        {
           "name": "goodhours_user",
-          "value": "{\"id\":\"cmlzy1ngg0009mu8ygz7f8m6f\",\"email\":\"volunteer@greenearth.org\",\"name\":\"Sarah Mitchell\",\"role\":\"ORG_ADMIN\",\"phone\":null,\"bio\":null,\"avatarUrl\":null,\"age\":null,\"grade\":null,\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":null,\"notificationPreferences\":{\"studentSignup\":{\"email\":false,\"inApp\":true},\"hourRequest\":{\"email\":true,\"inApp\":true},\"schoolApproval\":{\"email\":true,\"inApp\":true}},\"messagePreferences\":null,\"organizationId\":\"cmlzy1n9n0007mu8yi15p2x1k\",\"organization\":{\"id\":\"cmlzy1n9n0007mu8yi15p2x1k\",\"name\":\"Green Earth Foundation\",\"email\":\"contact@greenearth.org\",\"phone\":\"(555) 222-3333\",\"description\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"website\":\"https://greenearth.example.org\",\"socialLinks\":\"{\\\"instagram\\\":\\\"\\\",\\\"tiktok\\\":\\\"\\\",\\\"twitter\\\":\\\"\\\",\\\"youtube\\\":\\\"\\\"}\",\"avatarUrl\":null,\"status\":\"APPROVED\",\"zipCodes\":\"[\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:39.084Z\",\"updatedAt\":\"2026-02-24T01:49:06.296Z\"},\"school\":null,\"classroomId\":null,\"classroom\":null}"
+          "value": "{\"id\":\"cmpb8t63p000amupvfzpphskv\",\"email\":\"volunteer@greenearth.org\",\"name\":\"Sarah Mitchell\",\"role\":\"BENEFICIARY_ADMIN\",\"emailVerified\":true,\"organizationId\":null,\"organization\":null,\"schoolId\":null,\"school\":null,\"classroomId\":null,\"classroom\":null,\"cohortId\":null,\"cohort\":null,\"cohorts\":[],\"beneficiaryId\":\"cmpb8t5vf0007mupv6eprd92s\",\"beneficiary\":{\"id\":\"cmpb8t5vf0007mupv6eprd92s\",\"name\":\"Green Earth Foundation\",\"email\":\"contact@greenearth.org\",\"phone\":\"(555) 987-6543\",\"description\":\"Environmental conservation and community cleanup organization\",\"website\":\"https://greenearth.org\",\"category\":\"Environment\",\"address\":\"150 E Houston St\",\"city\":\"New York\",\"state\":\"NY\",\"zip\":\"10002\",\"latitude\":40.7223,\"longitude\":-73.9874,\"directoryId\":null,\"status\":\"ACTIVE\",\"visibility\":\"PUBLIC\",\"claimed\":false,\"createdBySchoolId\":null,\"createdAt\":\"2026-05-18T13:31:34.011Z\",\"updatedAt\":\"2026-05-18T13:31:34.011Z\"},\"phone\":null,\"grade\":null,\"house\":null,\"status\":\"ACTIVE\"}"
         },
         {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFuZ2cwMDA5bXU4eWd6N2Y4bTZmIiwiZW1haWwiOiJ2b2x1bnRlZXJAZ3JlZW5lYXJ0aC5vcmciLCJyb2xlIjoiT1JHX0FETUlOIiwiaWF0IjoxNzcxODk3NzI0LCJleHAiOjE3NzI1MDI1MjR9.g4sFGxYQvttsouFr9LImm2KkV21BK8ukHW-Mt6n8aGo"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXBiOHQ2M3AwMDBhbXVwdmZ6cHBoc2t2IiwiZW1haWwiOiJ2b2x1bnRlZXJAZ3JlZW5lYXJ0aC5vcmciLCJyb2xlIjoiQkVORUZJQ0lBUllfQURNSU4iLCJpYXQiOjE3NzkxMTIwNDgsImV4cCI6MTc3OTcxNjg0OH0.ZhDiw4WZE0wCfhMq-eM_WYIefF_3LeIX2-JC1Qj5x8Y"
         }
       ]
     }

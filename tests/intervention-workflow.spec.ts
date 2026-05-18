@@ -94,7 +94,7 @@ test("school intervention workflow is visible to staff and student", async ({ pa
     await page.goto(`${BASE}/messages`, { waitUntil: "networkidle" });
     await expect(page.getByText("Open Intervention Queue")).toBeVisible();
     await expect(page.getByText(caseSummary)).toBeVisible();
-    await expect(page.getByText(targetStudent.name)).toBeVisible();
+    await expect(page.getByText(targetStudent.name).first()).toBeVisible();
 
     const studentLogin = await loginViaApi(studentPage, STUDENT_EMAIL!, STUDENT_PASSWORD!);
     await installToken(studentPage, studentLogin.token);

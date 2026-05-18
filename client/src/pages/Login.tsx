@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 
 export default function Login() {
   const { login, loginWithToken, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +26,45 @@ export default function Login() {
       .then((data) => setGoogleUrl(data.url))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    if (errorParam) {
+      setError("Google sign-in was cancelled or failed. Please try again.");
+      return;
+    }
+    if (!code) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+
+    api
+      .post<any>(`/auth/google/callback${state ? `?state=${encodeURIComponent(state)}` : ""}`, { code })
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.token) {
+          throw new Error("No GoodHours account found for this Google account.");
+        }
+        loginWithToken(result.token, result.user);
+        navigate("/dashboard", { replace: true });
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        setError(err.message || "Google sign-in failed. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, loginWithToken, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +203,7 @@ export default function Login() {
 
           <button
             onClick={() => googleUrl && (window.location.href = googleUrl)}
-            disabled={!googleUrl}
+            disabled={!googleUrl || loading}
             className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-300 rounded-lg font-medium text-sm hover:bg-gray-50 text-gray-700 disabled:opacity-40 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">

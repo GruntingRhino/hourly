@@ -344,6 +344,8 @@ test.describe.serial('3 — Beneficiary Admin A: Opportunities', () => {
     // Title field: first text input in the create form (no placeholder, no name attr).
     // Find by traversing: label "Title *" → parent div → input sibling.
     await page.locator('label').filter({ hasText: /^Title/i }).locator('..').locator('input').fill(ctx.opportunityTitle);
+    await page.getByRole('combobox').first().fill('Education');
+    await page.getByRole('combobox').first().press('Enter');
 
     // Date field for the first time slot (one slot exists by default)
     await page.locator('input[type="date"]').first().fill(tomorrow());
@@ -535,13 +537,15 @@ test.describe.serial('5 — Beneficiary Admin A: Approve Hours', () => {
     await expect(page.locator('text=/failed to load/i')).toHaveCount(0);
   });
 
-  test('can approve a student signup via API', async () => {
+  test('cannot approve a student signup before the time slot has ended', async () => {
     if (!ctx.student1SignupId) {
       test.skip(true, 'No signup ID from test 4 — skipping approval');
       return;
     }
     const res = await apiRawPost(page, `/beneficiaries/signups/${ctx.student1SignupId}/approve`, {});
-    expect([200, 201]).toContain(res.status());
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/only available after the time slot has ended/i);
   });
 });
 
@@ -1119,6 +1123,7 @@ test.describe.serial('16 — Beneficiary Admin A: Opportunity 2 (Reject/NoShow F
     const res = await apiRawPost(page, `/beneficiaries/${ctx.orgAId}/opportunities`, {
       title: opp2Title,
       description: 'Second PW opportunity for reject/no-show testing',
+      category: 'Education',
       startDate: tomorrow(),
       timeSlots: [{
         date: tomorrow(),
@@ -1151,6 +1156,7 @@ test.describe.serial('16 — Beneficiary Admin A: Opportunity 2 (Reject/NoShow F
     const throwRes = await apiRawPost(page, `/beneficiaries/${ctx.orgAId}/opportunities`, {
       title: 'PW Throwaway Opp',
       description: 'Will be cancelled',
+      category: 'Education',
       startDate: tomorrow(),
       timeSlots: [{ date: tomorrow(), startTime: '10:00', endTime: '11:00', durationHours: 1, capacity: 1 }],
     });
@@ -1250,39 +1256,37 @@ test.describe.serial('17 — Student Signup Flows (Reject / Cancel / No-Show)', 
     expect(Array.isArray(signups)).toBe(true);
   });
 
-  test('beneficiary admin rejects student1 signup for opp2', async () => {
+  test('beneficiary admin cannot reject student1 signup for opp2 before the slot has ended', async () => {
     if (!ctx2.student1Signup2Id) { test.skip(true, 'No signup2 for student1'); return; }
     const res = await apiRawPost(orgPage, `/beneficiaries/signups/${ctx2.student1Signup2Id}/reject`, {
       reason: 'Test rejection reason',
     });
-    expect([200, 201]).toContain(res.status());
+    expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body.verificationStatus).toBe('REJECTED');
+    expect(body.error).toMatch(/only available after the time slot has ended/i);
   });
 
-  test('student1 can cancel a rejected signup', async () => {
+  test('student1 can cancel the future signup after rejection is blocked', async () => {
     if (!ctx2.student1Signup2Id) { test.skip(true, 'No signup2'); return; }
     const res = await apiRawPost(st1Page, `/beneficiaries/signups/${ctx2.student1Signup2Id}/cancel`, {});
-    expect([200, 400]).toContain(res.status()); // 400 if already cancelled
+    expect(res.status()).toBe(200);
   });
 
-  test('beneficiary admin marks student2 as no-show for opp2', async () => {
+  test('beneficiary admin cannot mark student2 as no-show for opp2 before the slot has ended', async () => {
     if (!ctx2.student2SignupId) { test.skip(true, 'No student2 signup'); return; }
     const res = await apiRawPost(orgPage, `/beneficiaries/signups/${ctx2.student2SignupId}/no-show`, {});
-    expect([200, 400]).toContain(res.status()); // 400 if already approved/no-show
-    if ((await res.json()).status === 'NO_SHOW') {
-      expect((await res.json()).status).toBe('NO_SHOW');
-    }
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/only available after the time slot has ended/i);
   });
 
-  test('GET /beneficiaries/signups/:id/history returns audit trail', async () => {
+  test('GET /beneficiaries/signups/:id/history returns audit trail for the future signup lifecycle', async () => {
     if (!ctx2.student1Signup2Id) { test.skip(true, 'No signup2'); return; }
     const history = await apiGet<any>(orgPage, `/beneficiaries/signups/${ctx2.student1Signup2Id}/history`);
     expect(history.signup).toBeDefined();
     expect(Array.isArray(history.history)).toBe(true);
-    // Should have at least the REJECT action
-    const hasReject = history.history.some((h: any) => h.action === 'REJECT');
-    expect(hasReject).toBe(true);
+    const hasCreationLikeEvent = history.history.some((h: any) => ["SIGNUP_CONFIRMED", "SIGNUP_WAITLISTED", "WAITLIST_PROMOTED"].includes(h.action));
+    expect(hasCreationLikeEvent).toBe(true);
   });
 
   test('student can view their own signups list', async () => {
@@ -1339,6 +1343,7 @@ test.describe.serial('18 — Waitlist Promotion', () => {
     const res = await apiRawPost(orgPage, `/beneficiaries/${ctx.orgAId}/opportunities`, {
       title: `PW Waitlist Opp ${Date.now()}`,
       description: 'Capacity-1 opportunity for waitlist test',
+      category: 'Education',
       startDate: tomorrow(),
       timeSlots: [{ date: tomorrow(), startTime: '15:00', endTime: '16:00', durationHours: 1, capacity: 1 }],
     });
@@ -2037,6 +2042,7 @@ test.describe.serial('28 — Beneficiary Admin A: Delete Opportunity', () => {
     const res = await apiRawPost(page, `/beneficiaries/${ctx.orgAId}/opportunities`, {
       title: `PW Delete Me ${Date.now()}`,
       description: 'Will be deleted',
+      category: 'Education',
       startDate: tomorrow(),
       timeSlots: [{ date: tomorrow(), startTime: '17:00', endTime: '18:00', durationHours: 1, capacity: 2 }],
     });
@@ -2334,6 +2340,7 @@ test.describe.serial('32 — Beneficiary Admin B: Full Flow', () => {
     const res = await apiRawPost(page, `/beneficiaries/${orgBId}/opportunities`, {
       title: `PW Org B Opp ${Date.now()}`,
       description: 'Org B opportunity for testing',
+      category: 'Education',
       startDate: tomorrow(),
       timeSlots: [{ date: tomorrow(), startTime: '09:00', endTime: '10:00', durationHours: 1, capacity: 3 }],
     });

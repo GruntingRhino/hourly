@@ -16,7 +16,9 @@ const FIXTURE_DIR = path.join(ARTIFACTS_DIR, 'fixtures');
 const AUTH_DIR = path.join(TESTS_DIR, '.auth');
 const QA_RESULTS_PATH = path.join(TESTS_DIR, 'qa-results.md');
 const FAIL_SUMMARY_PATH = path.join(TESTS_DIR, 'failures-summary.txt');
-const MANUAL_QA_PATH = path.join(ROOT, 'manual_qa.md');
+const MANUAL_QA_PATH = fs.existsSync(path.join(ROOT, 'manual_qa.md'))
+  ? path.join(ROOT, 'manual_qa.md')
+  : path.join(TESTS_DIR, 'qa-results.md');
 
 for (const dir of [TESTS_DIR, ARTIFACTS_DIR, SCREENSHOT_DIR, TRACE_DIR, DOWNLOAD_DIR, FIXTURE_DIR, AUTH_DIR]) {
   fs.mkdirSync(dir, { recursive: true });

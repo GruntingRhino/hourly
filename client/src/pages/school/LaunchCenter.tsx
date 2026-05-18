@@ -730,7 +730,7 @@ export default function LaunchCenter() {
                   disabled={savingMonitoring}
                   className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {savingMonitoring ? "Saving..." : "Save Monitoring Plan"}
+                  {savingMonitoring ? "Saving..." : "Save First-User Monitoring"}
                 </button>
               </div>
             </div>

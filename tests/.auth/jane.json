@@ -2,15 +2,19 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "http://localhost:5173",
+      "origin": "http://127.0.0.1:5174",
       "localStorage": [
         {
+          "name": "goodhours_auth_sync_request",
+          "value": "{\"requestId\":\"eee8c4c4-c283-4d1d-86ee-b1e3ea2e0419\",\"requesterTabId\":\"b8edd91d-2d6b-418e-963c-3b0bd8f9d213\",\"ts\":1779112011654}"
+        },
+        {
           "name": "goodhours_user",
-          "value": "{\"id\":\"cmlzy1o4w000kmu8yzikh9em0\",\"email\":\"jane@student.edu\",\"name\":\"Jane Davis\",\"role\":\"STUDENT\",\"phone\":null,\"bio\":null,\"avatarUrl\":null,\"age\":17,\"grade\":\"12th\",\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":null,\"notificationPreferences\":null,\"messagePreferences\":null,\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:45:38.908Z\"},\"classroomId\":\"cmlzy1n920006mu8ypkttt3fd\",\"classroom\":{\"id\":\"cmlzy1n920006mu8ypkttt3fd\",\"name\":\"AP Community Service\",\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"teacherId\":\"cmlzy1n380000mu8yv00au332\",\"inviteCode\":\"8c38b71b\",\"isActive\":true,\"createdAt\":\"2026-02-24T01:45:39.063Z\",\"updatedAt\":\"2026-02-24T01:45:39.063Z\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:45:38.908Z\"}}}"
+          "value": "{\"id\":\"cmpb8t6mt0016mupvuuqeo1vt\",\"email\":\"jane@student.edu\",\"name\":\"Jane Davis\",\"role\":\"STUDENT\",\"emailVerified\":true,\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmpb8t5v90002mupvua6iuln0\",\"school\":{\"id\":\"cmpb8t5v90002mupvua6iuln0\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"requiredHours\":40,\"verificationStandard\":\"STANDARD\",\"zipCodes\":\"[\\\"10001\\\"]\",\"address\":null,\"city\":null,\"state\":null,\"zip\":null,\"latitude\":null,\"longitude\":null,\"serviceStartDate\":null,\"serviceEndDate\":null,\"allowSelfSubmission\":true,\"requireOrgVerification\":false,\"categoryHourCaps\":null,\"partnerInviteTemplate\":null},\"classroomId\":\"cmpb8t5ve0006mupv724max3l\",\"classroom\":{\"id\":\"cmpb8t5ve0006mupv724max3l\",\"name\":\"AP Community Service\",\"schoolId\":\"cmpb8t5v90002mupvua6iuln0\",\"teacherId\":\"cmpb8t5v60000mupvqmx3zipw\",\"inviteCode\":\"ea3e3cef\",\"isActive\":true,\"createdAt\":\"2026-05-18T13:31:34.010Z\",\"updatedAt\":\"2026-05-18T13:31:34.010Z\",\"school\":{\"id\":\"cmpb8t5v90002mupvua6iuln0\",\"name\":\"Lincoln High School\",\"domain\":\"lincoln.edu\",\"verified\":false,\"requiredHours\":40,\"verificationStandard\":\"STANDARD\",\"zipCodes\":\"[\\\"10001\\\"]\",\"address\":null,\"city\":null,\"state\":null,\"zip\":null,\"latitude\":null,\"longitude\":null,\"serviceStartDate\":null,\"serviceEndDate\":null,\"allowSelfSubmission\":true,\"requireOrgVerification\":false,\"categoryHourCaps\":null,\"partnerInviteTemplate\":null}},\"cohortId\":null,\"cohort\":null,\"cohorts\":[],\"beneficiaryId\":null,\"beneficiary\":null,\"phone\":null,\"grade\":\"12th\",\"house\":null,\"status\":\"ACTIVE\"}"
         },
         {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFvNHcwMDBrbXU4eXppa2g5ZW0wIiwiZW1haWwiOiJqYW5lQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4OTc2NjAsImV4cCI6MTc3MjUwMjQ2MH0.-S7eF6bkE3zS8S8y5VuOuImdES0Z3LnOKGGEQnFDo9Y"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXBiOHQ2bXQwMDE2bXVwdnV1cWVvMXZ0IiwiZW1haWwiOiJqYW5lQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzkxMTIwMTEsImV4cCI6MTc3OTcxNjgxMX0.i4eVuGL1e_RYYuByXqq86yGzjU7omzwMxIuXXDdobBQ"
         }
       ]
     }

@@ -2,15 +2,19 @@
   "cookies": [],
   "origins": [
     {
-      "origin": "http://localhost:5173",
+      "origin": "http://127.0.0.1:5174",
       "localStorage": [
         {
+          "name": "goodhours_auth_sync_request",
+          "value": "{\"requestId\":\"3fd21b29-bc5e-4d76-9857-10123b858248\",\"requesterTabId\":\"931af917-06a8-4063-8498-1962c6d2b9a8\",\"ts\":1779111872158}"
+        },
+        {
           "name": "goodhours_user",
-          "value": "{\"id\":\"cmlzy1nxc000imu8yp74hsdcm\",\"email\":\"john@student.edu\",\"name\":\"John QA 1771897708840\",\"role\":\"STUDENT\",\"phone\":\"(555) 123-4567\",\"bio\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"avatarUrl\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2xWfQAAAAASUVORK5CYII=\",\"age\":16,\"grade\":\"11th\",\"status\":\"ACTIVE\",\"emailVerified\":true,\"socialLinks\":{\"instagram\":\"@johnqa1771897714193\",\"tiktok\":\"\",\"twitter\":\"\",\"youtube\":\"\"},\"notificationPreferences\":{\"hourApproval\":{\"email\":false,\"inApp\":true},\"hourRemoval\":{\"email\":true,\"inApp\":true},\"eventChange\":{\"email\":true,\"inApp\":true},\"orgRequest\":{\"email\":true,\"inApp\":true}},\"messagePreferences\":{\"allowFrom\":\"ADMINS_ONLY\",\"profileVisibility\":\"EVERYONE\"},\"organizationId\":null,\"organization\":null,\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School QA 1771897774359\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\",\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:49:34.437Z\"},\"classroomId\":\"cmlzy1n7q0004mu8y83fk83vr\",\"classroom\":{\"id\":\"cmlzy1n7q0004mu8y83fk83vr\",\"name\":\"General\",\"schoolId\":\"cmlzy1n4r0002mu8y605frpxa\",\"teacherId\":\"cmlzy1n380000mu8yv00au332\",\"inviteCode\":\"c69fb959\",\"isActive\":true,\"createdAt\":\"2026-02-24T01:45:39.015Z\",\"updatedAt\":\"2026-02-24T01:45:39.015Z\",\"school\":{\"id\":\"cmlzy1n4r0002mu8y605frpxa\",\"name\":\"Lincoln High School QA 1771897774359\",\"domain\":\"lincoln.edu\",\"verified\":false,\"createdById\":\"cmlzy1n380000mu8yv00au332\",\"requiredHours\":40,\"verificationStandard\":\"OPEN\",\"zipCodes\":\"[\\\"10001\\\",\\\"10002\\\"]\",\"createdAt\":\"2026-02-24T01:45:38.908Z\",\"updatedAt\":\"2026-02-24T01:49:34.437Z\"}}}"
+          "value": "{\"id\":\"cmpb8t6gl0014mupv5qct3f24\",\"email\":\"john@student.edu\",\"name\":\"John Collander\",\"role\":\"STUDENT\",\"emailVerified\":true,\"organizationId\":null,\"organization\":null,\"schoolId\":null,\"school\":null,\"classroomId\":null,\"classroom\":null,\"cohortId\":null,\"cohort\":null,\"cohorts\":[],\"beneficiaryId\":null,\"beneficiary\":null,\"phone\":null,\"grade\":\"11th\",\"house\":null,\"status\":\"ACTIVE\"}"
         },
         {
           "name": "goodhours_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWx6eTFueGMwMDBpbXU4eXA3NGhzZGNtIiwiZW1haWwiOiJqb2huQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzE4OTc2MzUsImV4cCI6MTc3MjUwMjQzNX0.tlksivT3b3MxeTGyZ9mzMoyauD09eH5YGo5L6rfE-uY"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXBiOHQ2Z2wwMDE0bXVwdjVxY3QzZjI0IiwiZW1haWwiOiJqb2huQHN0dWRlbnQuZWR1Iiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzkxMTE4NzIsImV4cCI6MTc3OTcxNjY3Mn0.Mqkxi-zv7wfEKQhCzB4lUg2s6OZy7HHDf2qhvBJ6h50"
         }
       ]
     }

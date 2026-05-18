@@ -537,7 +537,8 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
       data: {
         schoolId: user.schoolId,
         beneficiaryId: beneficiary.id,
-        status: "PENDING",
+        status: "APPROVED",
+        approvedAt: new Date(),
       },
     });
 

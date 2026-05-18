@@ -146,7 +146,10 @@ export default function SchoolRegister() {
   const handleOAuthCallback = async (code: string) => {
     const isLoginFlow = searchParams.get("state") === "login";
     try {
-      const result = await api.post<any>("/auth/google/callback", { code });
+      const stateSuffix = searchParams.get("state")
+        ? `?state=${encodeURIComponent(searchParams.get("state")!)}`
+        : "";
+      const result = await api.post<any>(`/auth/google/callback${stateSuffix}`, { code });
       if (result.token && !result.requiresSchoolRegistration) {
         loginWithToken(result.token, result.user);
         navigate("/dashboard");

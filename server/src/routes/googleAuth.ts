@@ -256,7 +256,7 @@ router.get("/callback", (req: Request, res: Response) => {
   const state = typeof req.query.state === "string" ? req.query.state : "";
   const error = typeof req.query.error === "string" ? req.query.error : "";
 
-  const target = new URL("/school/register", CLIENT_URL);
+  const target = new URL(state === "login" ? "/login" : "/school/register", CLIENT_URL);
   if (code) target.searchParams.set("code", code);
   if (state) target.searchParams.set("state", state);
   if (error) target.searchParams.set("error", error);
