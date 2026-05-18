@@ -707,29 +707,37 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
       return res.status(400).json({ error: "Not associated with a school" });
     }
 
-    const campaigns = await prisma.interventionCampaign.findMany({
-      where: {
-        schoolId: actor.schoolId,
-        ...(query.studentId ? { recipients: { some: { studentId: query.studentId } } } : {}),
-      },
-      include: {
-        actor: { select: { id: true, name: true, role: true } },
-        recipients: {
-          include: {
-            student: { select: { id: true, name: true, email: true } },
-            message: { select: { id: true, createdAt: true, subject: true, priority: true } },
-          },
-          orderBy: { createdAt: "desc" },
+    let campaigns;
+    try {
+      campaigns = await prisma.interventionCampaign.findMany({
+        where: {
+          schoolId: actor.schoolId,
+          ...(query.studentId ? { recipients: { some: { studentId: query.studentId } } } : {}),
         },
-      },
-      orderBy: { createdAt: "desc" },
-      take: query.limit ?? 25,
-    });
+        include: {
+          actor: { select: { id: true, name: true, role: true } },
+          recipients: {
+            include: {
+              student: { select: { id: true, name: true, email: true } },
+              message: { select: { id: true, createdAt: true, subject: true, priority: true } },
+            },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: query.limit ?? 25,
+      });
+    } catch (err) {
+      console.warn("[messages] Campaign history lookup failed; returning empty list:", err);
+      campaigns = [];
+    }
 
     const summaries = await Promise.all(campaigns.map(async (campaign) => {
       const recipientIds = campaign.recipients.map((recipient) => recipient.studentId);
-      const followUpSessions = recipientIds.length
-        ? await prisma.serviceSession.findMany({
+      let followUpIds = new Set<string>();
+      if (recipientIds.length) {
+        try {
+          const followUpSessions = await prisma.serviceSession.findMany({
             where: {
               userId: { in: recipientIds },
               OR: [
@@ -742,9 +750,12 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
             },
             select: { userId: true },
             distinct: ["userId"],
-          })
-        : [];
-      const followUpIds = new Set(followUpSessions.map((session) => session.userId));
+          });
+          followUpIds = new Set(followUpSessions.map((session) => session.userId));
+        } catch (err) {
+          console.warn("[messages] Follow-up session lookup failed; skipping follow-up flag:", err);
+        }
+      }
       const recipients = campaign.recipients.map((recipient) => ({
         id: recipient.id,
         studentId: recipient.student.id,

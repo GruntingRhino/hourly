@@ -19,7 +19,17 @@ export async function calculateStudentHours(
 ): Promise<Map<string, StudentHours>> {
   if (studentIds.length === 0) return new Map();
 
-  const [benSignups, selfSubs, sessions] = await Promise.all([
+  let benSignups: Array<{
+    studentId: string;
+    totalHours: number | null;
+    verificationStatus: string;
+    status: string;
+    slot: { durationHours: number } | null;
+  }> = [];
+  let selfSubs: Array<{ studentId: string; hours: number; status: string }> = [];
+  let sessions: Array<{ userId: string; totalHours: number | null; verificationStatus: string }> = [];
+
+  const queries = await Promise.allSettled([
     prisma.beneficiarySignup.findMany({
       where: {
         studentId: { in: studentIds },
@@ -44,6 +54,12 @@ export async function calculateStudentHours(
     }),
   ]);
 
+  if (queries[0].status === "fulfilled") benSignups = queries[0].value;
+  else console.warn("[hoursCalculator] beneficiarySignup lookup failed; using zero rows:", queries[0].reason);
+  if (queries[1].status === "fulfilled") selfSubs = queries[1].value;
+  else console.warn("[hoursCalculator] selfSubmittedRequest lookup failed; using zero rows:", queries[1].reason);
+  if (queries[2].status === "fulfilled") sessions = queries[2].value;
+  else console.warn("[hoursCalculator] serviceSession lookup failed; using zero rows:", queries[2].reason);
   const result = new Map<string, StudentHours>();
 
   const get = (id: string): StudentHours => {

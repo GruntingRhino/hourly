@@ -186,16 +186,23 @@ export async function buildStudentProgressRecords(
 
   const studentIds = students.map((student) => student.id);
 
-  const [hoursMap, noShowRows] = await Promise.all([
-    calculateStudentHours(studentIds),
-    prisma.beneficiarySignup.findMany({
-      where: {
-        studentId: { in: studentIds },
-        status: "NO_SHOW",
-      },
-      select: { studentId: true },
-    }),
-  ]);
+  let hoursMap = new Map<string, { approved: number; pending: number }>();
+  let noShowRows: Array<{ studentId: string }> = [];
+
+  try {
+    [hoursMap, noShowRows] = await Promise.all([
+      calculateStudentHours(studentIds),
+      prisma.beneficiarySignup.findMany({
+        where: {
+          studentId: { in: studentIds },
+          status: "NO_SHOW",
+        },
+        select: { studentId: true },
+      }),
+    ]);
+  } catch (err) {
+    console.warn("[studentProgress] Falling back to zero-hour progress due to lookup error:", err);
+  }
 
   const noShowCounts = new Map<string, number>();
   for (const row of noShowRows) {
