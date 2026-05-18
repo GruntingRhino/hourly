@@ -432,14 +432,24 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           })
         : null;
 
+      const schoolName = directorySchool?.name || data.schoolName || data.name;
+      const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
+
       const existingSchool = await prisma.school.findFirst({
-        where: { createdById: user.id },
+        where: {
+          OR: [
+            { createdById: user.id },
+            ...(data.directorySchoolId ? [{ directoryId: data.directorySchoolId }] : []),
+            ...(schoolDomain ? [{ domain: schoolDomain }] : []),
+            { name: schoolName },
+          ],
+        },
       });
 
       const school = existingSchool ?? await prisma.school.create({
         data: {
-          name: directorySchool?.name || data.schoolName || data.name,
-          domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
+          name: schoolName,
+          domain: schoolDomain || undefined,
           directoryId: data.directorySchoolId || null,
           type: directorySchool?.type || null,
           address: directorySchool?.address || null,
@@ -449,7 +459,6 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           latitude: directorySchool?.latitude || null,
           longitude: directorySchool?.longitude || null,
           verified: false,
-          createdById: user.id,
           zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
         },
       });
@@ -463,6 +472,15 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         });
       } catch (err) {
         console.error("[signup] Failed to link admin to school:", err);
+      }
+
+      try {
+        await prisma.school.update({
+          where: { id: school.id },
+          data: { createdById: user.id },
+        });
+      } catch (err) {
+        console.error("[signup] Failed to mark school creator:", err);
       }
 
       try {
