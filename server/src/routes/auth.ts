@@ -439,7 +439,6 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         const txSchool = await tx.school.create({
           data: {
             name: schoolName,
-            createdById: user.id,
             verified: false,
           },
         });

@@ -94,15 +94,31 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       });
     }
 
-    const sessions = await prisma.serviceSession.findMany({
-      where: { userId },
-      include: {
-        opportunity: {
-          include: { organization: { select: { id: true, name: true } } },
+    const fallbackResponse = {
+      totalApprovedHours: 0,
+      totalPendingHours: 0,
+      totalCommittedHours: 0,
+      requiredHours: 40,
+      activitiesCompleted: 0,
+      sessions: [],
+      approved: [],
+      pending: [],
+      committed: [],
+      rejected: [],
+      interventionCase: null,
+      warning: "Student report is temporarily unavailable.",
+    };
+
+    try {
+      const sessions = await prisma.serviceSession.findMany({
+        where: { userId },
+        include: {
+          opportunity: {
+            include: { organization: { select: { id: true, name: true } } },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      });
 
     const approved = sessions.filter((s) => s.verificationStatus === "APPROVED");
     const pending = sessions.filter((s) => s.verificationStatus === "PENDING" && s.status !== "COMMITTED");
@@ -173,6 +189,10 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
         owner: interventionCase.owner,
       } : null,
     });
+    } catch (err) {
+      console.error("Student report enrichment failed:", err);
+      res.json(fallbackResponse);
+    }
   } catch (err) {
     console.error("Student report error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -250,7 +270,8 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       select: safeSchoolSelect,
     });
     if (!school) return res.status(400).json({ error: "School not found" });
-    const selectedCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
+    try {
+      const selectedCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     // Include both legacy classroom students and new cohort students
     const students = await prisma.user.findMany({
@@ -345,6 +366,17 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       studentsCompleted: report.filter((r) => r.completed).length,
       students: report,
     });
+    } catch (err) {
+      console.error("School report enrichment failed:", err);
+      res.json({
+        schoolName: school.name,
+        requiredHours: school.requiredHours,
+        totalStudents: 0,
+        studentsCompleted: 0,
+        students: [],
+        warning: "School report is temporarily unavailable.",
+      });
+    }
   } catch (err) {
     console.error("School report error:", err);
     res.status(500).json({ error: "Internal server error" });
