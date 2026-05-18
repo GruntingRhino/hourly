@@ -328,63 +328,73 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
   const requiredHours = school?.requiredHours ?? 40;
   const assignedCohortIds = accessibleCohortIds ?? [];
 
-  const students = await prisma.user.findMany({
-    where: {
-      role: "STUDENT",
-      ...(scope.isSchoolAdmin
-        ? {
-            OR: [
-              { cohort: { schoolId: scope.schoolId } },
-              { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
-            ],
-          }
-        : {
-            OR: [
-              { cohortId: { in: assignedCohortIds } },
-              { cohortMemberships: { some: { isActive: true, cohortId: { in: assignedCohortIds } } } },
-            ],
-          }),
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      grade: true,
-      cohortId: true,
-      cohort: {
-        select: {
-          id: true,
-          name: true,
-          requiredHours: true,
-          serviceStartDate: true,
-          serviceEndDate: true,
-        },
+  let students: Array<any> = [];
+  try {
+    students = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        ...(scope.isSchoolAdmin
+          ? {
+              OR: [
+                { cohort: { schoolId: scope.schoolId } },
+                { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
+              ],
+            }
+          : {
+              OR: [
+                { cohortId: { in: assignedCohortIds } },
+                { cohortMemberships: { some: { isActive: true, cohortId: { in: assignedCohortIds } } } },
+              ],
+            }),
       },
-      cohortMemberships: {
-        where: { isActive: true },
-        orderBy: [{ updatedAt: "desc" }],
-        select: {
-          cohortId: true,
-          isActive: true,
-          cohort: {
-            select: {
-              id: true,
-              name: true,
-              requiredHours: true,
-              serviceStartDate: true,
-              serviceEndDate: true,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        grade: true,
+        cohortId: true,
+        cohort: {
+          select: {
+            id: true,
+            name: true,
+            requiredHours: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
+        cohortMemberships: {
+          where: { isActive: true },
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            cohortId: true,
+            isActive: true,
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                requiredHours: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.warn("[cohorts] student lookup failed; returning empty progress:", err);
+  }
 
-  const progress = await buildStudentProgressRecords(students, {
-    requiredHours,
-    serviceStartDate: school?.serviceStartDate ?? null,
-    serviceEndDate: school?.serviceEndDate ?? null,
-  });
+  let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+  try {
+    progress = await buildStudentProgressRecords(students, {
+      requiredHours,
+      serviceStartDate: school?.serviceStartDate ?? null,
+      serviceEndDate: school?.serviceEndDate ?? null,
+    });
+  } catch (err) {
+    console.warn("[cohorts] progress calculation failed; returning empty progress:", err);
+  }
   const progressByCohort = new Map<string, typeof progress>();
   for (const student of progress) {
     const sourceStudent = students.find((row) => row.id === student.id);
@@ -541,59 +551,74 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
     });
     const studentWhere = buildCohortScopedStudentWhere(scope);
     const defaultRequired = school?.requiredHours ?? 40;
-    const students = await prisma.user.findMany({
-      where: { role: "STUDENT", ...studentWhere },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        grade: true,
-        cohortId: true,
-        cohort: {
-          select: {
-            id: true,
-            name: true,
-            requiredHours: true,
-            serviceStartDate: true,
-            serviceEndDate: true,
+    let students: Array<any> = [];
+    try {
+      students = await prisma.user.findMany({
+        where: { role: "STUDENT", ...studentWhere },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          grade: true,
+          cohortId: true,
+          cohort: {
+            select: {
+              id: true,
+              name: true,
+              requiredHours: true,
+              serviceStartDate: true,
+              serviceEndDate: true,
+            },
           },
-        },
-        cohortMemberships: {
-          where: { isActive: true },
-          orderBy: [{ updatedAt: "desc" }],
-          select: {
-            cohortId: true,
-            isActive: true,
-            cohort: {
-              select: {
-                id: true,
-                name: true,
-                requiredHours: true,
-                serviceStartDate: true,
-                serviceEndDate: true,
+          cohortMemberships: {
+            where: { isActive: true },
+            orderBy: [{ updatedAt: "desc" }],
+            select: {
+              cohortId: true,
+              isActive: true,
+              cohort: {
+                select: {
+                  id: true,
+                  name: true,
+                  requiredHours: true,
+                  serviceStartDate: true,
+                  serviceEndDate: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: [{ cohort: { name: "asc" } }, { name: "asc" }],
-    });
+        orderBy: [{ cohort: { name: "asc" } }, { name: "asc" }],
+      });
+    } catch (err) {
+      console.warn("[cohorts] school-students lookup failed; returning empty list:", err);
+    }
 
-    const progress = await buildStudentProgressRecords(students, {
-      requiredHours: defaultRequired,
-      serviceStartDate: school?.serviceStartDate ?? null,
-      serviceEndDate: school?.serviceEndDate ?? null,
-    });
+    let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+    try {
+      progress = await buildStudentProgressRecords(students, {
+        requiredHours: defaultRequired,
+        serviceStartDate: school?.serviceStartDate ?? null,
+        serviceEndDate: school?.serviceEndDate ?? null,
+      });
+    } catch (err) {
+      console.warn("[cohorts] school-students progress failed; returning empty list:", err);
+    }
 
-    const cases = await prisma.interventionCase.findMany({
-      where: {
-        schoolId: scope.schoolId,
-        studentId: { in: progress.map((student) => student.id) },
-      },
-      include: {
-        owner: { select: { id: true, name: true, role: true } },
-      },
-    }).catch(() => []);
+    let cases: any[] = [];
+    try {
+      cases = await prisma.interventionCase.findMany({
+        where: {
+          schoolId: scope.schoolId,
+          studentId: { in: progress.map((student) => student.id) },
+        },
+        include: {
+          owner: { select: { id: true, name: true, role: true } },
+        },
+      });
+    } catch (err) {
+      console.warn("[cohorts] intervention case lookup failed; skipping case data:", err);
+    }
     const casesByStudentId = new Map(cases.map((item) => [item.studentId, item]));
 
     res.json(progress.map((student) => {

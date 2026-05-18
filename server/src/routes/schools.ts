@@ -2308,11 +2308,16 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       orderBy: { name: "asc" },
     });
 
-    const progress = await buildStudentProgressRecords(students, {
-      requiredHours: school.requiredHours,
-      serviceStartDate: school.serviceStartDate,
-      serviceEndDate: school.serviceEndDate,
-    });
+    let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+    try {
+      progress = await buildStudentProgressRecords(students, {
+        requiredHours: school.requiredHours,
+        serviceStartDate: school.serviceStartDate,
+        serviceEndDate: school.serviceEndDate,
+      });
+    } catch (err) {
+      console.warn("[schools] at-risk progress failed; returning empty list:", err);
+    }
 
     const atRisk = progress
       .filter((student) => student.status === "AT_RISK")
