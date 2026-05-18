@@ -441,6 +441,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
             name: schoolName,
             verified: false,
           },
+          select: { id: true, name: true },
         });
 
         signupStage = "transaction.school.update";
@@ -459,6 +460,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
               longitude: directorySchool?.longitude ?? undefined,
               zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
             },
+            select: { id: true, name: true },
           });
         } catch (err) {
           console.error("[signup] Failed to apply school metadata:", err);

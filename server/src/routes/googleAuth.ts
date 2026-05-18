@@ -603,6 +603,7 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
           registrationToken: magicToken,
           registrationTokenExpires: expiresAt,
         },
+        select: { id: true, name: true },
       });
 
       try {
@@ -620,6 +621,7 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
             domain: dirEntry?.emailDomain || undefined,
             registrationEmail: data.contactEmail,
           },
+          select: { id: true, name: true },
         });
       } catch (err) {
         console.error("[register-school] Failed to apply school metadata:", err);
