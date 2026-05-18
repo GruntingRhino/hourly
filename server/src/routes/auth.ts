@@ -353,6 +353,7 @@ function emailDomainMatchesWebsite(emailDomain: string, websiteDomain: string): 
 
 // POST /api/auth/signup
 router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
+  let signupStage = "parse";
   try {
     const data = signupSchema.parse(req.body);
     data.email = normalizeEmail(data.email);
@@ -419,6 +420,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
     const { user, school } = await prisma.$transaction(async (tx) => {
+      signupStage = "transaction.user.create";
       // Create the user first (school creation needs user id)
       const txUser = await tx.user.create({
         data: {
@@ -432,6 +434,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         },
       });
 
+      signupStage = "transaction.school.lookup";
       const existingSchool = await tx.school.findFirst({
         where: {
           OR: [
@@ -443,6 +446,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         },
       });
 
+      signupStage = "transaction.school.create";
       const txSchool = existingSchool ?? await tx.school.create({
         data: {
           name: schoolName,
@@ -451,6 +455,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         },
       });
 
+      signupStage = "transaction.school.update";
       try {
         await tx.school.update({
           where: { id: txSchool.id },
@@ -471,6 +476,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         console.error("[signup] Failed to apply school metadata:", err);
       }
 
+      signupStage = "transaction.user.update";
       await tx.user.update({
         where: { id: txUser.id },
         data: { schoolId: txSchool.id },
@@ -576,8 +582,8 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: err.errors });
     }
-    console.error("Signup error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Signup error:", err, { signupStage });
+    res.status(500).json({ error: "Internal server error", stage: signupStage });
   }
 });
 
