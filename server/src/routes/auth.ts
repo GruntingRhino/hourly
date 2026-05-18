@@ -184,6 +184,11 @@ const loginProfileInclude = {
     include: { cohort: { include: { school: { select: schoolAuthSelect } } } },
     orderBy: { updatedAt: "desc" },
   },
+  createdSchools: {
+    select: schoolAuthSelect,
+    orderBy: { createdAt: "asc" },
+    take: 1,
+  },
   beneficiary: true,
 } as const;
 
@@ -427,37 +432,38 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
           })
         : null;
 
-      const school = await prisma.$transaction(async (tx) => {
-        const existingSchool = await tx.school.findFirst({
-          where: { createdById: user.id },
-        });
-        const createdSchool = existingSchool ?? await tx.school.create({
-          data: {
-            name: directorySchool?.name || data.schoolName || data.name,
-            domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
-            directoryId: data.directorySchoolId || null,
-            type: directorySchool?.type || null,
-            address: directorySchool?.address || null,
-            city: directorySchool?.city || null,
-            state: directorySchool?.state || null,
-            zip: directorySchool?.zip || null,
-            latitude: directorySchool?.latitude || null,
-            longitude: directorySchool?.longitude || null,
-            verified: false,
-            createdById: user.id,
-            zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
-          },
-        });
+      const existingSchool = await prisma.school.findFirst({
+        where: { createdById: user.id },
+      });
 
-        await tx.user.update({
-          where: { id: user.id },
-          data: { schoolId: createdSchool.id },
-        });
-
-        return createdSchool;
+      const school = existingSchool ?? await prisma.school.create({
+        data: {
+          name: directorySchool?.name || data.schoolName || data.name,
+          domain: directorySchool?.emailDomain || data.schoolDomain || undefined,
+          directoryId: data.directorySchoolId || null,
+          type: directorySchool?.type || null,
+          address: directorySchool?.address || null,
+          city: directorySchool?.city || null,
+          state: directorySchool?.state || null,
+          zip: directorySchool?.zip || null,
+          latitude: directorySchool?.latitude || null,
+          longitude: directorySchool?.longitude || null,
+          verified: false,
+          createdById: user.id,
+          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
+        },
       });
 
       schoolId = school.id;
+
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { schoolId: school.id },
+        });
+      } catch (err) {
+        console.error("[signup] Failed to link admin to school:", err);
+      }
 
       try {
         const existingClassroom = await prisma.classroom.findFirst({

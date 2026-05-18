@@ -16,6 +16,7 @@ export function resolveSchoolIdFromUserAssociations<T extends {
   classroom?: SchoolRef;
   cohort?: SchoolRef;
   cohortMemberships?: CohortMembershipRef[];
+  createdSchools?: SchoolRef[];
 }>(user: T | null | undefined): string | null {
   if (!user) return null;
   return (
@@ -28,6 +29,8 @@ export function resolveSchoolIdFromUserAssociations<T extends {
     user.cohort?.id ??
     user.cohortMemberships?.[0]?.cohort?.schoolId ??
     user.cohortMemberships?.[0]?.cohort?.id ??
+    user.createdSchools?.[0]?.id ??
+    user.createdSchools?.[0]?.schoolId ??
     null
   );
 }
@@ -37,11 +40,13 @@ export function resolveSchoolFromUserAssociations<T extends {
   classroom?: { school?: SchoolRef } | null;
   cohort?: { school?: SchoolRef } | null;
   cohortMemberships?: Array<{ cohort?: { school?: SchoolRef } | null }>;
+  createdSchools?: SchoolRef[];
 }>(user: T | null | undefined): SchoolRef {
   if (!user) return null;
   return user.school
     ?? user.classroom?.school
     ?? user.cohort?.school
     ?? user.cohortMemberships?.[0]?.cohort?.school
+    ?? user.createdSchools?.[0]
     ?? null;
 }
