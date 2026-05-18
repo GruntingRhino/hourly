@@ -616,36 +616,58 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
     });
 
     // Link admin to school
-    await prisma.user.update({
-      where: { id: adminUser.id },
-      data: { schoolId: school.id },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: adminUser.id },
+        data: { schoolId: school.id },
+      });
+    } catch (err) {
+      console.error("[register-school] Failed to link admin to school:", err);
+    }
 
     // Mark directory entry as claimed
     if (data.directorySchoolId) {
       await prisma.schoolDirectory.update({
         where: { id: data.directorySchoolId },
         data: { claimed: true, claimedBySchoolId: school.id },
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error("[register-school] Failed to mark SchoolDirectory row as claimed:", err);
+      });
     }
 
-    // Create the school's private beneficiary so it can post opportunities immediately
-    const schoolBeneficiary = await prisma.beneficiary.create({
-      data: {
-        name: school.name,
-        visibility: "PRIVATE",
-        status: "ACTIVE",
-        createdBySchoolId: school.id,
-      },
-    });
-    await prisma.schoolBeneficiaryApproval.create({
-      data: {
-        schoolId: school.id,
-        beneficiaryId: schoolBeneficiary.id,
-        status: "APPROVED",
-        approvedAt: new Date(),
-      },
-    });
+    // Create the school's private beneficiary so it can post opportunities immediately.
+    // This is best-effort so a duplicate/legacy data issue can't abort registration
+    // after the school and admin user have already been created.
+    try {
+      const schoolBeneficiary =
+        (await prisma.beneficiary.findFirst({
+          where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
+        })) ??
+        (await prisma.beneficiary.create({
+          data: {
+            name: school.name,
+            visibility: "PRIVATE",
+            status: "ACTIVE",
+            createdBySchoolId: school.id,
+          },
+        }));
+
+      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
+      });
+      if (!existingApproval) {
+        await prisma.schoolBeneficiaryApproval.create({
+          data: {
+            schoolId: school.id,
+            beneficiaryId: schoolBeneficiary.id,
+            status: "APPROVED",
+            approvedAt: new Date(),
+          },
+        });
+      }
+    } catch (err) {
+      console.error("[register-school] Failed to create default school beneficiary:", err);
+    }
 
     // Link to BeneficiaryDirectory if a directory school was chosen
     try {
