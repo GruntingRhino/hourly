@@ -599,7 +599,6 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       const txSchool = await tx.school.create({
         data: {
           name: dirEntry?.name || data.schoolName,
-          createdById: adminUser.id,
           verified: false,
           registrationToken: magicToken,
           registrationTokenExpires: expiresAt,
@@ -642,6 +641,15 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       }).catch((err) => {
         console.error("[register-school] Failed to mark SchoolDirectory row as claimed:", err);
       });
+    }
+
+    try {
+      await prisma.school.update({
+        where: { id: school.id },
+        data: { createdById: adminUser.id },
+      });
+    } catch (err) {
+      console.error("[register-school] Failed to mark school creator:", err);
     }
 
     // Create the school's private beneficiary so it can post opportunities immediately.

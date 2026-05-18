@@ -438,10 +438,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
       const txSchool = await tx.school.create({
         data: {
           name: schoolName,
-          createdById: txUser.id,
           verified: false,
-          ...(schoolDomain ? { domain: schoolDomain } : {}),
-          ...(data.directorySchoolId ? { directoryId: data.directorySchoolId } : {}),
         },
       });
 
@@ -476,6 +473,15 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     });
 
     schoolId = school.id;
+
+    try {
+      await prisma.school.update({
+        where: { id: school.id },
+        data: { createdById: user.id },
+      });
+    } catch (err) {
+      console.error("[signup] Failed to mark school creator:", err);
+    }
 
     try {
       const existingClassroom = await prisma.classroom.findFirst({
