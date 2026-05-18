@@ -587,7 +587,9 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
       return res.status(400).json({ error: "Validation failed", details: err.errors });
     }
     console.error("Signup error:", err, { signupStage });
-    res.status(500).json({ error: "Internal server error", stage: signupStage });
+    const errorCode = typeof err === "object" && err && "code" in err ? String((err as any).code) : undefined;
+    const errorMeta = typeof err === "object" && err && "meta" in err ? (err as any).meta : undefined;
+    res.status(500).json({ error: "Internal server error", stage: signupStage, errorCode, errorMeta });
   }
 });
 
