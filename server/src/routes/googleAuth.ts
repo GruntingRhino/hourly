@@ -595,35 +595,44 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       ? await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } })
       : null;
 
-    const school = await prisma.school.create({
-      data: {
-        name: dirEntry?.name || data.schoolName,
-        type: dirEntry?.type || null,
-        address: dirEntry?.address || null,
-        city: dirEntry?.city || data.schoolCity || null,
-        state: dirEntry?.state || data.schoolState || null,
-        zip: dirEntry?.zip || data.schoolZip || null,
-        latitude: dirEntry?.latitude || null,
-        longitude: dirEntry?.longitude || null,
-        directoryId: data.directorySchoolId || null,
-        domain: dirEntry?.emailDomain || null,
-        verified: false,
-        createdById: adminUser.id,
-        registrationToken: magicToken,
-        registrationTokenExpires: expiresAt,
-        registrationEmail: data.contactEmail,
-      },
-    });
-
-    // Link admin to school
-    try {
-      await prisma.user.update({
-        where: { id: adminUser.id },
-        data: { schoolId: school.id },
+    const school = await prisma.$transaction(async (tx) => {
+      const txSchool = await tx.school.create({
+        data: {
+          name: dirEntry?.name || data.schoolName,
+          createdById: adminUser.id,
+          verified: false,
+          registrationToken: magicToken,
+          registrationTokenExpires: expiresAt,
+        },
       });
-    } catch (err) {
-      console.error("[register-school] Failed to link admin to school:", err);
-    }
+
+      try {
+        await tx.school.update({
+          where: { id: txSchool.id },
+          data: {
+            type: dirEntry?.type || undefined,
+            address: dirEntry?.address || undefined,
+            city: dirEntry?.city || data.schoolCity || undefined,
+            state: dirEntry?.state || data.schoolState || undefined,
+            zip: dirEntry?.zip || data.schoolZip || undefined,
+            latitude: dirEntry?.latitude ?? undefined,
+            longitude: dirEntry?.longitude ?? undefined,
+            directoryId: data.directorySchoolId || undefined,
+            domain: dirEntry?.emailDomain || undefined,
+            registrationEmail: data.contactEmail,
+          },
+        });
+      } catch (err) {
+        console.error("[register-school] Failed to apply school metadata:", err);
+      }
+
+      await tx.user.update({
+        where: { id: adminUser.id },
+        data: { schoolId: txSchool.id },
+      });
+
+      return txSchool;
+    });
 
     // Mark directory entry as claimed
     if (data.directorySchoolId) {

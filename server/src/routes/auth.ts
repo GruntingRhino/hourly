@@ -396,49 +396,46 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create the user first (school creation needs user id)
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        passwordHash,
-        name: data.name,
-        role: data.role,
-        emailVerified: false,
-        emailVerificationToken,
-        emailVerificationExpires,
-      },
-    });
+    const directorySchool = data.directorySchoolId
+      ? await prisma.schoolDirectory.findUnique({
+          where: { id: data.directorySchoolId },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            address: true,
+            city: true,
+            state: true,
+            zip: true,
+            latitude: true,
+            longitude: true,
+            emailDomain: true,
+            claimed: true,
+          },
+        })
+      : null;
 
-    // If signing up as a school admin, create the school first and keep
-    // follow-up setup best-effort so a downstream helper failure can't abort
-    // the whole signup after the user record already exists.
-    if (data.role === "SCHOOL_ADMIN") {
-      const directorySchool = data.directorySchoolId
-        ? await prisma.schoolDirectory.findUnique({
-            where: { id: data.directorySchoolId },
-            select: {
-              id: true,
-              name: true,
-              type: true,
-              address: true,
-              city: true,
-              state: true,
-              zip: true,
-              latitude: true,
-              longitude: true,
-              emailDomain: true,
-              claimed: true,
-            },
-          })
-        : null;
+    const schoolName = directorySchool?.name || data.schoolName || data.name;
+    const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
-      const schoolName = directorySchool?.name || data.schoolName || data.name;
-      const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
+    const { user, school } = await prisma.$transaction(async (tx) => {
+      // Create the user first (school creation needs user id)
+      const txUser = await tx.user.create({
+        data: {
+          email: data.email,
+          passwordHash,
+          name: data.name,
+          role: data.role,
+          emailVerified: false,
+          emailVerificationToken,
+          emailVerificationExpires,
+        },
+      });
 
-      const existingSchool = await prisma.school.findFirst({
+      const existingSchool = await tx.school.findFirst({
         where: {
           OR: [
-            { createdById: user.id },
+            { createdById: txUser.id },
             ...(data.directorySchoolId ? [{ directoryId: data.directorySchoolId }] : []),
             ...(schoolDomain ? [{ domain: schoolDomain }] : []),
             { name: schoolName },
@@ -446,109 +443,108 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         },
       });
 
-      const school = existingSchool ?? await prisma.school.create({
+      const txSchool = existingSchool ?? await tx.school.create({
         data: {
           name: schoolName,
-          domain: schoolDomain || undefined,
-          directoryId: data.directorySchoolId || null,
-          type: directorySchool?.type || null,
-          address: directorySchool?.address || null,
-          city: directorySchool?.city || null,
-          state: directorySchool?.state || null,
-          zip: directorySchool?.zip || null,
-          latitude: directorySchool?.latitude || null,
-          longitude: directorySchool?.longitude || null,
+          createdById: txUser.id,
           verified: false,
-          createdById: user.id,
-          zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : null,
         },
       });
 
-      schoolId = school.id;
-
       try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { schoolId: school.id },
-        });
-      } catch (err) {
-        console.error("[signup] Failed to link admin to school:", err);
-      }
-
-      try {
-        await prisma.school.update({
-          where: { id: school.id },
-          data: { createdById: user.id },
-        });
-      } catch (err) {
-        console.error("[signup] Failed to mark school creator:", err);
-      }
-
-      try {
-        const existingClassroom = await prisma.classroom.findFirst({
-          where: { schoolId: school.id, name: "General" },
-        });
-        if (!existingClassroom) {
-          const inviteCode = crypto.randomBytes(4).toString("hex");
-          await prisma.classroom.create({
-            data: {
-              name: "General",
-              schoolId: school.id,
-              teacherId: user.id,
-              inviteCode,
-            },
-          });
-        }
-      } catch (err) {
-        console.error("[signup] Failed to create default classroom:", err);
-      }
-
-      try {
-        const schoolBeneficiary = await prisma.beneficiary.findFirst({
-          where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
-        }) ?? await prisma.beneficiary.create({
+        await tx.school.update({
+          where: { id: txSchool.id },
           data: {
-            name: school.name,
-            visibility: "PRIVATE",
-            status: "ACTIVE",
-            createdBySchoolId: school.id,
+            domain: schoolDomain || undefined,
+            directoryId: data.directorySchoolId || undefined,
+            type: directorySchool?.type || undefined,
+            address: directorySchool?.address || undefined,
+            city: directorySchool?.city || undefined,
+            state: directorySchool?.state || undefined,
+            zip: directorySchool?.zip || undefined,
+            latitude: directorySchool?.latitude ?? undefined,
+            longitude: directorySchool?.longitude ?? undefined,
+            zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
           },
         });
-        const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
-          where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
-        });
-        if (!existingApproval) {
-          await prisma.schoolBeneficiaryApproval.create({
-            data: {
-              schoolId: school.id,
-              beneficiaryId: schoolBeneficiary.id,
-              status: "APPROVED",
-              approvedAt: new Date(),
-            },
-          });
-        }
       } catch (err) {
-        console.error("[signup] Failed to create default school beneficiary:", err);
+        console.error("[signup] Failed to apply school metadata:", err);
       }
 
-      // Link to BeneficiaryDirectory if a directory school was chosen
-      try {
-        await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
-      } catch (err) {
-        console.error("[signup] Failed to link school to BeneficiaryDirectory:", err);
-      }
+      await tx.user.update({
+        where: { id: txUser.id },
+        data: { schoolId: txSchool.id },
+      });
 
-      if (directorySchool && !directorySchool.claimed) {
-        await prisma.schoolDirectory.update({
-          where: { id: directorySchool.id },
+      return { user: txUser, school: txSchool };
+    });
+
+    schoolId = school.id;
+
+    try {
+      const existingClassroom = await prisma.classroom.findFirst({
+        where: { schoolId: school.id, name: "General" },
+      });
+      if (!existingClassroom) {
+        const inviteCode = crypto.randomBytes(4).toString("hex");
+        await prisma.classroom.create({
           data: {
-            claimed: true,
-            claimedBySchoolId: school.id,
+            name: "General",
+            schoolId: school.id,
+            teacherId: user.id,
+            inviteCode,
           },
-        }).catch((err) => {
-          console.error("[signup] Failed to mark SchoolDirectory row as claimed:", err);
         });
       }
+    } catch (err) {
+      console.error("[signup] Failed to create default classroom:", err);
+    }
+
+    try {
+      const schoolBeneficiary = await prisma.beneficiary.findFirst({
+        where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
+      }) ?? await prisma.beneficiary.create({
+        data: {
+          name: school.name,
+          visibility: "PRIVATE",
+          status: "ACTIVE",
+          createdBySchoolId: school.id,
+        },
+      });
+      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
+      });
+      if (!existingApproval) {
+        await prisma.schoolBeneficiaryApproval.create({
+          data: {
+            schoolId: school.id,
+            beneficiaryId: schoolBeneficiary.id,
+            status: "APPROVED",
+            approvedAt: new Date(),
+          },
+        });
+      }
+    } catch (err) {
+      console.error("[signup] Failed to create default school beneficiary:", err);
+    }
+
+    // Link to BeneficiaryDirectory if a directory school was chosen
+    try {
+      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
+    } catch (err) {
+      console.error("[signup] Failed to link school to BeneficiaryDirectory:", err);
+    }
+
+    if (directorySchool && !directorySchool.claimed) {
+      await prisma.schoolDirectory.update({
+        where: { id: directorySchool.id },
+        data: {
+          claimed: true,
+          claimedBySchoolId: school.id,
+        },
+      }).catch((err) => {
+        console.error("[signup] Failed to mark SchoolDirectory row as claimed:", err);
+      });
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
