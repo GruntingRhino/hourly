@@ -419,58 +419,66 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     const schoolName = directorySchool?.name || data.schoolName || data.name;
     const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
-    const { user, school } = await prisma.$transaction(async (tx) => {
-      signupStage = "transaction.user.create";
-      // Create the user first (school creation needs user id)
-      const txUser = await tx.user.create({
-        data: {
-          email: data.email,
-          passwordHash,
-          name: data.name,
-          role: data.role,
-          emailVerified: false,
-          emailVerificationToken,
-          emailVerificationExpires,
-        },
-      });
+    signupStage = "user.create";
+    const user = await prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash,
+        name: data.name,
+        role: data.role,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpires,
+      },
+    });
 
+    let school;
+    try {
       signupStage = "transaction.school.create";
-      const txSchool = await tx.school.create({
-        data: {
-          name: schoolName,
-          verified: false,
-        },
-      });
-
-      signupStage = "transaction.school.update";
-      try {
-        await tx.school.update({
-          where: { id: txSchool.id },
+      school = await prisma.$transaction(async (tx) => {
+        const txSchool = await tx.school.create({
           data: {
-            domain: schoolDomain || undefined,
-            directoryId: data.directorySchoolId || undefined,
-            type: directorySchool?.type || undefined,
-            address: directorySchool?.address || undefined,
-            city: directorySchool?.city || undefined,
-            state: directorySchool?.state || undefined,
-            zip: directorySchool?.zip || undefined,
-            latitude: directorySchool?.latitude ?? undefined,
-            longitude: directorySchool?.longitude ?? undefined,
-            zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
+            name: schoolName,
+            createdById: user.id,
+            verified: false,
           },
         });
-      } catch (err) {
-        console.error("[signup] Failed to apply school metadata:", err);
-      }
 
-      signupStage = "transaction.user.update";
-      await tx.user.update({
-        where: { id: txUser.id },
-        data: { schoolId: txSchool.id },
+        signupStage = "transaction.school.update";
+        try {
+          await tx.school.update({
+            where: { id: txSchool.id },
+            data: {
+              domain: schoolDomain || undefined,
+              directoryId: data.directorySchoolId || undefined,
+              type: directorySchool?.type || undefined,
+              address: directorySchool?.address || undefined,
+              city: directorySchool?.city || undefined,
+              state: directorySchool?.state || undefined,
+              zip: directorySchool?.zip || undefined,
+              latitude: directorySchool?.latitude ?? undefined,
+              longitude: directorySchool?.longitude ?? undefined,
+              zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
+            },
+          });
+        } catch (err) {
+          console.error("[signup] Failed to apply school metadata:", err);
+        }
+
+        signupStage = "transaction.user.update";
+        await tx.user.update({
+          where: { id: user.id },
+          data: { schoolId: txSchool.id },
+        });
+
+        return txSchool;
       });
-
-      return { user: txUser, school: txSchool };
-    });
+    } catch (err) {
+      await prisma.user.delete({ where: { id: user.id } }).catch((cleanupErr) => {
+        console.error("[signup] Failed to clean up orphaned user after school creation failure:", cleanupErr);
+      });
+      throw err;
+    }
 
     schoolId = school.id;
 
