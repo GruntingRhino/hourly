@@ -434,29 +434,14 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
         },
       });
 
-      signupStage = "transaction.school.lookup";
-      let existingSchool = null;
-      try {
-        existingSchool = await tx.school.findFirst({
-          where: {
-            OR: [
-              { createdById: txUser.id },
-              ...(data.directorySchoolId ? [{ directoryId: data.directorySchoolId }] : []),
-              ...(schoolDomain ? [{ domain: schoolDomain }] : []),
-              { name: schoolName },
-            ],
-          },
-        });
-      } catch (err) {
-        console.error("[signup] School reuse lookup failed; creating a fresh school instead:", err);
-      }
-
       signupStage = "transaction.school.create";
-      const txSchool = existingSchool ?? await tx.school.create({
+      const txSchool = await tx.school.create({
         data: {
           name: schoolName,
           createdById: txUser.id,
           verified: false,
+          ...(schoolDomain ? { domain: schoolDomain } : {}),
+          ...(data.directorySchoolId ? { directoryId: data.directorySchoolId } : {}),
         },
       });
 
