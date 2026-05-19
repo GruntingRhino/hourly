@@ -23,6 +23,7 @@ interface Signup {
     endTime: string;
     durationHours: number;
     opportunity: {
+      id: string;
       title: string;
       location: string | null;
       beneficiary: { id: string; name: string; category: string | null };
@@ -261,21 +262,59 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Array<{
+    id: string;
+    opportunityId: string;
+    status: string;
+    verificationStatus: string;
+    checkInTime: string | null;
+    checkOutTime: string | null;
+    submittedAt: string | null;
+    totalHours: number | null;
+    opportunity: {
+      id: string;
+      title: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+    };
+  }>>([]);
+  const [verificationSession, setVerificationSession] = useState<(typeof sessions)[number] | null>(null);
+  const [verificationSignature, setVerificationSignature] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     setError("");
     try {
-      const [s, ss, slots, report] = await Promise.all([
+      const [s, ss, slots, report, studentSessions] = await Promise.all([
         api.get<Signup[]>("/beneficiaries/my-signups"),
         api.get<SelfSubmission[]>("/self-submissions").catch(() => [] as SelfSubmission[]),
         api.get<AvailableSlot[]>("/beneficiaries/available-slots").catch(() => [] as AvailableSlot[]),
         api.get<HourTotals>("/reports/student").catch(() => null),
+        api.get<Array<{
+          id: string;
+          opportunityId: string;
+          status: string;
+          verificationStatus: string;
+          checkInTime: string | null;
+          checkOutTime: string | null;
+          submittedAt: string | null;
+          totalHours: number | null;
+          opportunity: {
+            id: string;
+            title: string;
+            date: string;
+            startTime: string;
+            endTime: string;
+          };
+        }>>("/sessions/my").catch(() => []),
       ]);
       setSignups(s);
       setSelfSubs(ss);
       setAvailableSlots(slots);
       setHourTotals(report);
+      setSessions(studentSessions);
     } catch {
       setError("Failed to load dashboard. Please refresh the page.");
     } finally {
@@ -298,6 +337,38 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleSessionAction = async (sessionId: string, action: "checkin" | "checkout") => {
+    try {
+      await api.post(`/sessions/${sessionId}/${action}`, {});
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || `Failed to ${action === "checkin" ? "check in" : "check out"}.`);
+    }
+  };
+
+  const handleVerificationSubmit = async () => {
+    if (!verificationSession) return;
+    const signature = verificationSignature.trim();
+    if (!signature) {
+      alert("Please type your full name to sign the verification.");
+      return;
+    }
+    setVerificationLoading(true);
+    try {
+      await api.post(`/sessions/${verificationSession.id}/submit-verification`, {
+        signatureType: "DRAWN",
+        signatureData: signature,
+      });
+      setVerificationSession(null);
+      setVerificationSignature("");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Failed to submit verification.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
@@ -316,6 +387,7 @@ export default function StudentDashboard() {
   const upcoming = signups
     .filter((s) => s.status === "CONFIRMED" && new Date(s.slot.date) >= now)
     .sort((a, b) => new Date(a.slot.date).getTime() - new Date(b.slot.date).getTime());
+  const sessionByOpportunityId = new Map(sessions.map((session) => [session.opportunityId, session]));
 
   const recentActivity: RecentActivityItem[] = [
     ...signups.flatMap((s) => s.auditLogs.map((audit) => describeSignupAuditEvent(s, audit))),
@@ -482,7 +554,76 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Stats cards */}
+      {upcoming.length > 0 && (
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[15px] font-semibold text-gray-900">Attendance & Verification</h2>
+            <span className="text-[12px] text-gray-500">Check in at start, check out when you finish</span>
+          </div>
+          <div className="space-y-3">
+            {upcoming.slice(0, 3).map((signup) => {
+              const session = sessionByOpportunityId.get(signup.slot.opportunity.id);
+              const sessionStatus = session?.status ?? signup.status;
+              const isPendingCheckIn = sessionStatus === "PENDING_CHECKIN" || sessionStatus === "COMMITTED";
+              const isCheckedIn = sessionStatus === "CHECKED_IN";
+              const isCheckedOut = sessionStatus === "CHECKED_OUT";
+              const canVerify = isCheckedOut || session?.verificationStatus === "PENDING";
+
+              return (
+                <div key={signup.id} className="rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-gray-900">{signup.slot.opportunity.title}</div>
+                      <div className="text-sm text-gray-500 mt-0.5">
+                        {new Date(signup.slot.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · {signup.slot.startTime}–{signup.slot.endTime}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{signup.slot.opportunity.beneficiary.name}</div>
+                    </div>
+                    <StatusBadge status={session?.verificationStatus === "APPROVED" ? "APPROVED" : signup.verificationStatus} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {session && isPendingCheckIn && (
+                      <button
+                        onClick={() => handleSessionAction(session.id, "checkin")}
+                        className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        Check In
+                      </button>
+                    )}
+                    {session && isCheckedIn && (
+                      <button
+                        onClick={() => handleSessionAction(session.id, "checkout")}
+                        className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                      >
+                        Check Out
+                      </button>
+                    )}
+                    {session && canVerify && (
+                      <button
+                        onClick={() => setVerificationSession(session)}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Submit Verification
+                      </button>
+                    )}
+                    {session?.status === "CHECKED_OUT" && session.verificationStatus === "PENDING" && (
+                      <span className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                        Awaiting school review
+                      </span>
+                    )}
+                    {session?.verificationStatus === "APPROVED" && (
+                      <span className="rounded-md bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Verified Hours</div>
@@ -650,6 +791,44 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      {verificationSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-2 text-lg font-semibold text-gray-900">Submit Verification</div>
+            <div className="text-sm text-gray-600 mb-4">
+              Type your full name to sign the verification for <strong>{verificationSession.opportunity.title}</strong>.
+            </div>
+            <input
+              type="text"
+              value={verificationSignature}
+              onChange={(e) => setVerificationSignature(e.target.value)}
+              placeholder="Your full name"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setVerificationSession(null);
+                  setVerificationSignature("");
+                }}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleVerificationSubmit}
+                disabled={verificationLoading}
+                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {verificationLoading ? "Submitting…" : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

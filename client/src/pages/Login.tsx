@@ -225,7 +225,7 @@ export default function Login() {
               </p>
               <div className="flex gap-2">
                 <input
-                  type="email"
+                  type="text"
                   value={devGoogleEmail}
                   onChange={(e) => setDevGoogleEmail(e.target.value)}
                   placeholder="dev@any-domain.test"

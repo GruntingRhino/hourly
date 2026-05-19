@@ -362,6 +362,27 @@ router.patch("/settings", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
   }
 });
 
+// GET /api/schools/my-rules — student-facing school service rules used by Browse
+router.get("/my-rules", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const rules = await resolveEffectiveRules(req.user!.userId);
+    if (!rules) {
+      return res.json({ blockedCategories: [], categoryCapStatuses: [] });
+    }
+
+    const categoryCapStatuses = await getCategoryCapStatusesForStudent(req.user!.userId);
+    const blockedCategories = categoryCapStatuses
+      .filter((status) => status.maxedOut || status.alreadyOverCap)
+      .map((status) => status.category)
+      .sort((a, b) => a.localeCompare(b));
+
+    res.json({ blockedCategories, categoryCapStatuses });
+  } catch (err) {
+    console.error("Student school rules error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/schools/:id/staff — list school staff and their accessible cohorts
 router.get("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {

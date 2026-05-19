@@ -1,1 +1,21 @@
-During rework.
+GoodHours / Hourly
+
+A school service-hours platform for students, schools, and community partners.
+
+Current status
+- Active rework branch
+- Customer-facing flow work is focused on signup/login, browse, signup/waitlist, and attendance verification
+- Latest QA notes live in tests/qa-results.md
+
+Local development
+- Client: cd client && npm ci && npm run dev
+- Server: cd server && npm ci && npm run dev
+
+Production build
+- Client: cd client && npm run build
+- Server: cd server && npm run build
+
+Notes
+- Students browse school-approved opportunities and sign up or waitlist directly from the slot detail page.
+- Students can check in, check out, and submit verification from the dashboard.
+- School admins handle school registration and verification workflows.
