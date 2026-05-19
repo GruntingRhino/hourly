@@ -1,16 +1,22 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
 
-const WEB_BASE_URL = process.env.QA_BASE_URL || 'http://localhost:5173';
-const API_BASE_URL = process.env.QA_API_BASE || 'http://localhost:3001/api';
+const WEB_BASE_URL =
+  process.env.QA_BASE_URL ||
+  process.env.PW_BASE_URL ||
+  'http://localhost:5173';
+const API_BASE_URL =
+  process.env.QA_API_BASE ||
+  (process.env.API_BASE_URL ? `${process.env.API_BASE_URL}/api` : '') ||
+  'http://localhost:3001/api';
 
 const SCHOOL_ADMIN = {
-  email: 'admin@lincoln.edu',
-  password: 'password123',
+  email: process.env.PW_SCHOOL_ADMIN_EMAIL || 'school-admin@test.goodhours.app',
+  password: process.env.PW_SCHOOL_ADMIN_PASSWORD || 'Playwright1!',
 };
 
 const STUDENT = {
-  email: 'john@student.edu',
-  password: 'password123',
+  email: process.env.PW_STUDENT_EMAIL || 'abhay.sivaram+5@gmail.com',
+  password: process.env.PW_STUDENT_PASSWORD || 'Playwright1!',
 };
 
 const DISABLED_MESSAGE = 'Joining by code is currently disabled by your school.';
