@@ -23,6 +23,8 @@ dist-ssr/
 .vercel
 .env*.local
 google_oAuth_secrets.json
+.claude/
+.claude/settings.local.json
 
 # Large data files (kept locally, not in git)
 server/data/*.zip
