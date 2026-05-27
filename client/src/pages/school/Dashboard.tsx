@@ -508,7 +508,7 @@ export default function SchoolDashboard() {
           { to: "/students/off-track", label: "Off-Track", count: totalAtRisk },
         ].map((b) => (
           <Link
-            key={b.to}
+            key={`${b.to}-${b.label}`}
             to={b.to}
             className="flex items-center justify-between px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >

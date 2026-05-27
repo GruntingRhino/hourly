@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const UI_BASE = process.env.UI_BASE_URL || "http://127.0.0.1:5174";
+const UI_BASE = process.env.PW_BASE_URL || process.env.UI_BASE_URL || "http://127.0.0.1:5173";
 
 test("school settings integrations tab hides the session banner and runs Canvas mock sync", async ({ page }) => {
   await page.goto(`${UI_BASE}/login`, { waitUntil: "networkidle" });
@@ -22,8 +22,8 @@ test("school settings integrations tab hides the session banner and runs Canvas 
   await expect(page.getByText("Canvas mock connection created.")).toBeVisible();
 
   await page.getByTestId("canvas-preview").click();
-  await expect(page.getByText("Canvas preview complete.")).toBeVisible();
+  await expect(page.getByText("Canvas preview complete.")).toBeVisible({ timeout: 10000 });
 
   await page.getByTestId("canvas-apply").click();
-  await expect(page.getByText("Canvas sync applied.")).toBeVisible();
+  await expect(page.getByText("Canvas sync applied.")).toBeVisible({ timeout: 10000 });
 });

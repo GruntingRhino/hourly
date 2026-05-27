@@ -3,6 +3,11 @@ import { test, expect, request, APIRequestContext } from "@playwright/test";
 import { BASE, auth, getToken } from "./security/helpers/tokens";
 import { startMockCanvasTenant } from "./helpers/canvasTenant";
 
+function internalAuth() {
+  const secret = process.env.CRON_SECRET?.trim();
+  return secret ? { headers: { Authorization: `Bearer ${secret}` } } : undefined;
+}
+
 async function completeCanvasOAuth(ctx: APIRequestContext, token: string, baseUrl: string, code: string) {
   const urlRes = await ctx.get(
     `${BASE}/api/integrations/canvas/oauth/url?baseUrl=${encodeURIComponent(baseUrl)}&displayName=${encodeURIComponent("Canvas OAuth Test")}`,
@@ -108,7 +113,7 @@ test.describe("Canvas OAuth flow", () => {
     expect(status.ops.recentJobFailures24h).toBeGreaterThan(0);
     expect(status.ops.warnings.length).toBeGreaterThan(0);
 
-    const opsRes = await ctx.get(`${BASE}/api/internal/canvas/ops`);
+    const opsRes = await ctx.get(`${BASE}/api/internal/canvas/ops`, internalAuth());
     expect(opsRes.ok()).toBeTruthy();
     const ops = await opsRes.json();
     expect(ops.totals.errored).toBeGreaterThan(0);

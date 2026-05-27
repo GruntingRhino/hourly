@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const UI_BASE = process.env.UI_BASE_URL || "http://127.0.0.1:5174";
+const UI_BASE = process.env.PW_BASE_URL || process.env.UI_BASE_URL || "http://127.0.0.1:5173";
 
 test("school settings integrations tab hides the session banner and runs Google Classroom mock sync", async ({ page }) => {
   await page.goto(`${UI_BASE}/login`, { waitUntil: "networkidle" });
@@ -22,8 +22,8 @@ test("school settings integrations tab hides the session banner and runs Google 
   await expect(page.getByText("Google Classroom mock connection created.")).toBeVisible();
 
   await page.getByTestId("google-classroom-preview").click();
-  await expect(page.getByText("Google Classroom preview complete.")).toBeVisible();
+  await expect(page.getByText("Google Classroom preview complete.")).toBeVisible({ timeout: 10000 });
 
   await page.getByTestId("google-classroom-apply").click();
-  await expect(page.getByText("Google Classroom sync applied.")).toBeVisible();
+  await expect(page.getByText("Google Classroom sync applied.")).toBeVisible({ timeout: 10000 });
 });

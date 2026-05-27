@@ -3,6 +3,11 @@ import { test, expect, request, APIRequestContext } from "@playwright/test";
 import { BASE, auth, getToken } from "./security/helpers/tokens";
 import { startMockGoogleClassroomTenant } from "./helpers/googleClassroomTenant";
 
+function internalAuth() {
+  const secret = process.env.CRON_SECRET?.trim();
+  return secret ? { headers: { Authorization: `Bearer ${secret}` } } : undefined;
+}
+
 async function completeGoogleClassroomOAuth(ctx: APIRequestContext, token: string, baseUrl: string, code: string) {
   const urlRes = await ctx.get(
     `${BASE}/api/integrations/googleClassroom/oauth/url?baseUrl=${encodeURIComponent(baseUrl)}&displayName=${encodeURIComponent("Google Classroom OAuth Test")}`,
@@ -83,7 +88,7 @@ test.describe("Google Classroom OAuth flow", () => {
     expect(status.ops.recentJobFailures24h).toBeGreaterThan(0);
     expect(status.ops.warnings.length).toBeGreaterThan(0);
 
-    const opsRes = await ctx.get(`${BASE}/api/internal/googleClassroom/ops`);
+    const opsRes = await ctx.get(`${BASE}/api/internal/googleClassroom/ops`, internalAuth());
     expect(opsRes.ok()).toBeTruthy();
     const ops = await opsRes.json();
     expect(ops.totals.errored).toBeGreaterThan(0);
