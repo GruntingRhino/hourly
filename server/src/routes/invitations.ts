@@ -5,8 +5,16 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { ensureStudentCohortMembership } from "../lib/studentCohorts";
+import { createHybridRateLimit } from "../middleware/rateLimit";
+import { firstZodError, strictObject, tokenSchema, trimmedString } from "../lib/validation";
 
 const router = Router();
+const publicInvitationLimiter = createHybridRateLimit({
+  namespace: "invitations-public",
+  windowMs: 15 * 60 * 1000,
+  maxPerIp: 60,
+  maxPerUser: 120,
+});
 
 const passwordSchema = z.string()
   .min(8, "Password must be at least 8 characters")
@@ -16,13 +24,32 @@ const passwordSchema = z.string()
   .regex(/[0-9]/, "Password must contain at least one number")
   .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 
+const invitationTokenQuerySchema = strictObject({
+  token: tokenSchema,
+});
+
+const acceptStudentInvitationSchema = strictObject({
+  token: tokenSchema,
+  name: trimmedString(255, 1),
+  password: passwordSchema,
+});
+
+const acceptBeneficiaryInvitationSchema = strictObject({
+  token: tokenSchema,
+  name: trimmedString(255, 1),
+  password: passwordSchema,
+});
+
+const declineBeneficiaryInvitationSchema = strictObject({
+  token: tokenSchema,
+});
+
 // GET /api/invitations/student?token=xxx — look up a student invitation
-router.get("/student", async (req: Request, res: Response) => {
+router.get("/student", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
-    const { token } = req.query;
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ error: "Token is required" });
-    }
+    const { token } = invitationTokenQuerySchema.parse({
+      token: typeof req.query.token === "string" ? req.query.token : undefined,
+    });
 
     const inv = await prisma.studentInvitation.findUnique({
       where: { token },
@@ -54,14 +81,9 @@ router.get("/student", async (req: Request, res: Response) => {
 });
 
 // POST /api/invitations/student/accept — student accepts invitation and creates account
-router.post("/student/accept", async (req: Request, res: Response) => {
+router.post("/student/accept", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
-    const schema = z.object({
-      token: z.string(),
-      name: z.string().min(1).max(255),
-      password: passwordSchema,
-    });
-    const data = schema.parse(req.body);
+    const data = acceptStudentInvitationSchema.parse(req.body);
 
     const inv = await prisma.studentInvitation.findUnique({
       where: { token: data.token },
@@ -178,19 +200,18 @@ router.post("/student/accept", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Accept student invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // GET /api/invitations/beneficiary?token=xxx — look up a beneficiary invitation
-router.get("/beneficiary", async (req: Request, res: Response) => {
+router.get("/beneficiary", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
-    const { token } = req.query;
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ error: "Token is required" });
-    }
+    const { token } = invitationTokenQuerySchema.parse({
+      token: typeof req.query.token === "string" ? req.query.token : undefined,
+    });
 
     const inv = await prisma.beneficiaryInvitation.findUnique({
       where: { token },
@@ -220,14 +241,9 @@ router.get("/beneficiary", async (req: Request, res: Response) => {
 });
 
 // POST /api/invitations/beneficiary/accept — beneficiary accepts invitation and creates admin account
-router.post("/beneficiary/accept", async (req: Request, res: Response) => {
+router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
-    const schema = z.object({
-      token: z.string(),
-      name: z.string().min(1).max(255), // admin user name
-      password: passwordSchema,
-    });
-    const data = schema.parse(req.body);
+    const data = acceptBeneficiaryInvitationSchema.parse(req.body);
 
     const inv = await prisma.beneficiaryInvitation.findUnique({
       where: { token: data.token },
@@ -333,16 +349,16 @@ router.post("/beneficiary/accept", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Accept beneficiary invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // POST /api/invitations/beneficiary/decline
-router.post("/beneficiary/decline", async (req: Request, res: Response) => {
+router.post("/beneficiary/decline", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
-    const { token } = z.object({ token: z.string() }).parse(req.body);
+    const { token } = declineBeneficiaryInvitationSchema.parse(req.body);
 
     const inv = await prisma.beneficiaryInvitation.findUnique({ where: { token } });
     if (!inv) return res.status(404).json({ error: "Invalid invitation token" });
@@ -360,7 +376,7 @@ router.post("/beneficiary/decline", async (req: Request, res: Response) => {
 
     res.json({ message: "Invitation declined" });
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Decline invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

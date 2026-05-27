@@ -8,6 +8,15 @@ import { authenticate, signToken } from "../middleware/auth";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
+import { createHybridRateLimit } from "../middleware/rateLimit";
+import {
+  firstZodError,
+  opaqueIdSchema,
+  optionalTrimmedString,
+  strictObject,
+  tokenSchema,
+  trimmedString,
+} from "../lib/validation";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -173,6 +182,12 @@ const loginLimiter = rateLimit({
 });
 
 const router = Router();
+const publicAuthLimiter = createHybridRateLimit({
+  namespace: "auth-public",
+  windowMs: 15 * 60 * 1000,
+  maxPerIp: 60,
+  maxPerUser: 120,
+});
 
 const loginProfileInclude = {
   organization: true,
@@ -271,7 +286,7 @@ async function safeBcryptCompare(plain: string, hash: string): Promise<boolean> 
 
 
 if (!IS_PROD_LIKE) {
-  router.get("/__test-email", (req: Request, res: Response) => {
+  router.get("/__test-email", publicAuthLimiter, (req: Request, res: Response) => {
     const inbox = String(req.query.inbox || "").trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(inbox)) {
       return res.status(400).json({ error: "Valid inbox query param is required" });
@@ -294,20 +309,66 @@ const passwordSchema = z.string()
   .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
 
 // School admin self-signup schema — students/beneficiaries use invitation flows
-const signupSchema = z.object({
-  email: z.string().email().max(255),
+const signupSchema = strictObject({
+  email: z.string().trim().toLowerCase().email().max(255),
   password: passwordSchema,
-  name: z.string().min(1).max(255),
+  name: trimmedString(255, 1),
   role: z.enum(VALID_ROLES),
-  schoolName: z.string().max(255).optional(),
-  schoolDomain: z.string().max(255).optional(),
-  directorySchoolId: z.string().optional(), // SchoolDirectory.id if chosen from directory
-  zipCodes: z.array(z.string().regex(/^\d{5}$/, "Invalid ZIP code")).optional(),
+  schoolName: optionalTrimmedString(255),
+  schoolDomain: optionalTrimmedString(255),
+  directorySchoolId: opaqueIdSchema.optional(), // SchoolDirectory.id if chosen from directory
+  zipCodes: z.array(z.string().trim().regex(/^\d{5}$/, "Invalid ZIP code")).max(50).optional(),
 });
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+const loginSchema = strictObject({
+  email: z.string().trim().toLowerCase().email().max(255),
+  password: z.string().min(1).max(128),
+});
+
+const passwordChangeSchema = strictObject({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: passwordSchema,
+});
+
+const emailTokenQuerySchema = strictObject({
+  token: tokenSchema,
+});
+
+const forgotPasswordSchema = strictObject({
+  email: z.string().trim().toLowerCase().email().max(255),
+});
+
+const resetPasswordSchema = strictObject({
+  token: tokenSchema,
+  password: passwordSchema,
+});
+
+const messagePreferenceSchema = strictObject({
+  allowFrom: z.enum(["EVERYONE", "PARTNERS_ONLY", "NOBODY"]).optional(),
+  profileVisibility: z.enum(["EVERYONE", "PARTNERS_ONLY", "NOBODY"]).optional(),
+});
+
+const profileSchema = strictObject({
+  name: optionalTrimmedString(255, 1),
+  phone: optionalTrimmedString(20),
+  bio: optionalTrimmedString(1000),
+  age: z.number().int().min(10).max(25).optional(),
+  grade: optionalTrimmedString(50),
+  avatarUrl: z.string().trim().max(50_000).nullable().optional(),
+  socialLinks: strictObject({
+    instagram: optionalTrimmedString(255),
+    tiktok: optionalTrimmedString(255),
+    twitter: optionalTrimmedString(255),
+    youtube: optionalTrimmedString(255),
+  }).optional(),
+  notificationPreferences: z.record(
+    z.string().trim().min(1).max(64),
+    strictObject({
+      email: z.boolean(),
+      inApp: z.boolean(),
+    })
+  ).optional(),
+  messagePreferences: messagePreferenceSchema.optional(),
 });
 
 const PERSONAL_EMAIL_DOMAINS = new Set([
@@ -352,7 +413,7 @@ function emailDomainMatchesWebsite(emailDomain: string, websiteDomain: string): 
 }
 
 // POST /api/auth/signup
-router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
+router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   let signupStage = "parse";
   try {
     const data = signupSchema.parse(req.body);
@@ -585,7 +646,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation failed", details: err.errors });
+      return res.status(400).json({ error: firstZodError(err) });
     }
     console.error("Signup error:", err, { signupStage });
     const errorCode = typeof err === "object" && err && "code" in err ? String((err as any).code) : undefined;
@@ -595,7 +656,7 @@ router.post("/signup", precheckDuplicateSignupEmail, signupLimiter, async (req: 
 });
 
 // POST /api/auth/login
-router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Response) => {
+router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
     data.email = normalizeEmail(data.email);
@@ -645,7 +706,7 @@ router.post("/login", loginIpLimiter, loginLimiter, async (req: Request, res: Re
 
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation failed", details: err.errors });
+      return res.status(400).json({ error: firstZodError(err) });
     }
     console.error("Login error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -696,14 +757,7 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
 // PUT /api/auth/password
 router.put("/password", authenticate, async (req: Request, res: Response) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: "Current password and new password are required" });
-    }
-    const pwResult = passwordSchema.safeParse(newPassword);
-    if (!pwResult.success) {
-      return res.status(400).json({ error: pwResult.error.errors[0].message });
-    }
+    const { currentPassword, newPassword } = passwordChangeSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) {
@@ -726,26 +780,12 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
 
     res.json({ message: "Password changed successfully" });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err) });
+    }
     console.error("Password change error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-});
-
-const profileSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  phone: z.string().max(20).optional(),
-  bio: z.string().max(1000).optional(),
-  age: z.number().int().min(10).max(25).optional(),
-  grade: z.string().max(50).optional(),
-  avatarUrl: z.string().nullable().optional(),
-  socialLinks: z.object({
-    instagram: z.string().max(255).optional(),
-    tiktok: z.string().max(255).optional(),
-    twitter: z.string().max(255).optional(),
-    youtube: z.string().max(255).optional(),
-  }).optional(),
-  notificationPreferences: z.record(z.any()).optional(),
-  messagePreferences: z.record(z.any()).optional(),
 });
 
 // PUT /api/auth/profile
@@ -780,7 +820,7 @@ router.put("/profile", authenticate, async (req: Request, res: Response) => {
     res.json({ ...user, phone: decryptField(user.phone) });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation failed", details: err.errors });
+      return res.status(400).json({ error: firstZodError(err) });
     }
     console.error("Profile update error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -788,12 +828,11 @@ router.put("/profile", authenticate, async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/verify-email?token=xxx
-router.get("/verify-email", async (req: Request, res: Response) => {
+router.get("/verify-email", publicAuthLimiter, async (req: Request, res: Response) => {
   try {
-    const { token } = req.query;
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ error: "Invalid token" });
-    }
+    const { token } = emailTokenQuerySchema.parse({
+      token: typeof req.query.token === "string" ? req.query.token : undefined,
+    });
 
     const user = await prisma.user.findFirst({
       where: {
@@ -817,6 +856,9 @@ router.get("/verify-email", async (req: Request, res: Response) => {
 
     res.json({ message: "Email verified successfully", userId: user.id });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err) });
+    }
     console.error("Email verification error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -853,9 +895,9 @@ router.post("/resend-verification", authenticate, resendVerificationLimiter, asy
 });
 
 // POST /api/auth/forgot-password
-router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res: Response) => {
+router.post("/forgot-password", publicAuthLimiter, forgotPasswordLimiter, async (req: Request, res: Response) => {
   try {
-    const parsed = z.object({ email: z.string().email() }).parse(req.body);
+    const parsed = forgotPasswordSchema.parse(req.body);
     const email = normalizeEmail(parsed.email);
     const user = await prisma.user.findUnique({ where: { email } });
 
@@ -880,7 +922,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
     res.json({ message: "If an account with that email exists, a password reset link has been sent." });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Valid email is required" });
+      return res.status(400).json({ error: firstZodError(err, "Valid email is required") });
     }
     console.error("Forgot password error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -888,12 +930,9 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 });
 
 // POST /api/auth/reset-password
-router.post("/reset-password", async (req: Request, res: Response) => {
+router.post("/reset-password", publicAuthLimiter, async (req: Request, res: Response) => {
   try {
-    const { token, password } = z.object({
-      token: z.string(),
-      password: passwordSchema,
-    }).parse(req.body);
+    const { token, password } = resetPasswordSchema.parse(req.body);
 
     const user = await prisma.user.findFirst({
       where: {
@@ -915,7 +954,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
     res.json({ message: "Password reset successfully" });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation failed", details: err.errors });
+      return res.status(400).json({ error: firstZodError(err) });
     }
     console.error("Reset password error:", err);
     res.status(500).json({ error: "Internal server error" });

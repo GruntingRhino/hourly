@@ -8,8 +8,23 @@ import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import { extractDomainFromWebsite } from "./auth";
+import { createHybridRateLimit } from "../middleware/rateLimit";
+import {
+  firstZodError,
+  opaqueIdSchema,
+  optionalTrimmedString,
+  strictObject,
+  tokenSchema,
+  trimmedString,
+} from "../lib/validation";
 
 const router = Router();
+const publicGoogleAuthLimiter = createHybridRateLimit({
+  namespace: "google-auth-public",
+  windowMs: 15 * 60 * 1000,
+  maxPerIp: 90,
+  maxPerUser: 180,
+});
 
 function normalizeContactEmail(email: unknown): string {
   return typeof email === "string" && email.trim()
@@ -51,6 +66,44 @@ function isApprovedDomain(email: string): boolean {
     domain === allowed || domain.endsWith(`.${allowed}`)
   );
 }
+
+const classifyDomainQuerySchema = strictObject({
+  email: optionalTrimmedString(255),
+});
+
+const googleUrlQuerySchema = strictObject({
+  state: optionalTrimmedString(50),
+});
+
+const callbackBridgeQuerySchema = strictObject({
+  code: optionalTrimmedString(2048),
+  state: optionalTrimmedString(50),
+  error: optionalTrimmedString(255),
+});
+
+const googleCallbackBodySchema = strictObject({
+  code: trimmedString(2048, 1),
+});
+
+const schoolSearchQuerySchema = strictObject({
+  search: optionalTrimmedString(120),
+  state: optionalTrimmedString(50),
+  domain: optionalTrimmedString(255),
+});
+
+const registerSchoolSchema = strictObject({
+  registrationToken: tokenSchema,
+  directorySchoolId: opaqueIdSchema.optional(),
+  schoolName: trimmedString(255, 1),
+  schoolState: optionalTrimmedString(50),
+  schoolCity: optionalTrimmedString(100),
+  schoolZip: z.string().trim().regex(/^\d{5}$/).optional(),
+  contactEmail: z.string().trim().toLowerCase().email().max(255),
+});
+
+const verifySchoolQuerySchema = strictObject({
+  token: tokenSchema,
+});
 
 // ─── Three-layer domain security ────────────────────────────────────────────
 
@@ -218,8 +271,14 @@ async function handleGoogleIdentity(params: {
 
 // GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
 // Returns: { status: "personal" | "edu" | "custom", blocked: boolean }
-router.get("/classify-domain", (req: Request, res: Response) => {
-  const email = ((req.query.email as string) || "").trim();
+router.get("/classify-domain", publicGoogleAuthLimiter, (req: Request, res: Response) => {
+  const parsed = classifyDomainQuerySchema.safeParse({
+    email: typeof req.query.email === "string" ? req.query.email : undefined,
+  });
+  if (!parsed.success) {
+    return res.status(400).json({ error: firstZodError(parsed.error) });
+  }
+  const { email = "" } = parsed.data;
   if (!email || !email.includes("@")) {
     return res.json({ status: "unknown", blocked: false });
   }
@@ -236,11 +295,17 @@ router.get("/classify-domain", (req: Request, res: Response) => {
 // GET /api/auth/google — returns redirect URL for Google OAuth
 // The client redirects to Google using this URL
 // Optional ?state= query param is forwarded to Google and returned in callback
-router.get("/url", (req: Request, res: Response) => {
+router.get("/url", publicGoogleAuthLimiter, (req: Request, res: Response) => {
   if (!GOOGLE_CLIENT_ID) {
     return res.status(503).json({ error: "Google OAuth is not configured" });
   }
-  const state = (req.query.state as string | undefined) || "";
+  const parsed = googleUrlQuerySchema.safeParse({
+    state: typeof req.query.state === "string" ? req.query.state : undefined,
+  });
+  if (!parsed.success) {
+    return res.status(400).json({ error: firstZodError(parsed.error) });
+  }
+  const { state = "" } = parsed.data;
   const scope = encodeURIComponent("openid email profile");
   const redirectUri = encodeURIComponent(GOOGLE_CALLBACK_URL);
   const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";
@@ -251,10 +316,16 @@ router.get("/url", (req: Request, res: Response) => {
 // GET /api/auth/google/callback — browser redirect bridge for Google OAuth
 // Supports legacy/prod Google Console setups that still point at the API URL.
 // The frontend page reads ?code= and POSTs it back to this route for token exchange.
-router.get("/callback", (req: Request, res: Response) => {
-  const code = typeof req.query.code === "string" ? req.query.code : "";
-  const state = typeof req.query.state === "string" ? req.query.state : "";
-  const error = typeof req.query.error === "string" ? req.query.error : "";
+router.get("/callback", publicGoogleAuthLimiter, (req: Request, res: Response) => {
+  const parsed = callbackBridgeQuerySchema.safeParse({
+    code: typeof req.query.code === "string" ? req.query.code : undefined,
+    state: typeof req.query.state === "string" ? req.query.state : undefined,
+    error: typeof req.query.error === "string" ? req.query.error : undefined,
+  });
+  if (!parsed.success) {
+    return res.status(400).json({ error: firstZodError(parsed.error) });
+  }
+  const { code = "", state = "", error = "" } = parsed.data;
 
   const target = new URL(state === "login" ? "/login" : "/school/register", CLIENT_URL);
   if (code) target.searchParams.set("code", code);
@@ -265,12 +336,12 @@ router.get("/callback", (req: Request, res: Response) => {
 });
 
 if (!IS_PRODUCTION) {
-  router.post("/dev-signin", async (req: Request, res: Response) => {
+  router.post("/dev-signin", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
     try {
-      const { email, name, state } = z.object({
-        email: z.string().email(),
-        name: z.string().min(1).max(255).optional(),
-        state: z.string().max(50).optional(),
+      const { email, name, state } = strictObject({
+        email: z.string().trim().toLowerCase().email().max(255),
+        name: optionalTrimmedString(255, 1),
+        state: optionalTrimmedString(50),
       }).parse(req.body);
 
       const effectiveName = name?.trim() || email.split("@")[0];
@@ -285,7 +356,7 @@ if (!IS_PRODUCTION) {
       return res.status(result.status).json(result.body);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation failed", details: err.errors });
+        return res.status(400).json({ error: firstZodError(err) });
       }
       console.error("Dev Google sign-in error:", err);
       return res.status(500).json({ error: "Internal server error" });
@@ -294,9 +365,9 @@ if (!IS_PRODUCTION) {
 }
 
 // POST /api/auth/google/callback — exchange code for tokens, sign in or start school registration
-router.post("/callback", async (req: Request, res: Response) => {
+router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
   try {
-    const { code } = z.object({ code: z.string() }).parse(req.body);
+    const { code } = googleCallbackBodySchema.parse(req.body);
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
       return res.status(503).json({ error: "Google OAuth is not configured on server" });
@@ -356,7 +427,7 @@ router.post("/callback", async (req: Request, res: Response) => {
 
     return res.status(result.status).json(result.body);
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Google auth callback error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -364,11 +435,13 @@ router.post("/callback", async (req: Request, res: Response) => {
 
 // GET /api/auth/google/schools — search school directory (unauthenticated, for registration)
 // Supports ?search= (fuzzy name match) and/or ?domain= (exact email domain match)
-router.get("/schools", async (req: Request, res: Response) => {
+router.get("/schools", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
   try {
-    const search = (req.query.search as string || "").trim();
-    const state = (req.query.state as string || "").trim();
-    const domain = (req.query.domain as string || "").trim().toLowerCase();
+    const { search = "", state = "", domain = "" } = schoolSearchQuerySchema.parse({
+      search: typeof req.query.search === "string" ? req.query.search : undefined,
+      state: typeof req.query.state === "string" ? req.query.state : undefined,
+      domain: typeof req.query.domain === "string" ? req.query.domain.toLowerCase() : undefined,
+    });
 
     // Domain-only lookup — return schools whose emailDomain matches
     if (domain && !search) {
@@ -434,24 +507,18 @@ router.get("/schools", async (req: Request, res: Response) => {
 
     res.json(ranked);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err) });
+    }
     console.error("School directory search error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // POST /api/auth/google/register-school — initiate school registration via magic link
-router.post("/register-school", registerSchoolLimiter, async (req: Request, res: Response) => {
+router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, async (req: Request, res: Response) => {
   try {
-    const schema = z.object({
-      registrationToken: z.string(), // JWT with Google profile
-      directorySchoolId: z.string().optional(), // if chosen from directory
-      schoolName: z.string().min(1).max(255), // fallback if not in directory
-      schoolState: z.string().max(50).optional(),
-      schoolCity: z.string().max(100).optional(),
-      schoolZip: z.string().regex(/^\d{5}$/).optional(),
-      contactEmail: z.string().email(), // where to send magic link
-    });
-    const data = schema.parse(req.body);
+    const data = registerSchoolSchema.parse(req.body);
 
     // Verify the registration token (contains Google profile)
     let googleProfile: any;
@@ -715,19 +782,18 @@ router.post("/register-school", registerSchoolLimiter, async (req: Request, res:
       emailDeliveryFailed,
     });
   } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Register school error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // GET /api/auth/google/verify-school?token=xxx — complete school registration from magic link
-router.get("/verify-school", async (req: Request, res: Response) => {
+router.get("/verify-school", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
   try {
-    const { token } = req.query;
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ error: "Token is required" });
-    }
+    const { token } = verifySchoolQuerySchema.parse({
+      token: typeof req.query.token === "string" ? req.query.token : undefined,
+    });
 
     const school = await prisma.school.findFirst({
       where: {
@@ -776,6 +842,9 @@ router.get("/verify-school", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err) });
+    }
     console.error("Verify school registration error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

@@ -1,7 +1,10 @@
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
+import { z } from "zod";
 import { runReminderCycle } from "../lib/reminders";
 import { getCanvasOperationalStatus } from "../services/canvasIntegration";
 import { getGoogleClassroomOperationalStatus } from "../services/googleClassroomIntegration";
+import { firstZodError, optionalTrimmedString, strictObject } from "../lib/validation";
 
 const router = Router();
 
@@ -15,8 +18,16 @@ function hasValidCronSecret(req: Request): boolean {
 
   const authHeader = req.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
-  return token === secret;
+  if (!token) return false;
+
+  const expected = Buffer.from(secret, "utf8");
+  const received = Buffer.from(token, "utf8");
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
+
+const internalQuerySchema = strictObject({
+  schoolId: optionalTrimmedString(191),
+});
 
 async function handleReminderRun(req: Request, res: Response): Promise<void> {
   if (!hasValidCronSecret(req)) {
@@ -30,7 +41,9 @@ async function handleReminderRun(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const schoolId = typeof req.query.schoolId === "string" ? req.query.schoolId : undefined;
+    const { schoolId } = internalQuerySchema.parse({
+      schoolId: typeof req.query.schoolId === "string" ? req.query.schoolId : undefined,
+    });
     const summaries = await runReminderCycle(schoolId);
     res.json({
       ok: true,
@@ -39,6 +52,10 @@ async function handleReminderRun(req: Request, res: Response): Promise<void> {
       ranAt: new Date().toISOString(),
     });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: firstZodError(err) });
+      return;
+    }
     console.error("Internal reminder run error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -64,10 +81,16 @@ async function handleCanvasOps(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const schoolId = typeof req.query.schoolId === "string" ? req.query.schoolId : undefined;
+    const { schoolId } = internalQuerySchema.parse({
+      schoolId: typeof req.query.schoolId === "string" ? req.query.schoolId : undefined,
+    });
     const status = await getCanvasOperationalStatus({ schoolId });
     res.json({ ok: true, ...status });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: firstZodError(err) });
+      return;
+    }
     console.error("Internal Canvas ops error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -89,10 +112,16 @@ async function handleGoogleClassroomOps(req: Request, res: Response): Promise<vo
   }
 
   try {
-    const schoolId = typeof req.query.schoolId === "string" ? req.query.schoolId : undefined;
+    const { schoolId } = internalQuerySchema.parse({
+      schoolId: typeof req.query.schoolId === "string" ? req.query.schoolId : undefined,
+    });
     const status = await getGoogleClassroomOperationalStatus({ schoolId });
     res.json({ ok: true, ...status });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: firstZodError(err) });
+      return;
+    }
     console.error("Internal Google Classroom ops error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

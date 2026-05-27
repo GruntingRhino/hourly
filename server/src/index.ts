@@ -25,6 +25,7 @@ import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
 import { startReminderScheduler } from "./lib/reminders";
+import { createHybridRateLimit } from "./middleware/rateLimit";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -72,6 +73,19 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Baseline protection for every API route.
+// Specialized route limiters below remain in place for sensitive workflows.
+app.use(
+  "/api",
+  createHybridRateLimit({
+    namespace: "api",
+    windowMs: 5 * 60 * 1000,
+    maxPerIp: 300,
+    maxPerUser: 600,
+    skip: (req) => req.path === "/health",
+  })
+);
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/auth/google", googleAuthRoutes);
@@ -109,11 +123,15 @@ const geocodeLimiter = rateLimit({
 // Geocode endpoint — proxies Nominatim so the client never touches the external API directly
 // GET /api/geocode?address=123+Main+St,+Springfield,+IL
 app.get("/api/geocode", geocodeLimiter, async (req, res) => {
-  const address = req.query.address as string | undefined;
-  if (!address?.trim()) {
+  const address =
+    typeof req.query.address === "string" ? req.query.address.trim() : "";
+  if (!address) {
     return res.status(400).json({ error: "address query param required" });
   }
-  const coords = await geocodeAddress(address.trim());
+  if (address.length > 300) {
+    return res.status(400).json({ error: "address must be 300 characters or fewer" });
+  }
+  const coords = await geocodeAddress(address);
   if (!coords) {
     return res.status(404).json({ error: "Address not found" });
   }
