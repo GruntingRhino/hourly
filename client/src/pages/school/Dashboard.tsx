@@ -219,11 +219,12 @@ export default function SchoolDashboard() {
   if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
   if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
 
-  // Aggregate stats across all cohorts
-  const totalStudents = cohorts.reduce((s, c) => s + c.studentCount, 0);
-  const totalHours = cohorts.reduce((s, c) => s + c.totalHours, 0);
-  const totalCompleted = cohorts.reduce((s, c) => s + c.completedCount, 0);
-  const totalAtRisk = cohorts.reduce((s, c) => s + c.atRiskCount, 0);
+  // Aggregate school-wide stats from the live student roster so unassigned students
+  // are counted consistently with the roster, triage queue, and reports export.
+  const totalStudents = students.length;
+  const totalHours = students.reduce((sum, student) => sum + (student.approvedHours || 0), 0);
+  const totalCompleted = students.filter((student) => student.status === "COMPLETED").length;
+  const totalAtRisk = students.filter((student) => student.status === "AT_RISK").length;
   const pendingInvites = cohorts.reduce((s, c) => s + c.invitationsPending, 0);
   const topAtRisk = [...atRiskStudents]
     .sort((a, b) => {
