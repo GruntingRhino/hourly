@@ -34,6 +34,16 @@ function normalizeEmail(email: string): string {
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
 
+const QA_SIGNUP_BYPASS_PATTERNS = [
+  /^abhay\.sivaram\+[^@]+@gmail\.com$/i,
+  /^vaneeta\.singh\+[^@]+@gmail\.com$/i,
+];
+
+function isQaSignupBypassEmail(email: string): boolean {
+  const normalized = normalizeEmail(email);
+  return QA_SIGNUP_BYPASS_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 function normalizeRateLimitEmail(email: unknown): string {
   if (typeof email !== "string") return "unknown";
   const trimmed = email.trim().toLowerCase();
@@ -418,8 +428,9 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
   try {
     const data = signupSchema.parse(req.body);
     data.email = normalizeEmail(data.email);
+    const isQaBypass = isQaSignupBypassEmail(data.email);
 
-    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
+    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass) {
       if (isPersonalEmailDomain(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
       }
@@ -427,7 +438,7 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
 
     // If a directory school was selected, validate email domain against its known domain
     // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
-    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
+    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass && data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
       const dirEntry = await prisma.schoolDirectory.findUnique({
         where: { id: data.directorySchoolId },
         select: { emailDomain: true, website: true },
