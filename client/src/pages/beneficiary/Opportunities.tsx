@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
+import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
 import SearchableSelect from "../../components/SearchableSelect";
 import {
@@ -690,15 +691,7 @@ export default function BeneficiaryOpportunities() {
     }
   };
 
-  const formatHistoryDetails = (raw: string | null) => {
-    if (!raw) return "";
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      return Object.entries(parsed).map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
-    } catch {
-      return raw;
-    }
-  };
+  const formatHistoryDetails = formatAuditDetails;
 
   const getSignupBucket = (signup: SignupRecord): "PENDING" | "APPROVED" | "DENIED" | "NO_SHOW" | "OTHER" => {
     if (signup.status === "NO_SHOW") return "NO_SHOW";

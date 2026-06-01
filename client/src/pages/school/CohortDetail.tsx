@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
+import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
 
 type FieldTarget = "name" | "email" | "grade" | "house" | "hours" | "skip";
@@ -406,17 +407,7 @@ export default function CohortDetail() {
     }
   };
 
-  const formatHistoryDetails = (raw: string | null) => {
-    if (!raw) return "";
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      return Object.entries(parsed)
-        .map(([key, value]) => `${key}: ${String(value)}`)
-        .join(" · ");
-    } catch {
-      return raw;
-    }
-  };
+  const formatHistoryDetails = formatAuditDetails;
 
   const requiredHours = cohort?.requiredHours ?? 0;
 
