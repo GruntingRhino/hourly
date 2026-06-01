@@ -7,7 +7,11 @@ import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
-import { extractDomainFromWebsite } from "./auth";
+import {
+  emailDomainMatchesWebsite,
+  extractDomainFromWebsite,
+  isPersonalEmailDomain,
+} from "../lib/signupEmailPolicy";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import {
   firstZodError,
@@ -107,45 +111,8 @@ const verifySchoolQuerySchema = strictObject({
 
 // ─── Three-layer domain security ────────────────────────────────────────────
 
-// Layer 1 — personal / free-tier email providers that schools would never use.
-const PERSONAL_EMAIL_DOMAINS = new Set([
-  // Google
-  "gmail.com", "googlemail.com",
-  // Yahoo
-  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
-  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
-  // Microsoft consumer
-  "hotmail.com", "outlook.com", "live.com", "msn.com",
-  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
-  "live.co.uk", "live.fr",
-  // Apple
-  "icloud.com", "me.com", "mac.com",
-  // AOL / Verizon
-  "aol.com", "aim.com", "verizon.net",
-  // Privacy / encrypted
-  "protonmail.com", "pm.me", "proton.me",
-  "tutanota.com", "tuta.com",
-  // Other common consumer providers
-  "gmx.com", "gmx.net", "mail.com",
-  "zoho.com", "zohomail.com",
-  "yandex.com", "yandex.ru",
-  "qq.com", "163.com", "126.com",
-  "mail.ru", "inbox.com", "rediffmail.com",
-  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
-]);
-
 function getEmailDomain(email: string): string {
   return email.split("@")[1]?.toLowerCase().trim() || "";
-}
-
-/** Returns true if emailDomain matches or is a subdomain of schoolDomain. */
-function emailDomainMatchesSchool(emailDomain: string, schoolDomain: string): boolean {
-  return emailDomain === schoolDomain || emailDomain.endsWith("." + schoolDomain);
-}
-
-/** Layer 1: true if the domain is a known personal / consumer email provider. */
-function isPersonalEmailDomain(email: string): boolean {
-  return PERSONAL_EMAIL_DOMAINS.has(getEmailDomain(email));
 }
 
 /** Layer 2: true if the domain ends with .edu (US institutional fast-track). */
@@ -570,7 +537,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         if (schoolDomain) {
           const contactDomain = getEmailDomain(data.contactEmail);
           const isEdu = contactDomain.endsWith(".edu");
-          if (!isEdu && !emailDomainMatchesSchool(contactDomain, schoolDomain)) {
+          if (!isEdu && !emailDomainMatchesWebsite(contactDomain, schoolDomain)) {
             return res.status(400).json({
               error: `Contact email domain does not match the school's domain (${schoolDomain}). Please use your school's official email address.`,
               code: "DOMAIN_MISMATCH",

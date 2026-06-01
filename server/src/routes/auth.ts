@@ -7,6 +7,13 @@ import prisma from "../lib/prisma";
 import { authenticate, signToken } from "../middleware/auth";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
+import {
+  emailDomainMatchesWebsite,
+  extractDomainFromWebsite,
+  isPersonalEmailDomain,
+  isQaSignupBypassEmail,
+  normalizeEmail,
+} from "../lib/signupEmailPolicy";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import {
@@ -27,22 +34,11 @@ import {
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
-
-const QA_SIGNUP_BYPASS_PATTERNS = [
-  /^abhay\.sivaram\+[^@]+@gmail\.com$/i,
-  /^vaneeta\.singh\+[^@]+@gmail\.com$/i,
-];
-
-function isQaSignupBypassEmail(email: string): boolean {
-  const normalized = normalizeEmail(email);
-  return QA_SIGNUP_BYPASS_PATTERNS.some((pattern) => pattern.test(normalized));
-}
+// Explicit opt-in for temporary QA aliases. Keep off by default so production-like
+// environments do not silently allow personal Gmail signups.
+const ALLOW_QA_SIGNUP_BYPASS = process.env.ALLOW_QA_SIGNUP_BYPASS === "true";
 
 function normalizeRateLimitEmail(email: unknown): string {
   if (typeof email !== "string") return "unknown";
@@ -381,54 +377,13 @@ const profileSchema = strictObject({
   messagePreferences: messagePreferenceSchema.optional(),
 });
 
-const PERSONAL_EMAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com",
-  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
-  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
-  "hotmail.com", "outlook.com", "live.com", "msn.com",
-  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
-  "live.co.uk", "live.fr",
-  "icloud.com", "me.com", "mac.com",
-  "aol.com", "aim.com", "verizon.net",
-  "protonmail.com", "pm.me", "proton.me",
-  "tutanota.com", "tuta.com",
-  "gmx.com", "gmx.net", "mail.com",
-  "zoho.com", "zohomail.com",
-  "yandex.com", "yandex.ru",
-  "qq.com", "163.com", "126.com",
-  "mail.ru", "inbox.com", "rediffmail.com",
-  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
-]);
-
-function isPersonalEmailDomain(email: string): boolean {
-  const domain = email.split("@")[1]?.toLowerCase().trim() || "";
-  return PERSONAL_EMAIL_DOMAINS.has(domain);
-}
-
-/** Strips https://, http://, www. and any path/query from a URL to get the bare domain. */
-export function extractDomainFromWebsite(website: string): string | null {
-  if (!website?.trim()) return null;
-  try {
-    let url = website.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
-    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-}
-
-/** Returns true if emailDomain matches or is a subdomain of websiteDomain. */
-function emailDomainMatchesWebsite(emailDomain: string, websiteDomain: string): boolean {
-  return emailDomain === websiteDomain || emailDomain.endsWith("." + websiteDomain);
-}
-
 // POST /api/auth/signup
 router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
   let signupStage = "parse";
   try {
     const data = signupSchema.parse(req.body);
     data.email = normalizeEmail(data.email);
-    const isQaBypass = isQaSignupBypassEmail(data.email);
+    const isQaBypass = isQaSignupBypassEmail(data.email, ALLOW_QA_SIGNUP_BYPASS);
 
     if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass) {
       if (isPersonalEmailDomain(data.email)) {
