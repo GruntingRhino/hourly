@@ -161,6 +161,7 @@ function getNavItems(role: string) {
         { path: "/dashboard", label: "Dashboard" },
         { path: "/browse", label: "Browse" },
         { path: "/submit", label: "Submit Hours" },
+        { path: "/messages", label: "Messages" },
         { path: "/settings", label: "Settings" },
       ];
     case "SCHOOL_ADMIN":

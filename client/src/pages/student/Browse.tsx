@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import SearchableSelect from "../../components/SearchableSelect";
 import { api } from "../../lib/api";
 import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
@@ -217,7 +217,6 @@ function CalendarGrid({
 }
 
 export default function StudentBrowse() {
-  const navigate = useNavigate();
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [mySignupStatuses, setMySignupStatuses] = useState<Map<string, string>>(new Map());
   const [search, setSearch] = useState("");
@@ -289,10 +288,6 @@ export default function StudentBrowse() {
     view === "list" && search
       ? [...filtered].sort((a, b) => getSlotSearchScore(b, search) - getSlotSearchScore(a, search))
       : filtered;
-
-  const handleCardClick = (slot: TimeSlot) => {
-    navigate(`/slot/${slot.id}`, { state: { slot } });
-  };
 
   return (
     <div>
@@ -400,10 +395,12 @@ export default function StudentBrowse() {
             const isWaitlisted = signupStatus === "WAITLISTED";
             const isFull = slot._count.signups >= slot.capacity;
             return (
-              <div
+              <Link
                 key={slot.id}
-                onClick={() => handleCardClick(slot)}
-                className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                to={`/slot/${slot.id}`}
+                state={{ slot }}
+                className="block bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                aria-label={`View ${slot.opportunity.title} details`}
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
@@ -472,7 +469,7 @@ export default function StudentBrowse() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

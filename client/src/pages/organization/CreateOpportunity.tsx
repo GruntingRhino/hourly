@@ -7,6 +7,27 @@ interface CustomField {
   value: string;
 }
 
+interface OpportunityResponse {
+  title?: string;
+  description?: string;
+  location?: string;
+  address?: string;
+  date?: unknown;
+  startTime?: string;
+  endTime?: string;
+  durationHours?: number | string;
+  capacity?: number | string;
+  ageRequirement?: number | string;
+  isRecurring?: boolean;
+  recurringPattern?: string;
+  tags?: string;
+  customFields?: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function formatDateForInput(value: unknown): string {
   if (!value) return "";
   if (typeof value === "string") {
@@ -60,7 +81,7 @@ export default function CreateOpportunity() {
 
     (async () => {
       try {
-        const opp = await api.get<any>(`/opportunities/${id}`);
+        const opp = await api.get<OpportunityResponse>(`/opportunities/${id}`);
         if (!active) return;
 
         setForm({
@@ -190,8 +211,8 @@ export default function CreateOpportunity() {
         await api.post("/opportunities", payload);
         navigate("/opportunities");
       }
-    } catch (err: any) {
-      setError(err.message || `Failed to ${isEditing ? "update" : "create"} opportunity`);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, `Failed to ${isEditing ? "update" : "create"} opportunity`));
     } finally {
       setLoading(false);
     }
@@ -261,6 +282,7 @@ export default function CreateOpportunity() {
               ))}
               <input
                 type="text"
+                name="tags"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
@@ -434,6 +456,7 @@ export default function CreateOpportunity() {
                 <div key={i} className="flex gap-2 items-center">
                   <input
                     type="text"
+                    name={`customFields.${i}.label`}
                     value={cf.label}
                     onChange={(e) => updateCustomField(i, "label", e.target.value)}
                     placeholder="Field label"
@@ -441,6 +464,7 @@ export default function CreateOpportunity() {
                   />
                   <input
                     type="text"
+                    name={`customFields.${i}.value`}
                     value={cf.value}
                     onChange={(e) => updateCustomField(i, "value", e.target.value)}
                     placeholder="Field value"
