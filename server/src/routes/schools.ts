@@ -1271,7 +1271,7 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
       const displayHours = signup.totalHours ?? signup.slot.durationHours;
       const approvedHours = signup.verificationStatus === "APPROVED" ? displayHours : 0;
       const pendingHours =
-        signup.verificationStatus === "PENDING" && signup.status !== "CANCELLED"
+        signup.verificationStatus === "PENDING" && signup.status === "CONFIRMED"
           ? signup.slot.durationHours
           : 0;
       beneficiaryApproved += approvedHours;
