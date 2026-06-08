@@ -357,10 +357,13 @@ export default function Landing() {
             </ul>
             <div className="flex flex-col gap-3 items-start">
               <Link to="/school/register"
-                className="px-6 py-3 bg-blue-700 text-white rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors shadow-sm">
+                className="px-5 md:px-6 py-3 bg-blue-700 text-white rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors shadow-sm text-center w-full md:w-auto">
                 Register Your School — Free
               </Link>
               <p className="text-xs text-gray-400">Students and partners join by invitation only</p>
+              <Link to="/login" className="text-sm text-blue-700 font-medium underline md:hidden">
+                Already have an account? Sign in
+              </Link>
             </div>
           </div>
           {/* Hero preview — school dashboard */}
@@ -373,30 +376,30 @@ export default function Landing() {
 
         {/* Stats bar */}
         <section style={{ background: "linear-gradient(90deg, #1a3a8f 0%, #1a56db 50%, #c2410c 100%)" }}
-          className="py-8">
-          <div className="max-w-4xl mx-auto px-6 grid grid-cols-4 gap-6 text-center">
+          className="py-8 md:py-10">
+          <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-center">
             {[
               { value: "700,000+", label: "Community Partners Across USA" },
               { value: "100%", label: "Verified school-controlled records" },
               { value: "FERPA", label: "Compliant student data security" },
-              { value: "35,000", label: "High Schools Across USA. Claim Yours." },
+              { value: "35,000", label: "High Schools. Claim Yours." },
             ].map((s) => (
               <div key={s.label} className="text-white">
-                <div className="text-3xl font-extrabold">{s.value}</div>
-                <div className="text-sm opacity-85 mt-1">{s.label}</div>
+                <div className="text-xl md:text-3xl font-extrabold">{s.value}</div>
+                <div className="text-xs md:text-sm opacity-85 mt-1">{s.label}</div>
               </div>
             ))}
           </div>
         </section>
 
         {/* How it works */}
-        <section id="how" className="py-20 bg-white">
+        <section id="how" className="py-16 md:py-20 bg-white">
           <div className="max-w-4xl mx-auto px-6 md:px-10">
-            <div className="text-center mb-12">
+            <div className="text-center mb-10 md:mb-12">
               <h2 className="text-3xl font-extrabold text-gray-900 mb-2">How It Works</h2>
               <p className="text-gray-500">Three steps from registration to verified hours</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-10 text-center">
+            <div className="grid md:grid-cols-3 gap-8 md:gap-10 text-center">
               {[
                 {
                   n: "1",
@@ -429,7 +432,7 @@ export default function Landing() {
         </section>
 
         {/* Features */}
-        <section id="features" className="py-20 bg-gray-50">
+        <section id="features" className="py-16 md:py-20 bg-gray-50">
           <div className="max-w-6xl mx-auto px-6 md:px-10">
             <div className="text-center mb-10">
               <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Built for Everyone</h2>
@@ -437,12 +440,12 @@ export default function Landing() {
             </div>
             {/* Demo tabs + mockup */}
             <div id="demo" className="mb-12">
-              <div className="flex items-center border-b-2 border-gray-200 mb-6">
+              <div className="flex items-center border-b-2 border-gray-200 mb-6 overflow-x-auto">
                 {(["school", "student", "partner"] as DemoTab[]).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-[2px] capitalize transition-colors ${
+                    className={`px-4 md:px-5 py-2.5 text-sm font-medium border-b-2 -mb-[2px] capitalize transition-colors whitespace-nowrap ${
                       activeTab === tab
                         ? "border-blue-600 text-blue-700 font-semibold"
                         : "border-transparent text-gray-500 hover:text-blue-600"
@@ -451,17 +454,29 @@ export default function Landing() {
                   </button>
                 ))}
                 <Link to="/school/register"
-                  className="ml-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors">
+                  className="ml-auto px-3 md:px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors whitespace-nowrap">
                   Register Free →
                 </Link>
               </div>
-              <div>
-                {activeTab === "school" && <SchoolDashboardMock />}
-                {activeTab === "student" && <StudentDashboardMock />}
-                {activeTab === "partner" && <PartnerDashboardMock />}
+              <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+                {activeTab === "school" && (
+                  <div className="min-w-[640px] md:min-w-0">
+                    <SchoolDashboardMock />
+                  </div>
+                )}
+                {activeTab === "student" && (
+                  <div className="min-w-[640px] md:min-w-0">
+                    <StudentDashboardMock />
+                  </div>
+                )}
+                {activeTab === "partner" && (
+                  <div className="min-w-[640px] md:min-w-0">
+                    <PartnerDashboardMock />
+                  </div>
+                )}
               </div>
             </div>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
               {[
                 {
                   emoji: "🏫",

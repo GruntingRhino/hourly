@@ -8,6 +8,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  STUDENT
+  TEACHER
+  SCHOOL_ADMIN
+  BENEFICIARY_ADMIN
+  ORG_ADMIN
+}
+
 enum IntegrationProvider {
   CANVAS
   GOOGLE_CLASSROOM
@@ -46,7 +54,7 @@ model User {
   passwordHash  String?   // nullable — Google-OAuth users may not have a password initially
   name          String
   phone         String?
-  role          String    // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
+  role          UserRole  // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
   emailVerificationToken String?
@@ -136,6 +144,7 @@ model School {
   serviceStartDate       DateTime?
   serviceEndDate         DateTime?
   allowSelfSubmission    Boolean   @default(true)
+  ferpaBeneficiaryPiiEnabled Boolean   @default(false) // when true, student names are shared with beneficiary admins
   requireOrgVerification Boolean   @default(false)
   categoryHourCaps       String?   // JSON: { [category: string]: number }
   // Legacy

@@ -21,9 +21,12 @@ export default function Login() {
   }, [user, navigate]);
 
   useEffect(() => {
+    setGoogleUrl(`${window.location.origin}/api/auth/google/url?state=login`);
     api
       .get<{ url: string }>("/auth/google/url?state=login")
-      .then((data) => setGoogleUrl(data.url))
+      .then((data) => {
+        if (data?.url) setGoogleUrl(data.url);
+      })
       .catch(() => {});
   }, []);
 
@@ -137,7 +140,7 @@ export default function Login() {
                 required
                 autoComplete="email"
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="you@school.edu"
+                placeholder="you@school.edu or your email"
               />
             </div>
             <div>

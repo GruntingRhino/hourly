@@ -25,8 +25,8 @@ export async function logDataAccess(params: {
         details: params.details ? JSON.stringify(params.details) : null,
       },
     });
-  } catch {
-    // intentionally swallowed — audit log failures must not disrupt the user flow
+  } catch (err) {
+    console.error("[FERPA] DataAccessLog write failed:", err);
   }
 }
 

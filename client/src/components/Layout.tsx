@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 
@@ -15,13 +15,16 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
-  const navItems = getNavItems(user?.role ?? "");
+  const navItems = useMemo(() => getNavItems(user?.role ?? ""), [user?.role]);
+  const visibleNavItems = navItems.slice(0, 4);
+  const overflowNavItems = navItems.slice(4);
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -58,7 +61,7 @@ export default function Layout() {
     <div className="min-h-screen bg-gray-50">
       {/* Top nav — 58px, white, underline active indicator */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40" style={{ height: 58 }}>
-        <div className="max-w-[1280px] mx-auto px-8 h-full relative flex items-center justify-between">
+        <div className="max-w-[960px] mx-auto px-4 h-full relative flex items-center justify-between sm:px-8">
           {/* Logo */}
           <Link to="/dashboard" className="flex items-center shrink-0 relative z-10">
             <img
@@ -95,7 +98,7 @@ export default function Layout() {
           </nav>
 
           <nav className="flex items-stretch h-full gap-0.5 lg:hidden" aria-label="Main navigation">
-            {navItems.slice(0, 4).map((item) => (
+            {visibleNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -109,6 +112,37 @@ export default function Layout() {
                 {item.label}
               </Link>
             ))}
+            {overflowNavItems.length > 0 && (
+              <div className="relative flex items-stretch">
+                <button
+                  onClick={() => setMobileMenuOpen((prev) => !prev)}
+                  className="flex items-center px-3 text-sm text-gray-600 hover:text-gray-900 border-b-2 border-transparent"
+                  aria-label="More navigation items"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                  </svg>
+                </button>
+                {mobileMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                    {overflowNavItems.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`block px-4 py-2 text-sm ${
+                          isActive(item.path)
+                            ? "text-blue-600 font-semibold bg-blue-50"
+                            : "text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           {/* User profile */}
@@ -147,7 +181,7 @@ export default function Layout() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-[960px] mx-auto px-8 py-7 pb-12">
+      <main className="max-w-[960px] mx-auto px-4 py-6 pb-12 sm:px-8">
         <Outlet />
       </main>
     </div>

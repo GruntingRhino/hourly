@@ -86,7 +86,7 @@ export default function EmailVerificationRequired() {
             {resending ? "Sending..." : "Resend verification email"}
           </button>
 
-          {(import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "development") && (
+          {(import.meta.env.DEV && import.meta.env.VITE_APP_ENV !== "production") && (
             <button
               onClick={handleBypassVerification}
               disabled={bypassing}

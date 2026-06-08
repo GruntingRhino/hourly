@@ -525,7 +525,6 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         });
         return res.status(409).json({
           error: "This school is already registered.",
-          contactEmail: existingSchool?.registrationEmail || existingSchool?.createdBy?.email || null,
         });
       }
 

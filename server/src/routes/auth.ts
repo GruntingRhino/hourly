@@ -33,6 +33,7 @@ import {
 
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+const ENABLE_IMPERSONATION = process.env.ENABLE_IMPERSONATION === "true";
 
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
@@ -133,9 +134,14 @@ const signupLimiter = rateLimit({
   // onboarding/testing flows without tripping anonymous IP abuse limits.
   skip: (req) => {
     const authHeader = req.get("authorization") || "";
-    if (/^Bearer\s+/i.test(authHeader)) return true;
-    const cookieHeader = req.headers.cookie || "";
-    return /(?:^|;\s*)token=/.test(cookieHeader);
+    if (!/^Bearer\s+/i.test(authHeader)) return false;
+    try {
+      const token = authHeader.slice(7);
+      const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+      return !!payload.userId;
+    } catch {
+      return false;
+    }
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -617,7 +623,7 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
     console.error("Signup error:", err, { signupStage });
     const errorCode = typeof err === "object" && err && "code" in err ? String((err as any).code) : undefined;
     const errorMeta = typeof err === "object" && err && "meta" in err ? (err as any).meta : undefined;
-    res.status(500).json({ error: "Internal server error", stage: signupStage, errorCode, errorMeta });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -1018,7 +1024,7 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   }
 });
 
-if (!IS_PROD_LIKE) {
+if (!IS_PROD_LIKE && ENABLE_IMPERSONATION) {
   // POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
   router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
     try {
@@ -1061,6 +1067,26 @@ if (!IS_PROD_LIKE) {
 
       console.warn(`[IMPERSONATION] ${actor.email} (${actor.id}) impersonated ${target.email} (${target.id}) at ${new Date().toISOString()}`);
 
+      // FERPA audit log for impersonation access
+      try {
+        await prisma.dataAccessLog.create({
+          data: {
+            actorId: actor.id,
+            action: "IMPERSONATE_USER",
+            targetType: "user",
+            targetId: target.id,
+            details: JSON.stringify({
+              actorEmail: actor.email,
+              targetEmail: target.email,
+              targetRole: target.role,
+              timestamp: new Date().toISOString(),
+            }),
+          },
+        });
+      } catch (logErr) {
+        console.error("[FERPA] Failed to log impersonation access:", logErr);
+      }
+
       const token = signToken({ userId: target.id, email: target.email, role: target.role });
 
       const studentSchool = resolveSchoolFromUserAssociations(target);
@@ -1096,6 +1122,8 @@ if (!IS_PROD_LIKE) {
       res.status(500).json({ error: "Internal server error" });
     }
   });
+} else if (!IS_PROD_LIKE && !ENABLE_IMPERSONATION) {
+  console.warn("[Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.");
 }
 
 export default router;

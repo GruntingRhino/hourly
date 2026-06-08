@@ -53,14 +53,14 @@ npx tsx prisma/seed.ts       # Re-seed (drops and recreates data)
 ```
 
 ### Test Accounts (after seeding)
-| Role         | Email                       | Password     |
-|--------------|-----------------------------|-------------|
-| Student      | john@student.edu            | password123 |
-| Student      | jane@student.edu            | password123 |
-| Student      | alex@student.edu            | password123 |
-| Organization | volunteer@greenearth.org    | password123 |
-| Organization | staff@library.org           | password123 |
-| School Admin | admin@lincoln.edu           | password123 |
+| Role         | Email                       | Password (set via SEED_PASSWORD env var) |
+|--------------|-----------------------------|----------------------------------------|
+| Student      | john@student.edu            | (see .env SEED_PASSWORD)               |
+| Student      | jane@student.edu            | (see .env SEED_PASSWORD)               |
+| Student      | alex@student.edu            | (see .env SEED_PASSWORD)               |
+| Organization | volunteer@greenearth.org    | (see .env SEED_PASSWORD)               |
+| Organization | staff@library.org           | (see .env SEED_PASSWORD)               |
+| School Admin | admin@lincoln.edu           | (see .env SEED_PASSWORD)               |
 
 ## Architecture
 

@@ -10,13 +10,32 @@ import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
 import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
-import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 
 function normalizeInviteEmail(email: unknown): string {
   return typeof email === "string" && email.trim()
     ? email.trim().toLowerCase()
     : "unknown";
+}
+
+// ─── FERPA Helpers ───────────────────────────────────────────────
+
+function pseudonymousStudentLabel(studentId: string): string {
+  const hash = crypto.createHash("sha256").update(studentId).digest("hex");
+  return `Student-${hash.slice(0, 8)}`;
+}
+
+async function isBeneficiaryPiiEnabled(beneficiaryId: string): Promise<boolean> {
+  const approvals = await prisma.schoolBeneficiaryApproval.findMany({
+    where: { beneficiaryId, status: "APPROVED" },
+    include: {
+      school: {
+        select: { ferpaBeneficiaryPiiEnabled: true },
+      },
+    },
+  });
+  return approvals.some((a) => a.school.ferpaBeneficiaryPiiEnabled);
 }
 
 // 10 invitations per school admin/recipient pair per hour — prevents inbox-bombing a beneficiary contact
@@ -1872,9 +1891,18 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async
       : [];
     const studentMap = new Map(students.map((student) => [student.id, student.name]));
 
+    // FERPA disclosure log: beneficiary admin accessed student signup list
+    logDataAccess({
+      actorId: req.user!.userId,
+      action: "VIEW_BENEFICIARY_SIGNUPS",
+      targetType: "beneficiary",
+      targetId: req.params.id,
+      details: { studentCount: signups.length, statusFilter: statusFilter ?? "all" },
+    }).catch(() => {});
+
     const result = signups.map((s) => ({
       ...s,
-      student: { id: s.studentId, label: studentMap.get(s.studentId) ?? "Unknown student" },
+      student: { id: s.studentId, label: pseudonymousStudentLabel(s.studentId) },
     }));
 
     res.json(result);
@@ -2281,7 +2309,7 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
         checkedIn: signup.checkedIn,
         checkedOut: signup.checkedOut,
         verifiedAt: signup.verifiedAt,
-        student: student ? { id: student.id, label: student.name } : { id: signup.studentId, label: "Unknown student" },
+        student: student ? { id: student.id, label: actor.role === "BENEFICIARY_ADMIN" ? pseudonymousStudentLabel(student.id) : student.name } : { id: signup.studentId, label: "Unknown student" },
         slot: {
           id: signup.slot.id,
           date: signup.slot.date,

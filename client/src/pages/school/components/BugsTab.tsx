@@ -1,0 +1,402 @@
+import { useEffect, useState } from "react";
+import { api } from "../../../lib/api";
+import type { LaunchWorkspace, LaunchBug, BugCreateForm, BugEditForm } from "./types";
+import { badgeClasses } from "./types";
+
+export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
+  const [createBugForm, setCreateBugForm] = useState<BugCreateForm>({
+    title: "",
+    description: "",
+    severity: "MEDIUM",
+    area: "",
+    source: "",
+    ownerName: "",
+    workaround: "",
+    nextAction: "",
+  });
+  const [creatingBug, setCreatingBug] = useState(false);
+  const [selectedBugId, setSelectedBugId] = useState<string>("");
+  const [bugEditForm, setBugEditForm] = useState<BugEditForm>({
+    title: "",
+    description: "",
+    severity: "MEDIUM",
+    status: "OPEN",
+    area: "",
+    source: "",
+    ownerName: "",
+    workaround: "",
+    nextAction: "",
+  });
+  const [savingBug, setSavingBug] = useState(false);
+  const [bugMessage, setBugMessage] = useState("");
+
+  const selectedBug = workspace.bugs.find((bug) => bug.id === selectedBugId) ?? null;
+
+  useEffect(() => {
+    const firstBug = workspace.bugs[0];
+    if (!selectedBugId && firstBug) {
+      setSelectedBugId(firstBug.id);
+    }
+  }, [workspace, selectedBugId]);
+
+  useEffect(() => {
+    if (!selectedBug) return;
+    setBugEditForm({
+      title: selectedBug.title,
+      description: selectedBug.description,
+      severity: selectedBug.severity,
+      status: selectedBug.status,
+      area: selectedBug.area,
+      source: selectedBug.source,
+      ownerName: selectedBug.ownerName,
+      workaround: selectedBug.workaround,
+      nextAction: selectedBug.nextAction,
+    });
+  }, [selectedBug]);
+
+  const handleCreateBug = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingBug(true);
+    setBugMessage("");
+    try {
+      const bug = await api.post<LaunchBug>("/schools/launch/bugs", createBugForm);
+      setCreateBugForm({
+        title: "",
+        description: "",
+        severity: "MEDIUM",
+        area: "",
+        source: "",
+        ownerName: "",
+        workaround: "",
+        nextAction: "",
+      });
+      setSelectedBugId(bug.id);
+      setBugMessage("Bug added to triage.");
+      await loadWorkspace();
+    } catch (err: any) {
+      setBugMessage(err.message || "Failed to create bug.");
+    } finally {
+      setCreatingBug(false);
+    }
+  };
+
+  const handleSaveBug = async () => {
+    if (!selectedBug) return;
+    setSavingBug(true);
+    setBugMessage("");
+    try {
+      await api.put<LaunchBug>(`/schools/launch/bugs/${selectedBug.id}`, bugEditForm);
+      setBugMessage("Bug triage entry saved.");
+      await loadWorkspace();
+    } catch (err: any) {
+      setBugMessage(err.message || "Failed to save bug.");
+    } finally {
+      setSavingBug(false);
+    }
+  };
+
+  const loadWorkspace = async () => {
+    try {
+      const data = await api.get<LaunchWorkspace>("/schools/launch");
+      onUpdate(data);
+    } catch {}
+  };
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
+      <div className="space-y-6">
+        <form onSubmit={handleCreateBug} className="rounded-xl border border-gray-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-900">New bug triage item</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Capture rollout defects with enough detail to assign, reproduce, and verify.
+          </p>
+          {bugMessage && (
+            <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              {bugMessage}
+            </div>
+          )}
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                aria-label="New bug title"
+                value={createBugForm.title}
+                onChange={(e) => setCreateBugForm((current) => ({ ...current, title: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                required
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Severity</label>
+                <select
+                  aria-label="New bug severity"
+                  value={createBugForm.severity}
+                  onChange={(e) =>
+                    setCreateBugForm((current) => ({
+                      ...current,
+                      severity: e.target.value as BugCreateForm["severity"],
+                    }))
+                  }
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Area</label>
+                <input
+                  type="text"
+                  aria-label="New bug area"
+                  value={createBugForm.area}
+                  onChange={(e) => setCreateBugForm((current) => ({ ...current, area: e.target.value }))}
+                  placeholder="Onboarding, Partners, Cohorts"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                rows={4}
+                aria-label="New bug description"
+                value={createBugForm.description}
+                onChange={(e) => setCreateBugForm((current) => ({ ...current, description: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Source</label>
+                <input
+                  type="text"
+                  aria-label="New bug source"
+                  value={createBugForm.source}
+                  onChange={(e) => setCreateBugForm((current) => ({ ...current, source: e.target.value }))}
+                  placeholder="Student report, admin test"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Owner</label>
+                <input
+                  type="text"
+                  aria-label="New bug owner"
+                  value={createBugForm.ownerName}
+                  onChange={(e) => setCreateBugForm((current) => ({ ...current, ownerName: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Workaround</label>
+              <textarea
+                rows={2}
+                aria-label="New bug workaround"
+                value={createBugForm.workaround}
+                onChange={(e) => setCreateBugForm((current) => ({ ...current, workaround: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Next action</label>
+              <textarea
+                rows={2}
+                aria-label="New bug next action"
+                value={createBugForm.nextAction}
+                onChange={(e) => setCreateBugForm((current) => ({ ...current, nextAction: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={creatingBug}
+              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+            >
+              {creatingBug ? "Saving..." : "Add Bug"}
+            </button>
+          </div>
+        </form>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">Triage queue</h2>
+            <div className="text-sm text-gray-500">{workspace.bugs.length} total</div>
+          </div>
+          <div className="mt-5 space-y-3">
+            {workspace.bugs.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500">
+                No rollout bugs yet.
+              </div>
+            ) : (
+              workspace.bugs.map((bug) => (
+                <button
+                  key={bug.id}
+                  onClick={() => setSelectedBugId(bug.id)}
+                  className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                    selectedBugId === bug.id
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClasses(bug.severity)}`}>
+                      {bug.severity}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClasses(bug.status)}`}>
+                      {bug.status}
+                    </span>
+                  </div>
+                  <div className="mt-2 font-medium text-gray-900">{bug.title}</div>
+                  <div className="mt-1 text-sm text-gray-500">
+                    {bug.area || "General"} · Updated {new Date(bug.updatedAt).toLocaleDateString()}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="text-lg font-semibold text-gray-900">Selected bug</h2>
+        {!selectedBug ? (
+          <div className="mt-5 rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500">
+            Select a bug to edit severity, status, owner, workaround, and next action.
+          </div>
+        ) : (
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                aria-label="Selected bug title"
+                value={bugEditForm.title}
+                onChange={(e) => setBugEditForm((current) => ({ ...current, title: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Severity</label>
+                <select
+                  aria-label="Selected bug severity"
+                  value={bugEditForm.severity}
+                  onChange={(e) =>
+                    setBugEditForm((current) => ({
+                      ...current,
+                      severity: e.target.value as BugEditForm["severity"],
+                    }))
+                  }
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+                <select
+                  aria-label="Selected bug status"
+                  value={bugEditForm.status}
+                  onChange={(e) =>
+                    setBugEditForm((current) => ({
+                      ...current,
+                      status: e.target.value as BugEditForm["status"],
+                    }))
+                  }
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="OPEN">Open</option>
+                  <option value="INVESTIGATING">Investigating</option>
+                  <option value="BLOCKED">Blocked</option>
+                  <option value="FIXED">Fixed</option>
+                  <option value="MONITORING">Monitoring</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Area</label>
+                <input
+                  type="text"
+                  aria-label="Selected bug area"
+                  value={bugEditForm.area}
+                  onChange={(e) => setBugEditForm((current) => ({ ...current, area: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Source</label>
+                <input
+                  type="text"
+                  aria-label="Selected bug source"
+                  value={bugEditForm.source}
+                  onChange={(e) => setBugEditForm((current) => ({ ...current, source: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Owner</label>
+              <input
+                type="text"
+                aria-label="Selected bug owner"
+                value={bugEditForm.ownerName}
+                onChange={(e) => setBugEditForm((current) => ({ ...current, ownerName: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                rows={5}
+                aria-label="Selected bug description"
+                value={bugEditForm.description}
+                onChange={(e) => setBugEditForm((current) => ({ ...current, description: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Workaround</label>
+              <textarea
+                rows={3}
+                aria-label="Selected bug workaround"
+                value={bugEditForm.workaround}
+                onChange={(e) => setBugEditForm((current) => ({ ...current, workaround: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Next action</label>
+              <textarea
+                rows={3}
+                aria-label="Selected bug next action"
+                value={bugEditForm.nextAction}
+                onChange={(e) => setBugEditForm((current) => ({ ...current, nextAction: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="text-xs text-gray-400">
+              Created {new Date(selectedBug.createdAt).toLocaleString()} · Updated {new Date(selectedBug.updatedAt).toLocaleString()}
+            </div>
+            <button
+              onClick={handleSaveBug}
+              disabled={savingBug}
+              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+            >
+              {savingBug ? "Saving..." : "Save Bug"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -14,7 +14,7 @@ function isProdLike(): boolean {
 
 function hasValidCronSecret(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return !isProdLike();
+  if (!secret) return false;
 
   const authHeader = req.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";

@@ -23,6 +23,9 @@ dist-ssr/
 .vercel
 .env*.local
 google_oAuth_secrets.json
+
+# Test auth tokens — never commit live JWT tokens
+tests/.auth/*.json
 .claude/
 .claude/settings.local.json
 

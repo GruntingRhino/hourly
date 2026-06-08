@@ -527,7 +527,7 @@ router.post("/:id/ownership-transfer", authenticate, requireRole("SCHOOL_ADMIN")
 });
 
 // POST /api/schools/confirm-transfer — confirm school ownership transfer by token
-router.post("/confirm-transfer", async (req: Request, res: Response) => {
+router.post("/confirm-transfer", authenticate, async (req: Request, res: Response) => {
   try {
     const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
 
@@ -544,6 +544,10 @@ router.post("/confirm-transfer", async (req: Request, res: Response) => {
     });
     if (!school?.createdById || !school.ownershipTransferTargetUserId) {
       return res.status(400).json({ error: "Invalid or expired transfer token" });
+    }
+
+    if (req.user!.userId !== school.ownershipTransferTargetUserId) {
+      return res.status(403).json({ error: "This transfer token was not issued for your account" });
     }
 
     await runOwnershipTransfer({

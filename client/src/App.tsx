@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import SessionPrefBanner from "./components/SessionPrefBanner";
 import { getSessionPref } from "./lib/authSession";
+import { ToastProvider } from "./components/Toast";
 
 // Public pages
 import Landing from "./pages/Landing";
@@ -183,7 +184,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -25,6 +25,7 @@ import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
 import { startReminderScheduler } from "./lib/reminders";
+import { authenticate } from "./middleware/auth";
 import { createHybridRateLimit } from "./middleware/rateLimit";
 
 const app = express();
@@ -71,7 +72,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "10mb" }));
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/uploads", authenticate, express.static(path.join(__dirname, "../uploads")));
 
 // Baseline protection for every API route.
 // Specialized route limiters below remain in place for sensitive workflows.

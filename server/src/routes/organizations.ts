@@ -1,9 +1,11 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendOrgApprovalRequestEmail } from "../services/email";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { strictObject, optionalTrimmedString } from "../lib/validation";
 
 const router = Router();
 
@@ -46,8 +48,17 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
 });
 
 // PUT /api/organizations/:id — update org profile
+const updateOrgSchema = strictObject({
+  name: optionalTrimmedString(255),
+  phone: optionalTrimmedString(50),
+  description: optionalTrimmedString(2000),
+  website: optionalTrimmedString(500),
+  zipCodes: z.array(z.string().trim().regex(/^\d{5}$/, "Invalid ZIP code")).max(50).optional(),
+});
+
 router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
   try {
+    const data = updateOrgSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.organizationId !== req.params.id) {
       return res.status(403).json({ error: "Not your organization" });
@@ -56,19 +67,18 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
     const org = await prisma.organization.update({
       where: { id: req.params.id },
       data: {
-        name: req.body.name,
-        phone: req.body.phone,
-        description: req.body.description,
-        website: req.body.website,
-        zipCodes: "zipCodes" in req.body
-          ? (Array.isArray(req.body.zipCodes) && req.body.zipCodes.length > 0
-              ? JSON.stringify(req.body.zipCodes)
-              : null)
-          : undefined,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.website !== undefined && { website: data.website }),
+        ...(data.zipCodes !== undefined && { zipCodes: data.zipCodes.length > 0 ? JSON.stringify(data.zipCodes) : null }),
       },
     });
     res.json(org);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
     console.error("Update org error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

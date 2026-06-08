@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import { CollapsibleList } from "../../components/CollapsibleList";
 
 interface Signup {
   id: string;
@@ -753,19 +754,19 @@ export default function StudentDashboard() {
             <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
               No recent status changes.
             </div>
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              {recentActivity.map((activity, i, arr) => (
-                <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
-                  <div>
-                    <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
-                    <div className="text-[12.5px] text-gray-500">{activity.detail}</div>
-                  </div>
-                  <StatusBadge status={activity.status} />
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <CollapsibleList limit={5} items={recentActivity.map((activity, i, arr) => (
+              <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                <div>
+                  <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
+                  <div className="text-[12.5px] text-gray-500">{activity.detail}</div>
                 </div>
-              ))}
-            </div>
-          )}
+                <StatusBadge status={activity.status} />
+              </div>
+            ))} />
+          </div>
+        )}
         </div>
       </div>
 
@@ -777,7 +778,7 @@ export default function StudentDashboard() {
           </div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            {pastActivities.map((activity, i, arr) => (
+            <CollapsibleList limit={5} items={pastActivities.map((activity, i, arr) => (
               <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
                 <div>
                   <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
@@ -787,7 +788,7 @@ export default function StudentDashboard() {
                 </div>
                 <StatusBadge status={activity.status} />
               </div>
-            ))}
+            ))} />
           </div>
         )}
       </div>

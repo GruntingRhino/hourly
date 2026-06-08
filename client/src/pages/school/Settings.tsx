@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
+import { CollapsibleList } from "../../components/CollapsibleList";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
 
 type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "integrations" | "data";
@@ -1225,13 +1226,14 @@ export default function SchoolSettings() {
           {!rulesIsError && categoryCapWarnings.length > 0 && (
             <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <div className="font-medium mb-2">Students already above a new cap</div>
-              <div className="space-y-1">
-                {categoryCapWarnings.map((warning) => (
+              <CollapsibleList
+                limit={5}
+                items={categoryCapWarnings.map((warning) => (
                   <div key={`${warning.studentId}:${warning.category}`}>
                     {warning.message}
                   </div>
                 ))}
-              </div>
+              />
             </div>
           )}
 
@@ -1689,7 +1691,9 @@ export default function SchoolSettings() {
                 <div className="text-sm text-gray-500">No access events recorded yet.</div>
               ) : (
                 <div className="space-y-3">
-                  {dataAccessLogs.slice(0, 50).map((entry) => (
+                  <CollapsibleList
+                    limit={10}
+                    items={dataAccessLogs.slice(0, 50).map((entry) => (
                     <div key={entry.id} className="rounded-lg border border-gray-200 p-3 overflow-hidden">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -1712,7 +1716,7 @@ export default function SchoolSettings() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  ))} />
                 </div>
               )}
             </div>
@@ -1751,9 +1755,12 @@ export default function SchoolSettings() {
 
           {(canvasStatus?.ops?.warnings?.length ?? 0) > 0 && (
             <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              {canvasStatus?.ops?.warnings.map((warning, index) => (
-                <div key={`${warning}-${index}`}>{warning}</div>
-              ))}
+              <CollapsibleList
+                limit={5}
+                items={canvasStatus?.ops?.warnings.map((warning, index) => (
+                  <div key={`${warning}-${index}`}>{warning}</div>
+                )) ?? []}
+              />
             </div>
           )}
 
@@ -1877,49 +1884,55 @@ export default function SchoolSettings() {
 
           <div className="mb-6">
             <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
-            <div className="space-y-2">
-              {(canvasStatus?.jobs ?? []).map((job) => (
-                <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <strong>{job.mode}</strong> · {job.status}
+            {(!canvasStatus?.jobs || canvasStatus.jobs.length === 0) ? (
+              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                No Canvas sync jobs yet.
+              </div>
+            ) : (
+              <CollapsibleList
+                limit={5}
+                className="space-y-2"
+                items={canvasStatus.jobs.map((job) => (
+                  <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <strong>{job.mode}</strong> · {job.status}
+                      </div>
+                      <div className="text-gray-500">
+                        {new Date(job.startedAt).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="text-gray-500">
-                      {new Date(job.startedAt).toLocaleString()}
-                    </div>
+                    {job.summary && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
+                      </div>
+                    )}
                   </div>
-                  {job.summary && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {(!canvasStatus?.jobs || canvasStatus.jobs.length === 0) && (
-                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                  No Canvas sync jobs yet.
-                </div>
-              )}
-            </div>
+                ))}
+              />
+            )}
           </div>
 
           <div>
             <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
-            <div className="space-y-2">
-              {canvasErrors.map((error) => (
-                <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                  <div><strong>{error.code}</strong> · {error.message}</div>
-                  <div className="text-xs mt-1">
-                    {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+            {canvasErrors.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                No Canvas sync errors recorded.
+              </div>
+            ) : (
+              <CollapsibleList
+                limit={5}
+                className="space-y-2"
+                items={canvasErrors.map((error) => (
+                  <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <div><strong>{error.code}</strong> · {error.message}</div>
+                    <div className="text-xs mt-1">
+                      {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {canvasErrors.length === 0 && (
-                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                  No Canvas sync errors recorded.
-                </div>
-              )}
-            </div>
+                ))}
+              />
+            )}
           </div>
         </div>
 
@@ -1952,9 +1965,12 @@ export default function SchoolSettings() {
 
           {(googleClassroomStatus?.ops?.warnings?.length ?? 0) > 0 && (
             <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              {googleClassroomStatus?.ops?.warnings.map((warning, index) => (
-                <div key={`${warning}-${index}`}>{warning}</div>
-              ))}
+              <CollapsibleList
+                limit={5}
+                items={googleClassroomStatus?.ops?.warnings.map((warning, index) => (
+                  <div key={`${warning}-${index}`}>{warning}</div>
+                )) ?? []}
+              />
             </div>
           )}
 
@@ -2078,49 +2094,55 @@ export default function SchoolSettings() {
 
           <div className="mb-6">
             <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
-            <div className="space-y-2">
-              {(googleClassroomStatus?.jobs ?? []).map((job) => (
-                <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <strong>{job.mode}</strong> · {job.status}
+            {(!googleClassroomStatus?.jobs || googleClassroomStatus.jobs.length === 0) ? (
+              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                No Google Classroom sync jobs yet.
+              </div>
+            ) : (
+              <CollapsibleList
+                limit={5}
+                className="space-y-2"
+                items={googleClassroomStatus.jobs.map((job) => (
+                  <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <strong>{job.mode}</strong> · {job.status}
+                      </div>
+                      <div className="text-gray-500">
+                        {new Date(job.startedAt).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="text-gray-500">
-                      {new Date(job.startedAt).toLocaleString()}
-                    </div>
+                    {job.summary && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
+                      </div>
+                    )}
                   </div>
-                  {job.summary && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {(!googleClassroomStatus?.jobs || googleClassroomStatus.jobs.length === 0) && (
-                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                  No Google Classroom sync jobs yet.
-                </div>
-              )}
-            </div>
+                ))}
+              />
+            )}
           </div>
 
           <div>
             <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
-            <div className="space-y-2">
-              {googleClassroomErrors.map((error) => (
-                <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                  <div><strong>{error.code}</strong> · {error.message}</div>
-                  <div className="text-xs mt-1">
-                    {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+            {googleClassroomErrors.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                No Google Classroom sync errors recorded.
+              </div>
+            ) : (
+              <CollapsibleList
+                limit={5}
+                className="space-y-2"
+                items={googleClassroomErrors.map((error) => (
+                  <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <div><strong>{error.code}</strong> · {error.message}</div>
+                    <div className="text-xs mt-1">
+                      {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {googleClassroomErrors.length === 0 && (
-                <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                  No Google Classroom sync errors recorded.
-                </div>
-              )}
-            </div>
+                ))}
+              />
+            )}
           </div>
         </div>
         </div>

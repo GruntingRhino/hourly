@@ -17,6 +17,10 @@ type HybridRateLimitOptions = {
 };
 
 const buckets = new Map<string, Bucket>();
+console.warn(
+  "[RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. " +
+  "For production multi-instance deployments, configure an external store like Upstash Redis."
+);
 const cleanupWindowMs = 5 * 60 * 1000;
 let lastCleanupAt = 0;
 
