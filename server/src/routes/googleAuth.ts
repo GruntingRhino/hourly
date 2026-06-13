@@ -517,12 +517,11 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     // Check if school directory entry exists and is already claimed; also validate contact email domain
     if (data.directorySchoolId) {
       const dirEntry = await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } });
-      if (dirEntry?.claimed) {
-        // Find the registered school and return contact info
-        const existingSchool = await prisma.school.findFirst({
-          where: { directoryId: data.directorySchoolId },
-          include: { createdBy: { select: { email: true } } },
-        });
+      const existingSchool = await prisma.school.findFirst({
+        where: { directoryId: data.directorySchoolId },
+        include: { createdBy: { select: { email: true } } },
+      });
+      if (dirEntry?.claimed || existingSchool) {
         return res.status(409).json({
           error: "This school is already registered.",
         });

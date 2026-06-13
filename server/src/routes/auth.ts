@@ -449,6 +449,19 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
         })
       : null;
 
+    if (data.directorySchoolId) {
+      const existingSchool = await prisma.school.findFirst({
+        where: { directoryId: data.directorySchoolId },
+        include: { createdBy: { select: { email: true } } },
+      });
+      if (directorySchool?.claimed || existingSchool) {
+        return res.status(409).json({
+          error: "This school is already registered.",
+          contactEmail: existingSchool?.registrationEmail || existingSchool?.createdBy?.email || null,
+        });
+      }
+    }
+
     const schoolName = directorySchool?.name || data.schoolName || data.name;
     const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
