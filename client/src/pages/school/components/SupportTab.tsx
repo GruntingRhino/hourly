@@ -4,24 +4,24 @@ import type { LaunchWorkspace, SupportForm } from "./types";
 
 export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
   const [supportForm, setSupportForm] = useState<SupportForm>({
-    ownerName: workspace.plan.supportProcess.ownerName,
-    ownerEmail: workspace.plan.supportProcess.ownerEmail,
-    responseTimeHours: String(workspace.plan.supportProcess.responseTimeHours),
-    escalationAfterHours: String(workspace.plan.supportProcess.escalationAfterHours),
+    ownerName: workspace.plan.supportProcess.ownerName ?? "",
+    ownerEmail: workspace.plan.supportProcess.ownerEmail ?? "",
+    responseTimeHours: String(workspace.plan.supportProcess.responseTimeHours ?? ""),
+    escalationAfterHours: String(workspace.plan.supportProcess.escalationAfterHours ?? ""),
     intakeChannels: workspace.plan.supportProcess.intakeChannels.join(", "),
-    notes: workspace.plan.supportProcess.notes,
+    notes: workspace.plan.supportProcess.notes ?? "",
   });
   const [savingSupport, setSavingSupport] = useState(false);
   const [supportMessage, setSupportMessage] = useState("");
 
   useEffect(() => {
     setSupportForm({
-      ownerName: workspace.plan.supportProcess.ownerName,
-      ownerEmail: workspace.plan.supportProcess.ownerEmail,
-      responseTimeHours: String(workspace.plan.supportProcess.responseTimeHours),
-      escalationAfterHours: String(workspace.plan.supportProcess.escalationAfterHours),
+      ownerName: workspace.plan.supportProcess.ownerName ?? "",
+      ownerEmail: workspace.plan.supportProcess.ownerEmail ?? "",
+      responseTimeHours: String(workspace.plan.supportProcess.responseTimeHours ?? ""),
+      escalationAfterHours: String(workspace.plan.supportProcess.escalationAfterHours ?? ""),
       intakeChannels: workspace.plan.supportProcess.intakeChannels.join(", "),
-      notes: workspace.plan.supportProcess.notes,
+      notes: workspace.plan.supportProcess.notes ?? "",
     });
   }, [workspace]);
 

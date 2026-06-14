@@ -46,11 +46,11 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
       description: selectedBug.description,
       severity: selectedBug.severity,
       status: selectedBug.status,
-      area: selectedBug.area,
-      source: selectedBug.source,
-      ownerName: selectedBug.ownerName,
-      workaround: selectedBug.workaround,
-      nextAction: selectedBug.nextAction,
+      area: selectedBug.area ?? "",
+      source: selectedBug.source ?? "",
+      ownerName: selectedBug.ownerName ?? "",
+      workaround: selectedBug.workaround ?? "",
+      nextAction: selectedBug.nextAction ?? "",
     });
   }, [selectedBug]);
 

@@ -4,24 +4,24 @@ import type { LaunchWorkspace, RollbackForm } from "./types";
 
 export default function RollbackTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
   const [rollbackForm, setRollbackForm] = useState<RollbackForm>({
-    ownerName: workspace.plan.rollbackPlan.ownerName,
-    trigger: workspace.plan.rollbackPlan.trigger,
-    freezeAction: workspace.plan.rollbackPlan.freezeAction,
-    rollbackSteps: workspace.plan.rollbackPlan.rollbackSteps,
-    restoreCheck: workspace.plan.rollbackPlan.restoreCheck,
-    lastDrillAt: workspace.plan.rollbackPlan.lastDrillAt,
+    ownerName: workspace.plan.rollbackPlan.ownerName ?? "",
+    trigger: workspace.plan.rollbackPlan.trigger ?? "",
+    freezeAction: workspace.plan.rollbackPlan.freezeAction ?? "",
+    rollbackSteps: workspace.plan.rollbackPlan.rollbackSteps ?? "",
+    restoreCheck: workspace.plan.rollbackPlan.restoreCheck ?? "",
+    lastDrillAt: workspace.plan.rollbackPlan.lastDrillAt ?? "",
   });
   const [savingRollback, setSavingRollback] = useState(false);
   const [rollbackMessage, setRollbackMessage] = useState("");
 
   useEffect(() => {
     setRollbackForm({
-      ownerName: workspace.plan.rollbackPlan.ownerName,
-      trigger: workspace.plan.rollbackPlan.trigger,
-      freezeAction: workspace.plan.rollbackPlan.freezeAction,
-      rollbackSteps: workspace.plan.rollbackPlan.rollbackSteps,
-      restoreCheck: workspace.plan.rollbackPlan.restoreCheck,
-      lastDrillAt: workspace.plan.rollbackPlan.lastDrillAt,
+      ownerName: workspace.plan.rollbackPlan.ownerName ?? "",
+      trigger: workspace.plan.rollbackPlan.trigger ?? "",
+      freezeAction: workspace.plan.rollbackPlan.freezeAction ?? "",
+      rollbackSteps: workspace.plan.rollbackPlan.rollbackSteps ?? "",
+      restoreCheck: workspace.plan.rollbackPlan.restoreCheck ?? "",
+      lastDrillAt: workspace.plan.rollbackPlan.lastDrillAt ?? "",
     });
   }, [workspace]);
 

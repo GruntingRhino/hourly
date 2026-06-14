@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../../../lib/api";
 import type { LaunchWorkspace, ReminderSummary, MonitoringForm } from "./types";
 import { MetricCard, formatDate } from "./types";
 
 export default function MonitoringTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
   const [monitoringForm, setMonitoringForm] = useState<MonitoringForm>({
-    launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate,
+    launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate ?? "",
     checkCadence: workspace.plan.firstUserMonitoring.checkCadence,
     activeStudentTarget: String(workspace.plan.firstUserMonitoring.activeStudentTarget),
     watchList: workspace.plan.firstUserMonitoring.watchList.join(", "),
-    notes: workspace.plan.firstUserMonitoring.notes,
+    notes: workspace.plan.firstUserMonitoring.notes ?? "",
   });
   const [savingMonitoring, setSavingMonitoring] = useState(false);
   const [monitoringMessage, setMonitoringMessage] = useState("");
@@ -24,11 +23,11 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
 
   useEffect(() => {
     setMonitoringForm({
-      launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate,
+      launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate ?? "",
       checkCadence: workspace.plan.firstUserMonitoring.checkCadence,
       activeStudentTarget: String(workspace.plan.firstUserMonitoring.activeStudentTarget),
       watchList: workspace.plan.firstUserMonitoring.watchList.join(", "),
-      notes: workspace.plan.firstUserMonitoring.notes,
+      notes: workspace.plan.firstUserMonitoring.notes ?? "",
     });
   }, [workspace]);
 
