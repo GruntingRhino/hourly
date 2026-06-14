@@ -54,7 +54,7 @@ model User {
   passwordHash  String?   // nullable — Google-OAuth users may not have a password initially
   name          String
   phone         String?
-  role          UserRole  // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
+  role          String    // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
   status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
   emailVerified Boolean   @default(false)
   emailVerificationToken String?
