@@ -16,6 +16,7 @@ import {
 } from "../lib/signupEmailPolicy";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { createHybridRateLimit } from "../middleware/rateLimit";
+import { isUniqueConstraintError } from "../lib/prismaErrors";
 import {
   firstZodError,
   opaqueIdSchema,
@@ -397,22 +398,29 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
       }
     }
 
-    // If a directory school was selected, validate email domain against its known domain
+    // If a directory school was selected, validate email domain against its known domain.
     // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
-    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass && data.role === "SCHOOL_ADMIN" && data.directorySchoolId) {
+    if (data.directorySchoolId) {
       const dirEntry = await prisma.schoolDirectory.findUnique({
         where: { id: data.directorySchoolId },
         select: { emailDomain: true, website: true },
       });
-      // Prefer the explicit emailDomain field; fall back to parsing the website URL
-      const schoolDomain = dirEntry?.emailDomain || (dirEntry?.website ? extractDomainFromWebsite(dirEntry.website) : null);
-      if (schoolDomain) {
-        const emailDomain = data.email.split("@")[1]?.toLowerCase().trim() || "";
-        const isEdu = emailDomain.endsWith(".edu");
-        if (!isEdu && !emailDomainMatchesWebsite(emailDomain, schoolDomain)) {
-          return res.status(403).json({
-            error: `Email domain does not match the school's domain (${schoolDomain}). Please use your school email address.`,
-          });
+      if (!dirEntry) {
+        return res.status(400).json({
+          error: "Selected school is no longer available. Please search again.",
+        });
+      }
+      if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass && data.role === "SCHOOL_ADMIN") {
+        // Prefer the explicit emailDomain field; fall back to parsing the website URL
+        const schoolDomain = dirEntry.emailDomain || (dirEntry.website ? extractDomainFromWebsite(dirEntry.website) : null);
+        if (schoolDomain) {
+          const emailDomain = data.email.split("@")[1]?.toLowerCase().trim() || "";
+          const isEdu = emailDomain.endsWith(".edu");
+          if (!isEdu && !emailDomainMatchesWebsite(emailDomain, schoolDomain)) {
+            return res.status(403).json({
+              error: `Email domain does not match the school's domain (${schoolDomain}). Please use your school email address.`,
+            });
+          }
         }
       }
     }
@@ -460,23 +468,36 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
           contactEmail: existingSchool?.registrationEmail || existingSchool?.createdBy?.email || null,
         });
       }
+      if (!directorySchool) {
+        return res.status(400).json({
+          error: "Selected school is no longer available. Please search again.",
+        });
+      }
     }
 
     const schoolName = directorySchool?.name || data.schoolName || data.name;
     const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
     signupStage = "user.create";
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        passwordHash,
-        name: data.name,
-        role: data.role,
-        emailVerified: false,
-        emailVerificationToken,
-        emailVerificationExpires,
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          email: data.email,
+          passwordHash,
+          name: data.name,
+          role: data.role,
+          emailVerified: false,
+          emailVerificationToken,
+          emailVerificationExpires,
+        },
+      });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        return res.status(409).json({ error: "Email already registered" });
+      }
+      throw err;
+    }
 
     let school;
     try {

@@ -527,6 +527,12 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         });
       }
 
+      if (!dirEntry) {
+        return res.status(400).json({
+          error: "Selected school is no longer available. Please search again.",
+        });
+      }
+
       // Validate contact email domain against the school's known domain.
       // Prefer the explicit emailDomain field; fall back to parsing the website URL.
       // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
