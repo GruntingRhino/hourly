@@ -815,16 +815,33 @@ router.put("/launch/bugs/:bugId", authenticate, requireRole("SCHOOL_ADMIN", "TEA
   }
 });
 
-// GET /api/schools/my-beneficiary — get the school's private beneficiary record (for opportunity management)
+// GET /api/schools/my-beneficiary — get (or auto-create) the school's private beneficiary record
 router.get("/my-beneficiary", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user?.schoolId) return res.status(404).json({ error: "No school found" });
-    const ben = await prisma.beneficiary.findFirst({
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { school: { select: { id: true, name: true } } },
+    });
+    if (!user?.schoolId || !user.school) return res.status(404).json({ error: "No school found" });
+
+    let ben = await prisma.beneficiary.findFirst({
       where: { createdBySchoolId: user.schoolId, visibility: "PRIVATE" },
       select: { id: true, name: true },
     });
-    if (!ben) return res.status(404).json({ error: "No beneficiary found for this school" });
+
+    if (!ben) {
+      ben = await prisma.beneficiary.create({
+        data: {
+          name: user.school.name,
+          visibility: "PRIVATE",
+          createdBySchoolId: user.schoolId,
+          planTier: "PRO",
+          status: "ACTIVE",
+        },
+        select: { id: true, name: true },
+      });
+    }
+
     res.json(ben);
   } catch (err) {
     console.error("my-beneficiary error:", err);

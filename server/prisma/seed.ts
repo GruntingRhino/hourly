@@ -56,6 +56,18 @@ async function main() {
     data: { schoolId: school.id },
   });
 
+  // Create the school's private beneficiary profile (for hosting opportunities)
+  await prisma.beneficiary.create({
+    data: {
+      name: "Lincoln High School",
+      email: "admin@lincoln.edu",
+      visibility: "PRIVATE",
+      createdBySchoolId: school.id,
+      planTier: "PRO",
+      status: "ACTIVE",
+    },
+  });
+
   // Create default "General" classroom
   const generalClassroom = await prisma.classroom.create({
     data: {

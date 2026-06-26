@@ -142,7 +142,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
   );
   if (!summary) return null;
 
-  const isPro = summary.planTier === "PRO";
+  const isPro = import.meta.env.DEV || summary.planTier === "PRO";
   const statusInfo = STATUS_LABELS[summary.subscriptionStatus] ?? { label: summary.subscriptionStatus, color: "text-[var(--text-sec)]" };
   const periodEnd = summary.currentPeriodEnd ? new Date(summary.currentPeriodEnd) : null;
 
