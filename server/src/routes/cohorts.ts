@@ -129,6 +129,10 @@ async function findOrCreateTeacherForCohort(params: {
       return { status: "already-assigned", reason: "Teacher is already assigned to this cohort" };
     }
 
+    const newName = params.name.trim();
+    if (newName && newName !== existing.name) {
+      await prisma.user.update({ where: { id: existing.id }, data: { name: newName } });
+    }
     await prisma.cohortTeacherAssignment.create({
       data: { cohortId: params.cohortId, teacherId: existing.id },
     });
@@ -136,7 +140,7 @@ async function findOrCreateTeacherForCohort(params: {
       status: "assigned-existing",
       teacherId: existing.id,
       teacherEmail: existing.email,
-      teacherName: existing.name,
+      teacherName: newName || existing.name,
     };
   }
 
