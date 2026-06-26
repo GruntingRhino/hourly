@@ -24,6 +24,9 @@ import selfSubmissionRoutes from "./routes/selfSubmissions";
 import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
+import billingRoutes from "./routes/billing";
+import schoolProcurementRoutes from "./routes/schoolProcurement";
+import stripeWebhookRoutes from "./routes/stripeWebhooks";
 import { startReminderScheduler } from "./lib/reminders";
 import { startUploadCleanupJob } from "./lib/uploadCleanup";
 import { startEventReminderScheduler } from "./lib/eventReminders";
@@ -77,6 +80,9 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
+// Stripe webhook needs raw body for signature verification
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRoutes);
+
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", authenticate, express.static(path.join(__dirname, "../uploads")));
 
@@ -100,6 +106,8 @@ app.use("/api/internal", internalRoutes);
 app.use("/api/integrations", integrationRoutes);
 
 // New architecture routes
+app.use("/api/billing/organizations", billingRoutes);
+app.use("/api/school-procurement", schoolProcurementRoutes);
 app.use("/api/cohorts", cohortRoutes);
 app.use("/api/beneficiaries", beneficiaryRoutes);
 app.use("/api/invitations", invitationRoutes);

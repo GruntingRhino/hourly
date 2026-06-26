@@ -4,8 +4,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 import { CollapsibleList } from "../../components/CollapsibleList";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
+import { SchoolBilling } from "./SchoolBilling";
 
-type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "integrations" | "data";
+type Tab = "profile" | "rules" | "security" | "notifications" | "privacy" | "integrations" | "data" | "billing";
 
 interface SchoolData {
   id: string;
@@ -932,8 +933,8 @@ export default function SchoolSettings() {
   if (loading) return <div className="text-[var(--text-sec)]">Loading settings...</div>;
 
   const visibleTabs: Tab[] = isAdmin
-    ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data"]
-    : ["profile", "security", "notifications", "privacy"];
+    ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
+    : ["profile", "security", "notifications", "privacy", "billing"];
 
   return (
     <div className="max-w-2xl">
@@ -950,7 +951,7 @@ export default function SchoolSettings() {
                 : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"
             }`}
           >
-            {t === "rules" ? "Service Rules" : t}
+            {t === "rules" ? "Service Rules" : t === "billing" ? "Plans & Billing" : t}
           </button>
         ))}
       </div>
@@ -2146,6 +2147,11 @@ export default function SchoolSettings() {
           </div>
         </div>
         </div>
+      )}
+
+      {/* ── Plans & Billing tab ── */}
+      {tab === "billing" && user?.schoolId && (
+        <SchoolBilling schoolId={user.schoolId} />
       )}
 
       {joinByCodeToast && (

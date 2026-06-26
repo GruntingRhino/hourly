@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { ProGate, ProBadge } from "../../components/ProGate";
+import { OrgBilling } from "./OrgBilling";
 
 interface BeneficiaryProfile {
   id: string;
@@ -50,7 +52,7 @@ interface Branding {
   emailSignature: string;
 }
 
-type Tab = "profile" | "reminders" | "branding" | "account";
+type Tab = "profile" | "reminders" | "branding" | "account" | "billing";
 
 const MINUTES_OPTIONS = [
   { value: 60,   label: "1 hour before" },
@@ -65,8 +67,12 @@ const MINUTES_OPTIONS = [
 export default function BeneficiarySettings() {
   const { user } = useAuth();
   const benId = user?.beneficiaryId;
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<Tab>("profile");
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return (["profile","reminders","branding","account","billing"].includes(t ?? "") ? t as Tab : "profile");
+  });
   const [profile, setProfile] = useState<BeneficiaryProfile | null>(null);
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
   const [form, setForm] = useState({
@@ -210,6 +216,7 @@ export default function BeneficiarySettings() {
     { id: "reminders", label: "Reminders" },
     { id: "branding", label: "Branding" },
     { id: "account", label: "Account" },
+    { id: "billing", label: "Plans & Billing" },
   ];
 
   return (
@@ -469,9 +476,9 @@ export default function BeneficiarySettings() {
             {!isPro && (
               <p className="text-xs text-[var(--text-sec)] mt-1">
                 Upgrade to Pro for configurable reminders, custom branding, and attendance analytics.{" "}
-                <a href="mailto:hello@goodhours.app?subject=GoodHours Pro" className="text-[var(--action)] hover:underline">
-                  Contact us — $30/month
-                </a>
+                <button onClick={() => setTab("billing")} className="text-[var(--action)] hover:underline">
+                  View Plans &amp; Billing
+                </button>
               </p>
             )}
           </div>
@@ -479,6 +486,11 @@ export default function BeneficiarySettings() {
             To change your login credentials, use the Forgot Password flow from the login page.
           </p>
         </div>
+      )}
+
+      {/* ── Plans & Billing tab ── */}
+      {tab === "billing" && benId && (
+        <OrgBilling beneficiaryId={benId} />
       )}
     </div>
   );

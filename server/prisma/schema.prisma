@@ -156,6 +156,10 @@ model School {
   launchRollbackConfig   String?
   launchMonitoringConfig String?
   zipCodes         String?  // JSON array of zip codes (service area)
+  // Billing / procurement
+  billingStatus  String   @default("NONE")
+  accessStatus   String   @default("PROCUREMENT")
+  pilotExpiresAt DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -174,6 +178,8 @@ model School {
   integrationMappings    IntegrationExternalMapping[]
   interventionCampaigns  InterventionCampaign[]
   interventionCases      InterventionCase[]
+  billingRecord  SchoolBillingRecord?
+  quoteRequests  SchoolQuoteRequest[]
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────
@@ -422,12 +428,22 @@ model Beneficiary {
   logoUrl         String?
   emailSignature  String?
 
+  // Stripe subscription fields
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  subscriptionStatus   String   @default("FREE")
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean  @default(false)
+  billingInterval      String?  // "monthly" | "annual"
+
   members     User[]              @relation("BeneficiaryMembers")
   opportunities BeneficiaryOpportunity[]
   schoolApprovals SchoolBeneficiaryApproval[]
   invitations BeneficiaryInvitation[]
   attachments BeneficiaryOpportunityAttachment[]
   reminderConfig  OrgReminderConfig?
+  invoiceRequests OrganizationInvoiceRequest[]
 }
 
 // ─── Beneficiary Directory (IRS 501c3 + public institutions) ────
@@ -987,4 +1003,108 @@ model Notification {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])
+}
+
+// ─── Organization Billing ─────────────────────────────────────────────────
+
+model OrganizationInvoiceRequest {
+  id                     String      @id @default(cuid())
+  beneficiaryId          String
+  beneficiary            Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  status                 String      @default("SUBMITTED")
+  legalName              String
+  address                String
+  billingContactName     String
+  billingContactEmail    String
+  purchaseOrderRequired  Boolean     @default(false)
+  taxExempt              Boolean     @default(false)
+  preferredPaymentMethod String?
+  additionalNotes        String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+}
+
+// ─── School Procurement ───────────────────────────────────────────────────
+
+model SchoolBillingRecord {
+  id                   String    @id @default(cuid())
+  schoolId             String    @unique
+  school               School    @relation(fields: [schoolId], references: [id])
+  billingStatus        String    @default("QUOTE_REQUESTED")
+  pricePerStudentCents Int?
+  annualMinimumCents   Int?
+  enrollmentCount      Int?
+  verifiedEnrollment   Int?
+  contractAmountCents  Int?
+  contractStartDate    DateTime?
+  contractEndDate      DateTime?
+  billingContactName   String?
+  billingContactEmail  String?
+  billingContactPhone  String?
+  goodhoursContactId   String?
+  purchaseOrderNumber  String?
+  invoiceNumber        String?
+  paymentStatus        String?
+  internalNotes        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  auditLogs            SchoolBillingAuditLog[]
+  documents            SchoolProcurementDocument[]
+}
+
+model SchoolQuoteRequest {
+  id                             String    @id @default(cuid())
+  schoolId                       String
+  school                         School    @relation(fields: [schoolId], references: [id])
+  schoolName                     String
+  districtName                   String?
+  schoolWebsite                  String?
+  schoolAddress                  String?
+  schoolState                    String?
+  enrollment                     Int
+  gradeLevels                    String?
+  primaryContactName             String
+  primaryContactTitle            String?
+  primaryContactEmail            String
+  primaryContactPhone            String?
+  billingContactName             String?
+  billingContactEmail            String?
+  billingContactPhone            String?
+  billingAddress                 String?
+  purchaseOrderRequired          Boolean   @default(false)
+  vendorRegistrationRequired     Boolean   @default(false)
+  w9Required                     Boolean   @default(false)
+  certificateOfInsuranceRequired Boolean   @default(false)
+  dataPrivacyAgreementRequired   Boolean   @default(false)
+  preferredStartDate             DateTime?
+  procurementNotes               String?
+  estimatedAnnualCents           Int?
+  createdAt                      DateTime  @default(now())
+}
+
+model SchoolProcurementDocument {
+  id               String              @id @default(cuid())
+  billingRecordId  String
+  billingRecord    SchoolBillingRecord @relation(fields: [billingRecordId], references: [id])
+  schoolId         String
+  documentType     String
+  filename         String
+  originalName     String
+  storedPath       String
+  fileSizeBytes    Int
+  mimeType         String
+  uploadedByUserId String
+  createdAt        DateTime            @default(now())
+}
+
+model SchoolBillingAuditLog {
+  id              String              @id @default(cuid())
+  billingRecordId String
+  billingRecord   SchoolBillingRecord @relation(fields: [billingRecordId], references: [id])
+  schoolId        String
+  previousStatus  String?
+  newStatus       String
+  changedByUserId String
+  changedAt       DateTime            @default(now())
+  note            String?
 }
