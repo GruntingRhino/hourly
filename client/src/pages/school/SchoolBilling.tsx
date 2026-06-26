@@ -96,18 +96,12 @@ const TIMELINE_STEPS: Array<{ statuses: SchoolBillingStatus[]; label: string }> 
 
 const TERMINAL_STATUSES: SchoolBillingStatus[] = ["DECLINED", "EXPIRED"];
 
-function getTimelineState(current: SchoolBillingStatus): "completed" | "current" | "upcoming" {
-  // Returns the state for each step given the current status
-  return "upcoming";
-}
-
 function stepState(step: typeof TIMELINE_STEPS[0], current: SchoolBillingStatus): "completed" | "current" | "upcoming" {
   if (TERMINAL_STATUSES.includes(current)) return "upcoming";
 
   const allStatuses = TIMELINE_STEPS.flatMap((s) => s.statuses);
   const currentIdx = allStatuses.indexOf(current);
   const stepStatuses = step.statuses;
-  const stepFirstIdx = allStatuses.indexOf(stepStatuses[0]);
 
   if (currentIdx < 0) return "upcoming";
   const stepLastIdx = Math.max(...stepStatuses.map((s) => allStatuses.indexOf(s)));

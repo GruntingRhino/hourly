@@ -67,7 +67,7 @@ const MINUTES_OPTIONS = [
 export default function BeneficiarySettings() {
   const { user } = useAuth();
   const benId = user?.beneficiaryId;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [tab, setTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
