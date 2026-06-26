@@ -940,12 +940,12 @@ export default function SchoolSettings() {
     <div className="max-w-2xl">
       <h1 className="text-[28px] font-bold mb-6">Settings</h1>
 
-      <div className="flex gap-1 mb-6 border-b border-[var(--border)] overflow-x-auto">
+      <div className="flex gap-0.5 mb-6 border-b border-[var(--border)] overflow-x-auto">
         {visibleTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
+            className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
               tab === t
                 ? "border-blue-700 text-[var(--action)]"
                 : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"
