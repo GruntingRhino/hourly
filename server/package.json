@@ -26,6 +26,7 @@
     "csv-stringify": "^6.6.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.1",
+    "file-type": "^16.5.4",
     "form-data": "^4.0.5",
     "fuse.js": "^7.1.0",
     "geolib": "^3.3.4",

@@ -15,39 +15,58 @@ import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
+import { detectMimeType } from "../lib/detectMimeType";
 
 const UPLOAD_DIR = path.join(__dirname, "../../../uploads/beneficiary-attachments");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;       // 10 MB per file
+const MAX_FILE_SIZE = 10 * 1024 * 1024;        // 10 MB per file
 const MAX_FILES_PER_UPLOAD = 5;
 const MAX_TOTAL_PER_UPLOAD = 25 * 1024 * 1024; // 25 MB per request
+
+const ABUSE_STRIKE_THRESHOLD = 5;
+const SUSPENSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const TIER_LIMITS = {
   FREE: { storageBytes: 350 * 1024 * 1024, uploadsPerHour: 12 },
   PRO:  { storageBytes: 5 * 1024 * 1024 * 1024, uploadsPerHour: 100 },
 } as const;
 
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg", "image/png", "image/gif", "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain", "text/csv",
-]);
-
+// Multer: disk storage only (never memory), enforce hard size cap server-side.
+// fileFilter is intentionally permissive here — real MIME detection happens
+// after the file lands on disk via magic bytes.
 const attachmentUpload = multer({
   storage: multer.diskStorage({
     destination: UPLOAD_DIR,
-    filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}`),
+    filename: (_req, _file, cb) => cb(null, crypto.randomUUID()),
   }),
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES_PER_UPLOAD },
-  fileFilter: (_req, file, cb) => {
-    cb(null, ALLOWED_MIME_TYPES.has(file.mimetype));
-  },
 });
+
+async function recordAbuseStrike(beneficiaryId: string): Promise<void> {
+  const ben = await prisma.beneficiary.update({
+    where: { id: beneficiaryId },
+    data: { uploadAbuseStrikes: { increment: 1 } },
+    select: { uploadAbuseStrikes: true },
+  });
+  if (ben.uploadAbuseStrikes >= ABUSE_STRIKE_THRESHOLD) {
+    await prisma.beneficiary.update({
+      where: { id: beneficiaryId },
+      data: { uploadSuspendedUntil: new Date(Date.now() + SUSPENSION_DURATION_MS) },
+    });
+    console.warn(`[upload] Beneficiary ${beneficiaryId} suspended after ${ABUSE_STRIKE_THRESHOLD} abuse strikes.`);
+  }
+}
+
+function sha256ofFile(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", reject);
+  });
+}
 
 function normalizeInviteEmail(email: unknown): string {
   return typeof email === "string" && email.trim()
@@ -1572,7 +1591,7 @@ router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIAR
   }
 });
 
-// POST /api/beneficiaries/:id/opportunities/:oppId/attachments — upload files
+// POST /api/beneficiaries/:id/opportunities/:oppId/attachments — upload files (hardened)
 router.post(
   "/:id/opportunities/:oppId/attachments",
   authenticate,
@@ -1580,7 +1599,15 @@ router.post(
   (req, res, next) => {
     attachmentUpload.array("files", MAX_FILES_PER_UPLOAD)(req, res, (err) => {
       if (err instanceof multer.MulterError) {
-        if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "One or more files exceed the 10 MB per-file limit." });
+        if (err.code === "LIMIT_FILE_SIZE") {
+          // Record abuse strike for oversized upload attempt (beneficiaryId not yet verified, use best-effort)
+          const benId = req.params.id;
+          if (benId) void recordAbuseStrike(benId);
+          // Clean up any partially uploaded files
+          const partial = (req.files ?? []) as Express.Multer.File[];
+          for (const f of partial) { try { fs.unlinkSync(f.path); } catch {} }
+          return res.status(413).json({ error: "One or more files exceed the 10 MB per-file limit." });
+        }
         if (err.code === "LIMIT_FILE_COUNT") return res.status(400).json({ error: `Maximum ${MAX_FILES_PER_UPLOAD} files per upload.` });
         return res.status(400).json({ error: err.message });
       }
@@ -1594,73 +1621,131 @@ router.post(
       return res.status(400).json({ error: "No files provided." });
     }
 
-    // Clean up uploaded files on any early error
-    const cleanup = () => { for (const f of files) { try { fs.unlinkSync(f.path); } catch {} } };
+    const cleanupFiles = (paths: string[]) => { for (const p of paths) { try { fs.unlinkSync(p); } catch {} } };
+    const allPaths = files.map((f) => f.path);
 
     try {
+      // --- Authorization ---
       if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
-        cleanup();
+        cleanupFiles(allPaths);
         return res.status(403).json({ error: "Not your beneficiary" });
       }
 
+      // --- Suspension check ---
+      const benRecord = await prisma.beneficiary.findUnique({
+        where: { id: req.params.id },
+        select: { planTier: true, uploadSuspendedUntil: true },
+      });
+      if (benRecord?.uploadSuspendedUntil && benRecord.uploadSuspendedUntil > new Date()) {
+        cleanupFiles(allPaths);
+        return res.status(429).json({ error: "Upload access temporarily suspended due to repeated policy violations." });
+      }
+
+      const tier = ((benRecord?.planTier ?? "FREE") as keyof typeof TIER_LIMITS);
+      const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.FREE;
+
+      // --- Opportunity ownership ---
       const opp = await prisma.beneficiaryOpportunity.findUnique({ where: { id: req.params.oppId }, select: { beneficiaryId: true } });
       if (!opp || opp.beneficiaryId !== req.params.id) {
-        cleanup();
+        cleanupFiles(allPaths);
         return res.status(404).json({ error: "Opportunity not found" });
       }
 
-      // Reject disallowed MIME types
-      const badFile = files.find((f) => !ALLOWED_MIME_TYPES.has(f.mimetype));
-      if (badFile) {
-        cleanup();
-        return res.status(400).json({ error: `File type not allowed: ${badFile.originalname}` });
+      // --- Verify actual file sizes from disk (never trust multer's f.size) ---
+      const verifiedFiles: Array<{ file: Express.Multer.File; size: number }> = [];
+      for (const f of files) {
+        const stat = fs.statSync(f.path);
+        if (stat.size > MAX_FILE_SIZE) {
+          await recordAbuseStrike(req.params.id);
+          cleanupFiles(allPaths);
+          return res.status(413).json({ error: `File "${f.originalname}" exceeds the 10 MB per-file limit.` });
+        }
+        verifiedFiles.push({ file: f, size: stat.size });
       }
 
-      // Total size check
-      const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+      // --- Verify MIME types from magic bytes (never trust f.mimetype) ---
+      const mimeResults: Array<{ file: Express.Multer.File; size: number; mimeType: string }> = [];
+      for (const { file, size } of verifiedFiles) {
+        const { mimeType, allowed } = await detectMimeType(file.path, file.originalname);
+        if (!allowed) {
+          await recordAbuseStrike(req.params.id);
+          cleanupFiles(allPaths);
+          return res.status(415).json({ error: `File type not allowed: ${file.originalname}` });
+        }
+        mimeResults.push({ file, size, mimeType });
+      }
+
+      // --- Total size check ---
+      const totalSize = mimeResults.reduce((sum, r) => sum + r.size, 0);
       if (totalSize > MAX_TOTAL_PER_UPLOAD) {
-        cleanup();
-        return res.status(400).json({ error: "Total upload size exceeds the 25 MB limit." });
+        cleanupFiles(allPaths);
+        return res.status(413).json({ error: "Total upload size exceeds the 25 MB limit." });
       }
 
-      // Fetch tier limits
-      const ben = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { planTier: true } });
-      const tier = (ben?.planTier ?? "FREE") as keyof typeof TIER_LIMITS;
-      const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.FREE;
-
-      // Rate limit: count uploads in last hour for this beneficiary
+      // --- Rate limit ---
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       const recentUploads = await prisma.beneficiaryOpportunityAttachment.count({
         where: { beneficiaryId: req.params.id, createdAt: { gte: oneHourAgo } },
       });
       if (recentUploads + files.length > limits.uploadsPerHour) {
-        cleanup();
+        cleanupFiles(allPaths);
         return res.status(429).json({ error: `Upload rate limit reached. Your plan allows ${limits.uploadsPerHour} files per hour.` });
       }
 
-      // Storage quota check
+      // --- Storage quota ---
       const usageAgg = await prisma.beneficiaryOpportunityAttachment.aggregate({
         where: { beneficiaryId: req.params.id },
         _sum: { size: true },
       });
       const currentUsage = usageAgg._sum.size ?? 0;
       if (currentUsage + totalSize > limits.storageBytes) {
-        cleanup();
+        cleanupFiles(allPaths);
         const usedMB = (currentUsage / 1024 / 1024).toFixed(1);
         const limitMB = (limits.storageBytes / 1024 / 1024).toFixed(0);
         return res.status(413).json({ error: `Storage quota exceeded. Used ${usedMB} MB of ${limitMB} MB.` });
       }
 
-      const created = await prisma.beneficiaryOpportunityAttachment.createMany({
-        data: files.map((f) => ({
+      // --- SHA-256 deduplication & DB record creation ---
+      const newAttachments: Array<{
+        opportunityId: string;
+        beneficiaryId: string;
+        filename: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        sha256: string;
+      }> = [];
+
+      for (const { file, size, mimeType } of mimeResults) {
+        const hash = await sha256ofFile(file.path);
+
+        // Check if an identical file already exists for this beneficiary
+        const existing = await prisma.beneficiaryOpportunityAttachment.findFirst({
+          where: { sha256: hash, beneficiaryId: req.params.id },
+          select: { filename: true },
+        });
+
+        let storedFilename: string;
+        if (existing) {
+          // Reuse the existing file on disk; delete the newly uploaded duplicate
+          storedFilename = existing.filename;
+          try { fs.unlinkSync(file.path); } catch {}
+        } else {
+          storedFilename = path.basename(file.path);
+        }
+
+        newAttachments.push({
           opportunityId: req.params.oppId,
           beneficiaryId: req.params.id,
-          filename: path.basename(f.path),
-          originalName: f.originalname,
-          mimeType: f.mimetype,
-          size: f.size,
-        })),
-      });
+          filename: storedFilename,
+          originalName: file.originalname,
+          mimeType,
+          size,
+          sha256: hash,
+        });
+      }
+
+      await prisma.beneficiaryOpportunityAttachment.createMany({ data: newAttachments });
 
       const attachments = await prisma.beneficiaryOpportunityAttachment.findMany({
         where: { opportunityId: req.params.oppId },
@@ -1668,9 +1753,9 @@ router.post(
         orderBy: { createdAt: "asc" },
       });
 
-      res.status(201).json({ count: created.count, attachments });
+      res.status(201).json({ count: newAttachments.length, attachments });
     } catch (err) {
-      cleanup();
+      cleanupFiles(allPaths);
       console.error("Upload attachment error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -1691,7 +1776,12 @@ router.delete("/:id/opportunities/:oppId/attachments/:attachmentId", authenticat
     }
 
     await prisma.beneficiaryOpportunityAttachment.delete({ where: { id: req.params.attachmentId } });
-    try { fs.unlinkSync(path.join(UPLOAD_DIR, attachment.filename)); } catch {}
+
+    // Only unlink the physical file if no other DB record shares the same filename (dedup).
+    const remaining = await prisma.beneficiaryOpportunityAttachment.count({ where: { filename: attachment.filename } });
+    if (remaining === 0) {
+      try { fs.unlinkSync(path.join(UPLOAD_DIR, attachment.filename)); } catch {}
+    }
 
     res.status(204).send();
   } catch (err) {

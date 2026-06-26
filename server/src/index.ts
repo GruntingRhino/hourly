@@ -25,6 +25,7 @@ import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
 import { startReminderScheduler } from "./lib/reminders";
+import { startUploadCleanupJob } from "./lib/uploadCleanup";
 import { authenticate } from "./middleware/auth";
 import { createHybridRateLimit } from "./middleware/rateLimit";
 
@@ -152,6 +153,7 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`GoodHours API running on http://localhost:${PORT}`);
     startReminderScheduler();
+    startUploadCleanupJob();
   });
 }
 

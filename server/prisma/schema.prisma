@@ -411,7 +411,9 @@ model Beneficiary {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  planTier    String   @default("FREE") // FREE, PRO
+  planTier             String    @default("FREE") // FREE, PRO
+  uploadAbuseStrikes   Int       @default(0)
+  uploadSuspendedUntil DateTime?
 
   members     User[]              @relation("BeneficiaryMembers")
   opportunities BeneficiaryOpportunity[]
@@ -538,10 +540,11 @@ model BeneficiaryOpportunityAttachment {
   opportunity   BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   beneficiaryId String
   beneficiary   Beneficiary            @relation(fields: [beneficiaryId], references: [id])
-  filename      String   // stored filename on disk (UUID-based)
+  filename      String   // stored filename on disk (UUID-based); multiple records may share a filename via dedup
   originalName  String   // original filename from uploader
-  mimeType      String
-  size          Int      // bytes
+  mimeType      String   // verified from magic bytes, not client-supplied header
+  size          Int      // bytes, verified from fs.stat after upload
+  sha256        String   // SHA-256 hex digest for deduplication
   createdAt     DateTime @default(now())
 }
 

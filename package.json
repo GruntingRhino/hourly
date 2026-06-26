@@ -2,6 +2,8 @@
   "scripts": {
     "postinstall": "prisma generate --schema=server/prisma/schema.prisma",
     "test:ui-audit": "playwright test tests/ui-interaction-audit.spec.ts",
+    "test:ui-stateful": "playwright test tests/ui-stateful-audit.spec.ts",
+    "test:ui-exhaustive": "playwright test tests/ui-interaction-audit.spec.ts tests/ui-stateful-audit.spec.ts",
     "test:security": "playwright test --config=playwright-security.config.ts",
     "test:security:report": "playwright test --config=playwright-security.config.ts && playwright show-report security-report"
   },
