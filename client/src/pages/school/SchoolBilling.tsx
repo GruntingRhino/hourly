@@ -750,8 +750,6 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-const TERMINAL_STATUSES: SchoolBillingStatus[] = ["DECLINED", "EXPIRED"];
-
 function StatusBadge({ status }: { status: SchoolBillingStatus }) {
   const label = STATUS_LABELS[status] ?? status;
   const colorClass =

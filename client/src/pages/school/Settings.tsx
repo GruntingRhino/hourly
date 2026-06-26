@@ -940,7 +940,7 @@ export default function SchoolSettings() {
     <div className="max-w-2xl">
       <h1 className="text-[28px] font-bold mb-6">Settings</h1>
 
-      <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--border)]">
+      <div className="flex gap-1 mb-6 border-b border-[var(--border)] overflow-x-auto">
         {visibleTabs.map((t) => (
           <button
             key={t}

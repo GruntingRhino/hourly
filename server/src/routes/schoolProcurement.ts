@@ -215,7 +215,7 @@ router.post("/:id/documents",
       }
 
       // Magic-byte MIME verification
-      const mimeResult = await detectMimeType(req.file.path, req.file.originalname);
+      const mimeResult = detectMimeType(req.file.path, req.file.originalname);
       const detectedMime = mimeResult.mimeType;
       if (!mimeResult.allowed || !ALLOWED_MIME_TYPES.has(detectedMime)) {
         fs.unlinkSync(req.file.path);
