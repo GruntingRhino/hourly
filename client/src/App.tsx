@@ -42,6 +42,7 @@ import SchoolCohorts from "./pages/school/Cohorts";
 import CohortDetail from "./pages/school/CohortDetail";
 import SchoolBeneficiaries from "./pages/school/Beneficiaries";
 import BeneficiaryDiscover from "./pages/school/Discover";
+import SchoolOpportunities from "./pages/school/SchoolOpportunities";
 import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
 import SchoolMessages from "./pages/school/Messages";
 import SchoolSettings from "./pages/school/Settings";
@@ -133,6 +134,7 @@ function AppRoutes() {
                   <Route path="/beneficiaries" element={<SchoolBeneficiaries />} />
                   <Route path="/partners" element={<SchoolBeneficiaries />} />
                   <Route path="/discover" element={<BeneficiaryDiscover />} />
+                  <Route path="/opportunities" element={<SchoolOpportunities />} />
                 </>
               )}
               <Route path="/submissions" element={<SchoolSelfSubmissions />} />

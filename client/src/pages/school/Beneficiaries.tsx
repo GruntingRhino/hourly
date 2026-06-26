@@ -839,7 +839,7 @@ export default function SchoolBeneficiaries() {
       )}
 
       {drawerBeneficiary && (
-        <div className="fixed inset-0 z-30 bg-black/30">
+        <div className="fixed top-[54px] inset-x-0 bottom-0 z-[45] bg-black/30">
           <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-[var(--surface)] shadow-2xl border-l border-[var(--border)]">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--border)]">
               <div>

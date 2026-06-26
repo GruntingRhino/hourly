@@ -203,6 +203,7 @@ function getNavItems(role: string) {
         { path: "/dashboard", label: "Dashboard" },
         { path: "/cohorts", label: "Cohorts" },
         { path: "/beneficiaries", label: "Partners" },
+        { path: "/opportunities", label: "Opportunities" },
         { path: "/launch", label: "Launch" },
         { path: "/settings", label: "Settings" },
         ...((import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development") && role === "SCHOOL_ADMIN"

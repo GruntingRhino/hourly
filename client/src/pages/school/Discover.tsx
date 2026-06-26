@@ -189,7 +189,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
   const [error, setError] = useState<string | null>(null);
 
   const [radius, setRadius] = useState(10);
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -212,10 +212,8 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
     if (!schoolData.latitude || !schoolData.longitude) return;
     setLoading(true);
     try {
-      const categoryParam =
-        selectedCategory !== "All" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
       const data = await api.get<{ items: NearbyBeneficiary[]; total: number; geocodingInProgress: boolean }>(
-        `/beneficiaries/directory/nearby?lat=${schoolData.latitude}&lng=${schoolData.longitude}&radius=${radius}&limit=500${categoryParam}`
+        `/beneficiaries/directory/nearby?lat=${schoolData.latitude}&lng=${schoolData.longitude}&radius=${radius}`
       );
       setBeneficiaries(data.items);
       setTotal(data.total ?? null);
@@ -229,7 +227,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
     } finally {
       setLoading(false);
     }
-  }, [radius, selectedCategory]);
+  }, [radius]);
 
   useEffect(() => {
     async function init() {
@@ -255,14 +253,18 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
     init();
   }, []);
 
-  // Reload when radius or category changes
+  // Reload when radius changes
   useEffect(() => {
     if (school) loadData(school);
-  }, [radius, selectedCategory]);
+  }, [radius]);
 
   // ─── Filtered list ─────────────────────────────────────────────────────────
 
   const filtered = beneficiaries.filter((b) => {
+    if (selectedCategories.length > 0) {
+      const cat = b.category || "Other";
+      if (!selectedCategories.includes(cat)) return false;
+    }
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -530,12 +532,26 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
 
               {/* Category pills */}
               <div className="flex gap-1 flex-wrap">
-                {CATEGORY_OPTIONS.map((cat) => (
+                <button
+                  onClick={() => setSelectedCategories([])}
+                  className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                    selectedCategories.length === 0
+                      ? "bg-[var(--action)] text-white border-[var(--action)]"
+                      : "border-[var(--border-s)] text-[var(--text-sec)] hover:border-blue-400"
+                  }`}
+                >
+                  All
+                </button>
+                {CATEGORY_OPTIONS.filter((c) => c !== "All").map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() =>
+                      setSelectedCategories((prev) =>
+                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+                      )
+                    }
                     className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
-                      selectedCategory === cat
+                      selectedCategories.includes(cat)
                         ? "bg-[var(--action)] text-white border-[var(--action)]"
                         : "border-[var(--border-s)] text-[var(--text-sec)] hover:border-blue-400"
                     }`}

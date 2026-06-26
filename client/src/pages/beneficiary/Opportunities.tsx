@@ -250,7 +250,7 @@ function validateOpportunityForm(form: typeof emptyForm): string[] {
   return details;
 }
 
-export default function BeneficiaryOpportunities() {
+export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBenId?: string } = {}) {
   const { user } = useAuth();
   const [tab, setTab] = useState<"opportunities" | "signups">("opportunities");
   const [signupFilter, setSignupFilter] = useState<"PENDING" | "ALL" | "APPROVED" | "DENIED" | "NO_SHOW">("PENDING");
@@ -289,7 +289,7 @@ export default function BeneficiaryOpportunities() {
   const [deletingSlot, setDeletingSlot] = useState(false);
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false);
 
-  const benId = user?.beneficiaryId;
+  const benId = overrideBenId ?? user?.beneficiaryId;
 
   const clearError = () => {
     setError("");

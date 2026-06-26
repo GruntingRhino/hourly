@@ -112,6 +112,18 @@ async function notifyBeneficiarySignupReviewChange(params: {
   });
 }
 
+async function canManageBeneficiary(userId: string, beneficiaryId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return false;
+  if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
+    const ben = await prisma.beneficiary.findFirst({
+      where: { id: beneficiaryId, createdBySchoolId: user.schoolId, visibility: "PRIVATE" },
+    });
+    return ben !== null;
+  }
+  return user.beneficiaryId === beneficiaryId;
+}
+
 async function cancelBeneficiarySlot(
   slotId: string,
   beneficiaryId: string,
@@ -132,8 +144,7 @@ async function cancelBeneficiarySlot(
     return { status: 404 as const, body: { error: "Time slot not found" } };
   }
 
-  const user = await prisma.user.findUnique({ where: { id: actorUserId } });
-  if (user?.beneficiaryId !== beneficiaryId) {
+  if (!await canManageBeneficiary(actorUserId, beneficiaryId)) {
     return { status: 403 as const, body: { error: "Not your beneficiary" } };
   }
 
@@ -314,7 +325,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     const radius = Math.min(parseFloat((req.query.radius as string) || "10"), 50);
     const category = req.query.category as string | undefined;
     const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 500);
+    const limit = parseInt((req.query.limit as string) || "10000", 10);
     const offset = (page - 1) * limit;
 
     if (isNaN(lat) || isNaN(lng)) {
@@ -1071,10 +1082,9 @@ router.post("/:id/drop", authenticate, requireRole("SCHOOL_ADMIN"), async (req: 
 });
 
 // GET /api/beneficiaries/:id/schools — list approved schools for a beneficiary (beneficiary admin only)
-router.get("/:id/schools", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.get("/:id/schools", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
       where: { beneficiaryId: req.params.id, status: "APPROVED" },
@@ -1241,11 +1251,10 @@ router.get("/:id/opportunities", authenticate, async (req: Request, res: Respons
   }
 });
 
-// POST /api/beneficiaries/:id/opportunities — create opportunity (beneficiary admin only)
-router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+// POST /api/beneficiaries/:id/opportunities — create opportunity (beneficiary admin or school admin for their private beneficiary)
+router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const schema = z.object({
       title: z.string().min(1).max(255),
@@ -1334,10 +1343,9 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN")
 });
 
 // PATCH /api/beneficiaries/:id/opportunities/:oppId — edit opportunity metadata
-router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const opp = await prisma.beneficiaryOpportunity.findUnique({ where: { id: req.params.oppId } });
     if (!opp || opp.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Opportunity not found" });
@@ -1442,10 +1450,9 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
 });
 
 // DELETE /api/beneficiaries/:id/opportunities/:oppId — soft-delete (CANCELLED)
-router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const opp = await prisma.beneficiaryOpportunity.findUnique({
       where: { id: req.params.oppId },
@@ -1507,7 +1514,7 @@ router.delete("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIAR
 });
 
 // PATCH /api/beneficiaries/:id/slots/:slotId — edit a future time slot for one beneficiary
-router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const slot = await prisma.beneficiaryTimeSlot.findUnique({
       where: { id: req.params.slotId },
@@ -1517,8 +1524,7 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
       return res.status(404).json({ error: "Time slot not found" });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
       return res.status(403).json({ error: "Not your beneficiary" });
     }
 
@@ -1622,7 +1628,7 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
 });
 
 // DELETE /api/beneficiaries/:id/slots/:slotId — delete a future time slot
-router.delete("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.delete("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const forceCancel =
       req.body?.forceCancel === true ||
@@ -1637,7 +1643,7 @@ router.delete("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN
 });
 
 // POST /api/beneficiaries/:id/slots/:slotId/cancel — cancel and remove a future time slot
-router.post("/:id/slots/:slotId/cancel", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/slots/:slotId/cancel", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const forceCancel = req.body?.forceCancel === true;
     const result = await cancelBeneficiarySlot(req.params.slotId, req.params.id, req.user!.userId, forceCancel);
@@ -1648,7 +1654,7 @@ router.post("/:id/slots/:slotId/cancel", authenticate, requireRole("BENEFICIARY_
   }
 });
 // PATCH /api/beneficiaries/slots/:slotId — edit a future time slot
-router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const slot = await prisma.beneficiaryTimeSlot.findUnique({
       where: { id: req.params.slotId },
@@ -1656,8 +1662,7 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"), a
     });
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== slot.opportunity.beneficiaryId) {
+    if (!await canManageBeneficiary(req.user!.userId, slot.opportunity.beneficiaryId)) {
       return res.status(403).json({ error: "Not your beneficiary" });
     }
 
@@ -1860,11 +1865,10 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
   }
 });
 
-// GET /api/beneficiaries/:id/signups — list signups for a beneficiary (beneficiary admin)
-router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+// GET /api/beneficiaries/:id/signups — list signups for a beneficiary (beneficiary admin or school admin)
+router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Not your beneficiary" });
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const statusFilter = req.query.status as string | undefined;
     const signups = await prisma.beneficiarySignup.findMany({
@@ -1913,7 +1917,7 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN"), async
 });
 
 // POST /api/beneficiaries/signups/:signupId/approve — beneficiary admin approves hours
-router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { id: req.params.signupId },
@@ -1921,8 +1925,7 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
     });
     if (!signup) return res.status(404).json({ error: "Signup not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+    if (!await canManageBeneficiary(req.user!.userId, signup.slot.opportunity.beneficiaryId)) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
     if (!["CONFIRMED", "NO_SHOW"].includes(signup.status)) {
@@ -2122,7 +2125,7 @@ router.patch("/:id/profile", authenticate, requireRole("BENEFICIARY_ADMIN"), asy
 });
 
 // POST /api/beneficiaries/signups/:signupId/reject — beneficiary admin rejects hours
-router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { id: req.params.signupId },
@@ -2130,8 +2133,7 @@ router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_
     });
     if (!signup) return res.status(404).json({ error: "Signup not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+    if (!await canManageBeneficiary(req.user!.userId, signup.slot.opportunity.beneficiaryId)) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
     if (signup.status === "CANCELLED" || signup.status === "WAITLISTED") {
@@ -2182,7 +2184,7 @@ router.post("/signups/:signupId/reject", authenticate, requireRole("BENEFICIARY_
 });
 
 // POST /api/beneficiaries/signups/:signupId/reset-review — beneficiary admin undoes a past review choice
-router.post("/signups/:signupId/reset-review", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.post("/signups/:signupId/reset-review", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { id: req.params.signupId },
@@ -2190,8 +2192,7 @@ router.post("/signups/:signupId/reset-review", authenticate, requireRole("BENEFI
     });
     if (!signup) return res.status(404).json({ error: "Signup not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+    if (!await canManageBeneficiary(req.user!.userId, signup.slot.opportunity.beneficiaryId)) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
     if (signup.status === "CANCELLED" || signup.status === "WAITLISTED") {
@@ -2429,7 +2430,7 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
 });
 
 // POST /api/beneficiaries/signups/:signupId/no-show — beneficiary admin marks student as no-show
-router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { id: req.params.signupId },
@@ -2437,8 +2438,7 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
     });
     if (!signup) return res.status(404).json({ error: "Signup not found" });
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (user?.beneficiaryId !== signup.slot.opportunity.beneficiaryId) {
+    if (!await canManageBeneficiary(req.user!.userId, signup.slot.opportunity.beneficiaryId)) {
       return res.status(403).json({ error: "Not your beneficiary's signup" });
     }
     if (signup.status === "CANCELLED") return res.status(400).json({ error: "Cannot mark a cancelled signup as no-show" });

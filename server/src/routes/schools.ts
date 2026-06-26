@@ -2411,4 +2411,21 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
   }
 });
 
+// GET /api/schools/my-beneficiary — get the school's private beneficiary record (for opportunity management)
+router.get("/my-beneficiary", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user?.schoolId) return res.status(404).json({ error: "No school found" });
+    const ben = await prisma.beneficiary.findFirst({
+      where: { createdBySchoolId: user.schoolId, visibility: "PRIVATE" },
+      select: { id: true, name: true },
+    });
+    if (!ben) return res.status(404).json({ error: "No beneficiary found for this school" });
+    res.json(ben);
+  } catch (err) {
+    console.error("my-beneficiary error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
