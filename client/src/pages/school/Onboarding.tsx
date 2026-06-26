@@ -61,7 +61,7 @@ export default function SchoolOnboarding() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 ">
+          <div className="bg-[var(--surface)] border border-slate-200 rounded-3xl p-8 ">
             <div className="mb-6">
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--action)] mb-2">Primary Action</div>
               <h2 className="text-2xl font-semibold text-slate-900 mb-2">Set the required service hours</h2>

@@ -79,7 +79,7 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr,1fr]">
-        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+        <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-[16px] font-semibold text-[var(--text)]">First-user monitoring</h2>
@@ -161,7 +161,7 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
           )}
         </div>
 
-        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+        <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
           <h2 className="text-[16px] font-semibold text-[var(--text)]">Monitoring plan</h2>
           <p className="mt-1 text-sm text-[var(--text-sec)]">
             Persist the operating target and the people you want to watch most closely.

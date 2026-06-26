@@ -136,17 +136,17 @@ export default function BeneficiaryDashboard() {
       {error && <div className="mb-4 px-3.5 py-2.5 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[3px] text-[var(--er-t)] text-[13px]">{error}</div>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
-        <div className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
           <div className="text-[11px] font-medium text-[var(--text-sec)] uppercase tracking-wide mb-1.5">Pending Approvals</div>
           <div className="text-[24px] font-semibold text-amber-500 leading-none">{pendingSignups.length}</div>
           <div className="text-xs text-[var(--text-faint)] mt-1">awaiting your review</div>
         </div>
-        <div className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
           <div className="text-[11px] font-medium text-[var(--text-sec)] uppercase tracking-wide mb-1.5">School Invitations</div>
           <div className="text-[24px] font-semibold text-[var(--action)] leading-none">{pendingInvitations.length}</div>
           <div className="text-xs text-[var(--text-faint)] mt-1">pending response</div>
         </div>
-        <div className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
           <div className="text-[11px] font-medium text-[var(--text-sec)] uppercase tracking-wide mb-1.5">School Partners</div>
           <div className="text-[24px] font-semibold text-[var(--ok-t)] leading-none">{invitations.filter(i => i.status === "ACCEPTED").length}</div>
           <div className="text-xs text-[var(--text-faint)] mt-1">approved</div>
@@ -157,7 +157,7 @@ export default function BeneficiaryDashboard() {
       {pendingInvitations.length > 0 && (
         <div className="mb-7">
           <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3">Pending School Invitations</h2>
-          <div className="bg-white border border-[var(--border)] rounded-[3px] overflow-hidden">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] overflow-hidden">
             {pendingInvitations.map((inv, i, arr) => (
               <div key={inv.id} className={`p-4 flex items-center justify-between gap-4 ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
                 <div>
@@ -177,7 +177,7 @@ export default function BeneficiaryDashboard() {
                   <button
                     onClick={() => handleInvitationRespond(inv.id, "DECLINED")}
                     disabled={respondingId === inv.id}
-                    className="px-3.5 py-[7px] bg-white border border-[var(--border)] text-[var(--text-sec)] rounded-[2px] text-[13px] font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                    className="px-3.5 py-[7px] bg-[var(--surface)] border border-[var(--border)] text-[var(--text-sec)] rounded-[2px] text-[13px] font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
                   >
                     Decline
                   </button>
@@ -192,7 +192,7 @@ export default function BeneficiaryDashboard() {
       {invitations.filter((inv) => inv.status !== "PENDING").length > 0 && (
         <div className="mb-7">
           <h2 className="text-[13px] font-semibold text-[var(--text-sec)] mb-2">Past School Invitations</h2>
-          <div className="bg-white border border-[var(--border)] rounded-[3px] overflow-hidden">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] overflow-hidden">
             {invitations.filter((inv) => inv.status !== "PENDING").map((inv, i, arr) => (
               <div key={inv.id} className={`px-4 py-3 flex items-center justify-between ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
                 <div className="text-[13.5px] font-medium text-[var(--text)]">{inv.schoolName}</div>
@@ -213,7 +213,7 @@ export default function BeneficiaryDashboard() {
       {pendingSignups.length > 0 && (
         <div>
           <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3">Pending Hour Approvals</h2>
-          <div className="bg-white border border-[var(--border)] rounded-[3px] overflow-hidden">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] overflow-hidden">
             {pendingSignups.map((signup, i, arr) => (
               <div key={signup.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
                 <div className="flex justify-between items-start">
@@ -238,7 +238,7 @@ export default function BeneficiaryDashboard() {
                       <button
                         onClick={() => { setRejectingId(signup.id); setRejectReason(""); setError(""); }}
                         disabled={approving === signup.id}
-                        className="px-3.5 py-[7px] bg-white border border-[var(--border)] text-[var(--er-t)] rounded-[2px] text-[13px] font-medium hover:bg-[var(--er-bg)] disabled:opacity-50">
+                        className="px-3.5 py-[7px] bg-[var(--surface)] border border-[var(--border)] text-[var(--er-t)] rounded-[2px] text-[13px] font-medium hover:bg-[var(--er-bg)] disabled:opacity-50">
                         Reject
                       </button>
                     </div>
@@ -275,7 +275,7 @@ export default function BeneficiaryDashboard() {
       )}
 
       {pendingSignups.length === 0 && pendingInvitations.length === 0 && (
-        <div className="bg-white border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)] text-[13.5px]">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)] text-[13.5px]">
           No pending items. <Link to="/opportunities" className="text-[var(--action)] hover:underline">Create opportunities</Link> for students.
         </div>
       )}

@@ -92,7 +92,7 @@ export default function JoinBeneficiary() {
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
           <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8 text-center">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8 text-center">
           <h2 className="text-xl font-semibold mb-2 text-[var(--er-t)]">Invitation Error</h2>
           <p className="text-sm text-[var(--text-sec)] break-words">{loadError}</p>
         </div>
@@ -108,7 +108,7 @@ export default function JoinBeneficiary() {
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
           <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8 text-center">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8 text-center">
           <h2 className="text-xl font-semibold mb-2 text-[var(--text)]">Invitation Declined</h2>
           <p className="text-sm text-[var(--text-sec)] break-words">You declined the partnership from {invInfo?.schoolName}. You can contact them if you change your mind.</p>
         </div>
@@ -124,7 +124,7 @@ export default function JoinBeneficiary() {
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
           <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8">
           <div className="mb-5 rounded-[3px] border border-blue-100 bg-[var(--in-bg)] px-4 py-3 text-sm text-[var(--navy)] text-center">
             <div className="font-semibold break-words">{invInfo?.schoolName}</div>
             <div className="text-xs mt-1 text-[var(--action)]">has invited <strong>{invInfo?.beneficiaryName}</strong> to partner</div>

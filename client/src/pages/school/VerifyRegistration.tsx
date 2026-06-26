@@ -37,7 +37,7 @@ export default function SchoolVerifyRegistration() {
           <div className="text-[var(--text-sec)]">Verifying your school registration...</div>
         )}
         {status === "success" && (
-          <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
             <div className="w-12 h-12 rounded-full bg-[var(--ok-bg)] flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-[var(--ok-t)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -48,7 +48,7 @@ export default function SchoolVerifyRegistration() {
           </div>
         )}
         {status === "error" && (
-          <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
             <div className="w-12 h-12 rounded-full bg-[var(--er-bg)] flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-[var(--er-t)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

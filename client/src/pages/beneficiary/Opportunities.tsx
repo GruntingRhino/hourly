@@ -763,7 +763,7 @@ export default function BeneficiaryOpportunities() {
       {tab === "opportunities" && (
         <div className="flex gap-6 items-start">
           {/* Left panel: Create / Edit form */}
-          <div className="w-[55%] flex-shrink-0 bg-white border border-[var(--border)] rounded-[3px] p-5">
+          <div className="w-[55%] flex-shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">{editOppId ? "Edit Opportunity" : "Create New Opportunity"}</h2>
               {editOppId && (
@@ -814,12 +814,12 @@ export default function BeneficiaryOpportunities() {
                     <div className="flex rounded-[2px] overflow-hidden border border-[var(--border-s)] text-xs">
                       <button type="button"
                         onClick={() => setForm((p) => ({ ...p, recurring: false }))}
-                        className={`px-3 py-1.5 ${!form.recurring ? "bg-[var(--action)] text-white" : "bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
+                        className={`px-3 py-1.5 ${!form.recurring ? "bg-[var(--action)] text-white" : "bg-[var(--surface)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                         Manual
                       </button>
                       <button type="button"
                         onClick={() => setForm((p) => ({ ...p, recurring: true }))}
-                        className={`px-3 py-1.5 border-l border-[var(--border-s)] ${form.recurring ? "bg-[var(--action)] text-white" : "bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
+                        className={`px-3 py-1.5 border-l border-[var(--border-s)] ${form.recurring ? "bg-[var(--action)] text-white" : "bg-[var(--surface)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                         Recurring
                       </button>
                     </div>
@@ -1037,11 +1037,11 @@ export default function BeneficiaryOpportunities() {
                   </svg>
                   Filter
                   {visibleStatuses.length < 3 && (
-                    <span className="bg-white text-[var(--text)] rounded-full px-1.5 font-semibold">{visibleStatuses.length}</span>
+                    <span className="bg-[var(--surface)] text-[var(--text)] rounded-full px-1.5 font-semibold">{visibleStatuses.length}</span>
                   )}
                 </button>
                 {filterOpen && (
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-[var(--border)] rounded-[3px]  z-10 p-3 space-y-2">
+                  <div className="absolute right-0 mt-1 w-44 bg-[var(--surface)] border border-[var(--border)] rounded-[3px]  z-10 p-3 space-y-2">
                     <div className="text-xs font-semibold text-[var(--text-sec)] uppercase tracking-wide mb-1">Show</div>
                     {(["Active", "Upcoming", "Expired"] as const).map((status) => (
                       <label key={status} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -1163,14 +1163,14 @@ export default function BeneficiaryOpportunities() {
                         className={`flex items-center gap-2 rounded-[2px] border px-3 py-2 text-sm ${
                           active
                             ? "border-blue-600 bg-[var(--in-bg)] text-[var(--action)]"
-                            : "border-[var(--border-s)] bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"
+                            : "border-[var(--border-s)] bg-[var(--surface)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"
                         }`}
                       >
                         <span
                           className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
                             active
                               ? "border-blue-600 bg-[var(--action)] text-white"
-                              : "border-[var(--border-s)] bg-white text-transparent"
+                              : "border-[var(--border-s)] bg-[var(--surface)] text-transparent"
                           }`}
                         >
                           ✓
@@ -1187,7 +1187,7 @@ export default function BeneficiaryOpportunities() {
                   <h2 className="text-sm font-semibold text-[var(--text)] mb-3">Pending Review ({pendingSignups.length})</h2>
                   <div className="space-y-3">
                     {pendingSignups.map((s) => (
-                      <div key={s.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+                      <div key={s.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
                         <div className="flex justify-between items-start gap-4">
                           <div>
                             <div className="font-medium text-sm">{s.student.label}</div>
@@ -1255,7 +1255,7 @@ export default function BeneficiaryOpportunities() {
                   </h2>
                   <div className="space-y-2">
                       {visibleReviewedSignups.map((s) => (
-                        <div key={s.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+                        <div key={s.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1280,7 +1280,7 @@ export default function BeneficiaryOpportunities() {
                                     step={0.25}
                                     value={approvalHours[s.id] ?? String(s.totalHours ?? s.slot.durationHours)}
                                     onChange={(e) => setApprovalHours((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                    className="w-20 px-2 py-1 border border-[var(--border-s)] rounded text-xs bg-white"
+                                    className="w-20 px-2 py-1 border border-[var(--border-s)] rounded text-xs bg-[var(--surface)]"
                                   />
                                   <button onClick={() => handleApprove(s)} disabled={actionId === s.id}
                                     className="px-2.5 py-1 bg-[var(--ok-bg)] text-[var(--ok-t)] border border-[var(--ok-b)] rounded text-xs hover:bg-[var(--ok-bg)] disabled:opacity-50">
@@ -1303,7 +1303,7 @@ export default function BeneficiaryOpportunities() {
                                   <input type="text" value={rejectReason[s.id] || ""}
                                     onChange={(e) => setRejectReason((prev) => ({ ...prev, [s.id]: e.target.value }))}
                                     placeholder="Reason for denial"
-                                    className="flex-1 min-w-[150px] px-2 py-1 border border-[var(--er-b)] rounded text-xs bg-white" />
+                                    className="flex-1 min-w-[150px] px-2 py-1 border border-[var(--er-b)] rounded text-xs bg-[var(--surface)]" />
                                   <button onClick={() => handleReject(s.id)} disabled={rejectingId === s.id}
                                     className="px-2.5 py-1 bg-[var(--er-bg)] text-[var(--er-t)] border border-[var(--er-b)] rounded text-xs hover:bg-[var(--er-bg)] disabled:opacity-50">
                                     {rejectingId === s.id ? "..." : "Deny"}
@@ -1329,7 +1329,7 @@ export default function BeneficiaryOpportunities() {
       {/* Slot edit modal */}
       {editSlot && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-[3px]  border border-[var(--border)] p-6">
+          <div className="w-full max-w-sm bg-[var(--surface)] rounded-[3px]  border border-[var(--border)] p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-[var(--text)]">Edit Time Slot</h3>
               <div className="flex items-center gap-2">
@@ -1426,7 +1426,7 @@ export default function BeneficiaryOpportunities() {
         if (!signup) return null;
         return (
           <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm bg-white rounded-[3px]  border border-[var(--border)] p-6">
+            <div className="w-full max-w-sm bg-[var(--surface)] rounded-[3px]  border border-[var(--border)] p-6">
               <h3 className="font-semibold text-[var(--text)] mb-2">Mark as No-Show?</h3>
               <p className="text-sm text-[var(--text-sec)] mb-1">
                 <strong>{signup.student.label}</strong> will be marked as a no-show for:
@@ -1453,7 +1453,7 @@ export default function BeneficiaryOpportunities() {
       {/* Verification history modal */}
       {historySignup && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white rounded-[3px]  border border-[var(--border)] max-h-[85vh] overflow-hidden">
+          <div className="w-full max-w-2xl bg-[var(--surface)] rounded-[3px]  border border-[var(--border)] max-h-[85vh] overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border)] flex items-start justify-between gap-4">
               <div>
                 <div className="font-semibold text-[var(--text)]">Verification History</div>

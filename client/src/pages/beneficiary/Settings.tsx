@@ -94,7 +94,7 @@ export default function BeneficiarySettings() {
       {error && <div className="mb-4 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded text-[var(--er-t)] text-sm">{error}</div>}
       {success && <div className="mb-4 p-3 bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded text-[var(--ok-t)] text-sm">{success}</div>}
 
-      <div className="bg-white border border-[var(--border)] rounded-[3px] p-6 mb-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 mb-6">
         <h2 className="font-semibold text-[var(--text)] mb-4">Organization Profile</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
@@ -218,7 +218,7 @@ export default function BeneficiarySettings() {
         </form>
       </div>
 
-      <div className="bg-white border border-[var(--border)] rounded-[3px] p-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
         <h2 className="font-semibold text-[var(--text)] mb-1">Account</h2>
         <p className="text-sm text-[var(--text-sec)] mb-4">Logged in as: {user?.name} ({user?.email})</p>
         <p className="text-xs text-[var(--text-faint)]">

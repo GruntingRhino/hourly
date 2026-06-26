@@ -80,7 +80,7 @@ export default function SignaturePad({ onSignatureChange }: SignaturePadProps) {
 
   return (
     <div>
-      <div className="border-2 border-dashed border-[var(--border-s)] rounded-[3px] bg-white relative">
+      <div className="border-2 border-dashed border-[var(--border-s)] rounded-[3px] bg-[var(--surface)] relative">
         <canvas
           ref={canvasRef}
           className="w-full h-40 cursor-crosshair touch-none"

@@ -168,7 +168,7 @@ export default function SearchableSelect({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-[2px] border border-[var(--border)] bg-white py-1 "
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-[2px] border border-[var(--border)] bg-[var(--surface)] py-1 "
         >
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option, index) => {

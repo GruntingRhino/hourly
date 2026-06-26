@@ -128,7 +128,7 @@ export default function FAQ() {
   return (
     <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-white border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
+      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img src="/logo-full.png" alt="GoodHours" className="h-7 w-auto"
             onError={(e) => {
@@ -146,7 +146,7 @@ export default function FAQ() {
 
         <div className="space-y-6">
           {SECTIONS.map((section) => (
-            <div key={section.title} className="bg-white border border-[var(--border)] rounded-[3px] overflow-hidden">
+            <div key={section.title} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-alt)]">
                 <h2 className="text-[11.5px] font-semibold text-[var(--text-sec)] uppercase tracking-wide">{section.title}</h2>
               </div>
@@ -160,7 +160,7 @@ export default function FAQ() {
         </div>
 
         {/* Contact footer */}
-        <div className="mt-10 bg-white border border-[var(--border)] rounded-[3px] p-6 text-center">
+        <div className="mt-10 bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 text-center">
           <div className="text-[15px] font-semibold text-[var(--text)] mb-1">Still have questions?</div>
           <p className="text-[13.5px] text-[var(--text-sec)] mb-3">
             Our team is happy to help. Reach out and we'll get back to you as soon as possible.

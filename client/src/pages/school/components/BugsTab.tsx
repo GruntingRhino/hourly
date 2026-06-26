@@ -105,7 +105,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
       <div className="space-y-6">
-        <form onSubmit={handleCreateBug} className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+        <form onSubmit={handleCreateBug} className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
           <h2 className="text-[16px] font-semibold text-[var(--text)]">New bug triage item</h2>
           <p className="mt-1 text-sm text-[var(--text-sec)]">
             Capture rollout defects with enough detail to assign, reproduce, and verify.
@@ -222,7 +222,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
           </div>
         </form>
 
-        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+        <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[16px] font-semibold text-[var(--text)]">Triage queue</h2>
             <div className="text-sm text-[var(--text-sec)]">{workspace.bugs.length} total</div>
@@ -240,7 +240,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                   className={`w-full rounded-[3px] border p-4 text-left transition-colors ${
                     selectedBugId === bug.id
                       ? "border-blue-300 bg-[var(--in-bg)]"
-                      : "border-[var(--border)] bg-white hover:border-[var(--border-s)]"
+                      : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-s)]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
         </div>
       </div>
 
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Selected bug</h2>
         {!selectedBug ? (
           <div className="mt-5 rounded-[3px] border border-dashed border-[var(--border-s)] p-5 text-sm text-[var(--text-sec)]">

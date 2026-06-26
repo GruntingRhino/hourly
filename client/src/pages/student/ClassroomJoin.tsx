@@ -30,7 +30,7 @@ export default function ClassroomJoin() {
           <p className="text-[var(--text-sec)] mt-2 text-sm">Welcome! Enter a classroom code to get started.</p>
         </div>
 
-        <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
           <h2 className="text-[16px] font-semibold mb-1">Join a Classroom</h2>
           <p className="text-sm text-[var(--text-sec)] mb-4">
             Ask your teacher for the classroom invite code, then enter it below.

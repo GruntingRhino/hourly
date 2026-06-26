@@ -414,7 +414,7 @@ export default function SchoolBeneficiaries() {
     const showRemove = isAdmin && !isSelfPartner;
 
     return (
-      <div key={beneficiary.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+      <div key={beneficiary.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
         <div className="flex justify-between items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="font-medium">{toTitleCase(beneficiary.name)}</div>
@@ -502,7 +502,7 @@ export default function SchoolBeneficiaries() {
         )}
 
         {confirmDrop?.benId === beneficiary.id && (
-          <div className="mt-3 rounded-[3px] border border-[var(--border-s)] bg-white p-3 ">
+          <div className="mt-3 rounded-[3px] border border-[var(--border-s)] bg-[var(--surface)] p-3 ">
             <p className="text-sm text-[var(--text)] mb-2">Remove <strong>{toTitleCase(confirmDrop.name)}</strong> from your partner list?</p>
             <div className="flex gap-2">
               <button onClick={confirmDropAction} className="px-3 py-1.5 bg-[var(--er-t)] text-white rounded text-xs hover:bg-[var(--er-t)]">Remove</button>
@@ -556,7 +556,7 @@ export default function SchoolBeneficiaries() {
           <button
             key={item.key}
             onClick={() => setTab(item.key as typeof tab)}
-            className={`pb-2 text-sm font-medium border-b-2 ${tab === item.key ? "border-blue-600 text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}
+            className={`pb-2 text-sm font-medium border-b-2 ${tab === item.key ? "border-[var(--action)] text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}
           >
             {item.label}
           </button>
@@ -618,7 +618,7 @@ export default function SchoolBeneficiaries() {
                 key={category || "all"}
                 onClick={() => setSelectedCategory(category)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  selectedCategory === category ? "bg-[var(--action)] text-white border-blue-600" : "bg-white text-[var(--text-sec)] border-[var(--border-s)] hover:border-gray-500"
+                  selectedCategory === category ? "bg-[var(--action)] text-white border-[var(--action)]" : "bg-[var(--surface)] text-[var(--text-sec)] border-[var(--border-s)] hover:border-[var(--border-s)]"
                 }`}
               >
                 {category || "All"}
@@ -695,7 +695,7 @@ export default function SchoolBeneficiaries() {
               {filteredApprovedPartnerOpportunities.map((opportunity) => {
                 const signupCount = opportunity.timeSlots.reduce((sum, slot) => sum + slot._count.signups, 0);
                 return (
-                  <div key={opportunity.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+                  <div key={opportunity.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-medium text-[var(--text)]">{opportunity.title}</div>
@@ -804,7 +804,7 @@ export default function SchoolBeneficiaries() {
             <h2 className="font-semibold mb-2">Bulk Upload Community Partners</h2>
             <p className="text-sm text-[var(--text-sec)] mb-4">
               Upload a CSV with columns aligned to the custom form:
-              <code className="ml-1 rounded bg-white px-1 py-0.5 text-xs">name,category,email,phone,website,address,city,state,zip,description,visibility</code>
+              <code className="ml-1 rounded bg-[var(--surface)] px-1 py-0.5 text-xs">name,category,email,phone,website,address,city,state,zip,description,visibility</code>
             </p>
 
             {csvResult && (
@@ -830,7 +830,7 @@ export default function SchoolBeneficiaries() {
               )}
             </div>
 
-            <div className="mt-6 rounded bg-white p-3 text-xs text-[var(--text-sec)]">
+            <div className="mt-6 rounded bg-[var(--surface)] p-3 text-xs text-[var(--text-sec)]">
               <p className="font-medium mb-1">CSV Example</p>
               <pre className="overflow-x-auto">name,category,email,phone,website,address,city,state,zip,description,visibility{"\n"}Green Earth,Environment,team@greenearth.org,6175551234,https://greenearth.org,123 Main St,Boston,MA,02110,Environmental org,PRIVATE</pre>
             </div>
@@ -840,7 +840,7 @@ export default function SchoolBeneficiaries() {
 
       {drawerBeneficiary && (
         <div className="fixed inset-0 z-30 bg-black/30">
-          <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-white shadow-2xl border-l border-[var(--border)]">
+          <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-[var(--surface)] shadow-2xl border-l border-[var(--border)]">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--border)]">
               <div>
                 <div className="font-semibold text-[var(--text)]">{toTitleCase(drawerBeneficiary.name)}</div>

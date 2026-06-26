@@ -28,7 +28,7 @@ export default function SchoolConfirmTransfer() {
 
   return (
     <div className="min-h-screen bg-[var(--surface-alt)] flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white border border-[var(--border)] rounded-[3px] p-6 ">
+      <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 ">
         <h1 className="text-xl font-bold text-[var(--text)] mb-3">School Ownership Transfer</h1>
         <div className={`rounded-[3px] border px-4 py-3 text-sm ${
           status === "success"

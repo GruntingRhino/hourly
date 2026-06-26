@@ -59,7 +59,7 @@ export default function EmailVerificationRequired() {
           <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
 
-        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8 text-center">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--in-bg)] text-2xl">✉️</div>
           <h2 className="text-2xl font-semibold text-[var(--text)] mb-2">Verify your email</h2>
           <p className="text-[var(--text-sec)] text-sm mb-5 break-words">

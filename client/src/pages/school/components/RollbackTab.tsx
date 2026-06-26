@@ -43,7 +43,7 @@ export default function RollbackTab({ workspace, onUpdate }: { workspace: Launch
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Rollback plan</h2>
         <p className="mt-1 text-sm text-[var(--text-sec)]">
           Define the trigger, freeze action, rollback sequence, and restore checks before the school is fully live.
@@ -124,7 +124,7 @@ export default function RollbackTab({ workspace, onUpdate }: { workspace: Launch
         </button>
       </div>
 
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Current risk signals</h2>
         <div className="mt-5 space-y-3">
           <div className="rounded-[3px] border border-[var(--border)] p-4">

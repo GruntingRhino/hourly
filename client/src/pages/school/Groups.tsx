@@ -477,7 +477,7 @@ export default function SchoolGroups() {
       {/* Remove Hours Modal */}
       {removeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[3px] p-6 w-full max-w-sm">
+          <div className="bg-[var(--surface)] rounded-[3px] p-6 w-full max-w-sm">
             <h2 className="text-[16px] font-semibold mb-2">Remove Verified Hours</h2>
             <p className="text-sm text-[var(--text-sec)] mb-4">
               Remove verified hours for <strong>{removeModal.studentName}</strong>? Enter a reason (optional).
@@ -547,7 +547,7 @@ export default function SchoolGroups() {
                 <button
                   key={view.id}
                   onClick={() => applySavedView(view.id as SavedView)}
-                  className={`rounded-[2px] border px-3 py-2 text-left ${savedView === view.id ? "border-blue-300 bg-white" : "border-blue-100 bg-[var(--in-bg)] hover:bg-white"}`}
+                  className={`rounded-[2px] border px-3 py-2 text-left ${savedView === view.id ? "border-blue-300 bg-[var(--surface)]" : "border-blue-100 bg-[var(--in-bg)] hover:bg-white"}`}
                 >
                   <div className="text-sm font-medium text-[var(--text)]">{view.title}</div>
                   <div className="text-[11px] text-[var(--text-sec)] mt-1">{view.note}</div>
@@ -572,7 +572,7 @@ export default function SchoolGroups() {
                     setTriageMode(queue.id as TriageMode);
                     syncSearchParams({ triage: queue.id, view: null, filter, classroom: selectedClassroom || null });
                   }}
-                  className={`rounded-[2px] border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-[var(--wn-bg)] text-amber-800 hover:bg-white"}`}
+                  className={`rounded-[2px] border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-[var(--surface)] text-amber-900" : "border-amber-100 bg-[var(--wn-bg)] text-amber-800 hover:bg-white"}`}
                 >
                   <div className="font-medium">{queue.label}</div>
                   <div className="text-[11px] opacity-80">{queue.count} students</div>
@@ -609,7 +609,7 @@ export default function SchoolGroups() {
             <button
               onClick={handleQueueExport}
               disabled={filtered.length === 0}
-              className="px-3 py-2 bg-white border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
+              className="px-3 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
             >
               Export Queue
             </button>
@@ -622,7 +622,7 @@ export default function SchoolGroups() {
           )}
 
           {showBulkCompose && (
-            <div className="mb-4 rounded-[3px] border border-[var(--in-b)] bg-white p-4 ">
+            <div className="mb-4 rounded-[3px] border border-[var(--in-b)] bg-[var(--surface)] p-4 ">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text)]">Bulk Follow-Up Composer</div>
@@ -659,7 +659,7 @@ export default function SchoolGroups() {
                 </button>
                 <button
                   onClick={() => setShowBulkCompose(false)}
-                  className="px-3 py-2 bg-white border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)]"
+                  className="px-3 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)]"
                 >
                   Cancel
                 </button>
@@ -684,7 +684,7 @@ export default function SchoolGroups() {
                       view: savedView === "CUSTOM" ? null : savedView,
                     });
                   }}
-                  className={`w-full text-left bg-white border rounded-[3px] p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-[var(--border)]"}`}
+                  className={`w-full text-left bg-[var(--surface)] border rounded-[3px] p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-[var(--border)]"}`}
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -771,7 +771,7 @@ export default function SchoolGroups() {
             </div>
           </div>
 
-          <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 mb-4">
             <div className="text-sm font-semibold mb-1">Current Queue</div>
             <div className="text-xs text-[var(--text-sec)] mb-2">
               {triageMode === "URGENT" && "Showing highest-priority students first: at-risk, near deadline, no-shows, and approval bottlenecks."}
@@ -800,7 +800,7 @@ export default function SchoolGroups() {
             </div>
           </div>
 
-          <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 mb-4">
             <div className="text-sm font-semibold mb-1">Audit Trail</div>
             <div className="text-xs text-[var(--text-sec)]">
               Open a student's hour history to review verification and override actions.
@@ -808,7 +808,7 @@ export default function SchoolGroups() {
           </div>
 
           {activeClassroom && (
-            <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 mb-4">
               <div className="font-medium text-sm mb-1">{activeClassroom.name}</div>
               <div className="text-xs text-[var(--text-sec)] mb-2">Teacher: {activeClassroom.teacher.name}</div>
               <div className="text-xs font-mono bg-[var(--surface-alt)] p-1.5 rounded flex justify-between">
@@ -1003,7 +1003,7 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   }, [showHistory, student.id]);
 
   return (
-    <div className="bg-white border border-[var(--border)] rounded-[3px] p-4">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
       <div className="font-semibold text-sm">{student.name}</div>
       <div className="text-xs text-[var(--text-sec)] mb-3">{student.email}</div>
 
@@ -1078,29 +1078,29 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <select value={caseForm.status} onChange={(e) => setCaseForm((current) => ({ ...current, status: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white">
+          <select value={caseForm.status} onChange={(e) => setCaseForm((current) => ({ ...current, status: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]">
             {['OPEN','WAITING_ON_STUDENT','WAITING_ON_SCHOOL','MONITORING','RESOLVED'].map((option) => (
               <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
             ))}
           </select>
-          <select value={caseForm.priority} onChange={(e) => setCaseForm((current) => ({ ...current, priority: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white">
+          <select value={caseForm.priority} onChange={(e) => setCaseForm((current) => ({ ...current, priority: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]">
             {['LOW','MEDIUM','HIGH','URGENT'].map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
         </div>
-        <input value={caseForm.summary} onChange={(e) => setCaseForm((current) => ({ ...current, summary: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Short intervention summary" />
-        <input value={caseForm.reason} onChange={(e) => setCaseForm((current) => ({ ...current, reason: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Why this student needs intervention" />
-        <input value={caseForm.nextStepForStudent} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStudent: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Next step for student" />
-        <input value={caseForm.nextStepForStaff} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStaff: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Next step for staff" />
-        <textarea value={caseForm.studentMessage} onChange={(e) => setCaseForm((current) => ({ ...current, studentMessage: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" rows={2} placeholder="Student-facing message shown in their dashboard/messages" />
-        <textarea value={caseForm.staffNote} onChange={(e) => setCaseForm((current) => ({ ...current, staffNote: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" rows={3} placeholder="Internal staff note" />
+        <input value={caseForm.summary} onChange={(e) => setCaseForm((current) => ({ ...current, summary: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" placeholder="Short intervention summary" />
+        <input value={caseForm.reason} onChange={(e) => setCaseForm((current) => ({ ...current, reason: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" placeholder="Why this student needs intervention" />
+        <input value={caseForm.nextStepForStudent} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStudent: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" placeholder="Next step for student" />
+        <input value={caseForm.nextStepForStaff} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStaff: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" placeholder="Next step for staff" />
+        <textarea value={caseForm.studentMessage} onChange={(e) => setCaseForm((current) => ({ ...current, studentMessage: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" rows={2} placeholder="Student-facing message shown in their dashboard/messages" />
+        <textarea value={caseForm.staffNote} onChange={(e) => setCaseForm((current) => ({ ...current, staffNote: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" rows={3} placeholder="Internal staff note" />
         <div className="grid grid-cols-2 gap-2 text-xs text-[var(--navy)]">
           <label className="space-y-1">
             <span className="block">Follow-up date</span>
-            <input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((current) => ({ ...current, dueDate: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" />
+            <input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((current) => ({ ...current, dueDate: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-[var(--surface)]" />
           </label>
-          <div className="rounded border border-blue-100 bg-white p-2 text-[11px] text-[var(--action)]">
+          <div className="rounded border border-blue-100 bg-[var(--surface)] p-2 text-[11px] text-[var(--action)]">
             <div>Last contacted: {caseForm.lastContactedAt ? new Date(caseForm.lastContactedAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
             <div>Last student action: {caseForm.lastStudentActionAt ? new Date(caseForm.lastStudentActionAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
             <div>New hour activity since outreach: {caseForm.followUpSeen ? 'Yes' : 'No'}</div>
@@ -1174,7 +1174,7 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
         ) : (
           <div className="space-y-2">
             {interventions.map((item) => (
-              <div key={item.id} className="rounded bg-white border border-[var(--border)] p-2.5">
+              <div key={item.id} className="rounded bg-[var(--surface)] border border-[var(--border)] p-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-xs font-medium text-[var(--text)]">{item.subject || "Student outreach"}</div>
@@ -1264,7 +1264,7 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[3px] p-6 w-full max-w-md">
+      <div className="bg-[var(--surface)] rounded-[3px] p-6 w-full max-w-md">
         <h2 className="text-[20px] font-semibold mb-4">Add Staff Member</h2>
 
         {result ? (

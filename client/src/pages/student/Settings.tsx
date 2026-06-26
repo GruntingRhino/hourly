@@ -714,7 +714,7 @@ export default function StudentSettings() {
                     className="w-10 h-5 rounded-full transition-colors relative"
                     style={{ background: notifPrefs[key].email ? "var(--action)" : "var(--border-s)" }}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface)] rounded-full transition-transform ${
                       notifPrefs[key].email ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>
@@ -725,7 +725,7 @@ export default function StudentSettings() {
                     className="w-10 h-5 rounded-full transition-colors relative"
                     style={{ background: notifPrefs[key].inApp ? "var(--action)" : "var(--border-s)" }}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface)] rounded-full transition-transform ${
                       notifPrefs[key].inApp ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>

@@ -50,7 +50,7 @@ export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchW
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Support process</h2>
         <p className="mt-1 text-sm text-[var(--text-sec)]">
           Define the operating owner, intake channel, and escalation window before the first live support request lands.
@@ -134,7 +134,7 @@ export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchW
         </button>
       </div>
 
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Support flow</h2>
         <div className="mt-5 space-y-3">
           <div className="rounded-[3px] border border-[var(--border)] p-4">

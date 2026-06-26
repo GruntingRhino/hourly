@@ -53,7 +53,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
   const colors = {
     success: "bg-[var(--ok-t)] text-white",
     error: "bg-[var(--er-t)] text-white",
-    info: "bg-gray-800 text-white",
+    info: "bg-[var(--navy)] text-white",
   };
 
   return (

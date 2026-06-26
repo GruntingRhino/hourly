@@ -36,7 +36,7 @@ export default function OnboardingTab({ workspace, onUpdate }: { workspace: Laun
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr,1fr]">
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Onboarding instructions</h2>
         <p className="mt-1 text-sm text-[var(--text-sec)]">
           Set the rollout narrative for staff so the pilot follows one consistent path.
@@ -77,7 +77,7 @@ export default function OnboardingTab({ workspace, onUpdate }: { workspace: Laun
         </div>
       </div>
 
-      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+      <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[16px] font-semibold text-[var(--text)]">Launch checklist</h2>
         <p className="mt-1 text-sm text-[var(--text-sec)]">
           This checklist reflects live product state, not guesses. Use it before sending the next invite batch.

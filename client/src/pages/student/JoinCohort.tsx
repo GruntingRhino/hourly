@@ -89,7 +89,7 @@ export default function JoinCohort() {
       <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
         <div className="max-w-sm w-full text-center">
           <Link to="/" className="block text-[20px] font-semibold italic mb-8">GoodHours</Link>
-          <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
             <h2 className="text-[16px] font-semibold mb-2 text-[var(--er-t)]">Invitation Error</h2>
             <p className="text-sm text-[var(--text-sec)]">{loadError}</p>
             <p className="text-xs text-[var(--text-faint)] mt-4">Contact your school administrator for a new invitation.</p>
@@ -103,7 +103,7 @@ export default function JoinCohort() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="w-full max-w-sm">
         <Link to="/" className="block text-center text-[20px] font-semibold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
           <div className="mb-4 p-3 bg-[var(--in-bg)] border border-blue-100 rounded text-sm text-[var(--navy)] text-center">
             <div className="font-semibold">{invInfo?.schoolName}</div>
             <div className="text-xs mt-0.5">{invInfo?.cohortName}</div>

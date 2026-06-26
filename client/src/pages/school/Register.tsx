@@ -348,7 +348,7 @@ export default function SchoolRegister() {
             />
             <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
           </Link>
-          <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8">
             <h2 className="text-[20px] font-semibold mb-1 text-[var(--text)]">Register Your School</h2>
             <p className="text-sm text-[var(--text-sec)] mb-6">
               Create a school administrator account to get started.
@@ -359,7 +359,7 @@ export default function SchoolRegister() {
             <button
               onClick={() => googleUrl && (window.location.href = googleUrl)}
               disabled={!googleUrl}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-[var(--border-s)] rounded-[3px] font-medium text-sm hover:bg-[var(--surface-alt)] text-[var(--text)] disabled:opacity-40 transition-colors"
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-[var(--surface)] border border-[var(--border-s)] rounded-[3px] font-medium text-sm hover:bg-[var(--surface-alt)] text-[var(--text)] disabled:opacity-40 transition-colors"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -384,7 +384,7 @@ export default function SchoolRegister() {
                     value={devGoogleName}
                     onChange={(e) => setDevGoogleName(e.target.value)}
                     placeholder="Admin name"
-                    className="w-full h-10 px-3 border border-[var(--wn-b)] rounded-[3px] focus:outline-none focus:border-amber-400 bg-white text-sm"
+                    className="w-full h-10 px-3 border border-[var(--wn-b)] rounded-[3px] focus:outline-none focus:border-amber-400 bg-[var(--surface)] text-sm"
                   />
                   <div className="flex gap-2">
                     <input
@@ -392,7 +392,7 @@ export default function SchoolRegister() {
                       value={devGoogleEmail}
                       onChange={(e) => setDevGoogleEmail(e.target.value)}
                       placeholder="admin@any-domain.test"
-                      className="flex-1 h-10 px-3 border border-[var(--wn-b)] rounded-[3px] focus:outline-none focus:border-amber-400 bg-white text-sm"
+                      className="flex-1 h-10 px-3 border border-[var(--wn-b)] rounded-[3px] focus:outline-none focus:border-amber-400 bg-[var(--surface)] text-sm"
                     />
                     <button
                       type="button"
@@ -461,7 +461,7 @@ export default function SchoolRegister() {
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
             <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
           </Link>
-          <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8">
             <button onClick={() => setStep("google")}
               className="flex items-center gap-1 text-sm text-[var(--text-sec)] hover:text-[var(--text)] mb-5">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -554,7 +554,7 @@ export default function SchoolRegister() {
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
             <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
           </Link>
-          <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8">
             <button
               onClick={() => { setError(""); setStep(signupMode === "email" ? "email-collect" : "google"); }}
               className="flex items-center gap-1 text-sm text-[var(--text-sec)] hover:text-[var(--text)] mb-5"
@@ -659,7 +659,7 @@ export default function SchoolRegister() {
                 {showDropdown && searchResults.length > 0 && (
                   <div
                     ref={dropdownRef}
-                    className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-[var(--border)] rounded-[2px]  max-h-64 overflow-y-auto"
+                    className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-[2px]  max-h-64 overflow-y-auto"
                   >
                     {searchResults.map((school, idx) => (
                       <button
@@ -741,7 +741,7 @@ export default function SchoolRegister() {
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
             <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
           </Link>
-          <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+          <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)]  p-8">
             <button
               onClick={() => { setError(""); setStep("search"); }}
               className="flex items-center gap-1 text-sm text-[var(--text-sec)] hover:text-[var(--text)] mb-5"
@@ -852,7 +852,7 @@ export default function SchoolRegister() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="w-full max-w-sm text-center">
         <Link to="/" className="block text-[20px] font-semibold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-[3px] border border-[var(--border)] p-6">
+        <div className="bg-[var(--surface)] rounded-[3px] border border-[var(--border)] p-6">
           <div className="w-12 h-12 rounded-full bg-[var(--ok-bg)] flex items-center justify-center mx-auto mb-4">
             <svg className="w-6 h-6 text-[var(--ok-t)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

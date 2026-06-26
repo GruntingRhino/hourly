@@ -457,7 +457,7 @@ export default function Terms() {
   return (
     <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-white border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
+      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img
             src="/logo-full.png"
@@ -498,7 +498,7 @@ export default function Terms() {
         </div>
 
         {/* Table of Contents */}
-        <div className="bg-white border border-[var(--border)] rounded-[3px] p-5 mb-8">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5 mb-8">
           <p className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wide mb-3">
             Table of Contents
           </p>
@@ -521,7 +521,7 @@ export default function Terms() {
             <div
               key={s.id}
               id={s.id}
-              className="bg-white border border-[var(--border)] rounded-[3px] px-6 py-5 scroll-mt-6"
+              className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] px-6 py-5 scroll-mt-6"
             >
               <h2 className="text-[16px] font-semibold text-[var(--text)] mb-3">{s.title}</h2>
               <div className="text-[13.5px] text-[var(--text-sec)] leading-relaxed">{s.content}</div>
@@ -530,7 +530,7 @@ export default function Terms() {
         </div>
 
         {/* Footer */}
-        <div className="mt-10 bg-white border border-[var(--border)] rounded-[3px] p-6 text-center">
+        <div className="mt-10 bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 text-center">
           <div className="text-[14px] font-semibold text-[var(--text)] mb-1">
             Questions about our Terms?
           </div>

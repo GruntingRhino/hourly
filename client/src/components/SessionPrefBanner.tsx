@@ -21,7 +21,7 @@ export default function SessionPrefBanner({ onDismiss }: Props) {
       }`}
     >
       <div className="mx-auto max-w-4xl px-4 pb-4">
-        <div className="rounded-2xl border border-[var(--border)] bg-white  shadow-gray-200/60 overflow-hidden">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]  shadow-gray-200/60 overflow-hidden">
           <div className="h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-400" />
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
             {/* Icon + text */}
@@ -44,7 +44,7 @@ export default function SessionPrefBanner({ onDismiss }: Props) {
             <div className="flex items-center gap-2 flex-shrink-0 pl-0 sm:pl-2">
               <button
                 onClick={() => choose("session")}
-                className="rounded-[3px] border border-[var(--border)] bg-white px-3.5 py-2 text-xs font-medium text-[var(--text-sec)] hover:bg-[var(--surface-alt)] hover:border-[var(--border-s)] transition-colors whitespace-nowrap"
+                className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs font-medium text-[var(--text-sec)] hover:bg-[var(--surface-alt)] hover:border-[var(--border-s)] transition-colors whitespace-nowrap"
               >
                 This session only
               </button>
