@@ -523,14 +523,15 @@ export default function Landing() {
         {/* CTA */}
         <section className="py-16 text-center" style={{ background: "var(--navy)" }}>
           <div className="max-w-xl mx-auto px-6">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(255,255,255,0.1)" }}>
-              <img src="/logo-icon.png" alt="" className="w-7 h-7 object-contain brightness-0 invert"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                  (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
-                }} />
-              <span className="hidden text-white font-bold text-[13px] tracking-tight">GH</span>
-            </div>
+            <img src="/logo-full.png" alt="GoodHours" className="h-7 w-auto brightness-0 invert mx-auto mb-5"
+              onError={(e) => {
+                const el = e.currentTarget as HTMLImageElement;
+                el.style.display = "none";
+                const span = document.createElement("span");
+                span.textContent = "GoodHours";
+                span.className = "font-semibold text-white text-[15px] tracking-tight block mb-5";
+                el.parentNode?.insertBefore(span, el.nextSibling);
+              }} />
             <h2 className="text-[28px] font-bold text-white mb-3">Ready to get started?</h2>
             <p className="text-white/75 text-[14px] mb-7 leading-relaxed">
               GoodHours is free for schools. Register with Google Sign-In — students and community partners join through invitation only.
