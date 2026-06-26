@@ -477,21 +477,138 @@ export async function sendAdminTransferRequestEmail(
   );
 }
 
-export async function sendEventReminderEmail(
-  to: string,
-  eventName: string,
-  eventTime: string,
-  location: string
-): Promise<void> {
-  await send(
-    to,
-    `Reminder: ${eventName} is coming up`,
-    base(
-      "Upcoming volunteer event",
-      `Don't forget — you're signed up for <strong>${eventName}</strong>.<br><br>📅 ${eventTime}<br>📍 ${location}`,
-      { label: "View Event", url: `${CLIENT_URL}/dashboard` }
-    )
-  );
+export interface EventReminderParams {
+  to: string;
+  eventName: string;
+  eventDate: string;     // human-readable, e.g. "Saturday, July 12"
+  startTime: string;
+  endTime: string;
+  location: string;
+  address?: string;
+  cancellationToken?: string;
+  // Pro-only fields (omit for Free)
+  preparationNotes?: string;
+  arrivalInstructions?: string;
+  contactInfo?: string;
+  requiredFormUrl?: string;
+  requiredFormName?: string;
+  customMessage?: string;
+  // Org branding (Pro)
+  brandColor?: string;
+  orgLogoUrl?: string;
+  emailSignature?: string;
+  orgName?: string;
+  // ICS attachment
+  icsContent?: string;  // pre-generated ICS string
+}
+
+export async function sendEventReminderEmail(params: EventReminderParams): Promise<void> {
+  const {
+    to, eventName, eventDate, startTime, endTime, location, address,
+    cancellationToken, preparationNotes, arrivalInstructions, contactInfo,
+    requiredFormUrl, requiredFormName, customMessage,
+    brandColor, orgLogoUrl, emailSignature, orgName, icsContent,
+  } = params;
+
+  const accentColor = brandColor ?? "#2563eb";
+  const fromOrgName = orgName ?? "GoodHours";
+
+  const mapsLink = address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+
+  const cancelSection = cancellationToken
+    ? `<p style="margin:20px 0 0;font-size:13px;color:#6b7280">
+        Can't make it? <a href="${CLIENT_URL}/cancel/${cancellationToken}" style="color:${accentColor}">Cancel your spot</a> so we can offer it to someone on the waitlist.
+      </p>`
+    : "";
+
+  const proBlocks: string[] = [];
+
+  if (requiredFormUrl && requiredFormName) {
+    proBlocks.push(`<div style="margin:20px 0;padding:14px 16px;background:#fef9c3;border-left:4px solid #ca8a04;border-radius:4px">
+      <strong style="color:#92400e">Action required:</strong> Complete <a href="${requiredFormUrl}" style="color:#92400e">${requiredFormName}</a> before attending.
+    </div>`);
+  }
+
+  if (preparationNotes) {
+    proBlocks.push(`<div style="margin:16px 0"><strong>Preparation:</strong><br>${preparationNotes.replace(/\n/g, "<br>")}</div>`);
+  }
+
+  if (arrivalInstructions) {
+    proBlocks.push(`<div style="margin:16px 0"><strong>Arrival instructions:</strong><br>${arrivalInstructions.replace(/\n/g, "<br>")}</div>`);
+  }
+
+  if (contactInfo) {
+    proBlocks.push(`<div style="margin:16px 0"><strong>On-site contact:</strong><br>${contactInfo.replace(/\n/g, "<br>")}</div>`);
+  }
+
+  if (customMessage) {
+    proBlocks.push(`<div style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-radius:4px;color:#374151">${customMessage.replace(/\n/g, "<br>")}</div>`);
+  }
+
+  const signatureBlock = emailSignature
+    ? `<p style="margin:20px 0 0;font-size:13px;color:#374151">${emailSignature.replace(/\n/g, "<br>")}</p>`
+    : "";
+
+  const logoBlock = orgLogoUrl
+    ? `<img src="${orgLogoUrl}" alt="${fromOrgName}" style="max-height:40px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px">`
+    : "";
+
+  const body = `
+    ${logoBlock}
+    Don't forget — you're signed up for <strong>${eventName}</strong>.<br><br>
+    📅 ${eventDate}, ${startTime}–${endTime}<br>
+    📍 ${location}<br>
+    <a href="${mapsLink}" style="color:${accentColor};font-size:13px">Get directions</a>
+    ${proBlocks.join("")}
+    ${cancelSection}
+    ${signatureBlock}
+  `;
+
+  // Build the branded email wrapper
+  const ctaHtml = `<div style="margin:24px 0;text-align:center">
+    <a href="${CLIENT_URL}/dashboard" style="background:${accentColor};color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600;display:inline-block">View Event</a>
+  </div>`;
+
+  const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0">
+<div style="max-width:520px;margin:48px auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">
+  <div style="background:${accentColor};padding:20px 32px"><span style="color:#fff;font-size:20px;font-weight:700">${fromOrgName}</span></div>
+  <div style="padding:32px">
+    <h2 style="margin:0 0 12px;font-size:20px;color:#111827">Upcoming volunteer event</h2>
+    <div style="color:#374151;font-size:15px;line-height:1.6">${body}</div>
+    ${ctaHtml}
+    <p style="color:#9ca3af;font-size:12px;margin:32px 0 0">If you didn't expect this email, you can safely ignore it.</p>
+  </div>
+</div>
+</body></html>`;
+
+  if (icsContent) {
+    // Send with ICS attachment via Resend
+    const resend = getResendClient();
+    if (resend && !shouldLogOnlyEmailDelivery(to)) {
+      const fromAddr = (getFromCandidates(to)[0] ?? FROM ?? "noreply@notifications.goodhours.app").trim();
+      const subject = `Reminder: ${eventName} is coming up`;
+      try {
+        await resend.emails.send({
+          from: fromAddr,
+          to,
+          subject,
+          html,
+          attachments: [{
+            filename: "event.ics",
+            content: Buffer.from(icsContent, "utf8").toString("base64"),
+          }],
+        });
+        console.info(`[email] Sent reminder with ICS for "${eventName}" to ${to}`);
+        return;
+      } catch (err) {
+        console.error("[email] ICS attachment send failed, falling back to plain send:", (err as any)?.message);
+      }
+    }
+  }
+
+  await send(to, `Reminder: ${eventName} is coming up`, html);
 }
 
 // ─── New invitation emails ────────────────────────────────────────

@@ -11,6 +11,16 @@ import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
+import {
+  getOrgTier,
+  getOrgTierLimits,
+  requireOrgFeature,
+  ForbiddenFeatureError,
+  sendForbiddenFeature,
+  ORGANIZATION_TIER_LIMITS,
+  DEFAULT_FREE_REMINDERS,
+  DEFAULT_PRO_REMINDERS,
+} from "../lib/orgTierGates";
 import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
@@ -27,9 +37,16 @@ const MAX_TOTAL_PER_UPLOAD = 25 * 1024 * 1024; // 25 MB per request
 const ABUSE_STRIKE_THRESHOLD = 5;
 const SUSPENSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Derived from centralized tier gates — single source of truth
 const TIER_LIMITS = {
-  FREE: { storageBytes: 350 * 1024 * 1024, uploadsPerHour: 12 },
-  PRO:  { storageBytes: 5 * 1024 * 1024 * 1024, uploadsPerHour: 100 },
+  FREE: {
+    storageBytes: ORGANIZATION_TIER_LIMITS.FREE.storageLimitBytes,
+    uploadsPerHour: ORGANIZATION_TIER_LIMITS.FREE.uploadAttemptsPerHour,
+  },
+  PRO: {
+    storageBytes: ORGANIZATION_TIER_LIMITS.PRO.storageLimitBytes,
+    uploadsPerHour: ORGANIZATION_TIER_LIMITS.PRO.uploadAttemptsPerHour,
+  },
 } as const;
 
 // Multer: disk storage only (never memory), enforce hard size cap server-side.
@@ -2113,7 +2130,12 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
       const status = confirmedCount >= liveSlot.capacity ? "WAITLISTED" : "CONFIRMED";
 
       const signup = await tx.beneficiarySignup.create({
-        data: { slotId: slot.id, studentId: req.user!.userId, status },
+        data: {
+          slotId: slot.id,
+          studentId: req.user!.userId,
+          status,
+          cancellationToken: crypto.randomUUID(),
+        },
       });
 
       await tx.beneficiaryAuditLog.create({
@@ -2706,6 +2728,384 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
   }
 });
 
+// GET /api/beneficiaries/cancel/:token — public one-click cancellation link (no auth required)
+router.get("/cancel/:token", async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { cancellationToken: req.params.token },
+      include: {
+        slot: {
+          include: {
+            opportunity: { select: { title: true, beneficiaryId: true } },
+          },
+        },
+      },
+    });
+
+    if (!signup) return res.status(404).json({ error: "Cancellation link not found or already used." });
+    if (signup.status === "CANCELLED") {
+      return res.status(200).json({ message: "You were already cancelled from this event." });
+    }
+    if (signup.verificationStatus === "APPROVED") {
+      return res.status(400).json({ error: "Cannot cancel an already-approved signup." });
+    }
+
+    const result = await runSerializableTransaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${signup.slotId} FOR UPDATE`;
+
+      await tx.beneficiarySignup.update({
+        where: { id: signup.id },
+        data: { status: "CANCELLED", cancellationToken: null },
+      });
+
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: "SIGNUP_CANCELLED",
+          actorId: signup.studentId,
+          signupId: signup.id,
+          details: JSON.stringify({ source: "one_click_cancel", previousStatus: signup.status }),
+        },
+      });
+
+      let promotedStudentId: string | null = null;
+      if (signup.status === "CONFIRMED") {
+        const next = await tx.beneficiarySignup.findFirst({
+          where: { slotId: signup.slotId, status: "WAITLISTED" },
+          orderBy: { createdAt: "asc" },
+        });
+        if (next) {
+          await tx.beneficiarySignup.update({
+            where: { id: next.id },
+            data: { status: "CONFIRMED" },
+          });
+          await tx.beneficiaryAuditLog.create({
+            data: {
+              action: "WAITLIST_PROMOTED",
+              actorId: signup.studentId,
+              signupId: next.id,
+              details: JSON.stringify({ source: "one_click_cancel_promotion" }),
+            },
+          });
+          promotedStudentId = next.studentId;
+        }
+      }
+
+      return { promotedStudentId };
+    });
+
+    if (result.promotedStudentId) {
+      await prisma.notification.create({
+        data: {
+          userId: result.promotedStudentId,
+          type: "SIGNUP_CONFIRMED",
+          title: "You're off the waitlist!",
+          body: `A spot opened up for "${signup.slot.opportunity.title}" — you're now confirmed!`,
+          data: JSON.stringify({ href: "/dashboard" }),
+        },
+      });
+    }
+
+    res.json({ message: `You've been successfully removed from "${signup.slot.opportunity.title}". Thank you for letting us know!` });
+  } catch (err) {
+    console.error("One-click cancel error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/:id/opportunities/:oppId/attendance — org records attendance (Free)
+router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    const opp = await prisma.beneficiaryOpportunity.findUnique({
+      where: { id: req.params.oppId },
+      select: { beneficiaryId: true },
+    });
+    if (!opp || opp.beneficiaryId !== req.params.id) {
+      return res.status(404).json({ error: "Opportunity not found" });
+    }
+
+    // Expect body: { records: Array<{ signupId: string; attendance: "ATTENDED" | "NO_SHOW" }> }
+    const { records } = req.body as { records?: Array<{ signupId: string; attendance: string }> };
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: "records array is required" });
+    }
+
+    const VALID = new Set(["ATTENDED", "NO_SHOW"]);
+    const invalid = records.find((r) => !r.signupId || !VALID.has(r.attendance));
+    if (invalid) {
+      return res.status(400).json({ error: "Each record must have signupId and attendance (ATTENDED | NO_SHOW)" });
+    }
+
+    const signupIds = records.map((r) => r.signupId);
+    const existing = await prisma.beneficiarySignup.findMany({
+      where: { id: { in: signupIds }, slot: { opportunity: { id: req.params.oppId } } },
+      select: { id: true },
+    });
+    const validIds = new Set(existing.map((s) => s.id));
+
+    const updates = await Promise.all(
+      records
+        .filter((r) => validIds.has(r.signupId))
+        .map((r) =>
+          prisma.beneficiarySignup.update({
+            where: { id: r.signupId },
+            data: { attendance: r.attendance },
+          })
+        )
+    );
+
+    res.json({ updated: updates.length });
+  } catch (err) {
+    console.error("Attendance record error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/:id/analytics — Pro attendance + reminder analytics
+router.get("/:id/analytics", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    try {
+      await requireOrgFeature(req.params.id, "attendanceAnalytics");
+    } catch (err) {
+      if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+      throw err;
+    }
+
+    // Date range filter (optional)
+    const since = req.query.since ? new Date(req.query.since as string) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    const [signupStats, reminderStats] = await Promise.all([
+      // Attendance summary
+      prisma.beneficiarySignup.groupBy({
+        by: ["attendance"],
+        where: {
+          slot: {
+            opportunity: { beneficiaryId: req.params.id },
+            date: { gte: since },
+          },
+          status: { in: ["CONFIRMED", "NO_SHOW"] },
+        },
+        _count: { id: true },
+      }),
+      // Reminder delivery summary
+      prisma.orgEventReminderLog.groupBy({
+        by: ["deliveryStatus"],
+        where: {
+          beneficiaryId: req.params.id,
+          createdAt: { gte: since },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    // Cancellations initiated through one-click cancel
+    const oneClickCancels = await prisma.beneficiaryAuditLog.count({
+      where: {
+        action: "SIGNUP_CANCELLED",
+        details: { contains: "one_click_cancel" },
+        createdAt: { gte: since },
+        signup: { slot: { opportunity: { beneficiaryId: req.params.id } } },
+      },
+    });
+
+    // Waitlist promotions
+    const waitlistPromotions = await prisma.beneficiaryAuditLog.count({
+      where: {
+        action: "WAITLIST_PROMOTED",
+        createdAt: { gte: since },
+        signup: { slot: { opportunity: { beneficiaryId: req.params.id } } },
+      },
+    });
+
+    const attendedCount = signupStats.find((s) => s.attendance === "ATTENDED")?._count.id ?? 0;
+    const noShowCount = signupStats.find((s) => s.attendance === "NO_SHOW")?._count.id ?? 0;
+    const unrecordedCount = signupStats.find((s) => s.attendance === null)?._count.id ?? 0;
+    const totalRecorded = attendedCount + noShowCount;
+
+    const reminderSent = reminderStats.find((s) => s.deliveryStatus === "SENT")?._count.id ?? 0;
+    const reminderFailed = reminderStats.find((s) => s.deliveryStatus === "FAILED")?._count.id ?? 0;
+    const reminderTotal = reminderSent + reminderFailed;
+
+    res.json({
+      period: { since: since.toISOString() },
+      attendance: {
+        attended: attendedCount,
+        noShow: noShowCount,
+        unrecorded: unrecordedCount,
+        totalRecorded,
+        attendanceRate: totalRecorded > 0 ? (attendedCount / totalRecorded) : null,
+        noShowRate: totalRecorded > 0 ? (noShowCount / totalRecorded) : null,
+      },
+      reminders: {
+        sent: reminderSent,
+        failed: reminderFailed,
+        total: reminderTotal,
+        deliveryRate: reminderTotal > 0 ? (reminderSent / reminderTotal) : null,
+      },
+      cancellations: {
+        oneClickCancels,
+        waitlistReplacementsCompleted: waitlistPromotions,
+      },
+    });
+  } catch (err) {
+    console.error("Analytics error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/:id/tier — return tier info + feature flags for this org
+router.get("/:id/tier", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+    const tier = await getOrgTier(req.params.id);
+    const limits = getOrgTierLimits(tier);
+    res.json({ tier, limits });
+  } catch (err) {
+    console.error("Tier info error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/beneficiaries/:id/branding — update org email branding (Pro)
+router.patch("/:id/branding", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+    try {
+      await requireOrgFeature(req.params.id, "customEmailBranding");
+    } catch (err) {
+      if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+      throw err;
+    }
+
+    const { brandColor, logoUrl, emailSignature } = req.body as {
+      brandColor?: string;
+      logoUrl?: string;
+      emailSignature?: string;
+    };
+
+    const updated = await prisma.beneficiary.update({
+      where: { id: req.params.id },
+      data: {
+        ...(brandColor !== undefined ? { brandColor: brandColor || null } : {}),
+        ...(logoUrl !== undefined ? { logoUrl: logoUrl || null } : {}),
+        ...(emailSignature !== undefined ? { emailSignature: emailSignature || null } : {}),
+      },
+      select: { id: true, brandColor: true, logoUrl: true, emailSignature: true },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Branding update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/beneficiaries/:id/reminder-config — get reminder configuration
+router.get("/:id/reminder-config", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    const tier = await getOrgTier(req.params.id);
+    let config = await prisma.orgReminderConfig.findUnique({ where: { beneficiaryId: req.params.id } });
+
+    if (!config) {
+      // Return defaults without persisting (lazy creation happens on first save)
+      const defaultReminders = tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS;
+      return res.json({
+        beneficiaryId: req.params.id,
+        reminders: defaultReminders,
+        waitlistCutoffHours: null,
+        requireApprovalForPromotion: false,
+        disableAutoPromotion: false,
+        promoMessageTemplate: null,
+        tier,
+      });
+    }
+
+    res.json({
+      ...config,
+      reminders: JSON.parse(config.reminders),
+      tier,
+    });
+  } catch (err) {
+    console.error("Reminder config fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/beneficiaries/:id/reminder-config — update reminder configuration
+router.put("/:id/reminder-config", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+
+    const tier = await getOrgTier(req.params.id);
+    const body = req.body as {
+      reminders?: Array<{ minutesBefore: number; enabled: boolean; label: string }>;
+      waitlistCutoffHours?: number | null;
+      requireApprovalForPromotion?: boolean;
+      disableAutoPromotion?: boolean;
+      promoMessageTemplate?: string | null;
+    };
+
+    // Free orgs can only have the one standardized 24h reminder
+    if (tier === "FREE") {
+      if (body.reminders && (body.reminders.length > 1 || body.reminders.some((r) => r.minutesBefore !== 1440))) {
+        try { await requireOrgFeature(req.params.id, "configurableReminders"); } catch (err) {
+          if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+          throw err;
+        }
+      }
+      if (body.waitlistCutoffHours != null || body.requireApprovalForPromotion || body.disableAutoPromotion) {
+        try { await requireOrgFeature(req.params.id, "advancedWaitlistControls"); } catch (err) {
+          if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+          throw err;
+        }
+      }
+    }
+
+    const remindersJson = body.reminders ? JSON.stringify(body.reminders) : undefined;
+
+    const config = await prisma.orgReminderConfig.upsert({
+      where: { beneficiaryId: req.params.id },
+      create: {
+        beneficiaryId: req.params.id,
+        reminders: remindersJson ?? JSON.stringify(tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS),
+        waitlistCutoffHours: body.waitlistCutoffHours ?? null,
+        requireApprovalForPromotion: body.requireApprovalForPromotion ?? false,
+        disableAutoPromotion: body.disableAutoPromotion ?? false,
+        promoMessageTemplate: body.promoMessageTemplate ?? null,
+      },
+      update: {
+        ...(remindersJson !== undefined ? { reminders: remindersJson } : {}),
+        ...(body.waitlistCutoffHours !== undefined ? { waitlistCutoffHours: body.waitlistCutoffHours } : {}),
+        ...(body.requireApprovalForPromotion !== undefined ? { requireApprovalForPromotion: body.requireApprovalForPromotion } : {}),
+        ...(body.disableAutoPromotion !== undefined ? { disableAutoPromotion: body.disableAutoPromotion } : {}),
+        ...(body.promoMessageTemplate !== undefined ? { promoMessageTemplate: body.promoMessageTemplate } : {}),
+      },
+    });
+
+    res.json({ ...config, reminders: JSON.parse(config.reminders), tier });
+  } catch (err) {
+    console.error("Reminder config update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/beneficiaries/signups/:signupId/no-show — beneficiary admin marks student as no-show
 router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
@@ -2727,6 +3127,7 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
       where: { id: signup.id },
       data: {
         status: "NO_SHOW",
+        attendance: "NO_SHOW",
         verificationStatus: "PENDING",
         rejectionReason: null,
         verifiedBy: null,

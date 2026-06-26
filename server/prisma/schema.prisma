@@ -412,14 +412,21 @@ model Beneficiary {
   updatedAt   DateTime @updatedAt
 
   planTier             String    @default("FREE") // FREE, PRO
+  proActivatedAt       DateTime?
   uploadAbuseStrikes   Int       @default(0)
   uploadSuspendedUntil DateTime?
+
+  // Custom email branding (Pro)
+  brandColor      String?
+  logoUrl         String?
+  emailSignature  String?
 
   members     User[]              @relation("BeneficiaryMembers")
   opportunities BeneficiaryOpportunity[]
   schoolApprovals SchoolBeneficiaryApproval[]
   invitations BeneficiaryInvitation[]
   attachments BeneficiaryOpportunityAttachment[]
+  reminderConfig  OrgReminderConfig?
 }
 
 // ─── Beneficiary Directory (IRS 501c3 + public institutions) ────
@@ -525,6 +532,17 @@ model BeneficiaryOpportunity {
   customFields    String?     // JSON
   schoolRestrictions String?  // JSON array of school IDs (null = all approved schools)
   recurrenceRule  String?     // JSON: { type, dayOfWeek?, weeksOfMonth?, datesOfMonth?, startTime, endTime, capacity }
+
+  // Event content fields (visible in reminder emails)
+  preparationNotes     String?   // what volunteers should bring / prepare
+  arrivalInstructions  String?   // parking, entrance, check-in details
+  contactInfo          String?   // on-site contact name + number
+
+  // Required-form / waiver (Free: attachment visible; Pro: automated follow-up reminders)
+  requiredFormUrl        String?
+  requiredFormName       String?
+  requiredFormIsRequired Boolean   @default(false)
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -582,10 +600,17 @@ model BeneficiarySignup {
   verifiedBy  String?
   verifiedAt  DateTime?
   rejectionReason String?
+  // One-click cancellation (token emailed to volunteer; single-use)
+  cancellationToken String?  @unique
+
+  // Attendance outcome (recorded after the event by the org)
+  attendance  String?  // ATTENDED | NO_SHOW | null (not yet recorded)
+
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
   auditLogs   BeneficiaryAuditLog[]
+  reminderLogs OrgEventReminderLog[]
 
   @@unique([slotId, studentId])
 }
@@ -600,6 +625,49 @@ model BeneficiaryAuditLog {
   signupId  String?
   signup    BeneficiarySignup? @relation(fields: [signupId], references: [id])
   createdAt DateTime          @default(now())
+}
+
+// ─── Org Reminder Configuration (Pro) ───────────────────────────
+
+model OrgReminderConfig {
+  id            String      @id @default(cuid())
+  beneficiaryId String      @unique
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+
+  // JSON array of {minutesBefore:number, enabled:boolean, label:string}
+  // Free default: [{minutesBefore:1440, enabled:true, label:"24 hours before"}]
+  // Pro default adds 48h+3h entries
+  reminders     String      @default("[{\"minutesBefore\":1440,\"enabled\":true,\"label\":\"24 hours before\"}]")
+
+  // Pro-only waitlist controls
+  waitlistCutoffHours         Int?     // stop promoting waitlist this many hours before event
+  requireApprovalForPromotion Boolean  @default(false)
+  disableAutoPromotion        Boolean  @default(false)
+  promoMessageTemplate        String?  // custom message sent to promoted volunteer
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Event Reminder Log (idempotency) ───────────────────────────
+
+model OrgEventReminderLog {
+  id                String   @id @default(cuid())
+  signupId          String
+  signup            BeneficiarySignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  beneficiaryId     String
+  opportunityId     String
+  reminderType      String   // FREE_24H | PRO_CUSTOM_{minutesBefore}
+  scheduledFor      DateTime
+  sentAt            DateTime?
+  deliveryStatus    String   @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  providerMessageId String?
+  failureReason     String?
+  createdAt         DateTime @default(now())
+
+  @@unique([signupId, reminderType])
+  @@index([beneficiaryId, deliveryStatus])
+  @@index([scheduledFor, deliveryStatus])
 }
 
 // ─── Legacy: Classrooms ─────────────────────────────────────────
