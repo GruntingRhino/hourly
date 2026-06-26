@@ -9,6 +9,7 @@ import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { calculateSchoolEstimate, BILLING_CONFIG } from "../lib/billingConfig";
 import { detectMimeType } from "../lib/detectMimeType";
+import { isDevMode } from "../lib/env";
 
 const PROC_UPLOAD_DIR = path.join(__dirname, "../../../uploads/school-procurement");
 fs.mkdirSync(PROC_UPLOAD_DIR, { recursive: true });
@@ -82,8 +83,12 @@ router.get("/:id/summary", authenticate, requireRole("SCHOOL_ADMIN"), async (req
     if (!school) return res.status(404).json({ error: "School not found" });
 
     const config = BILLING_CONFIG.school;
+    const devOverrides = isDevMode()
+      ? { billingStatus: "ACTIVE" as const, accessStatus: "ACTIVE" as const }
+      : {};
     res.json({
       ...school,
+      ...devOverrides,
       pricingConfig: {
         pricePerStudentCents: config.pricePerStudentCents,
         annualMinimumCents: config.annualMinimumCents,

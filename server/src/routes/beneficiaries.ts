@@ -26,6 +26,7 @@ import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKe
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 import { detectMimeType } from "../lib/detectMimeType";
+import { isDevMode } from "../lib/env";
 
 const UPLOAD_DIR = path.join(__dirname, "../../../uploads/beneficiary-attachments");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -1658,7 +1659,7 @@ router.post(
         return res.status(429).json({ error: "Upload access temporarily suspended due to repeated policy violations." });
       }
 
-      const tier = ((benRecord?.planTier ?? "FREE") as keyof typeof TIER_LIMITS);
+      const tier = (isDevMode() ? "PRO" : (benRecord?.planTier ?? "FREE")) as keyof typeof TIER_LIMITS;
       const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.FREE;
 
       // --- Opportunity ownership ---

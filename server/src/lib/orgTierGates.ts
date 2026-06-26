@@ -1,4 +1,5 @@
 import prisma from "./prisma";
+import { isDevMode } from "./env";
 
 // ─── Tier feature flags ──────────────────────────────────────────
 
@@ -64,6 +65,7 @@ const FEATURE_MESSAGES: Record<OrgFeature, string> = {
 // ─── Helpers ────────────────────────────────────────────────────
 
 export async function getOrgTier(beneficiaryId: string): Promise<OrgTier> {
+  if (isDevMode()) return "PRO";
   const ben = await prisma.beneficiary.findUnique({
     where: { id: beneficiaryId },
     select: { planTier: true },

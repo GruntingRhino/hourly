@@ -157,3 +157,11 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
 }
 
 export const env = validateEnv();
+
+export function isDevMode(): boolean {
+  return !(
+    process.env.APP_ENV === "production" ||
+    (process.env.APP_ENV !== "development" &&
+      (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production"))
+  );
+}
