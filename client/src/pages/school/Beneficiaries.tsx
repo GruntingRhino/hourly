@@ -130,7 +130,6 @@ export default function SchoolBeneficiaries() {
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult, setCsvResult] = useState<{ added: number; failed: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [proximityRadius, setProximityRadius] = useState(5);
   const [schoolSearchCity, setSchoolSearchCity] = useState("");
@@ -290,21 +289,7 @@ export default function SchoolBeneficiaries() {
     }
   };
 
-  const handleApprove = async (benId: string) => {
-    setApprovingId(benId);
-    setBeneficiaries((prev) => prev.map((b) => b.id === benId ? { ...b, approvalStatus: "APPROVED" } : b));
-    try {
-      await api.post(`/beneficiaries/${benId}/approve`, {});
-      await load();
-    } catch (err: any) {
-      setError(err.message || "Failed to approve.");
-      await load();
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
-  const handleDrop = async (benId: string, name: string) => {
+const handleDrop = async (benId: string, name: string) => {
     setConfirmDrop({ benId, name });
   };
 
@@ -458,15 +443,6 @@ export default function SchoolBeneficiaries() {
           >
             {expandedBeneficiaryId === beneficiary.id ? "Hide Opportunities" : "View Opportunities"}
           </button>
-          {mode === "pending" && isAdmin && (
-            <button
-              onClick={() => handleApprove(beneficiary.id)}
-              disabled={approvingId === beneficiary.id}
-              className="px-3 py-1.5 bg-[var(--ok-t)] text-white rounded text-xs hover:bg-[var(--ok-t)] disabled:opacity-50"
-            >
-              {approvingId === beneficiary.id ? "..." : "Approve"}
-            </button>
-          )}
         </div>
 
         {isAdmin && !beneficiary.claimed && mode !== "approved" && (
@@ -726,7 +702,7 @@ export default function SchoolBeneficiaries() {
       {tab === "map" && isAdmin && <BeneficiaryDiscover embedded />}
 
       {tab === "manage" && isAdmin && (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="max-w-3xl">
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
@@ -800,11 +776,11 @@ export default function SchoolBeneficiaries() {
             </form>
           </div>
 
-          <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4">
+          <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4 overflow-hidden min-w-0">
             <h2 className="font-semibold mb-2">Bulk Upload Community Partners</h2>
             <p className="text-sm text-[var(--text-sec)] mb-4">
               Upload a CSV with columns aligned to the custom form:
-              <code className="ml-1 rounded bg-[var(--surface)] px-1 py-0.5 text-xs">name,category,email,phone,website,address,city,state,zip,description,visibility</code>
+              <code className="ml-1 rounded bg-[var(--surface)] px-1 py-0.5 text-xs break-all">name,category,email,phone,website,address,city,state,zip,description,visibility</code>
             </p>
 
             {csvResult && (
@@ -832,7 +808,7 @@ export default function SchoolBeneficiaries() {
 
             <div className="mt-6 rounded bg-[var(--surface)] p-3 text-xs text-[var(--text-sec)]">
               <p className="font-medium mb-1">CSV Example</p>
-              <pre className="overflow-x-auto">name,category,email,phone,website,address,city,state,zip,description,visibility{"\n"}Green Earth,Environment,team@greenearth.org,6175551234,https://greenearth.org,123 Main St,Boston,MA,02110,Environmental org,PRIVATE</pre>
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all">name,category,email,phone,website,address,city,state,zip,description,visibility{"\n"}Green Earth,Environment,team@greenearth.org,6175551234,https://greenearth.org,123 Main St,Boston,MA,02110,Environmental org,PRIVATE</pre>
             </div>
           </div>
         </div>
