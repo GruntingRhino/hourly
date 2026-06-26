@@ -215,7 +215,7 @@ function DeadlineBanner({ deadline, approvedHours, requiredHours }: { deadline: 
 
   if (pastDue) {
     return (
-      <div className="mb-6 p-4 bg-red-50 border border-red-300 rounded-lg text-red-800 text-sm">
+      <div className="mb-6 px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
         <strong>Service period ended</strong> on {deadline.toLocaleDateString()}. You still need{" "}
         <strong>{hoursLeft.toFixed(1)}h</strong> — contact your school administrator.
       </div>
@@ -223,8 +223,11 @@ function DeadlineBanner({ deadline, approvedHours, requiredHours }: { deadline: 
   }
 
   return (
-    <div className={`mb-6 p-4 rounded-lg text-sm border ${urgent ? "bg-orange-50 border-orange-300 text-orange-800" : "bg-blue-50 border-blue-200 text-blue-800"}`}>
-      {urgent ? "⚠️ " : ""}<strong>{daysLeft} day{daysLeft !== 1 ? "s" : ""} left</strong> to complete{" "}
+    <div className={`mb-6 px-4 py-3 rounded-[3px] border text-[13px]`} style={urgent
+      ? { background: "var(--wn-bg)", borderColor: "var(--wn-b)", color: "var(--wn-t)" }
+      : { background: "var(--in-bg)", borderColor: "var(--in-b)", color: "var(--in-t)" }
+    }>
+      <strong>{daysLeft} day{daysLeft !== 1 ? "s" : ""} left</strong> to complete{" "}
       <strong>{hoursLeft.toFixed(1)}h</strong> more by{" "}
       {deadline.toLocaleDateString()}
       {!urgent && "."}
@@ -370,8 +373,8 @@ export default function StudentDashboard() {
     }
   };
 
-  if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
-  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
+  if (loading) return <div style={{ color: "var(--text-faint)" }}>Loading dashboard...</div>;
+  if (error) return <div className="px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>{error}</div>;
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -501,8 +504,8 @@ export default function StudentDashboard() {
   return (
     <div>
       <div className="mb-6">
-        <div className="text-sm font-semibold text-blue-700 mb-1">{user?.name || "Student"}</div>
-        <h1 className="text-[22px] font-bold text-gray-900">Dashboard</h1>
+        <div className="text-[12px] mb-1" style={{ color: "var(--text-faint)" }}>Dashboard / Student</div>
+        <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>Dashboard</h1>
       </div>
 
       {deadline && (
@@ -510,30 +513,30 @@ export default function StudentDashboard() {
       )}
 
       {hourTotals?.interventionCase && hourTotals.interventionCase.status !== "RESOLVED" && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-900">
+        <div className="mb-4 rounded-[3px] border border-[var(--er-b)] px-4 py-3 text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">School Follow-Up Active</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--er-t)" }}>School Follow-Up Active</div>
               <div className="font-semibold">{hourTotals.interventionCase.summary || `${remainingHours.toFixed(1)}h still remaining`}</div>
-              <div className="mt-1 text-red-800">
+              <div className="mt-1">
                 {hourTotals.interventionCase.studentMessage || hourTotals.interventionCase.reason || `You still need ${remainingHours.toFixed(1)}h to finish your requirement.`}
               </div>
               {hourTotals.interventionCase.nextStepForStudent && (
-                <div className="mt-2 text-red-900">
+                <div className="mt-2">
                   Next step: <strong>{hourTotals.interventionCase.nextStepForStudent}</strong>
                 </div>
               )}
-              <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-red-700">
+              <div className="mt-2 flex flex-wrap gap-3 text-[12px]">
                 <span>Priority: {hourTotals.interventionCase.priority}</span>
                 {hourTotals.interventionCase.dueDate && <span>Follow up by {new Date(hourTotals.interventionCase.dueDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>}
                 {hourTotals.interventionCase.owner?.name && <span>Owner: {hourTotals.interventionCase.owner.name}</span>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link to="/browse" className="rounded-md bg-red-600 px-3 py-2 text-white text-sm font-medium hover:bg-red-700">
+              <Link to="/browse" className="h-[34px] px-3 flex items-center rounded-[2px] text-white text-[13px] font-medium" style={{ background: "var(--er-t)" }}>
                 Find Hours
               </Link>
-              <Link to="/messages" className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
+              <Link to="/messages" className="h-[34px] px-3 flex items-center rounded-[2px] border text-[13px] font-medium" style={{ borderColor: "var(--er-b)", color: "var(--er-t)", background: "var(--surface)" }}>
                 Contact School
               </Link>
             </div>
@@ -542,24 +545,24 @@ export default function StudentDashboard() {
       )}
 
       {revisionNeeded.length > 0 && (
-        <div className="mb-4 px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800">
+        <div className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--wn-b)] text-[13px]" style={{ background: "var(--wn-bg)", color: "var(--wn-t)" }}>
           <strong>{revisionNeeded.length} submission{revisionNeeded.length > 1 ? "s" : ""} need revision.</strong>{" "}
-          <Link to="/submit" className="underline hover:text-amber-900">Review &rarr;</Link>
+          <Link to="/submit" className="underline hover:opacity-75">Review &rarr;</Link>
         </div>
       )}
 
       {user?.cohort && (
-        <div className="mb-4 px-3.5 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-[13px] text-blue-800">
+        <div className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--in-b)] text-[13px]" style={{ background: "var(--in-bg)", color: "var(--in-t)" }}>
           Cohort: <strong>{user.cohort.name}</strong>
-          {user.cohort.requiredHours && <span className="ml-2 text-blue-600">Goal: {user.cohort.requiredHours}h</span>}
+          {user.cohort.requiredHours && <span className="ml-2">Goal: {user.cohort.requiredHours}h</span>}
         </div>
       )}
 
       {upcoming.length > 0 && (
-        <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
+        <div className="mb-6 border border-[var(--border)] rounded-[3px] p-4" style={{ background: "var(--surface)" }}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-semibold text-gray-900">Attendance & Verification</h2>
-            <span className="text-[12px] text-gray-500">Check in at start, check out when you finish</span>
+            <h2 className="text-[14px] font-semibold" style={{ color: "var(--text)" }}>Attendance & Verification</h2>
+            <span className="text-[12px]" style={{ color: "var(--text-faint)" }}>Check in at start, check out when you finish</span>
           </div>
           <div className="space-y-3">
             {upcoming.slice(0, 3).map((signup) => {
@@ -571,14 +574,14 @@ export default function StudentDashboard() {
               const canVerify = isCheckedOut || session?.verificationStatus === "PENDING";
 
               return (
-                <div key={signup.id} className="rounded-lg border border-gray-200 p-4">
+                <div key={signup.id} className="rounded-[3px] border border-[var(--border)] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-gray-900">{signup.slot.opportunity.title}</div>
-                      <div className="text-sm text-gray-500 mt-0.5">
+                      <div className="font-semibold text-[13.5px]" style={{ color: "var(--text)" }}>{signup.slot.opportunity.title}</div>
+                      <div className="text-[12.5px] mt-0.5" style={{ color: "var(--text-sec)" }}>
                         {new Date(signup.slot.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · {signup.slot.startTime}–{signup.slot.endTime}
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{signup.slot.opportunity.beneficiary.name}</div>
+                      <div className="text-[12px] mt-0.5" style={{ color: "var(--text-faint)" }}>{signup.slot.opportunity.beneficiary.name}</div>
                     </div>
                     <StatusBadge status={session?.verificationStatus === "APPROVED" ? "APPROVED" : signup.verificationStatus} />
                   </div>
@@ -586,7 +589,8 @@ export default function StudentDashboard() {
                     {session && isPendingCheckIn && (
                       <button
                         onClick={() => handleSessionAction(session.id, "checkin")}
-                        className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                        className="h-[34px] px-3 rounded-[2px] text-[13px] font-medium text-white"
+                        style={{ background: "var(--action)" }}
                       >
                         Check In
                       </button>
@@ -594,7 +598,8 @@ export default function StudentDashboard() {
                     {session && isCheckedIn && (
                       <button
                         onClick={() => handleSessionAction(session.id, "checkout")}
-                        className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                        className="h-[34px] px-3 rounded-[2px] text-[13px] font-medium text-white"
+                        style={{ background: "var(--ok-t)" }}
                       >
                         Check Out
                       </button>
@@ -602,18 +607,19 @@ export default function StudentDashboard() {
                     {session && canVerify && (
                       <button
                         onClick={() => setVerificationSession(session)}
-                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        className="h-[34px] px-3 rounded-[2px] border text-[13px] font-medium"
+                        style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
                       >
                         Submit Verification
                       </button>
                     )}
                     {session?.status === "CHECKED_OUT" && session.verificationStatus === "PENDING" && (
-                      <span className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                      <span className="h-[34px] px-3 flex items-center rounded-[2px] text-[13px] font-medium" style={{ background: "var(--wn-bg)", color: "var(--wn-t)" }}>
                         Awaiting school review
                       </span>
                     )}
                     {session?.verificationStatus === "APPROVED" && (
-                      <span className="rounded-md bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                      <span className="h-[34px] px-3 flex items-center rounded-[2px] text-[13px] font-medium" style={{ background: "var(--ok-bg)", color: "var(--ok-t)" }}>
                         Verified
                       </span>
                     )}
@@ -625,51 +631,44 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Verified Hours</div>
-          <div className="text-3xl font-bold text-green-600 leading-none">{totalApprovedHours.toFixed(1)}</div>
-          <div className="text-xs text-gray-400 mt-1">of {requiredHours} required</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Pending Verification</div>
-          <div className="text-3xl font-bold text-amber-500 leading-none">{totalPendingHours.toFixed(1)}h</div>
-          <div className="text-xs text-gray-400 mt-1">awaiting approval</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Activities Signed Up</div>
-          <div className="text-3xl font-bold text-blue-600 leading-none">{signups.filter(s => s.status !== "CANCELLED").length}</div>
-          <div className="text-xs text-gray-400 mt-1">upcoming</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">Hours Remaining</div>
-          <div className={`text-3xl font-bold leading-none ${remainingHours > 0 ? "text-red-700" : "text-gray-900"}`}>{remainingHours.toFixed(1)}h</div>
-          <div className="text-xs text-gray-400 mt-1">needed to reach goal</div>
-        </div>
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 mb-6" style={{ border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden" }}>
+        {[
+          { label: "Verified Hours", value: totalApprovedHours.toFixed(1), sub: `of ${requiredHours} required`, color: "var(--ok-t)" },
+          { label: "Pending Verification", value: `${totalPendingHours.toFixed(1)}h`, sub: "awaiting approval", color: "var(--wn-t)" },
+          { label: "Activities Signed Up", value: String(signups.filter(s => s.status !== "CANCELLED").length), sub: "upcoming", color: "var(--action)" },
+          { label: "Hours Remaining", value: `${remainingHours.toFixed(1)}h`, sub: "needed to reach goal", color: remainingHours > 0 ? "var(--er-t)" : "var(--text)" },
+        ].map((stat, i) => (
+          <div key={stat.label} className={`px-5 py-4 ${i < 3 ? "border-r" : ""}`} style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+            <div className="text-[11px] font-semibold uppercase tracking-[.07em] mb-2" style={{ color: "var(--text-faint)" }}>{stat.label}</div>
+            <div className="text-[28px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</div>
+            <div className="text-[12px] mt-1" style={{ color: "var(--text-faint)" }}>{stat.sub}</div>
+          </div>
+        ))}
       </div>
 
       {/* Progress bar */}
-      <div className="bg-white border border-gray-200 rounded-lg px-5 py-4 mb-6">
+      <div className="border border-[var(--border)] rounded-[3px] px-5 py-4 mb-6" style={{ background: "var(--surface)" }}>
         <div className="flex justify-between text-[13.5px] mb-2">
-          <span className="font-semibold text-gray-900">Progress toward goal</span>
-          <span className="text-gray-500">{totalApprovedHours.toFixed(1)} / {requiredHours} hours</span>
+          <span className="font-semibold" style={{ color: "var(--text)" }}>Progress toward goal</span>
+          <span style={{ color: "var(--text-sec)" }}>{totalApprovedHours.toFixed(1)} / {requiredHours} hours</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-[7px]">
+        <div className="w-full rounded-full h-[5px] border border-[var(--border)]" style={{ background: "var(--surface-alt)" }}>
           <div
-            className="bg-blue-600 h-[7px] rounded-full transition-all"
-            style={{ width: `${Math.min(100, (totalApprovedHours / requiredHours) * 100)}%` }}
+            className="h-[5px] rounded-full transition-all"
+            style={{ width: `${Math.min(100, (totalApprovedHours / requiredHours) * 100)}%`, background: "var(--action)" }}
           />
         </div>
         {totalPendingHours > 0 && (
-          <div className="text-[12px] text-amber-500 mt-1.5">{totalPendingHours.toFixed(1)}h more pending approval</div>
+          <div className="text-[12px] mt-1.5" style={{ color: "var(--wn-t)" }}>{totalPendingHours.toFixed(1)}h more pending approval</div>
         )}
       </div>
 
       {recommended.length > 0 && totalApprovedHours < requiredHours && (
         <div className="mb-7">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-semibold text-gray-900">Recommended Opportunities</h2>
-            <Link to="/browse" className="text-[13px] text-blue-600 hover:opacity-75">Browse all</Link>
+            <h2 className="text-[14px] font-semibold" style={{ color: "var(--text)" }}>Recommended Opportunities</h2>
+            <Link to="/browse" className="text-[13px] hover:opacity-75" style={{ color: "var(--action)" }}>Browse all</Link>
           </div>
           <div className="grid md:grid-cols-3 gap-3">
             {recommended.map(({ slot, openSpots, reasons }) => {
@@ -678,26 +677,27 @@ export default function StudentDashboard() {
                 <Link
                   key={slot.id}
                   to={`/slot/${slot.id}`}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                  className="border border-[var(--border)] rounded-[3px] p-4 transition-colors hover:border-[var(--action)]"
+                  style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-semibold text-[13.5px] text-gray-900">{slot.opportunity.title}</div>
-                      <div className="text-[12.5px] text-gray-500 mt-0.5">{slot.opportunity.beneficiary.name}</div>
+                      <div className="font-semibold text-[13.5px]" style={{ color: "var(--text)" }}>{slot.opportunity.title}</div>
+                      <div className="text-[12.5px] mt-0.5" style={{ color: "var(--text-sec)" }}>{slot.opportunity.beneficiary.name}</div>
                     </div>
                     <StatusBadge status={openSpots > 0 ? "OPEN" : "WAITLISTED"} />
                   </div>
-                  <div className="text-[12.5px] text-gray-600 mt-2.5">
+                  <div className="text-[12.5px] mt-2.5" style={{ color: "var(--text-sec)" }}>
                     {new Date(slot.date).toLocaleDateString()} · {slot.startTime}–{slot.endTime}
                   </div>
-                  <div className="text-[12.5px] text-blue-600 font-semibold mt-0.5">
+                  <div className="text-[12.5px] font-semibold mt-0.5" style={{ color: "var(--action)" }}>
                     {slot.durationHours}h · {slotCategory}
                   </div>
                   {slot.opportunity.location && (
-                    <div className="text-[12px] text-gray-400 mt-0.5">{slot.opportunity.location}</div>
+                    <div className="text-[12px] mt-0.5" style={{ color: "var(--text-faint)" }}>{slot.opportunity.location}</div>
                   )}
                   {reasons.length > 0 && (
-                    <div className="text-[11.5px] text-blue-700 mt-2">
+                    <div className="text-[11.5px] mt-2" style={{ color: "var(--action)" }}>
                       Recommended because {reasons.join(" · ")}
                     </div>
                   )}
@@ -711,32 +711,33 @@ export default function StudentDashboard() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Upcoming */}
         <div>
-          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Upcoming Activities</h2>
+          <h2 className="text-[14px] font-semibold mb-3" style={{ color: "var(--text)" }}>Upcoming Activities</h2>
           {upcoming.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
+            <div className="border border-[var(--border)] rounded-[3px] p-5 text-[13.5px]" style={{ background: "var(--surface)", color: "var(--text-sec)" }}>
               No upcoming activities.{" "}
-              <Link to="/browse" className="text-blue-600 hover:underline">Browse opportunities</Link>
+              <Link to="/browse" className="hover:underline" style={{ color: "var(--action)" }}>Browse opportunities</Link>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-[var(--border)] rounded-[3px] overflow-hidden" style={{ background: "var(--surface)" }}>
               {upcoming.slice(0, 5).map((s, i, arr) => (
-                <div key={s.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                <div key={s.id} className={`p-4 ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="font-semibold text-[13.5px] text-gray-900">{s.slot.opportunity.title}</div>
-                      <div className="text-[12.5px] text-gray-500 mt-0.5">
+                      <div className="font-semibold text-[13.5px]" style={{ color: "var(--text)" }}>{s.slot.opportunity.title}</div>
+                      <div className="text-[12.5px] mt-0.5" style={{ color: "var(--text-sec)" }}>
                         {new Date(s.slot.date).toLocaleDateString()} · {s.slot.startTime}–{s.slot.endTime}
                       </div>
-                      <div className="text-[12.5px] text-gray-400">{s.slot.opportunity.beneficiary.name}</div>
+                      <div className="text-[12.5px]" style={{ color: "var(--text-faint)" }}>{s.slot.opportunity.beneficiary.name}</div>
                       {s.slot.opportunity.location && (
-                        <div className="text-[12px] text-gray-400">{s.slot.opportunity.location}</div>
+                        <div className="text-[12px]" style={{ color: "var(--text-faint)" }}>{s.slot.opportunity.location}</div>
                       )}
-                      <div className="text-[12px] font-semibold text-blue-600 mt-1">{s.slot.durationHours}h</div>
+                      <div className="text-[12px] font-semibold mt-1" style={{ color: "var(--action)" }}>{s.slot.durationHours}h</div>
                     </div>
                     <button
                       onClick={() => handleCancel(s.id)}
                       disabled={cancelling === s.id}
-                      className="ml-2 text-[12px] text-gray-400 hover:text-red-500 disabled:opacity-40"
+                      className="ml-2 text-[12px] hover:opacity-75 disabled:opacity-40"
+                      style={{ color: "var(--text-faint)" }}
                     >
                       {cancelling === s.id ? "..." : "Cancel"}
                     </button>
@@ -749,42 +750,42 @@ export default function StudentDashboard() {
 
         {/* Recent activity */}
         <div>
-          <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Recent Activity</h2>
+          <h2 className="text-[14px] font-semibold mb-3" style={{ color: "var(--text)" }}>Recent Activity</h2>
           {recentActivity.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
+            <div className="border border-[var(--border)] rounded-[3px] p-5 text-[13.5px]" style={{ background: "var(--surface)", color: "var(--text-sec)" }}>
               No recent status changes.
             </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <CollapsibleList limit={5} items={recentActivity.map((activity, i, arr) => (
-              <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
-                <div>
-                  <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
-                  <div className="text-[12.5px] text-gray-500">{activity.detail}</div>
+          ) : (
+            <div className="border border-[var(--border)] rounded-[3px] overflow-hidden" style={{ background: "var(--surface)" }}>
+              <CollapsibleList limit={5} items={recentActivity.map((activity, i, arr) => (
+                <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
+                  <div>
+                    <div className="font-semibold text-[13.5px]" style={{ color: "var(--text)" }}>{activity.title}</div>
+                    <div className="text-[12.5px]" style={{ color: "var(--text-sec)" }}>{activity.detail}</div>
+                  </div>
+                  <StatusBadge status={activity.status} />
                 </div>
-                <StatusBadge status={activity.status} />
-              </div>
-            ))} />
-          </div>
-        )}
+              ))} />
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-6">
-        <h2 className="text-[15px] font-semibold text-gray-900 mb-3">Past Activity</h2>
+        <h2 className="text-[14px] font-semibold mb-3" style={{ color: "var(--text)" }}>Past Activity</h2>
         {pastActivities.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-lg p-5 text-[13.5px] text-gray-500">
+          <div className="border border-[var(--border)] rounded-[3px] p-5 text-[13.5px]" style={{ background: "var(--surface)", color: "var(--text-sec)" }}>
             No activity yet.
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="border border-[var(--border)] rounded-[3px] overflow-hidden" style={{ background: "var(--surface)" }}>
             <CollapsibleList limit={5} items={pastActivities.map((activity, i, arr) => (
-              <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+              <div key={activity.id} className={`p-4 flex justify-between items-start ${i < arr.length - 1 ? "border-b border-[var(--border)]" : ""}`}>
                 <div>
-                  <div className="font-semibold text-[13.5px] text-gray-900">{activity.title}</div>
-                  <div className="text-[12.5px] text-gray-500">{activity.subtitle}</div>
-                  <div className="text-[12px] text-gray-400 mt-0.5">{activity.meta}</div>
-                  <div className="text-[12px] text-gray-400 mt-0.5">{activity.hoursLabel}</div>
+                  <div className="font-semibold text-[13.5px]" style={{ color: "var(--text)" }}>{activity.title}</div>
+                  <div className="text-[12.5px]" style={{ color: "var(--text-sec)" }}>{activity.subtitle}</div>
+                  <div className="text-[12px] mt-0.5" style={{ color: "var(--text-faint)" }}>{activity.meta}</div>
+                  <div className="text-[12px] mt-0.5" style={{ color: "var(--text-faint)" }}>{activity.hoursLabel}</div>
                 </div>
                 <StatusBadge status={activity.status} />
               </div>
@@ -795,9 +796,9 @@ export default function StudentDashboard() {
 
       {verificationSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <div className="mb-2 text-lg font-semibold text-gray-900">Submit Verification</div>
-            <div className="text-sm text-gray-600 mb-4">
+          <div className="w-full max-w-md rounded-[3px] border border-[var(--border)] p-5" style={{ background: "var(--surface)" }}>
+            <div className="mb-2 text-[16px] font-semibold" style={{ color: "var(--text)" }}>Submit Verification</div>
+            <div className="text-[13px] mb-4" style={{ color: "var(--text-sec)" }}>
               Type your full name to sign the verification for <strong>{verificationSession.opportunity.title}</strong>.
             </div>
             <input
@@ -805,7 +806,8 @@ export default function StudentDashboard() {
               value={verificationSignature}
               onChange={(e) => setVerificationSignature(e.target.value)}
               placeholder="Your full name"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
+              style={{ background: "var(--surface)", color: "var(--text)" }}
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -814,7 +816,8 @@ export default function StudentDashboard() {
                   setVerificationSession(null);
                   setVerificationSignature("");
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="h-[34px] px-3 rounded-[2px] border text-[13px] font-medium"
+                style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
               >
                 Cancel
               </button>
@@ -822,7 +825,8 @@ export default function StudentDashboard() {
                 type="button"
                 onClick={handleVerificationSubmit}
                 disabled={verificationLoading}
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="h-[34px] px-3 rounded-[2px] text-[13px] font-medium text-white disabled:opacity-50"
+                style={{ background: "var(--action)" }}
               >
                 {verificationLoading ? "Submitting…" : "Submit"}
               </button>
@@ -835,21 +839,22 @@ export default function StudentDashboard() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { bg: string; text: string; label: string }> = {
-    APPROVED:           { bg: "bg-green-50",  text: "text-green-700",  label: "Verified" },
-    OPEN:               { bg: "bg-green-50",  text: "text-green-700",  label: "Open" },
-    PENDING:            { bg: "bg-amber-50",  text: "text-amber-600",  label: "Pending" },
-    CONFIRMED:          { bg: "bg-blue-50",   text: "text-blue-600",   label: "Confirmed" },
-    WAITLISTED:         { bg: "bg-amber-50",  text: "text-amber-600",  label: "Waitlisted" },
-    REJECTED:           { bg: "bg-red-50",    text: "text-red-600",    label: "Rejected" },
-    REVISION_REQUESTED: { bg: "bg-amber-50",  text: "text-amber-700",  label: "Needs Revision" },
-    CANCELLED:          { bg: "bg-gray-100",  text: "text-gray-600",   label: "Cancelled" },
-    NO_SHOW:            { bg: "bg-red-50",    text: "text-red-600",    label: "No Show" },
+  type BadgeStyle = { bg: string; color: string; border: string; label: string };
+  const map: Record<string, BadgeStyle> = {
+    APPROVED:           { bg: "var(--ok-bg)",  color: "var(--ok-t)",  border: "var(--ok-b)",  label: "Verified" },
+    OPEN:               { bg: "var(--ok-bg)",  color: "var(--ok-t)",  border: "var(--ok-b)",  label: "Open" },
+    PENDING:            { bg: "var(--wn-bg)",  color: "var(--wn-t)",  border: "var(--wn-b)",  label: "Pending" },
+    CONFIRMED:          { bg: "var(--in-bg)",  color: "var(--in-t)",  border: "var(--in-b)",  label: "Confirmed" },
+    WAITLISTED:         { bg: "var(--wn-bg)",  color: "var(--wn-t)",  border: "var(--wn-b)",  label: "Waitlisted" },
+    REJECTED:           { bg: "var(--er-bg)",  color: "var(--er-t)",  border: "var(--er-b)",  label: "Rejected" },
+    REVISION_REQUESTED: { bg: "var(--in-bg)",  color: "var(--in-t)",  border: "var(--in-b)",  label: "Needs Revision" },
+    CANCELLED:          { bg: "#f0eeea",       color: "var(--text-sec)", border: "var(--border-s)", label: "Cancelled" },
+    NO_SHOW:            { bg: "var(--er-bg)",  color: "var(--er-t)",  border: "var(--er-b)",  label: "No Show" },
   };
-  const { bg, text, label } = map[status] ?? { bg: "bg-gray-100", text: "text-gray-600", label: status };
+  const s = map[status] ?? { bg: "#f0eeea", color: "var(--text-sec)", border: "var(--border-s)", label: status };
   return (
-    <span className={`shrink-0 text-[11.5px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${bg} ${text}`}>
-      {label}
+    <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[2px] uppercase tracking-wide border" style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+      {s.label}
     </span>
   );
 }

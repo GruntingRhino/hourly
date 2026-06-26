@@ -310,16 +310,21 @@ export default function StudentSettings() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <div className="mb-6">
+        <div className="text-[12px] mb-1" style={{ color: "var(--text-faint)" }}>Student / Settings</div>
+        <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>Settings</h1>
+      </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-1.5 mb-6">
         {(["profile", "classroom", "security", "notifications", "privacy"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-              tab === t ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100"
-            }`}
+            className="h-[32px] px-4 rounded-[2px] text-[13px] font-medium capitalize transition-colors"
+            style={tab === t
+              ? { background: "var(--navy)", color: "#fff" }
+              : { background: "var(--surface)", color: "var(--text-sec)", border: "1px solid var(--border)" }
+            }
           >
             {t}
           </button>
@@ -327,7 +332,7 @@ export default function StudentSettings() {
       </div>
 
       {tab === "profile" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="border border-[var(--border)] rounded-[3px] p-6" style={{ background: "var(--surface)" }}>
           {/* Avatar */}
           <div className="flex items-center gap-4 mb-6">
             <div
@@ -341,7 +346,7 @@ export default function StudentSettings() {
                   className="w-20 h-20 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-2xl text-gray-500">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl" style={{ background: "var(--surface-alt)", color: "var(--text-faint)" }}>
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -357,25 +362,26 @@ export default function StudentSettings() {
               className="hidden"
             />
             <div>
-              <div className="font-semibold text-lg">{user?.name}</div>
-              <div className="text-sm text-gray-500">{user?.email}</div>
+              <div className="font-semibold text-[15px]" style={{ color: "var(--text)" }}>{user?.name}</div>
+              <div className="text-[13px]" style={{ color: "var(--text-sec)" }}>{user?.email}</div>
               {user?.school && (
-                <div className="text-sm text-gray-400">{user.school.name}</div>
+                <div className="text-[13px]" style={{ color: "var(--text-faint)" }}>{user.school.name}</div>
               )}
-              <div className="text-sm text-gray-400 mt-1">
+              <div className="text-[13px] mt-1" style={{ color: "var(--text-faint)" }}>
                 {signupCount !== null ? `${signupCount} signups` : ""}
               </div>
             </div>
           </div>
 
           {activeCohorts.length > 0 && (
-            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <h3 className="font-semibold text-gray-900">Active Cohorts</h3>
+            <div className="mb-6 rounded-[3px] border border-[var(--border)] p-4" style={{ background: "var(--surface-alt)" }}>
+              <h3 className="font-semibold" style={{ color: "var(--text)" }}>Active Cohorts</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {activeCohorts.map((cohort) => (
                   <div
                     key={cohort.id}
-                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700"
+                    className="rounded-[2px] border px-3 py-1 text-[13px]"
+                    style={{ borderColor: "var(--border-s)", background: "var(--surface)", color: "var(--text-sec)" }}
                   >
                     {cohort.name}
                     {cohort.serviceEndDate
@@ -388,31 +394,32 @@ export default function StudentSettings() {
           )}
 
           {message && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
-              isError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
-            }`}>
+            <div
+              className="mb-4 px-3 py-2 rounded-[3px] border text-[13px]"
+              style={isError
+                ? { background: "var(--er-bg)", borderColor: "var(--er-b)", color: "var(--er-t)" }
+                : { background: "var(--ok-bg)", borderColor: "var(--ok-b)", color: "var(--ok-t)" }}
+            >
               {message}
             </div>
           )}
 
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Grade</label>
               <select
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               >
                 <option value="">Select grade</option>
                 <option value="9">9th Grade</option>
@@ -423,8 +430,8 @@ export default function StudentSettings() {
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-medium text-gray-700">Biography</label>
-                <span className={`text-xs ${bio.length > 280 ? "text-red-500" : "text-gray-400"}`}>
+                <label className="block text-[13px] font-medium" style={{ color: "var(--text)" }}>Biography</label>
+                <span className="text-[12px]" style={{ color: bio.length > 280 ? "var(--er-t)" : "var(--text-faint)" }}>
                   {bio.length}/300
                 </span>
               </div>
@@ -432,7 +439,7 @@ export default function StudentSettings() {
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, 300))}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
 
@@ -440,36 +447,39 @@ export default function StudentSettings() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
+                className="h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+                style={{ background: "var(--navy)" }}
               >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                className="h-[34px] px-4 border rounded-[2px] text-[13px]"
+                style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
               >
                 Export Hours (CSV)
               </button>
               <button
                 type="button"
                 onClick={handleExportPDF}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                className="h-[34px] px-4 border rounded-[2px] text-[13px]"
+                style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
               >
                 Export Hours (PDF)
               </button>
             </div>
           </form>
 
-          <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h3 className="font-semibold text-gray-900">Parent Progress Sharing</h3>
-            <p className="mt-1 text-sm text-gray-600">
+          <div className="mt-6 rounded-[3px] border p-4" style={{ borderColor: "var(--border)", background: "var(--surface-alt)" }}>
+            <h3 className="font-semibold text-[14px]" style={{ color: "var(--text)" }}>Parent Progress Sharing</h3>
+            <p className="mt-1 text-[13px]" style={{ color: "var(--text-sec)" }}>
               Direct student-generated parent links are disabled. Parent or guardian progress sharing must be managed through a school-controlled FERPA-safe workflow.
             </p>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <button onClick={logout} className="text-red-600 text-sm hover:underline">
+          <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border)" }}>
+            <button onClick={logout} className="text-[13px] hover:underline" style={{ color: "var(--er-t)" }}>
               Log Out
             </button>
           </div>
@@ -477,23 +487,24 @@ export default function StudentSettings() {
       )}
 
       {tab === "classroom" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Classroom</h3>
+        <div className="border rounded-[3px] p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h3 className="font-semibold mb-4" style={{ color: "var(--text)" }}>Classroom</h3>
 
           {classroomMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
-              classroomIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
-            }`}>
+            <div
+              className="mb-4 px-3 py-2 rounded-[3px] border text-[13px]"
+              style={classroomIsError
+                ? { background: "var(--er-bg)", borderColor: "var(--er-b)", color: "var(--er-t)" }
+                : { background: "var(--ok-bg)", borderColor: "var(--ok-b)", color: "var(--ok-t)" }}
+            >
               {classroomMessage}
             </div>
           )}
 
           {activeCohorts.length > 0 && (
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="text-sm font-medium text-gray-900">Linked Cohorts</div>
-              <div className="mt-2 text-sm text-gray-600">
+            <div className="mb-4 rounded-[3px] border p-4" style={{ borderColor: "var(--border)", background: "var(--surface-alt)" }}>
+              <div className="text-[13px] font-medium" style={{ color: "var(--text)" }}>Linked Cohorts</div>
+              <div className="mt-2 text-[13px]" style={{ color: "var(--text-sec)" }}>
                 {activeCohorts.map((cohort) => cohort.name).join(", ")}
               </div>
             </div>
@@ -501,30 +512,32 @@ export default function StudentSettings() {
 
           {user?.classroomId ? (
             <div>
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                <div className="font-medium text-blue-900">
+              <div className="p-4 rounded-[3px] border mb-4" style={{ background: "var(--in-bg)", borderColor: "var(--in-b)" }}>
+                <div className="font-medium text-[14px]" style={{ color: "var(--in-t)" }}>
                   {(user as any).classroom?.name || "Classroom"}
                 </div>
-                <div className="text-sm text-blue-700">
+                <div className="text-[13px]" style={{ color: "var(--in-t)" }}>
                   {user.school?.name || "School"}
                 </div>
               </div>
               {leaveConfirm ? (
-                <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm font-medium text-yellow-800 mb-1">Leave this classroom?</p>
-                  <p className="text-xs text-yellow-700 mb-3">
+                <div className="mt-2 p-4 rounded-[3px] border" style={{ background: "var(--wn-bg)", borderColor: "var(--wn-b)" }}>
+                  <p className="text-[13px] font-medium mb-1" style={{ color: "var(--wn-t)" }}>Leave this classroom?</p>
+                  <p className="text-[12px] mb-3" style={{ color: "var(--wn-t)" }}>
                     You'll need a new invite code from your teacher to re-join any classroom.
                   </p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleLeaveClassroom}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      className="h-[34px] px-3 rounded-[2px] text-white text-[13px] font-medium"
+                      style={{ background: "var(--er-t)" }}
                     >
                       Leave
                     </button>
                     <button
                       onClick={() => setLeaveConfirm(false)}
-                      className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50"
+                      className="h-[34px] px-3 border rounded-[2px] text-[13px]"
+                      style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
                     >
                       Cancel
                     </button>
@@ -533,7 +546,8 @@ export default function StudentSettings() {
               ) : (
                 <button
                   onClick={() => setLeaveConfirm(true)}
-                  className="text-red-600 text-sm hover:underline"
+                  className="text-[13px] hover:underline"
+                  style={{ color: "var(--er-t)" }}
                 >
                   Leave Classroom
                 </button>
@@ -541,7 +555,7 @@ export default function StudentSettings() {
             </div>
           ) : (
             <div>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-[13px] mb-4" style={{ color: "var(--text-sec)" }}>
                 Enter an invite code from your teacher to join a classroom.
               </p>
               <form onSubmit={handleJoinClassroom} className="flex gap-2">
@@ -552,12 +566,13 @@ export default function StudentSettings() {
                   placeholder="Enter 8-character code"
                   maxLength={8}
                   required
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md font-mono tracking-wider text-center"
+                  className="flex-1 h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] font-mono tracking-wider text-center focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
                 />
                 <button
                   type="submit"
                   disabled={joining || inviteCode.trim().length !== 8}
-                  className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
+                  className="h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+                  style={{ background: "var(--navy)" }}
                 >
                   {joining ? "Joining..." : "Join"}
                 </button>
@@ -568,74 +583,77 @@ export default function StudentSettings() {
       )}
 
       {tab === "security" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-4">Change Password</h3>
+        <div className="border rounded-[3px] p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h3 className="font-semibold mb-4" style={{ color: "var(--text)" }}>Change Password</h3>
           {passwordMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
-              passwordIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
-            }`}>
+            <div
+              className="mb-4 px-3 py-2 rounded-[3px] border text-[13px]"
+              style={passwordIsError
+                ? { background: "var(--er-bg)", borderColor: "var(--er-b)", color: "var(--er-t)" }
+                : { background: "var(--ok-bg)", borderColor: "var(--ok-b)", color: "var(--ok-t)" }}
+            >
               {passwordMessage}
             </div>
           )}
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Current Password</label>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>New Password</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Confirm New Password</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
+              className="h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+              style={{ background: "var(--navy)" }}
             >
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
-            <p className="text-sm text-gray-500 mb-3">
+          <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border)" }}>
+            <h3 className="font-semibold mb-1 text-[14px]" style={{ color: "var(--er-t)" }}>Delete Account</h3>
+            <p className="text-[13px] mb-3" style={{ color: "var(--text-sec)" }}>
               Permanently deletes your account, all your service records, signups, and personal data. This cannot be undone.
             </p>
             {!deleteConfirm ? (
               <button
                 onClick={() => setDeleteConfirm(true)}
-                className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+                className="h-[34px] px-4 border rounded-[2px] text-[13px]"
+                style={{ borderColor: "var(--er-b)", color: "var(--er-t)", background: "var(--er-bg)" }}
               >
                 Delete My Account
               </button>
             ) : (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm font-medium text-red-800 mb-3">
+              <div className="p-4 rounded-[3px] border" style={{ background: "var(--er-bg)", borderColor: "var(--er-b)" }}>
+                <p className="text-[13px] font-medium mb-3" style={{ color: "var(--er-t)" }}>
                   Type <span className="font-mono font-bold">DELETE</span> to confirm:
                 </p>
                 <input
@@ -643,19 +661,21 @@ export default function StudentSettings() {
                   value={deleteInput}
                   onChange={(e) => setDeleteInput(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
+                  className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--er-b)] rounded-[2px] focus:outline-none mb-3 bg-[var(--surface)]"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleDeleteAccount}
                     disabled={deleteInput !== "DELETE" || deleting}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                    className="h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+                    style={{ background: "var(--er-t)" }}
                   >
                     {deleting ? "Deleting..." : "Permanently Delete"}
                   </button>
                   <button
                     onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    className="h-[34px] px-4 border rounded-[2px] text-[13px]"
+                    style={{ borderColor: "var(--border-s)", color: "var(--text)", background: "var(--surface)" }}
                   >
                     Cancel
                   </button>
@@ -667,34 +687,34 @@ export default function StudentSettings() {
       )}
 
       {tab === "notifications" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-1">Notification Preferences</h3>
-          <p className="text-sm text-gray-500 mb-6">Choose how you want to be notified.</p>
+        <div className="border rounded-[3px] p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h3 className="font-semibold mb-1" style={{ color: "var(--text)" }}>Notification Preferences</h3>
+          <p className="text-[13px] mb-6" style={{ color: "var(--text-sec)" }}>Choose how you want to be notified.</p>
 
           {notifMessage && (
-            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+            <div className="mb-4 px-3 py-2 rounded-[3px] border text-[13px]"
+              style={{ background: "var(--ok-bg)", borderColor: "var(--ok-b)", color: "var(--ok-t)" }}>
               {notifMessage}
             </div>
           )}
 
           <div className="space-y-4">
-            {/* Header */}
-            <div className="grid grid-cols-3 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-2">
+            <div className="grid grid-cols-3 gap-4 text-[11px] font-semibold uppercase tracking-[.07em] border-b pb-2"
+              style={{ color: "var(--text-faint)", borderColor: "var(--border)" }}>
               <div>Notification</div>
               <div className="text-center">Email</div>
               <div className="text-center">In-App</div>
             </div>
             {notifRows.map(({ key, label }) => (
               <div key={key} className="grid grid-cols-3 gap-4 items-center">
-                <div className="text-sm font-medium text-gray-700">{label}</div>
+                <div className="text-[13px] font-medium" style={{ color: "var(--text)" }}>{label}</div>
                 <div className="flex justify-center">
                   <button
                     onClick={() => toggleNotif(key, "email")}
-                    className={`w-10 h-5 rounded-full transition-colors ${
-                      notifPrefs[key].email ? "bg-blue-600" : "bg-gray-300"
-                    } relative`}
+                    className="w-10 h-5 rounded-full transition-colors relative"
+                    style={{ background: notifPrefs[key].email ? "var(--action)" : "var(--border-s)" }}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
                       notifPrefs[key].email ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>
@@ -702,11 +722,10 @@ export default function StudentSettings() {
                 <div className="flex justify-center">
                   <button
                     onClick={() => toggleNotif(key, "inApp")}
-                    className={`w-10 h-5 rounded-full transition-colors ${
-                      notifPrefs[key].inApp ? "bg-blue-600" : "bg-gray-300"
-                    } relative`}
+                    className="w-10 h-5 rounded-full transition-colors relative"
+                    style={{ background: notifPrefs[key].inApp ? "var(--action)" : "var(--border-s)" }}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
                       notifPrefs[key].inApp ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>
@@ -718,7 +737,8 @@ export default function StudentSettings() {
           <button
             onClick={handleSaveNotifications}
             disabled={savingNotif}
-            className="mt-6 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
+            className="mt-6 h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+            style={{ background: "var(--navy)" }}
           >
             {savingNotif ? "Saving..." : "Save Preferences"}
           </button>
@@ -726,23 +746,24 @@ export default function StudentSettings() {
       )}
 
       {tab === "privacy" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-1">Privacy Settings</h3>
-          <p className="text-sm text-gray-500 mb-6">Control who can see your profile and message you.</p>
+        <div className="border rounded-[3px] p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h3 className="font-semibold mb-1" style={{ color: "var(--text)" }}>Privacy Settings</h3>
+          <p className="text-[13px] mb-6" style={{ color: "var(--text-sec)" }}>Control who can see your profile and message you.</p>
 
           {privacyMessage && (
-            <div className="mb-4 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-700">
+            <div className="mb-4 px-3 py-2 rounded-[3px] border text-[13px]"
+              style={{ background: "var(--ok-bg)", borderColor: "var(--ok-b)", color: "var(--ok-t)" }}>
               {privacyMessage}
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Profile Visibility</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Profile Visibility</label>
               <select
                 value={msgPrefs.profileVisibility}
                 onChange={(e) => setMsgPrefs((p) => ({ ...p, profileVisibility: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               >
                 <option value="EVERYONE">Everyone</option>
                 <option value="SCHOOL">School Only</option>
@@ -750,17 +771,17 @@ export default function StudentSettings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Message Restrictions</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Message Restrictions</label>
               <select
                 value={msgPrefs.allowFrom}
                 onChange={(e) => setMsgPrefs((p) => ({ ...p, allowFrom: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               >
                 <option value="EVERYONE">Everyone</option>
                 <option value="ORGS_ONLY">Organizations Only</option>
                 <option value="ADMINS_ONLY">Admins Only</option>
               </select>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-[12px] mt-1" style={{ color: "var(--text-faint)" }}>
                 Restricts who can send you direct messages.
               </p>
             </div>
@@ -769,7 +790,8 @@ export default function StudentSettings() {
           <button
             onClick={handleSavePrivacy}
             disabled={savingPrivacy}
-            className="mt-6 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50"
+            className="mt-6 h-[34px] px-4 rounded-[2px] text-white text-[13px] font-medium disabled:opacity-50"
+            style={{ background: "var(--navy)" }}
           >
             {savingPrivacy ? "Saving..." : "Save Settings"}
           </button>

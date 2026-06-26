@@ -324,7 +324,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
   if (!school && loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-[var(--text-sec)]">Loading...</div>
       </div>
     );
   }
@@ -332,7 +332,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">{error}</div>
+        <div className="text-[var(--er-t)]">{error}</div>
       </div>
     );
   }
@@ -342,13 +342,13 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
   return (
     <div className="flex flex-col" style={{ height: embedded ? "calc(100vh - 220px)" : "calc(100vh - 56px)", overflow: "hidden" }}>
       {!embedded && (
-        <div className="flex-none px-4 py-3 bg-white border-b border-gray-200">
+        <div className="flex-none px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)]">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Discover Community Partners</h1>
-              <p className="text-sm text-gray-500">Find and approve organizations near your school</p>
+              <h1 className="text-[20px] font-semibold text-[var(--text)]">Discover Community Partners</h1>
+              <p className="text-sm text-[var(--text-sec)]">Find and approve organizations near your school</p>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-[var(--text-sec)]">
               {loading
                 ? "Loading..."
                 : searchQuery
@@ -362,7 +362,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
       )}
 
       {geocodingInProgress && (
-        <div className="flex-none px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-800 flex items-center gap-2">
+        <div className="flex-none px-4 py-2 bg-[var(--wn-bg)] border-b border-[var(--wn-b)] text-sm text-[var(--wn-t)] flex items-center gap-2">
           <svg className="w-4 h-4 animate-spin flex-none" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
@@ -372,21 +372,21 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
       )}
 
       {noCoords ? (
-        <div className="flex items-center justify-center flex-1 bg-gray-50">
+        <div className="flex items-center justify-center flex-1 bg-[var(--surface-alt)]">
           <div className="text-center max-w-sm p-8">
-            <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full bg-[var(--in-bg)] border border-blue-100 flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
               </svg>
             </div>
-            <h2 className="text-base font-semibold text-gray-800 mb-2">Add your school address</h2>
-            <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+            <h2 className="text-base font-semibold text-[var(--text)] mb-2">Add your school address</h2>
+            <p className="text-sm text-[var(--text-sec)] mb-5 leading-relaxed">
               Set your school's address in Settings to discover nearby community partners on the map.
             </p>
             <a
               href="/settings"
-              className="inline-block px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 transition-colors"
+              className="inline-block h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] transition-colors"
             >
               Go to Settings
             </a>
@@ -417,7 +417,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                 >
                   <Popup>
                     <div className="font-semibold">{school.name}</div>
-                    <div className="text-xs text-gray-500">Your school</div>
+                    <div className="text-xs text-[var(--text-sec)]">Your school</div>
                   </Popup>
                 </Marker>
               )}
@@ -496,21 +496,21 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
           </div>
 
           {/* List pane */}
-          <div className="flex-none w-80 xl:w-96 flex flex-col border-l border-gray-200 bg-white overflow-hidden">
+          <div className="flex-none w-80 xl:w-96 flex flex-col border-l border-[var(--border)] bg-[var(--surface)] overflow-hidden">
             {/* Filters */}
-            <div className="flex-none p-3 border-b border-gray-100 space-y-2">
+            <div className="flex-none p-3 border-b border-[var(--border)] space-y-2">
               {/* Search */}
               <input
                 type="text"
                 placeholder="Search name, category, city..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 text-sm border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:ring-1 focus:ring-[var(--action)]"
               />
 
               {/* Radius */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 whitespace-nowrap">Radius:</span>
+                <span className="text-xs text-[var(--text-sec)] whitespace-nowrap">Radius:</span>
                 <div className="flex gap-1 flex-wrap">
                   {RADIUS_OPTIONS.map((r) => (
                     <button
@@ -518,8 +518,8 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                       onClick={() => setRadius(r)}
                       className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
                         radius === r
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "border-gray-300 text-gray-600 hover:border-blue-400"
+                          ? "bg-[var(--action)] text-white border-[var(--action)]"
+                          : "border-[var(--border-s)] text-[var(--text-sec)] hover:border-blue-400"
                       }`}
                     >
                       {r}mi
@@ -536,8 +536,8 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                     onClick={() => setSelectedCategory(cat)}
                     className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
                       selectedCategory === cat
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "border-gray-300 text-gray-600 hover:border-blue-400"
+                        ? "bg-[var(--action)] text-white border-[var(--action)]"
+                        : "border-[var(--border-s)] text-[var(--text-sec)] hover:border-blue-400"
                     }`}
                   >
                     {cat}
@@ -547,27 +547,27 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
             </div>
 
             {/* Legend */}
-            <div className="flex-none px-3 py-2 border-b border-gray-100 bg-gray-50">
-              <div className="text-xs text-gray-400 mb-1.5 font-medium">Map legend</div>
+            <div className="flex-none px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-alt)]">
+              <div className="text-xs text-[var(--text-faint)] mb-1.5 font-medium">Map legend</div>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 {Object.entries(CATEGORY_COLORS).slice(0, 8).map(([cat, color]) => (
                   <div key={cat} className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: color }} />
-                    <span className="text-xs text-gray-500">{cat}</span>
+                    <span className="text-xs text-[var(--text-sec)]">{cat}</span>
                   </div>
                 ))}
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full flex-none bg-gray-400" />
-                  <span className="text-xs text-gray-500">Other</span>
+                  <div className="w-2 h-2 rounded-full flex-none bg-[var(--border-s)]" />
+                  <span className="text-xs text-[var(--text-sec)]">Other</span>
                 </div>
               </div>
               <div className="flex items-center gap-3 mt-1.5">
                 <div className="flex items-center gap-1">
                   <div className="relative w-4 h-4">
-                    <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white" />
-                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-600 rounded-full flex items-center justify-center text-white text-[7px]">✓</div>
+                    <div className="w-3.5 h-3.5 rounded-full bg-[var(--in-bg)]0 border-2 border-white" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--action)] rounded-full flex items-center justify-center text-white text-[7px]">✓</div>
                   </div>
-                  <span className="text-xs text-gray-500">Approved</span>
+                  <span className="text-xs text-[var(--text-sec)]">Approved</span>
                 </div>
               </div>
             </div>
@@ -575,11 +575,11 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+                <div className="flex items-center justify-center h-32 text-[var(--text-faint)] text-sm">
                   Loading nearby partners...
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-gray-400 text-sm text-center px-4">
+                <div className="flex items-center justify-center h-32 text-[var(--text-faint)] text-sm text-center px-4">
                   No partners found in this area. Try expanding the radius or changing the category.
                 </div>
               ) : (
@@ -594,12 +594,12 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                       setMapTarget({ lat: b.latitude, lng: b.longitude, zoom: 18 });
                       setExpandedId(expandedId === b.id ? null : b.id);
                     }}
-                    className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${
+                    className={`p-3 border-b border-[var(--border)] cursor-pointer transition-colors ${
                       expandedId === b.id
-                        ? "bg-blue-50 border-l-2 border-l-blue-500"
+                        ? "bg-[var(--in-bg)] border-l-2 border-l-blue-500"
                         : highlightedId === b.id
-                        ? "bg-blue-50"
-                        : "hover:bg-gray-50"
+                        ? "bg-[var(--in-bg)]"
+                        : "hover:bg-[var(--surface-alt)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -609,46 +609,46 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                             className="w-2.5 h-2.5 rounded-full flex-none"
                             style={{ backgroundColor: categoryColor(b.category) }}
                           />
-                          <span className="font-medium text-sm text-gray-900 truncate">
+                          <span className="font-medium text-sm text-[var(--text)] truncate">
                             {toTitleCase(b.name)}
                           </span>
                           {b.approvalStatus === "APPROVED" && (
-                            <span className="flex-none text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">✓ Partner</span>
+                            <span className="flex-none text-xs bg-[var(--in-bg)] text-[var(--action)] px-1.5 py-0.5 rounded font-medium">✓ Partner</span>
                           )}
                         </div>
 
                         {b.category && (
-                          <div className="text-xs text-gray-500 mt-0.5 ml-4">{b.category}</div>
+                          <div className="text-xs text-[var(--text-sec)] mt-0.5 ml-4">{b.category}</div>
                         )}
 
-                        <div className="text-xs text-gray-400 mt-0.5 ml-4">
+                        <div className="text-xs text-[var(--text-faint)] mt-0.5 ml-4">
                           {[b.city ? toTitleCase(b.city) : null, b.state].filter(Boolean).join(", ")}
                           {b.distanceMiles != null && ` · ${b.distanceMiles} mi`}
                         </div>
 
                         {b.email && expandedId !== b.id && (
-                          <div className="text-xs text-gray-400 ml-4 truncate">{b.email}</div>
+                          <div className="text-xs text-[var(--text-faint)] ml-4 truncate">{b.email}</div>
                         )}
 
                         {/* Expanded details */}
                         {expandedId === b.id && (
                           <div className="mt-2 ml-4 space-y-1">
                             {b.address && (
-                              <div className="text-xs text-gray-600">
+                              <div className="text-xs text-[var(--text-sec)]">
                                 {[b.address, b.city, b.state, b.zip].filter(Boolean).join(", ")}
                               </div>
                             )}
                             {b.phone && (
-                              <div className="text-xs text-gray-600">
-                                <span className="text-gray-400">Phone: </span>{b.phone}
+                              <div className="text-xs text-[var(--text-sec)]">
+                                <span className="text-[var(--text-faint)]">Phone: </span>{b.phone}
                               </div>
                             )}
                             {b.email && (
-                              <div className="text-xs text-gray-600 truncate">
-                                <span className="text-gray-400">Email: </span>
+                              <div className="text-xs text-[var(--text-sec)] truncate">
+                                <span className="text-[var(--text-faint)]">Email: </span>
                                 <a
                                   href={`mailto:${b.email}`}
-                                  className="text-blue-600 hover:underline"
+                                  className="text-[var(--action)] hover:underline"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   {b.email}
@@ -661,7 +661,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                                   href={b.website.startsWith("http") ? b.website : `https://${b.website}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
+                                  className="text-[var(--action)] hover:underline"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   {b.website}
@@ -669,7 +669,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                               </div>
                             )}
                             {b.ein && (
-                              <div className="text-xs text-gray-400">EIN: {b.ein}</div>
+                              <div className="text-xs text-[var(--text-faint)]">EIN: {b.ein}</div>
                             )}
                           </div>
                         )}
@@ -677,11 +677,11 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
 
                       <div className="flex-none">
                         {b.approvalStatus === "APPROVED" ? (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                          <span className="inline-block px-2 py-0.5 text-xs bg-[var(--in-bg)] text-[var(--action)] rounded-full">
                             Approved
                           </span>
                         ) : b.approvalStatus === "PENDING" ? (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                          <span className="inline-block px-2 py-0.5 text-xs bg-yellow-100 text-[var(--wn-t)] rounded-full">
                             Pending
                           </span>
                         ) : approveConfirm === b.id ? (
@@ -689,13 +689,13 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                             <button
                               onClick={(e) => { e.stopPropagation(); handleApprove(b.id); }}
                               disabled={approving === b.id}
-                              className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                              className="px-2 py-0.5 text-xs bg-[var(--action)] text-white rounded hover:bg-[var(--action)] disabled:opacity-50"
                             >
                               {approving === b.id ? "..." : "Confirm"}
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setApproveConfirm(null); }}
-                              className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                              className="px-2 py-0.5 text-xs border border-[var(--border-s)] text-[var(--text-sec)] rounded hover:bg-[var(--surface-alt)]"
                             >
                               Cancel
                             </button>
@@ -703,7 +703,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); setApproveConfirm(b.id); }}
-                            className="px-2 py-0.5 text-xs border border-blue-300 text-blue-600 rounded hover:bg-blue-50"
+                            className="px-2 py-0.5 text-xs border border-[var(--in-b)] text-[var(--action)] rounded hover:bg-[var(--in-bg)]"
                           >
                             + Approve
                           </button>

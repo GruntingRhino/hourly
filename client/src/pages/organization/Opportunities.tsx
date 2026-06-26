@@ -131,10 +131,10 @@ export default function OrgOpportunities() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Opportunities</h1>
+        <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>My Opportunities</h1>
         <Link
           to="/opportunities/new"
-          className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
+          className="px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85"
         >
           Create New
         </Link>
@@ -145,8 +145,8 @@ export default function OrgOpportunities() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-md text-sm ${
-              filter === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            className={`px-3 py-1.5 rounded-[2px] text-sm ${
+              filter === f ? "bg-[var(--action)] text-white" : "bg-[var(--surface-alt)] text-[var(--text)] hover:bg-[var(--border)]"
             }`}
           >
             {f.charAt(0) + f.slice(1).toLowerCase()}
@@ -155,41 +155,41 @@ export default function OrgOpportunities() {
       </div>
 
       {showLoadingState ? (
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-[var(--text-sec)]">Loading...</div>
       ) : visibleOpportunities.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">
+        <div className="text-[var(--text-sec)] text-center py-8">
           No {filter.toLowerCase()} opportunities.
         </div>
       ) : (
         <div className="space-y-3">
           {visibleOpportunities.map((opp) => (
-            <div key={opp.id} className="bg-white border border-gray-200 rounded-lg p-5">
+            <div key={opp.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold">{opp.title}</h3>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-sm text-[var(--text-sec)] mt-1">
                     {new Date(opp.date).toLocaleDateString()} &middot; {opp.startTime} - {opp.endTime}
                   </div>
-                  <div className="text-sm text-gray-400">{opp.location}</div>
+                  <div className="text-sm text-[var(--text-faint)]">{opp.location}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-blue-600">
+                  <div className="text-lg font-bold text-[var(--action)]">
                     {opp._count.signups}/{opp.capacity}
                   </div>
-                  <div className="text-xs text-gray-400">enrolled</div>
+                  <div className="text-xs text-[var(--text-faint)]">enrolled</div>
                 </div>
               </div>
               {opp.status === "ACTIVE" && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3">
+                <div className="mt-3 pt-3 border-t border-[var(--border)] flex gap-3">
                   <button
                     onClick={() => navigate(`/opportunities/${opp.id}/edit`)}
-                    className="text-sm text-blue-600 hover:underline font-medium"
+                    className="text-sm text-[var(--action)] hover:underline font-medium"
                   >
                     Edit Details
                   </button>
                   <button
                     onClick={() => handleCancel(opp.id)}
-                    className="text-sm text-red-600 hover:underline"
+                    className="text-sm text-[var(--er-t)] hover:underline"
                   >
                     Cancel
                   </button>

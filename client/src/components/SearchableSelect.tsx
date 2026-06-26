@@ -158,7 +158,7 @@ export default function SearchableSelect({
             setQuery("");
             setIsOpen(false);
           }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text-sec)]"
           aria-label="Clear selection"
         >
           ×
@@ -168,7 +168,7 @@ export default function SearchableSelect({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-[2px] border border-[var(--border)] bg-white py-1 "
         >
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option, index) => {
@@ -184,7 +184,7 @@ export default function SearchableSelect({
                   onMouseEnter={() => setHighlightedIndex(index)}
                   onClick={() => commitValue(option)}
                   className={`block w-full px-3 py-2 text-left text-sm ${
-                    isActive ? "bg-blue-50 text-blue-700" : "text-gray-700"
+                    isActive ? "bg-[var(--in-bg)] text-[var(--action)]" : "text-[var(--text)]"
                   } ${isSelected ? "font-medium" : ""}`}
                 >
                   {option}
@@ -192,7 +192,7 @@ export default function SearchableSelect({
               );
             })
           ) : (
-            <div className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</div>
+            <div className="px-3 py-2 text-sm text-[var(--text-sec)]">{emptyMessage}</div>
           )}
         </div>
       )}

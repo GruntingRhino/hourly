@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --navy: #0f2040;
+    --navy-mid: #1a3560;
+    --action: #1a56a0;
+    --action-h: #154685;
+    --action-lt: #ddeaf8;
+    --bg: #f2f0ec;
+    --surface: #ffffff;
+    --surface-alt: #f7f5f1;
+    --border: #d4cfc7;
+    --border-s: #afa9a0;
+    --text: #1b1916;
+    --text-sec: #5b5650;
+    --text-faint: #908a83;
+    --ok-t: #165d2c; --ok-bg: #eaf6ee; --ok-b: #a8d8b8;
+    --wn-t: #7a4e00; --wn-bg: #fef7e5; --wn-b: #e8c878;
+    --er-t: #891313; --er-bg: #fef0f0; --er-b: #e8aaaa;
+    --in-t: #1a4a7a; --in-bg: #eef4fb; --in-b: #a8c5e8;
+  }
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--bg);
+  }
+}

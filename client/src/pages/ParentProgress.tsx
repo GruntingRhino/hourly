@@ -35,19 +35,19 @@ export default function ParentProgress() {
   }, [params]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading progress...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-[var(--text-sec)]">Loading progress...</div>;
   }
 
   if (error || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white border border-red-200 rounded-xl p-6 text-center">
-          <div className="text-lg font-semibold text-red-700">Unable to open parent progress</div>
-          <div className="text-sm text-red-600 mt-2">{error || "Parent or guardian progress links are disabled."}</div>
-          <div className="text-sm text-gray-600 mt-3">
+        <div className="max-w-md w-full bg-white border border-[var(--er-b)] rounded-[3px] p-6 text-center">
+          <div className="text-[16px] font-semibold text-[var(--er-t)]">Unable to open parent progress</div>
+          <div className="text-sm text-[var(--er-t)] mt-2">{error || "Parent or guardian progress links are disabled."}</div>
+          <div className="text-sm text-[var(--text-sec)] mt-3">
             Progress sharing must be initiated through a school-controlled workflow.
           </div>
-          <Link to="/" className="inline-block mt-4 text-sm text-blue-600 hover:underline">
+          <Link to="/" className="inline-block mt-4 text-sm text-[var(--action)] hover:underline">
             Return to GoodHours
           </Link>
         </div>
@@ -56,45 +56,45 @@ export default function ParentProgress() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-[var(--surface-alt)] py-10 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="text-sm uppercase tracking-wide text-blue-600 font-semibold mb-2">Parent Progress View</div>
-          <h1 className="text-3xl font-bold text-gray-900">{data.student.name}</h1>
-          <div className="text-sm text-gray-500 mt-2">
+        <div className="bg-white border border-[var(--border)] rounded-[3px] p-6">
+          <div className="text-sm uppercase tracking-wide text-[var(--action)] font-semibold mb-2">Parent Progress View</div>
+          <h1 className="text-[24px] font-semibold text-[var(--text)]">{data.student.name}</h1>
+          <div className="text-sm text-[var(--text-sec)] mt-2">
             {[data.school?.name, data.cohort?.name, data.student.grade].filter(Boolean).join(" · ")}
           </div>
         </div>
 
         <div className="grid sm:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="text-sm text-gray-500">Approved</div>
-            <div className="text-2xl font-bold text-green-600 mt-1">{data.approvedHours.toFixed(1)}h</div>
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-5">
+            <div className="text-sm text-[var(--text-sec)]">Approved</div>
+            <div className="text-[20px] font-semibold text-[var(--ok-t)] mt-1">{data.approvedHours.toFixed(1)}h</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="text-sm text-gray-500">Pending</div>
-            <div className="text-2xl font-bold text-yellow-600 mt-1">{data.pendingHours.toFixed(1)}h</div>
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-5">
+            <div className="text-sm text-[var(--text-sec)]">Pending</div>
+            <div className="text-[20px] font-semibold text-yellow-600 mt-1">{data.pendingHours.toFixed(1)}h</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="text-sm text-gray-500">Required</div>
-            <div className="text-2xl font-bold mt-1">{data.requiredHours.toFixed(1)}h</div>
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-5">
+            <div className="text-sm text-[var(--text-sec)]">Required</div>
+            <div className="text-[20px] font-semibold mt-1">{data.requiredHours.toFixed(1)}h</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="text-sm text-gray-500">Remaining</div>
-            <div className="text-2xl font-bold text-blue-600 mt-1">{data.remainingHours.toFixed(1)}h</div>
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-5">
+            <div className="text-sm text-[var(--text-sec)]">Remaining</div>
+            <div className="text-[20px] font-semibold text-[var(--action)] mt-1">{data.remainingHours.toFixed(1)}h</div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-[var(--border)] rounded-[3px] p-6">
           <div className="flex justify-between text-sm mb-2">
-            <span className="font-medium text-gray-700">Progress toward goal</span>
-            <span className="text-gray-500">{data.percentComplete}% complete</span>
+            <span className="font-medium text-[var(--text)]">Progress toward goal</span>
+            <span className="text-[var(--text-sec)]">{data.percentComplete}% complete</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${data.percentComplete}%` }} />
+          <div className="w-full bg-[var(--border)] rounded-full h-3">
+            <div className="bg-[var(--in-bg)]0 h-3 rounded-full" style={{ width: `${data.percentComplete}%` }} />
           </div>
           {data.deadline && (
-            <div className="text-sm text-gray-500 mt-3">
+            <div className="text-sm text-[var(--text-sec)] mt-3">
               Service deadline: {new Date(data.deadline).toLocaleDateString()}
             </div>
           )}

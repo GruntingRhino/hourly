@@ -115,7 +115,7 @@ export default function StudentMessages() {
         <h1 className="text-2xl font-bold">Messages</h1>
         <button
           onClick={() => setShowCompose(!showCompose)}
-          className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
+          className="px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85"
         >
           {showCompose ? "Cancel" : "New Message"}
         </button>
@@ -123,18 +123,18 @@ export default function StudentMessages() {
 
       {/* Compose */}
       {supportSummary?.interventionCase && supportSummary.interventionCase.status !== "RESOLVED" && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+        <div className="mb-6 rounded-[3px] border border-[var(--er-b)] bg-[var(--er-bg)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">School Follow-Up Active</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-[var(--er-t)] mb-1">School Follow-Up Active</div>
               <div className="font-semibold text-red-900">{supportSummary.interventionCase.summary || "Your school needs a response from you"}</div>
-              <div className="mt-1 text-sm text-red-800">
+              <div className="mt-1 text-sm text-[var(--er-t)]">
                 {supportSummary.interventionCase.studentMessage || supportSummary.interventionCase.reason || "Check your remaining hours and message your school if you need help completing them."}
               </div>
               {supportSummary.interventionCase.nextStepForStudent && (
                 <div className="mt-2 text-sm text-red-900">Next step: <strong>{supportSummary.interventionCase.nextStepForStudent}</strong></div>
               )}
-              <div className="mt-2 text-xs text-red-700 flex flex-wrap gap-3">
+              <div className="mt-2 text-xs text-[var(--er-t)] flex flex-wrap gap-3">
                 <span>Priority: {supportSummary.interventionCase.priority}</span>
                 <span>{Math.max(0, supportSummary.requiredHours - supportSummary.totalApprovedHours).toFixed(1)}h remaining</span>
                 {supportSummary.interventionCase.dueDate && <span>Follow up by {new Date(supportSummary.interventionCase.dueDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>}
@@ -152,7 +152,7 @@ export default function StudentMessages() {
                   ? `Hi, I'm following up on my service hours. ${supportSummary.interventionCase.nextStepForStudent}`
                   : "Hi, I need help understanding my remaining service-hour requirements.");
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
+              className="px-4 py-2 bg-red-600 text-white rounded-[2px] text-sm font-medium hover:bg-red-700"
             >
               Message School Now
             </button>
@@ -162,10 +162,10 @@ export default function StudentMessages() {
 
       {/* Compose */}
       {showCompose && (
-        <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5 mb-6">
           <h3 className="font-semibold mb-3">Compose Message</h3>
           {sendError && (
-            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            <div className="mb-3 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
               {sendError}
             </div>
           )}
@@ -176,14 +176,14 @@ export default function StudentMessages() {
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
             />
             <input
               type="text"
               placeholder="Subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
             />
             <textarea
               placeholder="Write your message..."
@@ -191,12 +191,12 @@ export default function StudentMessages() {
               onChange={(e) => setBody(e.target.value)}
               required
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
             />
             <button
               type="submit"
               disabled={sending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[var(--action)] text-white rounded-[2px] text-sm hover:bg-[var(--action)] disabled:opacity-50"
             >
               {sending ? "Sending..." : "Send"}
             </button>
@@ -210,8 +210,8 @@ export default function StudentMessages() {
           <button
             key={f}
             onClick={() => setFolder(f)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-              folder === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            className={`px-4 py-2 rounded-[2px] text-sm font-medium capitalize ${
+              folder === f ? "bg-[var(--action)] text-white" : "bg-[var(--surface-alt)] text-[var(--text)] hover:bg-[var(--border)]"
             }`}
           >
             {f}
@@ -222,13 +222,13 @@ export default function StudentMessages() {
       {/* Sender filter (inbox only) */}
       {folder === "inbox" && (
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-gray-500">Filter:</span>
+          <span className="text-sm text-[var(--text-sec)]">Filter:</span>
           {(["all", "students", "organizations", "schools"] as SenderFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setSenderFilter(f)}
               className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                senderFilter === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                senderFilter === f ? "bg-[var(--action)] text-white" : "bg-[var(--surface-alt)] text-[var(--text-sec)] hover:bg-[var(--border)]"
               }`}
             >
               {f}
@@ -238,23 +238,23 @@ export default function StudentMessages() {
       )}
 
       {loading ? (
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-[var(--text-sec)]">Loading...</div>
       ) : folder === "notifications" ? (
         <div className="space-y-2">
           {notifications.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">No notifications.</div>
+            <div className="text-[var(--text-sec)] text-center py-8">No notifications.</div>
           ) : (
             notifications.map((n) => (
               <div
                 key={n.id}
-                className={`bg-white border rounded-lg p-4 ${n.read ? "border-gray-200" : "border-blue-300 bg-blue-50"}`}
+                className={`bg-[var(--surface)] border rounded-[3px] p-4 ${n.read ? "border-[var(--border)]" : "border-[var(--in-b)] bg-[var(--in-bg)]"}`}
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-medium text-sm">{n.title}</div>
-                    <div className="text-sm text-gray-600">{n.body}</div>
+                    <div className="text-sm text-[var(--text-sec)]">{n.body}</div>
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-[var(--text-faint)]">
                     {new Date(n.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -270,14 +270,14 @@ export default function StudentMessages() {
               ? messages.filter((m) => allowedRoles.includes(m.sender.role))
               : messages;
             return filtered.length === 0 ? (
-              <div className="text-gray-500 text-center py-8">No messages.</div>
+              <div className="text-[var(--text-sec)] text-center py-8">No messages.</div>
             ) : (
               filtered.map((m) => (
               <div
                 key={m.id}
                 onClick={() => !m.read && folder === "inbox" && markRead(m.id)}
-                className={`bg-white border rounded-lg p-4 cursor-pointer ${
-                  m.read ? "border-gray-200" : "border-blue-300 bg-blue-50"
+                className={`bg-[var(--surface)] border rounded-[3px] p-4 cursor-pointer ${
+                  m.read ? "border-[var(--border)]" : "border-[var(--in-b)] bg-[var(--in-bg)]"
                 } ${m.priority ? "border-l-4 border-l-red-500" : ""}`}
               >
                 <div className="flex justify-between items-start">
@@ -285,10 +285,10 @@ export default function StudentMessages() {
                     <div className="font-medium text-sm">
                       {folder === "inbox" ? m.sender.name : m.receiver.name}
                     </div>
-                    {m.subject && <div className="text-sm text-gray-700">{m.subject}</div>}
-                    <div className="text-sm text-gray-500 mt-1">{m.body}</div>
+                    {m.subject && <div className="text-sm text-[var(--text)]">{m.subject}</div>}
+                    <div className="text-sm text-[var(--text-sec)] mt-1">{m.body}</div>
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-[var(--text-faint)]">
                     {new Date(m.createdAt).toLocaleDateString()}
                   </div>
                 </div>

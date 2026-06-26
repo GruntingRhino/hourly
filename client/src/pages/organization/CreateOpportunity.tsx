@@ -220,17 +220,17 @@ export default function CreateOpportunity() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">
+      <h1 className="text-[20px] font-semibold mb-5">
         {isEditing ? "Edit Opportunity" : "Create Opportunity"}
       </h1>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
         {isEditing && loadingExisting && (
-          <div className="mb-4 text-sm text-gray-500">Loading opportunity...</div>
+          <div className="mb-4 text-sm text-[var(--text-sec)]">Loading opportunity...</div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+          <div className="mb-4 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
             {error}
           </div>
         )}
@@ -238,43 +238,43 @@ export default function CreateOpportunity() {
         {!loadingExisting && (
           <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Event Name</label>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">Event Name</label>
             <input
               type="text"
               name="title"
               value={form.title}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">Description</label>
             <textarea
               name="description"
               value={form.description}
               onChange={handleChange}
               required
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
           {/* Chip tag input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-            <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">Tags</label>
+            <div className="flex flex-wrap gap-1 p-2 border border-[var(--border-s)] rounded-[2px] min-h-[42px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-sm"
+                  className="flex items-center gap-1 px-2 py-0.5 bg-[var(--in-bg)] text-[var(--action)] rounded-full text-sm"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(tag)}
-                    className="text-blue-400 hover:text-blue-700 font-bold leading-none"
+                    className="text-blue-400 hover:text-[var(--action)] font-bold leading-none"
                   >
                     ×
                   </button>
@@ -295,24 +295,24 @@ export default function CreateOpportunity() {
                 className="flex-1 min-w-20 outline-none text-sm bg-transparent"
               />
             </div>
-            <p className="text-xs text-gray-400 mt-1">Press Enter or comma to add a tag</p>
+            <p className="text-xs text-[var(--text-faint)] mt-1">Press Enter or comma to add a tag</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">Location</label>
             <input
               type="text"
               name="location"
               value={form.location}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address <span className="text-gray-400">(optional)</span>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">
+              Address <span className="text-[var(--text-faint)]">(optional)</span>
             </label>
             <input
               type="text"
@@ -320,25 +320,25 @@ export default function CreateOpportunity() {
               value={form.address}
               onChange={handleChange}
               placeholder="123 Main St, Boston MA"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">Date</label>
             <input
               type="date"
               name="date"
               value={form.date}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Start Time</label>
               <input
                 type="text"
                 name="startTime"
@@ -346,11 +346,11 @@ export default function CreateOpportunity() {
                 onChange={handleChange}
                 required
                 placeholder="10:00 AM"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">End Time</label>
               <input
                 type="text"
                 name="endTime"
@@ -358,14 +358,14 @@ export default function CreateOpportunity() {
                 onChange={handleChange}
                 required
                 placeholder="2:00 PM"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
                 Duration (hours)
               </label>
               <input
@@ -376,11 +376,11 @@ export default function CreateOpportunity() {
                 required
                 step="0.5"
                 min="0.5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
                 Volunteers Needed
               </label>
               <input
@@ -390,13 +390,13 @@ export default function CreateOpportunity() {
                 onChange={handleChange}
                 required
                 min="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text)] mb-1">
               Age Requirement (optional)
             </label>
             <input
@@ -405,7 +405,7 @@ export default function CreateOpportunity() {
               value={form.ageRequirement}
               onChange={handleChange}
               min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
             />
           </div>
 
@@ -417,12 +417,12 @@ export default function CreateOpportunity() {
               onChange={handleChange}
               className="w-4 h-4"
             />
-            <label className="text-sm font-medium text-gray-700">Recurring Event</label>
+            <label className="text-sm font-medium text-[var(--text)]">Recurring Event</label>
           </div>
 
           {form.isRecurring && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
                 Recurring Pattern
               </label>
               <input
@@ -431,7 +431,7 @@ export default function CreateOpportunity() {
                 value={form.recurringPattern}
                 onChange={handleChange}
                 placeholder="e.g. Weekly on Saturdays"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
           )}
@@ -439,17 +439,17 @@ export default function CreateOpportunity() {
           {/* Custom Fields */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">Custom Fields</label>
+              <label className="block text-sm font-medium text-[var(--text)]">Custom Fields</label>
               <button
                 type="button"
                 onClick={addCustomField}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                className="text-xs text-[var(--action)] hover:text-[var(--navy)] font-medium"
               >
                 + Add Field
               </button>
             </div>
             {customFields.length === 0 && (
-              <p className="text-xs text-gray-400">Add custom fields to display extra information on your event.</p>
+              <p className="text-xs text-[var(--text-faint)]">Add custom fields to display extra information on your event.</p>
             )}
             <div className="space-y-2">
               {customFields.map((cf, i) => (
@@ -460,7 +460,7 @@ export default function CreateOpportunity() {
                     value={cf.label}
                     onChange={(e) => updateCustomField(i, "label", e.target.value)}
                     placeholder="Field label"
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                    className="flex-1 px-2 py-1.5 border border-[var(--border-s)] rounded-[2px] text-sm"
                   />
                   <input
                     type="text"
@@ -468,12 +468,12 @@ export default function CreateOpportunity() {
                     value={cf.value}
                     onChange={(e) => updateCustomField(i, "value", e.target.value)}
                     placeholder="Field value"
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                    className="flex-1 px-2 py-1.5 border border-[var(--border-s)] rounded-[2px] text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => removeCustomField(i)}
-                    className="text-red-400 hover:text-red-600 text-lg leading-none px-1"
+                    className="text-red-400 hover:text-[var(--er-t)] text-lg leading-none px-1"
                   >
                     ×
                   </button>
@@ -486,14 +486,14 @@ export default function CreateOpportunity() {
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50"
+              className="px-6 py-[7px] bg-[var(--action)] text-white rounded-[2px] font-medium hover:opacity-85 disabled:opacity-50"
             >
               {loading ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Opportunity")}
             </button>
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="px-6 py-2 border border-gray-300 rounded-md font-medium hover:bg-gray-50"
+              className="px-6 py-2 border border-[var(--border-s)] rounded-[2px] font-medium hover:bg-[var(--surface-alt)]"
             >
               Cancel
             </button>

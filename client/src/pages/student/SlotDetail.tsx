@@ -89,9 +89,9 @@ export default function SlotDetail() {
     }
   };
 
-  if (loading) return <div className="text-gray-500 p-4">Loading...</div>;
-  if (error) return <div className="text-red-500 p-4">{error}</div>;
-  if (!slot) return <div className="text-red-500 p-4">Slot not found</div>;
+  if (loading) return <div className="text-[var(--text-sec)] p-4">Loading...</div>;
+  if (error) return <div className="text-[var(--er-t)] p-4">{error}</div>;
+  if (!slot) return <div className="text-[var(--er-t)] p-4">Slot not found</div>;
 
   const opp = slot.opportunity;
   const spotsLeft = slot.capacity - slot._count.signups;
@@ -108,28 +108,28 @@ export default function SlotDetail() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:text-gray-700 mb-4 block">
+      <button onClick={() => navigate(-1)} className="text-sm text-[var(--text-sec)] hover:text-[var(--text)] mb-4 block">
         ← Back
       </button>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
         <div className="mb-4">
-          <div className="text-sm text-gray-500 mb-1">{opp.beneficiary.name}</div>
+          <div className="text-sm text-[var(--text-sec)] mb-1">{opp.beneficiary.name}</div>
           {opp.category && (
             <span className="inline-block px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded-full mb-2">
               {opp.category}
             </span>
           )}
-          <h1 className="text-2xl font-bold">{opp.title}</h1>
+          <h1 className="text-[28px] font-bold">{opp.title}</h1>
         </div>
 
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
-          <div className="font-semibold text-blue-900">{dateStr}</div>
-          <div className="text-blue-700 mt-1">
+        <div className="bg-[var(--in-bg)] border border-blue-100 rounded-[3px] p-4 mb-4">
+          <div className="font-semibold text-[var(--navy)]">{dateStr}</div>
+          <div className="text-[var(--action)] mt-1">
             {slot.startTime} – {slot.endTime} ·{" "}
             <span className="font-medium">{slot.durationHours}h</span>
           </div>
-          <div className="text-sm text-blue-600 mt-1">
+          <div className="text-sm text-[var(--action)] mt-1">
             {isFull
               ? "Full"
               : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} remaining`}{" "}
@@ -137,39 +137,39 @@ export default function SlotDetail() {
           </div>
         </div>
 
-        {opp.description && <p className="text-gray-700 mb-4">{opp.description}</p>}
+        {opp.description && <p className="text-[var(--text)] mb-4">{opp.description}</p>}
 
         <div className="space-y-2 mb-4 text-sm">
           {opp.location && (
             <div>
-              <span className="text-gray-500">Location: </span>
+              <span className="text-[var(--text-sec)]">Location: </span>
               <span className="font-medium">{opp.location}</span>
             </div>
           )}
           {opp.address && (
             <div>
-              <span className="text-gray-500">Address: </span>
+              <span className="text-[var(--text-sec)]">Address: </span>
               <span className="font-medium">{opp.address}</span>
             </div>
           )}
         </div>
 
         {opp.requirementsNote && (
-          <div className="mb-4 p-3 bg-orange-50 border border-orange-100 rounded-md text-sm text-orange-700">
+          <div className="mb-4 p-3 bg-orange-50 border border-orange-100 rounded-[2px] text-sm text-orange-700">
             <span className="font-medium">Requirements: </span>
             {opp.requirementsNote}
           </div>
         )}
 
-        <div className="border-t border-gray-100 pt-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+        <div className="border-t border-[var(--border)] pt-4 mb-4">
+          <h3 className="text-sm font-semibold text-[var(--text)] mb-2">
             About {opp.beneficiary.name}
           </h3>
           {opp.beneficiary.description && (
-            <p className="text-sm text-gray-600 mb-2">{opp.beneficiary.description}</p>
+            <p className="text-sm text-[var(--text-sec)] mb-2">{opp.beneficiary.description}</p>
           )}
           {(opp.beneficiary.city || opp.beneficiary.state) && (
-            <p className="text-xs text-gray-500 mb-1">
+            <p className="text-xs text-[var(--text-sec)] mb-1">
               {[opp.beneficiary.city, opp.beneficiary.state].filter(Boolean).join(", ")}
             </p>
           )}
@@ -178,18 +178,18 @@ export default function SlotDetail() {
               href={opp.beneficiary.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:underline"
+              className="text-xs text-[var(--action)] hover:underline"
             >
               {opp.beneficiary.website}
             </a>
           )}
         </div>
 
-        <div className="border-t border-gray-100 pt-4">
+        <div className="border-t border-[var(--border)] pt-4">
           {actionMsg && (
             <div
-              className={`mb-3 p-3 rounded-md text-sm ${
-                actionOk ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+              className={`mb-3 p-3 rounded-[2px] text-sm ${
+                actionOk ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" : "bg-[var(--er-bg)] text-[var(--er-t)]"
               }`}
             >
               {actionMsg}
@@ -197,8 +197,8 @@ export default function SlotDetail() {
           )}
           {isSignedUp ? (
             <div
-              className={`p-3 rounded-md text-sm text-center font-medium ${
-                isWaitlisted ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
+              className={`p-3 rounded-[2px] text-sm text-center font-medium ${
+                isWaitlisted ? "bg-[var(--wn-bg)] text-[var(--wn-t)]" : "bg-[var(--ok-bg)] text-[var(--ok-t)]"
               }`}
             >
               {isWaitlisted
@@ -209,8 +209,8 @@ export default function SlotDetail() {
             <button
               onClick={handleSignup}
               disabled={signingUp}
-              className={`w-full py-3 text-white rounded-md font-medium disabled:opacity-50 ${
-                isFull ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
+              className={`w-full py-3 text-white rounded-[2px] font-medium disabled:opacity-50 ${
+                isFull ? "bg-amber-600 hover:bg-amber-700" : "bg-[var(--action)] hover:bg-[var(--action)]"
               }`}
             >
               {signingUp

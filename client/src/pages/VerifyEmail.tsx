@@ -37,28 +37,28 @@ export default function VerifyEmail() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="w-full max-w-sm text-center">
-        <Link to="/" className="block text-2xl font-bold italic mb-8">GoodHours</Link>
+        <Link to="/" className="block text-[20px] font-semibold italic mb-8">GoodHours</Link>
         {status === "verifying" && (
           <div>
             <div className="text-4xl mb-4">⏳</div>
-            <h2 className="text-xl font-bold">Verifying your email...</h2>
+            <h2 className="text-[20px] font-semibold">Verifying your email...</h2>
           </div>
         )}
         {status === "success" && (
           <div>
             <div className="text-4xl mb-4">✅</div>
-            <h2 className="text-xl font-bold text-green-700">Email verified!</h2>
-            <p className="text-gray-600 mt-2">Redirecting to your dashboard...</p>
+            <h2 className="text-[20px] font-semibold text-[var(--ok-t)]">Email verified!</h2>
+            <p className="text-[var(--text-sec)] mt-2">Redirecting to your dashboard...</p>
           </div>
         )}
         {status === "error" && (
           <div>
             <div className="text-4xl mb-4">❌</div>
-            <h2 className="text-xl font-bold text-red-700">Verification failed</h2>
-            <p className="text-gray-600 mt-2">{error}</p>
-            <Link to="/login" className="mt-4 inline-block text-blue-600 hover:underline">Back to Sign In</Link>
+            <h2 className="text-[20px] font-semibold text-[var(--er-t)]">Verification failed</h2>
+            <p className="text-[var(--text-sec)] mt-2">{error}</p>
+            <Link to="/login" className="mt-4 inline-block text-[var(--action)] hover:underline">Back to Sign In</Link>
           </div>
         )}
       </div>

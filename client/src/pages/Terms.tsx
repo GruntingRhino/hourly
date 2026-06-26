@@ -107,7 +107,7 @@ export default function Terms() {
       title: "4. User Roles and Responsibilities",
       content: (
         <>
-          <p className="font-medium text-gray-900">4.1 School Administrators and Teachers</p>
+          <p className="font-medium text-[var(--text)]">4.1 School Administrators and Teachers</p>
           <p className="mt-1.5">
             School administrators are the primary account holders for their institution. By
             registering, school administrators agree to:
@@ -134,7 +134,7 @@ export default function Terms() {
             </li>
           </ul>
 
-          <p className="font-medium text-gray-900 mt-4">4.2 Students</p>
+          <p className="font-medium text-[var(--text)] mt-4">4.2 Students</p>
           <p className="mt-1.5">Students agree to:
           </p>
           <ul className="list-disc pl-5 mt-2 space-y-1.5">
@@ -156,7 +156,7 @@ export default function Terms() {
             school.
           </p>
 
-          <p className="font-medium text-gray-900 mt-4">4.3 Beneficiary Organizations</p>
+          <p className="font-medium text-[var(--text)] mt-4">4.3 Beneficiary Organizations</p>
           <p className="mt-1.5">Beneficiary organizations agree to:
           </p>
           <ul className="list-disc pl-5 mt-2 space-y-1.5">
@@ -288,7 +288,7 @@ export default function Terms() {
       content: (
         <p>
           Your use of the Service is also governed by our{" "}
-          <Link to="/privacy" className="text-blue-600 underline hover:opacity-80">
+          <Link to="/privacy" className="text-[var(--action)] underline hover:opacity-80">
             Privacy Policy
           </Link>
           , which is incorporated into these Terms by reference. The Privacy Policy describes how
@@ -441,11 +441,11 @@ export default function Terms() {
       content: (
         <p>
           Questions about these Terms should be directed to{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+          <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
             {CONTACT_EMAIL}
           </a>
           . For general support, contact{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
             {SUPPORT_EMAIL}
           </a>
           .
@@ -455,9 +455,9 @@ export default function Terms() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img
             src="/logo-full.png"
@@ -468,15 +468,15 @@ export default function Terms() {
               (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
             }}
           />
-          <span className="hidden font-bold text-blue-700 text-lg">GoodHours</span>
+          <span className="hidden font-bold text-[var(--action)] text-lg">GoodHours</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link to="/privacy" className="text-sm text-gray-500 hover:text-gray-800">
+          <Link to="/privacy" className="text-sm text-[var(--text-sec)] hover:text-[var(--text)]">
             Privacy Policy
           </Link>
           <Link
             to="/login"
-            className="text-sm text-blue-600 hover:underline font-medium"
+            className="text-sm text-[var(--action)] hover:underline font-medium"
           >
             Sign in
           </Link>
@@ -486,11 +486,11 @@ export default function Terms() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-[30px] font-bold text-gray-900 mb-2">Terms of Service</h1>
-          <p className="text-[13.5px] text-gray-500">
+          <h1 className="text-[30px] font-bold text-[var(--text)] mb-2">Terms of Service</h1>
+          <p className="text-[13.5px] text-[var(--text-sec)]">
             Effective date: {EFFECTIVE_DATE}
           </p>
-          <p className="text-[14px] text-gray-600 mt-4 leading-relaxed">
+          <p className="text-[14px] text-[var(--text-sec)] mt-4 leading-relaxed">
             These Terms of Service govern your access to and use of the GoodHours platform —
             a community service tracking and verification system for students, schools, and
             partner organizations. Please read these Terms carefully before using the Service.
@@ -498,8 +498,8 @@ export default function Terms() {
         </div>
 
         {/* Table of Contents */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-8">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        <div className="bg-white border border-[var(--border)] rounded-[3px] p-5 mb-8">
+          <p className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wide mb-3">
             Table of Contents
           </p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -507,7 +507,7 @@ export default function Terms() {
               <a
                 key={s.id}
                 href={`#${s.id}`}
-                className="text-[13px] text-blue-600 hover:underline py-0.5"
+                className="text-[13px] text-[var(--action)] hover:underline py-0.5"
               >
                 {s.title}
               </a>
@@ -521,32 +521,32 @@ export default function Terms() {
             <div
               key={s.id}
               id={s.id}
-              className="bg-white border border-gray-200 rounded-xl px-6 py-5 scroll-mt-6"
+              className="bg-white border border-[var(--border)] rounded-[3px] px-6 py-5 scroll-mt-6"
             >
-              <h2 className="text-[16px] font-semibold text-gray-900 mb-3">{s.title}</h2>
-              <div className="text-[13.5px] text-gray-600 leading-relaxed">{s.content}</div>
+              <h2 className="text-[16px] font-semibold text-[var(--text)] mb-3">{s.title}</h2>
+              <div className="text-[13.5px] text-[var(--text-sec)] leading-relaxed">{s.content}</div>
             </div>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="mt-10 bg-white border border-gray-200 rounded-xl p-6 text-center">
-          <div className="text-[14px] font-semibold text-gray-900 mb-1">
+        <div className="mt-10 bg-white border border-[var(--border)] rounded-[3px] p-6 text-center">
+          <div className="text-[14px] font-semibold text-[var(--text)] mb-1">
             Questions about our Terms?
           </div>
-          <p className="text-[13px] text-gray-500 mb-3">
+          <p className="text-[13px] text-[var(--text-sec)] mb-3">
             We're happy to clarify anything. Reach out and we'll respond promptly.
           </p>
           <a
             href={`mailto:${CONTACT_EMAIL}`}
-            className="inline-block px-5 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85 transition-opacity"
+            className="inline-block px-5 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85 transition-opacity"
           >
             Email {CONTACT_EMAIL}
           </a>
-          <div className="mt-5 pt-5 border-t border-gray-100 flex justify-center gap-5 text-[12.5px] text-gray-400">
-            <Link to="/privacy" className="hover:text-gray-600">Privacy Policy</Link>
-            <Link to="/faq" className="hover:text-gray-600">FAQ</Link>
-            <Link to="/" className="hover:text-gray-600">Home</Link>
+          <div className="mt-5 pt-5 border-t border-[var(--border)] flex justify-center gap-5 text-[12.5px] text-[var(--text-faint)]">
+            <Link to="/privacy" className="hover:text-[var(--text-sec)]">Privacy Policy</Link>
+            <Link to="/faq" className="hover:text-[var(--text-sec)]">FAQ</Link>
+            <Link to="/" className="hover:text-[var(--text-sec)]">Home</Link>
           </div>
         </div>
       </div>

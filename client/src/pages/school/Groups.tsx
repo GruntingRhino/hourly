@@ -433,10 +433,10 @@ export default function SchoolGroups() {
   };
 
   const statusColors: Record<string, string> = {
-    COMPLETED: "text-green-600 bg-green-50",
-    ON_TRACK: "text-blue-600 bg-blue-50",
-    AT_RISK: "text-red-600 bg-red-50",
-    NOT_STARTED: "text-gray-500 bg-gray-50",
+    COMPLETED: "text-[var(--ok-t)] bg-[var(--ok-bg)]",
+    ON_TRACK: "text-[var(--action)] bg-[var(--in-bg)]",
+    AT_RISK: "text-[var(--er-t)] bg-[var(--er-bg)]",
+    NOT_STARTED: "text-[var(--text-sec)] bg-[var(--surface-alt)]",
   };
   const statusLabels: Record<string, string> = {
     COMPLETED: "Completed",
@@ -447,18 +447,18 @@ export default function SchoolGroups() {
 
   const activeClassroom = classrooms.find((c) => c.id === selectedClassroom);
 
-  if (loading) return <div className="text-gray-500">Loading roster...</div>;
+  if (loading) return <div className="text-[var(--text-sec)]">Loading roster...</div>;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-[20px] font-semibold">
           {activeClassroom ? activeClassroom.name : "Student Roster"}
         </h1>
         {isOwner && (
           <button
             onClick={() => setShowAddStaff(true)}
-            className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
+            className="px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85"
           >
             + Add Staff Member
           </button>
@@ -477,9 +477,9 @@ export default function SchoolGroups() {
       {/* Remove Hours Modal */}
       {removeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-            <h2 className="text-lg font-bold mb-2">Remove Verified Hours</h2>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className="bg-white rounded-[3px] p-6 w-full max-w-sm">
+            <h2 className="text-[16px] font-semibold mb-2">Remove Verified Hours</h2>
+            <p className="text-sm text-[var(--text-sec)] mb-4">
               Remove verified hours for <strong>{removeModal.studentName}</strong>? Enter a reason (optional).
             </p>
             <textarea
@@ -488,19 +488,19 @@ export default function SchoolGroups() {
               placeholder="Reason (optional)"
               rows={3}
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm mb-4"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmRemove}
                 disabled={removing !== null}
-                className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 py-2 bg-[var(--er-t)] text-white rounded-[2px] text-sm font-medium hover:bg-[var(--er-t)] disabled:opacity-50"
               >
                 {removing !== null ? "Removing..." : "Remove Hours"}
               </button>
               <button
                 onClick={() => setRemoveModal(null)}
-                className="flex-1 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                className="flex-1 py-2 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
               >
                 Cancel
               </button>
@@ -512,11 +512,11 @@ export default function SchoolGroups() {
       <div className="grid md:grid-cols-4 gap-6">
         {/* Left: Classroom list */}
         <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Classrooms</div>
+          <div className="text-xs font-semibold text-[var(--text-sec)] uppercase tracking-wide mb-2">Classrooms</div>
           <div className="space-y-1">
             <button
               onClick={() => handleSelectClassroom("")}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm ${!selectedClassroom ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"}`}
+              className={`w-full text-left px-3 py-2 rounded-[2px] text-sm ${!selectedClassroom ? "bg-[var(--in-bg)] text-[var(--action)] font-medium" : "text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}
             >
               All Students
             </button>
@@ -524,10 +524,10 @@ export default function SchoolGroups() {
               <button
                 key={c.id}
                 onClick={() => handleSelectClassroom(c.id)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm ${selectedClassroom === c.id ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"}`}
+                className={`w-full text-left px-3 py-2 rounded-[2px] text-sm ${selectedClassroom === c.id ? "bg-[var(--in-bg)] text-[var(--action)] font-medium" : "text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}
               >
                 <div>{c.name}</div>
-                <div className="text-xs text-gray-400">{c.teacher.name} · {c.studentCount} students</div>
+                <div className="text-xs text-[var(--text-faint)]">{c.teacher.name} · {c.studentCount} students</div>
               </button>
             ))}
           </div>
@@ -535,8 +535,8 @@ export default function SchoolGroups() {
 
         {/* Center: Student list */}
         <div className="md:col-span-2">
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-blue-800 mb-2">Saved Admin Views</div>
+          <div className="mb-4 rounded-[3px] border border-[var(--in-b)] bg-[var(--in-bg)] p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--navy)] mb-2">Saved Admin Views</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
                 { id: "ADMIN_MORNING", title: "Morning Triage", note: "Highest-risk students across deadline, pace, and attendance" },
@@ -547,16 +547,16 @@ export default function SchoolGroups() {
                 <button
                   key={view.id}
                   onClick={() => applySavedView(view.id as SavedView)}
-                  className={`rounded-md border px-3 py-2 text-left ${savedView === view.id ? "border-blue-300 bg-white" : "border-blue-100 bg-blue-50 hover:bg-white"}`}
+                  className={`rounded-[2px] border px-3 py-2 text-left ${savedView === view.id ? "border-blue-300 bg-white" : "border-blue-100 bg-[var(--in-bg)] hover:bg-white"}`}
                 >
-                  <div className="text-sm font-medium text-gray-900">{view.title}</div>
-                  <div className="text-[11px] text-gray-500 mt-1">{view.note}</div>
+                  <div className="text-sm font-medium text-[var(--text)]">{view.title}</div>
+                  <div className="text-[11px] text-[var(--text-sec)] mt-1">{view.note}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <div className="mb-4 rounded-[3px] border border-[var(--wn-b)] bg-[var(--wn-bg)] p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">Triage Queue</div>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -572,7 +572,7 @@ export default function SchoolGroups() {
                     setTriageMode(queue.id as TriageMode);
                     syncSearchParams({ triage: queue.id, view: null, filter, classroom: selectedClassroom || null });
                   }}
-                  className={`rounded-md border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-50 text-amber-800 hover:bg-white"}`}
+                  className={`rounded-[2px] border px-3 py-2 text-left text-xs ${triageMode === queue.id ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-[var(--wn-bg)] text-amber-800 hover:bg-white"}`}
                 >
                   <div className="font-medium">{queue.label}</div>
                   <div className="text-[11px] opacity-80">{queue.count} students</div>
@@ -585,7 +585,7 @@ export default function SchoolGroups() {
                 setTriageMode("ALL");
                 syncSearchParams({ triage: "ALL", view: "FULL_ROSTER", filter, classroom: selectedClassroom || null });
               }}
-              className={`mt-2 text-xs ${triageMode === "ALL" ? "text-amber-900 font-medium" : "text-amber-700 hover:text-amber-900"}`}
+              className={`mt-2 text-xs ${triageMode === "ALL" ? "text-amber-900 font-medium" : "text-[var(--wn-t)] hover:text-amber-900"}`}
             >
               Show full roster
             </button>
@@ -597,40 +597,40 @@ export default function SchoolGroups() {
               placeholder="Search students..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]"
             />
             <button
               onClick={draftBulkMessage}
               disabled={filtered.length === 0}
-              className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              className="px-3 py-2 bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               Message Queue
             </button>
             <button
               onClick={handleQueueExport}
               disabled={filtered.length === 0}
-              className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-2 bg-white border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
             >
               Export Queue
             </button>
           </div>
 
           {bulkResult && (
-            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            <div className="mb-4 rounded-[3px] border border-[var(--ok-b)] bg-[var(--ok-bg)] px-3 py-2 text-sm text-[var(--ok-t)]">
               {bulkResult}
             </div>
           )}
 
           {showBulkCompose && (
-            <div className="mb-4 rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 rounded-[3px] border border-[var(--in-b)] bg-white p-4 ">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <div className="text-sm font-semibold text-gray-900">Bulk Follow-Up Composer</div>
-                  <div className="text-xs text-gray-500 mt-1">Send one polished follow-up to {filtered.length} students in the {queueLabel.toLowerCase()}.</div>
+                  <div className="text-sm font-semibold text-[var(--text)]">Bulk Follow-Up Composer</div>
+                  <div className="text-xs text-[var(--text-sec)] mt-1">Send one polished follow-up to {filtered.length} students in the {queueLabel.toLowerCase()}.</div>
                 </div>
                 <button
                   onClick={() => setShowBulkCompose(false)}
-                  className="text-xs text-gray-500 hover:text-gray-700"
+                  className="text-xs text-[var(--text-sec)] hover:text-[var(--text)]"
                 >
                   Close
                 </button>
@@ -640,26 +640,26 @@ export default function SchoolGroups() {
                 value={bulkSubject}
                 onChange={(e) => setBulkSubject(e.target.value)}
                 placeholder="Subject"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2"
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm mb-2"
               />
               <textarea
                 value={bulkBody}
                 onChange={(e) => setBulkBody(e.target.value)}
                 rows={4}
                 placeholder="Message body"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3"
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm mb-3"
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleBulkSend}
                   disabled={sendingBulk || !bulkBody.trim() || filtered.length === 0}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                  className="px-3 py-2 bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
                 >
                   {sendingBulk ? "Sending..." : `Send to ${filtered.length}`}
                 </button>
                 <button
                   onClick={() => setShowBulkCompose(false)}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-3 py-2 bg-white border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)]"
                 >
                   Cancel
                 </button>
@@ -668,7 +668,7 @@ export default function SchoolGroups() {
           )}
 
           {filtered.length === 0 ? (
-            <div className="text-gray-500 text-sm text-center py-8">No students found.</div>
+            <div className="text-[var(--text-sec)] text-sm text-center py-8">No students found.</div>
           ) : (
             <div className="space-y-2">
               {filtered.map((s) => (
@@ -684,36 +684,36 @@ export default function SchoolGroups() {
                       view: savedView === "CUSTOM" ? null : savedView,
                     });
                   }}
-                  className={`w-full text-left bg-white border rounded-lg p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-gray-200"}`}
+                  className={`w-full text-left bg-white border rounded-[3px] p-4 hover:border-blue-300 transition-colors ${selectedStudent?.id === s.id ? "border-blue-500" : "border-[var(--border)]"}`}
                 >
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="font-medium text-sm">{s.name}</div>
-                      <div className="text-xs text-gray-500">{s.email}</div>
+                      <div className="text-xs text-[var(--text-sec)]">{s.email}</div>
                       {s.email.toLowerCase() === "john@student.edu" && (
                         <span className="sr-only">John Collander</span>
                       )}
                       {'classroom' in s && s.classroom && (
-                        <div className="text-xs text-gray-400">{s.classroom.name}</div>
+                        <div className="text-xs text-[var(--text-faint)]">{s.classroom.name}</div>
                       )}
                       <div className="mt-1 flex flex-wrap gap-1">
                         {typeof s.pendingHours === "number" && s.pendingHours > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--wn-bg)] text-[var(--wn-t)]">
                             {s.pendingHours}h pending
                           </span>
                         )}
                         {deadlineLabel(s.daysToDeadline) && (
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.daysToDeadline != null && s.daysToDeadline <= 14 ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.daysToDeadline != null && s.daysToDeadline <= 14 ? "bg-[var(--er-bg)] text-[var(--er-t)]" : "bg-[var(--surface-alt)] text-[var(--text-sec)]"}`}>
                             {deadlineLabel(s.daysToDeadline)}
                           </span>
                         )}
                         {typeof s.noShowCount === "number" && s.noShowCount > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-50 text-red-700">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--er-bg)] text-[var(--er-t)]">
                             {s.noShowCount} no-show{s.noShowCount === 1 ? "" : "s"}
                           </span>
                         )}
                         {s.interventionCase && (
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.interventionCase.status === "RESOLVED" ? "bg-green-50 text-green-700" : s.interventionCase.priority === "URGENT" ? "bg-red-100 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${s.interventionCase.status === "RESOLVED" ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" : s.interventionCase.priority === "URGENT" ? "bg-[var(--er-bg)] text-[var(--er-t)]" : "bg-[var(--in-bg)] text-[var(--action)]"}`}>
                             {s.interventionCase.status.replaceAll("_", " ")}
                           </span>
                         )}
@@ -722,21 +722,21 @@ export default function SchoolGroups() {
                     <div className="text-right">
                       <div className="text-sm font-bold">{s.approvedHours}h</div>
                       {typeof s.remainingHours === "number" && s.status !== "COMPLETED" && (
-                        <div className="text-[11px] text-gray-400">{s.remainingHours}h left</div>
+                        <div className="text-[11px] text-[var(--text-faint)]">{s.remainingHours}h left</div>
                       )}
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${statusColors[s.status]}`}>
                         {statusLabels[s.status]}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                  <div className="mt-2 w-full bg-[var(--border)] rounded-full h-1.5">
                     <div
-                      className="bg-blue-500 h-1.5 rounded-full transition-all"
+                      className="bg-[var(--in-bg)]0 h-1.5 rounded-full transition-all"
                       style={{ width: `${Math.min(100, s.percentComplete ?? (s.approvedHours / Math.max(1, s.requiredHours)) * 100)}%` }}
                     />
                   </div>
                   {!!s.riskReasons?.length && (
-                    <div className="mt-2 text-[11px] text-gray-500 line-clamp-2">
+                    <div className="mt-2 text-[11px] text-[var(--text-sec)] line-clamp-2">
                       {s.riskReasons.slice(0, 2).join(" • ")}
                     </div>
                   )}
@@ -749,7 +749,7 @@ export default function SchoolGroups() {
         {/* Right: Filters + student detail */}
         <div>
           <div className="mb-4">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter</div>
+            <div className="text-xs font-semibold text-[var(--text-sec)] uppercase tracking-wide mb-2">Filter</div>
             <div className="space-y-1">
               {["ALL", "COMPLETED", "ON_TRACK", "AT_RISK", "NOT_STARTED"].map((f) => (
                 <button
@@ -760,10 +760,10 @@ export default function SchoolGroups() {
                     syncSearchParams({ filter: f, view: null, triage: triageMode, classroom: selectedClassroom || null });
                   }}
                   aria-label={`${f === "ALL" ? "All" : statusLabels[f]}${f === "ALL" ? displayStudents.length : displayStudents.filter((s) => s.status === f).length}`}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === f ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"}`}
+                  className={`w-full text-left px-3 py-2 rounded-[2px] text-sm ${filter === f ? "bg-[var(--in-bg)] text-[var(--action)] font-medium" : "text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}
                 >
                   {f === "ALL" ? "All" : statusLabels[f]}
-                  <span className="float-right text-xs text-gray-400">
+                  <span className="float-right text-xs text-[var(--text-faint)]">
                     {f === "ALL" ? displayStudents.length : displayStudents.filter((s) => s.status === f).length}
                   </span>
                 </button>
@@ -771,9 +771,9 @@ export default function SchoolGroups() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
             <div className="text-sm font-semibold mb-1">Current Queue</div>
-            <div className="text-xs text-gray-500 mb-2">
+            <div className="text-xs text-[var(--text-sec)] mb-2">
               {triageMode === "URGENT" && "Showing highest-priority students first: at-risk, near deadline, no-shows, and approval bottlenecks."}
               {triageMode === "OVERDUE" && "Students whose service deadline has already passed and still need intervention."}
               {triageMode === "PENDING_APPROVAL" && "Students blocked by approval backlog instead of pure participation."}
@@ -781,41 +781,41 @@ export default function SchoolGroups() {
               {triageMode === "ALL" && "Full roster view, still sorted by urgency so the most actionable cases stay on top."}
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded bg-gray-50 p-2">
-                <div className="text-gray-500">Students in queue</div>
-                <div className="font-semibold text-gray-900">{filtered.length}</div>
+              <div className="rounded bg-[var(--surface-alt)] p-2">
+                <div className="text-[var(--text-sec)]">Students in queue</div>
+                <div className="font-semibold text-[var(--text)]">{filtered.length}</div>
               </div>
-              <div className="rounded bg-gray-50 p-2">
-                <div className="text-gray-500">Saved view</div>
-                <div className="font-semibold text-gray-900">{savedView === "CUSTOM" ? "Custom" : savedView.replaceAll("_", " ")}</div>
+              <div className="rounded bg-[var(--surface-alt)] p-2">
+                <div className="text-[var(--text-sec)]">Saved view</div>
+                <div className="font-semibold text-[var(--text)]">{savedView === "CUSTOM" ? "Custom" : savedView.replaceAll("_", " ")}</div>
               </div>
-              <div className="rounded bg-gray-50 p-2">
-                <div className="text-gray-500">Active cases</div>
-                <div className="font-semibold text-gray-900">{filtered.filter((student) => student.interventionCase && student.interventionCase.status !== "RESOLVED").length}</div>
+              <div className="rounded bg-[var(--surface-alt)] p-2">
+                <div className="text-[var(--text-sec)]">Active cases</div>
+                <div className="font-semibold text-[var(--text)]">{filtered.filter((student) => student.interventionCase && student.interventionCase.status !== "RESOLVED").length}</div>
               </div>
-              <div className="rounded bg-gray-50 p-2">
-                <div className="text-gray-500">Hours remaining</div>
-                <div className="font-semibold text-gray-900">{filtered.reduce((sum, student) => sum + (student.remainingHours ?? 0), 0).toFixed(1)}h</div>
+              <div className="rounded bg-[var(--surface-alt)] p-2">
+                <div className="text-[var(--text-sec)]">Hours remaining</div>
+                <div className="font-semibold text-[var(--text)]">{filtered.reduce((sum, student) => sum + (student.remainingHours ?? 0), 0).toFixed(1)}h</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
             <div className="text-sm font-semibold mb-1">Audit Trail</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-[var(--text-sec)]">
               Open a student's hour history to review verification and override actions.
             </div>
           </div>
 
           {activeClassroom && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="bg-white border border-[var(--border)] rounded-[3px] p-4 mb-4">
               <div className="font-medium text-sm mb-1">{activeClassroom.name}</div>
-              <div className="text-xs text-gray-500 mb-2">Teacher: {activeClassroom.teacher.name}</div>
-              <div className="text-xs font-mono bg-gray-50 p-1.5 rounded flex justify-between">
+              <div className="text-xs text-[var(--text-sec)] mb-2">Teacher: {activeClassroom.teacher.name}</div>
+              <div className="text-xs font-mono bg-[var(--surface-alt)] p-1.5 rounded flex justify-between">
                 <span>{activeClassroom.inviteCode}</span>
                 <button
                   onClick={() => navigator.clipboard.writeText(activeClassroom.inviteCode)}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-[var(--action)] hover:text-[var(--navy)]"
                 >Copy</button>
               </div>
             </div>
@@ -1003,18 +1003,18 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   }, [showHistory, student.id]);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div className="bg-white border border-[var(--border)] rounded-[3px] p-4">
       <div className="font-semibold text-sm">{student.name}</div>
-      <div className="text-xs text-gray-500 mb-3">{student.email}</div>
+      <div className="text-xs text-[var(--text-sec)] mb-3">{student.email}</div>
 
       <div className="mb-3">
-        <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <div className="flex justify-between text-xs text-[var(--text-sec)] mb-1">
           <span>Progress</span>
           <span>{student.approvedHours}h / {requiredHours}h</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-[var(--border)] rounded-full h-2">
           <div
-            className="bg-blue-500 h-2 rounded-full"
+            className="bg-[var(--in-bg)]0 h-2 rounded-full"
             style={{ width: `${Math.min(100, student.percentComplete ?? (student.approvedHours / Math.max(1, requiredHours)) * 100)}%` }}
           />
         </div>
@@ -1025,37 +1025,37 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
           {statusLabels[student.status]}
         </span>
         {typeof student.pendingHours === "number" && student.pendingHours > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded font-medium bg-amber-50 text-amber-700">
+          <span className="text-xs px-2 py-0.5 rounded font-medium bg-[var(--wn-bg)] text-[var(--wn-t)]">
             {student.pendingHours}h pending
           </span>
         )}
         {deadlineLabel(student.daysToDeadline) && (
-          <span className={`text-xs px-2 py-0.5 rounded font-medium ${student.daysToDeadline != null && student.daysToDeadline <= 14 ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+          <span className={`text-xs px-2 py-0.5 rounded font-medium ${student.daysToDeadline != null && student.daysToDeadline <= 14 ? "bg-[var(--er-bg)] text-[var(--er-t)]" : "bg-[var(--surface-alt)] text-[var(--text-sec)]"}`}>
             {deadlineLabel(student.daysToDeadline)}
           </span>
         )}
         {typeof student.noShowCount === "number" && student.noShowCount > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded font-medium bg-red-50 text-red-700">
+          <span className="text-xs px-2 py-0.5 rounded font-medium bg-[var(--er-bg)] text-[var(--er-t)]">
             {student.noShowCount} no-show{student.noShowCount === 1 ? "" : "s"}
           </span>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-        <div className="bg-gray-50 rounded p-2">
-          <div className="text-gray-500">Remaining</div>
-          <div className="font-medium text-gray-800">{student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h</div>
+        <div className="bg-[var(--surface-alt)] rounded p-2">
+          <div className="text-[var(--text-sec)]">Remaining</div>
+          <div className="font-medium text-[var(--text)]">{student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h</div>
         </div>
-        <div className="bg-gray-50 rounded p-2">
-          <div className="text-gray-500">Completion</div>
-          <div className="font-medium text-gray-800">{student.percentComplete ?? Math.min(100, Math.round((student.approvedHours / Math.max(1, requiredHours)) * 100))}%</div>
+        <div className="bg-[var(--surface-alt)] rounded p-2">
+          <div className="text-[var(--text-sec)]">Completion</div>
+          <div className="font-medium text-[var(--text)]">{student.percentComplete ?? Math.min(100, Math.round((student.approvedHours / Math.max(1, requiredHours)) * 100))}%</div>
         </div>
       </div>
 
       {!!student.riskReasons?.length && (
-        <div className="mb-3 rounded border border-red-100 bg-red-50 p-3">
+        <div className="mb-3 rounded border border-red-100 bg-[var(--er-bg)] p-3">
           <div className="text-xs font-semibold text-red-800 mb-1">Why this student is flagged</div>
-          <ul className="list-disc pl-4 text-xs text-red-700 space-y-1">
+          <ul className="list-disc pl-4 text-xs text-[var(--er-t)] space-y-1">
             {student.riskReasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
@@ -1063,44 +1063,44 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
         </div>
       )}
 
-      <div className="mb-3 rounded border border-blue-100 bg-blue-50 p-3 space-y-3">
+      <div className="mb-3 rounded border border-blue-100 bg-[var(--in-bg)] p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold text-blue-800">Intervention Case</div>
-            <div className="text-[11px] text-blue-700">Track the case, next steps, and whether this student still blocks graduation progress.</div>
+            <div className="text-xs font-semibold text-[var(--navy)]">Intervention Case</div>
+            <div className="text-[11px] text-[var(--action)]">Track the case, next steps, and whether this student still blocks graduation progress.</div>
           </div>
           <button
             onClick={saveCase}
             disabled={savingCase}
-            className="px-2.5 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="px-2.5 py-1.5 text-xs rounded bg-[var(--action)] text-white hover:bg-[var(--action)] disabled:opacity-50"
           >
             {savingCase ? "Saving..." : "Save Case"}
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <select value={caseForm.status} onChange={(e) => setCaseForm((current) => ({ ...current, status: e.target.value }))} className="px-2 py-1.5 text-xs border border-blue-200 rounded bg-white">
+          <select value={caseForm.status} onChange={(e) => setCaseForm((current) => ({ ...current, status: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white">
             {['OPEN','WAITING_ON_STUDENT','WAITING_ON_SCHOOL','MONITORING','RESOLVED'].map((option) => (
               <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>
             ))}
           </select>
-          <select value={caseForm.priority} onChange={(e) => setCaseForm((current) => ({ ...current, priority: e.target.value }))} className="px-2 py-1.5 text-xs border border-blue-200 rounded bg-white">
+          <select value={caseForm.priority} onChange={(e) => setCaseForm((current) => ({ ...current, priority: e.target.value }))} className="px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white">
             {['LOW','MEDIUM','HIGH','URGENT'].map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
         </div>
-        <input value={caseForm.summary} onChange={(e) => setCaseForm((current) => ({ ...current, summary: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Short intervention summary" />
-        <input value={caseForm.reason} onChange={(e) => setCaseForm((current) => ({ ...current, reason: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Why this student needs intervention" />
-        <input value={caseForm.nextStepForStudent} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStudent: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Next step for student" />
-        <input value={caseForm.nextStepForStaff} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStaff: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" placeholder="Next step for staff" />
-        <textarea value={caseForm.studentMessage} onChange={(e) => setCaseForm((current) => ({ ...current, studentMessage: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" rows={2} placeholder="Student-facing message shown in their dashboard/messages" />
-        <textarea value={caseForm.staffNote} onChange={(e) => setCaseForm((current) => ({ ...current, staffNote: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" rows={3} placeholder="Internal staff note" />
-        <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+        <input value={caseForm.summary} onChange={(e) => setCaseForm((current) => ({ ...current, summary: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Short intervention summary" />
+        <input value={caseForm.reason} onChange={(e) => setCaseForm((current) => ({ ...current, reason: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Why this student needs intervention" />
+        <input value={caseForm.nextStepForStudent} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStudent: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Next step for student" />
+        <input value={caseForm.nextStepForStaff} onChange={(e) => setCaseForm((current) => ({ ...current, nextStepForStaff: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" placeholder="Next step for staff" />
+        <textarea value={caseForm.studentMessage} onChange={(e) => setCaseForm((current) => ({ ...current, studentMessage: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" rows={2} placeholder="Student-facing message shown in their dashboard/messages" />
+        <textarea value={caseForm.staffNote} onChange={(e) => setCaseForm((current) => ({ ...current, staffNote: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" rows={3} placeholder="Internal staff note" />
+        <div className="grid grid-cols-2 gap-2 text-xs text-[var(--navy)]">
           <label className="space-y-1">
             <span className="block">Follow-up date</span>
-            <input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((current) => ({ ...current, dueDate: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded bg-white" />
+            <input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((current) => ({ ...current, dueDate: e.target.value }))} className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded bg-white" />
           </label>
-          <div className="rounded border border-blue-100 bg-white p-2 text-[11px] text-blue-700">
+          <div className="rounded border border-blue-100 bg-white p-2 text-[11px] text-[var(--action)]">
             <div>Last contacted: {caseForm.lastContactedAt ? new Date(caseForm.lastContactedAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
             <div>Last student action: {caseForm.lastStudentActionAt ? new Date(caseForm.lastStudentActionAt).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}</div>
             <div>New hour activity since outreach: {caseForm.followUpSeen ? 'Yes' : 'No'}</div>
@@ -1112,33 +1112,33 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
         <button
           onClick={() => setShowReminderCompose(true)}
           disabled={sendingReminder}
-          className="w-full text-xs py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 disabled:opacity-50"
+          className="w-full text-xs py-1.5 bg-[var(--in-bg)] text-[var(--action)] border border-[var(--in-b)] rounded hover:bg-[var(--in-bg)] disabled:opacity-50"
         >
           {reminderSent ? "Reminder Sent!" : "Send Reminder"}
         </button>
         <button
           onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
-          className="w-full text-xs py-1.5 border border-gray-200 rounded hover:bg-gray-50"
+          className="w-full text-xs py-1.5 border border-[var(--border)] rounded hover:bg-[var(--surface-alt)]"
         >
           {showHistory ? "Hide Hour History" : "View Hour History"}
         </button>
       </div>
 
       {showReminderCompose && (
-        <div className="mt-3 p-3 border border-blue-200 bg-blue-50 rounded">
-          <div className="text-xs font-semibold text-blue-800 mb-2">Compose Reminder</div>
-          <div className="text-xs text-blue-700 mb-2">Recipient: {student.email}</div>
+        <div className="mt-3 p-3 border border-[var(--in-b)] bg-[var(--in-bg)] rounded">
+          <div className="text-xs font-semibold text-[var(--navy)] mb-2">Compose Reminder</div>
+          <div className="text-xs text-[var(--action)] mb-2">Recipient: {student.email}</div>
           <input
             type="text"
             value={reminderSubject}
             onChange={(e) => setReminderSubject(e.target.value)}
-            className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded mb-2"
+            className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded mb-2"
             placeholder="Subject"
           />
           <textarea
             value={reminderBody}
             onChange={(e) => setReminderBody(e.target.value)}
-            className="w-full px-2 py-1.5 text-xs border border-blue-200 rounded mb-2"
+            className="w-full px-2 py-1.5 text-xs border border-[var(--in-b)] rounded mb-2"
             rows={3}
             placeholder="Message body"
           />
@@ -1146,13 +1146,13 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
             <button
               onClick={handleSendReminder}
               disabled={sendingReminder || !reminderBody.trim()}
-              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-2 py-1 text-xs bg-[var(--action)] text-white rounded hover:bg-[var(--action)] disabled:opacity-50"
             >
               {sendingReminder ? "Sending..." : "Send"}
             </button>
             <button
               onClick={() => setShowReminderCompose(false)}
-              className="px-2 py-1 text-xs border border-blue-200 rounded hover:bg-blue-100"
+              className="px-2 py-1 text-xs border border-[var(--in-b)] rounded hover:bg-[var(--in-bg)]"
             >
               Cancel
             </button>
@@ -1160,37 +1160,37 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
         </div>
       )}
 
-      <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3">
+      <div className="mt-3 rounded border border-[var(--border)] bg-[var(--surface-alt)] p-3">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
-            <div className="text-xs font-semibold text-gray-800">Outreach History</div>
-            <div className="text-[11px] text-gray-500">Track who followed up after staff outreach and which queue triggered the message.</div>
+            <div className="text-xs font-semibold text-[var(--text)]">Outreach History</div>
+            <div className="text-[11px] text-[var(--text-sec)]">Track who followed up after staff outreach and which queue triggered the message.</div>
           </div>
         </div>
         {loadingInterventions ? (
-          <div className="text-xs text-gray-400">Loading outreach history...</div>
+          <div className="text-xs text-[var(--text-faint)]">Loading outreach history...</div>
         ) : interventions.length === 0 ? (
-          <div className="text-xs text-gray-400">No outreach has been logged for this student yet.</div>
+          <div className="text-xs text-[var(--text-faint)]">No outreach has been logged for this student yet.</div>
         ) : (
           <div className="space-y-2">
             {interventions.map((item) => (
-              <div key={item.id} className="rounded bg-white border border-gray-200 p-2.5">
+              <div key={item.id} className="rounded bg-white border border-[var(--border)] p-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-xs font-medium text-gray-900">{item.subject || "Student outreach"}</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">
+                    <div className="text-xs font-medium text-[var(--text)]">{item.subject || "Student outreach"}</div>
+                    <div className="text-[11px] text-[var(--text-sec)] mt-0.5">
                       {item.actor.name} · {new Date(item.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${item.followUpCount > 0 ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                  <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${item.followUpCount > 0 ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" : "bg-[var(--wn-bg)] text-[var(--wn-t)]"}`}>
                     {item.followUpCount > 0 ? "Follow-up seen" : "Awaiting follow-up"}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {item.queueType && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.queueType.replaceAll("_", " ")}</span>}
-                  {item.savedView && <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{item.savedView.replaceAll("_", " ")}</span>}
+                  {item.queueType && <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--in-bg)] text-[var(--action)]">{item.queueType.replaceAll("_", " ")}</span>}
+                  {item.savedView && <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-alt)] text-[var(--text-sec)]">{item.savedView.replaceAll("_", " ")}</span>}
                 </div>
-                {item.bodyPreview && <div className="mt-2 text-[11px] text-gray-600 line-clamp-2">{item.bodyPreview}</div>}
+                {item.bodyPreview && <div className="mt-2 text-[11px] text-[var(--text-sec)] line-clamp-2">{item.bodyPreview}</div>}
               </div>
             ))}
           </div>
@@ -1200,24 +1200,24 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
       {showHistory && (
         <div className="mt-3 space-y-2">
           {loadingSessions ? (
-            <div className="text-xs text-gray-400">Loading...</div>
+            <div className="text-xs text-[var(--text-faint)]">Loading...</div>
           ) : sessions.length === 0 ? (
-            <div className="text-xs text-gray-400">No sessions found.</div>
+            <div className="text-xs text-[var(--text-faint)]">No sessions found.</div>
           ) : (
             sessions.slice(0, 5).map((session: any) => (
-              <div key={session.id} className="bg-gray-50 rounded p-2 text-xs">
+              <div key={session.id} className="bg-[var(--surface-alt)] rounded p-2 text-xs">
                 <div className="flex justify-between">
                   <span className="font-medium">{session.opportunity?.title}</span>
-                  <span className={session.verificationStatus === "APPROVED" ? "text-green-600" : "text-gray-500"}>
+                  <span className={session.verificationStatus === "APPROVED" ? "text-[var(--ok-t)]" : "text-[var(--text-sec)]"}>
                     {session.totalHours}h
                   </span>
                 </div>
-                <div className="mt-0.5 text-[11px] text-gray-500">Status: {session.verificationStatus}</div>
+                <div className="mt-0.5 text-[11px] text-[var(--text-sec)]">Status: {session.verificationStatus}</div>
                 {session.verificationStatus === "APPROVED" && (
                   <button
                     onClick={() => onRemoveHours(session.id, student.name)}
                     disabled={removing === session.id}
-                    className="text-red-500 hover:text-red-700 mt-1"
+                    className="text-[var(--er-t)] hover:text-[var(--er-t)] mt-1"
                   >
                     Remove Hours
                   </button>
@@ -1264,42 +1264,42 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Add Staff Member</h2>
+      <div className="bg-white rounded-[3px] p-6 w-full max-w-md">
+        <h2 className="text-[20px] font-semibold mb-4">Add Staff Member</h2>
 
         {result ? (
           <div>
-            <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
-              <div className="font-medium text-green-800">Staff member created!</div>
-              <div className="text-sm text-green-700 mt-1">
+            <div className="bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded-[2px] p-4 mb-4">
+              <div className="font-medium text-[var(--ok-t)]">Staff member created!</div>
+              <div className="text-sm text-[var(--ok-t)] mt-1">
                 <div>Email: {result.email}</div>
                 <div>Temp Password: <span className="font-mono font-bold">{result.tempPassword}</span></div>
               </div>
-              <p className="text-xs text-green-600 mt-2">Share these credentials with {result.name}.</p>
+              <p className="text-xs text-[var(--ok-t)] mt-2">Share these credentials with {result.name}.</p>
             </div>
-            <button onClick={onClose} className="w-full py-[7px] bg-blue-600 text-white rounded-md hover:opacity-85">Done</button>
+            <button onClick={onClose} className="w-full py-[7px] bg-[var(--action)] text-white rounded-[2px] hover:opacity-85">Done</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+              <div className="p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
                 {formError}
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:ring-2 focus:ring-[var(--action)]" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Email</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:ring-2 focus:ring-[var(--action)]" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Classroom <span className="text-gray-400">(optional)</span></label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Assign to Classroom <span className="text-[var(--text-faint)]">(optional)</span></label>
               <select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:ring-2 focus:ring-[var(--action)]">
                 <option value="">Select classroom...</option>
                 {classrooms.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -1308,11 +1308,11 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
             </div>
             <div className="flex gap-2 pt-2">
               <button type="submit" disabled={loading}
-                className="flex-1 py-[7px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85 disabled:opacity-50">
+                className="flex-1 py-[7px] bg-[var(--action)] text-white rounded-[2px] font-medium hover:opacity-85 disabled:opacity-50">
                 {loading ? "Creating..." : "Create Account"}
               </button>
               <button type="button" onClick={onClose}
-                className="flex-1 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+                className="flex-1 py-2 border border-[var(--border-s)] rounded-[2px] hover:bg-[var(--surface-alt)]">
                 Cancel
               </button>
             </div>

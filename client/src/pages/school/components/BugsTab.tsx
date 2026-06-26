@@ -105,31 +105,31 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
       <div className="space-y-6">
-        <form onSubmit={handleCreateBug} className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">New bug triage item</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <form onSubmit={handleCreateBug} className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+          <h2 className="text-[16px] font-semibold text-[var(--text)]">New bug triage item</h2>
+          <p className="mt-1 text-sm text-[var(--text-sec)]">
             Capture rollout defects with enough detail to assign, reproduce, and verify.
           </p>
           {bugMessage && (
-            <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <div className="mt-4 rounded-[2px] border border-[var(--border)] bg-[var(--surface-alt)] px-3 py-2 text-sm text-[var(--text)]">
               {bugMessage}
             </div>
           )}
           <div className="mt-5 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Title</label>
               <input
                 type="text"
                 aria-label="New bug title"
                 value={createBugForm.title}
                 onChange={(e) => setCreateBugForm((current) => ({ ...current, title: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 required
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Severity</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Severity</label>
                 <select
                   aria-label="New bug severity"
                   value={createBugForm.severity}
@@ -139,7 +139,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                       severity: e.target.value as BugCreateForm["severity"],
                     }))
                   }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 >
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -148,88 +148,88 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Area</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Area</label>
                 <input
                   type="text"
                   aria-label="New bug area"
                   value={createBugForm.area}
                   onChange={(e) => setCreateBugForm((current) => ({ ...current, area: e.target.value }))}
                   placeholder="Onboarding, Partners, Cohorts"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Description</label>
               <textarea
                 rows={4}
                 aria-label="New bug description"
                 value={createBugForm.description}
                 onChange={(e) => setCreateBugForm((current) => ({ ...current, description: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Source</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Source</label>
                 <input
                   type="text"
                   aria-label="New bug source"
                   value={createBugForm.source}
                   onChange={(e) => setCreateBugForm((current) => ({ ...current, source: e.target.value }))}
                   placeholder="Student report, admin test"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Owner</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Owner</label>
                 <input
                   type="text"
                   aria-label="New bug owner"
                   value={createBugForm.ownerName}
                   onChange={(e) => setCreateBugForm((current) => ({ ...current, ownerName: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Workaround</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Workaround</label>
               <textarea
                 rows={2}
                 aria-label="New bug workaround"
                 value={createBugForm.workaround}
                 onChange={(e) => setCreateBugForm((current) => ({ ...current, workaround: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Next action</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Next action</label>
               <textarea
                 rows={2}
                 aria-label="New bug next action"
                 value={createBugForm.nextAction}
                 onChange={(e) => setCreateBugForm((current) => ({ ...current, nextAction: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <button
               type="submit"
               disabled={creatingBug}
-              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+              className="rounded-[2px] bg-[var(--action)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--navy)] disabled:opacity-50"
             >
               {creatingBug ? "Saving..." : "Add Bug"}
             </button>
           </div>
         </form>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">Triage queue</h2>
-            <div className="text-sm text-gray-500">{workspace.bugs.length} total</div>
+            <h2 className="text-[16px] font-semibold text-[var(--text)]">Triage queue</h2>
+            <div className="text-sm text-[var(--text-sec)]">{workspace.bugs.length} total</div>
           </div>
           <div className="mt-5 space-y-3">
             {workspace.bugs.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500">
+              <div className="rounded-[3px] border border-dashed border-[var(--border-s)] p-5 text-sm text-[var(--text-sec)]">
                 No rollout bugs yet.
               </div>
             ) : (
@@ -237,10 +237,10 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                 <button
                   key={bug.id}
                   onClick={() => setSelectedBugId(bug.id)}
-                  className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                  className={`w-full rounded-[3px] border p-4 text-left transition-colors ${
                     selectedBugId === bug.id
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
+                      ? "border-blue-300 bg-[var(--in-bg)]"
+                      : "border-[var(--border)] bg-white hover:border-[var(--border-s)]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -251,8 +251,8 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                       {bug.status}
                     </span>
                   </div>
-                  <div className="mt-2 font-medium text-gray-900">{bug.title}</div>
-                  <div className="mt-1 text-sm text-gray-500">
+                  <div className="mt-2 font-medium text-[var(--text)]">{bug.title}</div>
+                  <div className="mt-1 text-sm text-[var(--text-sec)]">
                     {bug.area || "General"} · Updated {new Date(bug.updatedAt).toLocaleDateString()}
                   </div>
                 </button>
@@ -262,27 +262,27 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Selected bug</h2>
+      <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+        <h2 className="text-[16px] font-semibold text-[var(--text)]">Selected bug</h2>
         {!selectedBug ? (
-          <div className="mt-5 rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500">
+          <div className="mt-5 rounded-[3px] border border-dashed border-[var(--border-s)] p-5 text-sm text-[var(--text-sec)]">
             Select a bug to edit severity, status, owner, workaround, and next action.
           </div>
         ) : (
           <div className="mt-5 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Title</label>
               <input
                 type="text"
                 aria-label="Selected bug title"
                 value={bugEditForm.title}
                 onChange={(e) => setBugEditForm((current) => ({ ...current, title: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Severity</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Severity</label>
                 <select
                   aria-label="Selected bug severity"
                   value={bugEditForm.severity}
@@ -292,7 +292,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                       severity: e.target.value as BugEditForm["severity"],
                     }))
                   }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 >
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -301,7 +301,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Status</label>
                 <select
                   aria-label="Selected bug status"
                   value={bugEditForm.status}
@@ -311,7 +311,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
                       status: e.target.value as BugEditForm["status"],
                     }))
                   }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 >
                   <option value="OPEN">Open</option>
                   <option value="INVESTIGATING">Investigating</option>
@@ -324,73 +324,73 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Area</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Area</label>
                 <input
                   type="text"
                   aria-label="Selected bug area"
                   value={bugEditForm.area}
                   onChange={(e) => setBugEditForm((current) => ({ ...current, area: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Source</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--text)]">Source</label>
                 <input
                   type="text"
                   aria-label="Selected bug source"
                   value={bugEditForm.source}
                   onChange={(e) => setBugEditForm((current) => ({ ...current, source: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Owner</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Owner</label>
               <input
                 type="text"
                 aria-label="Selected bug owner"
                 value={bugEditForm.ownerName}
                 onChange={(e) => setBugEditForm((current) => ({ ...current, ownerName: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Description</label>
               <textarea
                 rows={5}
                 aria-label="Selected bug description"
                 value={bugEditForm.description}
                 onChange={(e) => setBugEditForm((current) => ({ ...current, description: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Workaround</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Workaround</label>
               <textarea
                 rows={3}
                 aria-label="Selected bug workaround"
                 value={bugEditForm.workaround}
                 onChange={(e) => setBugEditForm((current) => ({ ...current, workaround: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Next action</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Next action</label>
               <textarea
                 rows={3}
                 aria-label="Selected bug next action"
                 value={bugEditForm.nextAction}
                 onChange={(e) => setBugEditForm((current) => ({ ...current, nextAction: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-[var(--text-faint)]">
               Created {new Date(selectedBug.createdAt).toLocaleString()} · Updated {new Date(selectedBug.updatedAt).toLocaleString()}
             </div>
             <button
               onClick={handleSaveBug}
               disabled={savingBug}
-              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+              className="rounded-[2px] bg-[var(--action)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--navy)] disabled:opacity-50"
             >
               {savingBug ? "Saving..." : "Save Bug"}
             </button>

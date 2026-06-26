@@ -104,7 +104,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-yellow-100 text-gray-900 rounded-sm">{text.slice(idx, idx + query.length)}</mark>
+      <mark className="bg-[var(--wn-bg)] text-[var(--text)] rounded-sm">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
   );
@@ -414,37 +414,37 @@ export default function SchoolBeneficiaries() {
     const showRemove = isAdmin && !isSelfPartner;
 
     return (
-      <div key={beneficiary.id} className="bg-white border border-gray-200 rounded-lg p-4">
+      <div key={beneficiary.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
         <div className="flex justify-between items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="font-medium">{toTitleCase(beneficiary.name)}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-[var(--text-sec)]">
               {[beneficiary.category, beneficiary.city ? toTitleCase(beneficiary.city) : null, beneficiary.state].filter(Boolean).join(" · ")}
             </div>
             {beneficiary.description && (
-              <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{beneficiary.description}</p>
+              <p className="mt-2 text-sm text-[var(--text-sec)] whitespace-pre-wrap">{beneficiary.description}</p>
             )}
             {beneficiary.latestInvitationStatus && (
-              <div className="mt-2 text-xs text-blue-700">
+              <div className="mt-2 text-xs text-[var(--action)]">
                 Invitation {beneficiary.latestInvitationStatus.toLowerCase()}
                 {beneficiary.latestInvitationSentTo ? ` · ${beneficiary.latestInvitationSentTo}` : ""}
               </div>
             )}
             {isSelfPartner && (
-              <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <div className="mt-2 rounded-[2px] border border-[var(--in-b)] bg-[var(--in-bg)] px-3 py-2 text-xs text-[var(--action)]">
                 This Partner account is used for tracking volunteer opportunities within the school.
               </div>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {beneficiary.claimed && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">Registered</span>}
+            {beneficiary.claimed && <span className="text-xs bg-[var(--ok-bg)] text-[var(--ok-t)] px-2 py-0.5 rounded">Registered</span>}
             {canEdit && (
-              <button onClick={() => beginEdit(beneficiary)} className="text-xs text-blue-600 hover:text-blue-800">
+              <button onClick={() => beginEdit(beneficiary)} className="text-xs text-[var(--action)] hover:text-[var(--navy)]">
                 Edit
               </button>
             )}
             {showRemove && (
-              <button onClick={() => handleDrop(beneficiary.id, beneficiary.name)} className="text-xs text-red-500 hover:text-red-700">
+              <button onClick={() => handleDrop(beneficiary.id, beneficiary.name)} className="text-xs text-[var(--er-t)] hover:text-[var(--er-t)]">
                 Remove
               </button>
             )}
@@ -454,7 +454,7 @@ export default function SchoolBeneficiaries() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={() => void loadOpportunities(beneficiary.id)}
-            className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50"
+            className="px-3 py-1.5 border border-[var(--border-s)] rounded text-xs hover:bg-[var(--surface-alt)]"
           >
             {expandedBeneficiaryId === beneficiary.id ? "Hide Opportunities" : "View Opportunities"}
           </button>
@@ -462,7 +462,7 @@ export default function SchoolBeneficiaries() {
             <button
               onClick={() => handleApprove(beneficiary.id)}
               disabled={approvingId === beneficiary.id}
-              className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+              className="px-3 py-1.5 bg-[var(--ok-t)] text-white rounded text-xs hover:bg-[var(--ok-t)] disabled:opacity-50"
             >
               {approvingId === beneficiary.id ? "..." : "Approve"}
             </button>
@@ -480,12 +480,12 @@ export default function SchoolBeneficiaries() {
                   setInviteEmailError((prev) => ({ ...prev, [beneficiary.id]: "" }));
                 }}
                 placeholder="Email to send invitation"
-                className={`flex-1 px-3 py-1.5 border rounded text-xs ${inviteEmailError[beneficiary.id] ? "border-red-400" : "border-gray-300"}`}
+                className={`flex-1 px-3 py-1.5 border rounded text-xs ${inviteEmailError[beneficiary.id] ? "border-red-400" : "border-[var(--border-s)]"}`}
               />
               <button
                 onClick={() => handleInvite(beneficiary.id)}
                 disabled={inviting === beneficiary.id}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-1.5 bg-[var(--action)] text-white rounded text-xs hover:bg-[var(--action)] disabled:opacity-50"
               >
                 {inviting === beneficiary.id ? "Sending..." : beneficiary.latestInvitationStatus === "PENDING" ? "Resend Invite" : "Send Invite"}
               </button>
@@ -494,19 +494,19 @@ export default function SchoolBeneficiaries() {
               value={inviteMessage[beneficiary.id] ?? schoolInviteTemplate}
               onChange={(e) => setInviteMessage((prev) => ({ ...prev, [beneficiary.id]: e.target.value }))}
               rows={3}
-              className="mt-2 w-full px-3 py-2 border border-gray-300 rounded text-xs"
+              className="mt-2 w-full px-3 py-2 border border-[var(--border-s)] rounded text-xs"
               placeholder="Optional custom message for this partner"
             />
-            {inviteEmailError[beneficiary.id] && <p className="mt-1 text-xs text-red-500">{inviteEmailError[beneficiary.id]}</p>}
+            {inviteEmailError[beneficiary.id] && <p className="mt-1 text-xs text-[var(--er-t)]">{inviteEmailError[beneficiary.id]}</p>}
           </div>
         )}
 
         {confirmDrop?.benId === beneficiary.id && (
-          <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-700 mb-2">Remove <strong>{toTitleCase(confirmDrop.name)}</strong> from your partner list?</p>
+          <div className="mt-3 rounded-[3px] border border-[var(--border-s)] bg-white p-3 ">
+            <p className="text-sm text-[var(--text)] mb-2">Remove <strong>{toTitleCase(confirmDrop.name)}</strong> from your partner list?</p>
             <div className="flex gap-2">
-              <button onClick={confirmDropAction} className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700">Remove</button>
-              <button onClick={() => setConfirmDrop(null)} className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmDropAction} className="px-3 py-1.5 bg-[var(--er-t)] text-white rounded text-xs hover:bg-[var(--er-t)]">Remove</button>
+              <button onClick={() => setConfirmDrop(null)} className="px-3 py-1.5 border border-[var(--border-s)] rounded text-xs hover:bg-[var(--surface-alt)]">Cancel</button>
             </div>
           </div>
         )}
@@ -532,15 +532,15 @@ export default function SchoolBeneficiaries() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Community Partners</h1>
+        <h1 className="text-[20px] font-semibold">Community Partners</h1>
         <div className="flex items-center gap-3">
-          {pending.length > 0 && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">{pending.length} pending</span>}
-          <span className="text-sm text-gray-500">{approved.length} approved</span>
+          {pending.length > 0 && <span className="text-xs bg-[var(--wn-bg)] text-[var(--wn-t)] px-2 py-0.5 rounded-full">{pending.length} pending</span>}
+          <span className="text-sm text-[var(--text-sec)]">{approved.length} approved</span>
         </div>
       </div>
 
-      {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
-      {toastMessage && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">{toastMessage}</div>}
+      {error && <div className="mb-4 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded text-[var(--er-t)] text-sm">{error}</div>}
+      {toastMessage && <div className="mb-4 p-3 bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded text-[var(--ok-t)] text-sm">{toastMessage}</div>}
 
       <div className="flex gap-4 border-b mb-6 flex-wrap">
         {[
@@ -556,7 +556,7 @@ export default function SchoolBeneficiaries() {
           <button
             key={item.key}
             onClick={() => setTab(item.key as typeof tab)}
-            className={`pb-2 text-sm font-medium border-b-2 ${tab === item.key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            className={`pb-2 text-sm font-medium border-b-2 ${tab === item.key ? "border-blue-600 text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}
           >
             {item.label}
           </button>
@@ -565,7 +565,7 @@ export default function SchoolBeneficiaries() {
 
       {tab === "pending" && (
         pending.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+          <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)]">
             No pending organization requests.
           </div>
         ) : (
@@ -576,8 +576,8 @@ export default function SchoolBeneficiaries() {
       )}
 
       {tab === "approved" && (
-        loading ? <div className="text-gray-500 text-sm">Loading...</div> : approved.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+        loading ? <div className="text-[var(--text-sec)] text-sm">Loading...</div> : approved.length === 0 ? (
+          <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)]">
             No approved community partners yet. Add from the directory or create a custom one.
           </div>
         ) : (
@@ -596,15 +596,15 @@ export default function SchoolBeneficiaries() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, city, or zip code..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm pr-8"
+                className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm pr-8"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="Clear">
+                <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text-sec)]" aria-label="Clear">
                   ×
                 </button>
               )}
             </div>
-            <select value={proximityRadius} onChange={(e) => setProximityRadius(Number(e.target.value))} className="px-2 py-2 border border-gray-300 rounded-md text-sm">
+            <select value={proximityRadius} onChange={(e) => setProximityRadius(Number(e.target.value))} className="px-2 py-2 border border-[var(--border-s)] rounded-[2px] text-sm">
               <option value={5}>5 mi</option>
               <option value={10}>10 mi</option>
               <option value={15}>15 mi</option>
@@ -618,7 +618,7 @@ export default function SchoolBeneficiaries() {
                 key={category || "all"}
                 onClick={() => setSelectedCategory(category)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  selectedCategory === category ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                  selectedCategory === category ? "bg-[var(--action)] text-white border-blue-600" : "bg-white text-[var(--text-sec)] border-[var(--border-s)] hover:border-gray-500"
                 }`}
               >
                 {category || "All"}
@@ -627,27 +627,27 @@ export default function SchoolBeneficiaries() {
           </div>
 
           {smartLoading ? (
-            <div className="text-gray-400 text-sm py-4">Searching...</div>
+            <div className="text-[var(--text-faint)] text-sm py-4">Searching...</div>
           ) : smartResults.length > 0 ? (
-            <div className="border border-gray-200 rounded-lg divide-y">
+            <div className="border border-[var(--border)] rounded-[3px] divide-y">
               {smartResults.map((entry) => (
                 <div key={entry.id} className="px-4 py-3 flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{highlightMatch(entry.name, searchQuery)}</div>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {entry.category && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{entry.category}</span>}
-                      {entry.distanceMiles != null && <span className="text-xs text-blue-500">{entry.distanceMiles.toFixed(1)} mi</span>}
-                      <span className="text-xs text-gray-400">{[entry.city, entry.state].filter(Boolean).join(", ")}</span>
+                      {entry.category && <span className="text-xs bg-[var(--surface-alt)] text-[var(--text-sec)] px-2 py-0.5 rounded-full">{entry.category}</span>}
+                      {entry.distanceMiles != null && <span className="text-xs text-[var(--action)]">{entry.distanceMiles.toFixed(1)} mi</span>}
+                      <span className="text-xs text-[var(--text-faint)]">{[entry.city, entry.state].filter(Boolean).join(", ")}</span>
                     </div>
-                    {entry.description && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{entry.description}</div>}
+                    {entry.description && <div className="text-xs text-[var(--text-sec)] mt-0.5 line-clamp-1">{entry.description}</div>}
                   </div>
                   <div className="shrink-0">
                     {entry.approvalStatus === "APPROVED" ? (
-                      <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded font-medium">Approved ✓</span>
+                      <span className="text-xs bg-[var(--ok-bg)] text-[var(--ok-t)] px-2 py-1 rounded font-medium">Approved ✓</span>
                     ) : entry.approvalStatus === "PENDING" ? (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">Pending invite</span>
+                      <span className="text-xs bg-[var(--in-bg)] text-[var(--action)] px-2 py-1 rounded font-medium">Pending invite</span>
                     ) : (
-                      <button onClick={() => handleApproveFromDir(entry.id)} className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                      <button onClick={() => handleApproveFromDir(entry.id)} className="px-3 py-1.5 bg-[var(--ok-t)] text-white rounded text-xs hover:bg-[var(--ok-t)]">
                         Invite
                       </button>
                     )}
@@ -656,7 +656,7 @@ export default function SchoolBeneficiaries() {
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 text-sm py-4">
+            <div className="text-[var(--text-sec)] text-sm py-4">
               No results. Try a different category or search term.
               {schoolLocation && " You can also try a larger radius."}
             </div>
@@ -672,7 +672,7 @@ export default function SchoolBeneficiaries() {
               value={opportunitySearchQuery}
               onChange={(e) => setOpportunitySearchQuery(e.target.value)}
               placeholder="Search approved opportunities or partners..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
             />
             <SearchableSelect
               value={opportunityCategoryFilter}
@@ -680,14 +680,14 @@ export default function SchoolBeneficiaries() {
               options={opportunityCategoryOptions}
               placeholder="Filter by category"
               clearable
-              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 pr-8 border border-[var(--border-s)] rounded-[2px] text-sm"
             />
           </div>
 
           {approvedPartnerOpportunitiesLoading ? (
-            <div className="text-gray-500 text-sm">Loading opportunities...</div>
+            <div className="text-[var(--text-sec)] text-sm">Loading opportunities...</div>
           ) : filteredApprovedPartnerOpportunities.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+            <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)]">
               No approved partner opportunities match the current filters.
             </div>
           ) : (
@@ -695,22 +695,22 @@ export default function SchoolBeneficiaries() {
               {filteredApprovedPartnerOpportunities.map((opportunity) => {
                 const signupCount = opportunity.timeSlots.reduce((sum, slot) => sum + slot._count.signups, 0);
                 return (
-                  <div key={opportunity.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div key={opportunity.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-medium text-gray-900">{opportunity.title}</div>
-                        <div className="mt-1 text-sm text-gray-500">
+                        <div className="font-medium text-[var(--text)]">{opportunity.title}</div>
+                        <div className="mt-1 text-sm text-[var(--text-sec)]">
                           {opportunity.beneficiary.name}
                           {opportunity.location ? ` · ${opportunity.location}` : ""}
                         </div>
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-[var(--text-sec)]">
                           {opportunity.category || "Uncategorized"} · {opportunity.timeSlots.length} slot{opportunity.timeSlots.length !== 1 ? "s" : ""} · {signupCount} signup{signupCount !== 1 ? "s" : ""}
                         </div>
                       </div>
                     </div>
                     <div className="mt-3 space-y-1">
                       {opportunity.timeSlots.slice(0, 6).map((slot) => (
-                        <div key={slot.id} className="text-xs text-gray-600">
+                        <div key={slot.id} className="text-xs text-[var(--text-sec)]">
                           {new Date(slot.date).toLocaleDateString()} · {slot.durationHours}h · {slot._count.signups} signup{slot._count.signups !== 1 ? "s" : ""}
                         </div>
                       ))}
@@ -731,57 +731,57 @@ export default function SchoolBeneficiaries() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Organization Name *</label>
-                  <input type="text" value={newBen.name} onChange={(e) => setNewBen((prev) => ({ ...prev, name: e.target.value }))} required className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Organization Name *</label>
+                  <input type="text" value={newBen.name} onChange={(e) => setNewBen((prev) => ({ ...prev, name: e.target.value }))} required className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <input type="text" value={newBen.category} onChange={(e) => setNewBen((prev) => ({ ...prev, category: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Category</label>
+                  <input type="text" value={newBen.category} onChange={(e) => setNewBen((prev) => ({ ...prev, category: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" value={newBen.email} onChange={(e) => setNewBen((prev) => ({ ...prev, email: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Email</label>
+                  <input type="email" value={newBen.email} onChange={(e) => setNewBen((prev) => ({ ...prev, email: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input type="text" value={newBen.phone} onChange={(e) => setNewBen((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Phone</label>
+                  <input type="text" value={newBen.phone} onChange={(e) => setNewBen((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                  <input type="text" value={newBen.website} onChange={(e) => setNewBen((prev) => ({ ...prev, website: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Website</label>
+                  <input type="text" value={newBen.website} onChange={(e) => setNewBen((prev) => ({ ...prev, website: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-                  <select value={newBen.visibility} onChange={(e) => setNewBen((prev) => ({ ...prev, visibility: e.target.value as "PUBLIC" | "PRIVATE" }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Visibility</label>
+                  <select value={newBen.visibility} onChange={(e) => setNewBen((prev) => ({ ...prev, visibility: e.target.value as "PUBLIC" | "PRIVATE" }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm">
                     <option value="PRIVATE">Private (this school only)</option>
                     <option value="PUBLIC">Public (submit for global directory)</option>
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                  <input type="text" value={newBen.address} onChange={(e) => setNewBen((prev) => ({ ...prev, address: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Address</label>
+                  <input type="text" value={newBen.address} onChange={(e) => setNewBen((prev) => ({ ...prev, address: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input type="text" value={newBen.city} onChange={(e) => setNewBen((prev) => ({ ...prev, city: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">City</label>
+                  <input type="text" value={newBen.city} onChange={(e) => setNewBen((prev) => ({ ...prev, city: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                    <input type="text" value={newBen.state} onChange={(e) => setNewBen((prev) => ({ ...prev, state: e.target.value }))} maxLength={2} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                    <label className="block text-sm font-medium text-[var(--text)] mb-1">State</label>
+                    <input type="text" value={newBen.state} onChange={(e) => setNewBen((prev) => ({ ...prev, state: e.target.value }))} maxLength={2} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
-                    <input type="text" value={newBen.zip} onChange={(e) => setNewBen((prev) => ({ ...prev, zip: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                    <label className="block text-sm font-medium text-[var(--text)] mb-1">ZIP</label>
+                    <input type="text" value={newBen.zip} onChange={(e) => setNewBen((prev) => ({ ...prev, zip: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                   </div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea value={newBen.description} onChange={(e) => setNewBen((prev) => ({ ...prev, description: e.target.value }))} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Description</label>
+                <textarea value={newBen.description} onChange={(e) => setNewBen((prev) => ({ ...prev, description: e.target.value }))} rows={3} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               <div className="flex gap-2">
-                <button type="submit" disabled={creating} className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
+                <button type="submit" disabled={creating} className="px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
                   {creating ? "Saving..." : editingBenId ? "Save Changes" : "Create Partner"}
                 </button>
                 {editingBenId && (
@@ -791,7 +791,7 @@ export default function SchoolBeneficiaries() {
                       setEditingBenId(null);
                       setNewBen(EMPTY_PARTNER);
                     }}
-                    className="px-4 py-[7px] border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    className="px-4 py-[7px] border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
                   >
                     Cancel
                   </button>
@@ -800,18 +800,18 @@ export default function SchoolBeneficiaries() {
             </form>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4">
             <h2 className="font-semibold mb-2">Bulk Upload Community Partners</h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-[var(--text-sec)] mb-4">
               Upload a CSV with columns aligned to the custom form:
               <code className="ml-1 rounded bg-white px-1 py-0.5 text-xs">name,category,email,phone,website,address,city,state,zip,description,visibility</code>
             </p>
 
             {csvResult && (
-              <div className={`mb-4 p-3 rounded border text-sm ${csvResult.failed > 0 ? "bg-yellow-50 border-yellow-200" : "bg-green-50 border-green-200"}`}>
+              <div className={`mb-4 p-3 rounded border text-sm ${csvResult.failed > 0 ? "bg-[var(--wn-bg)] border-[var(--wn-b)]" : "bg-[var(--ok-bg)] border-[var(--ok-b)]"}`}>
                 <div><strong>{csvResult.added}</strong> partners added, <strong>{csvResult.failed}</strong> failed.</div>
                 {csvResult.errors.length > 0 && (
-                  <ul className="mt-2 text-xs text-red-600 space-y-0.5">
+                  <ul className="mt-2 text-xs text-[var(--er-t)] space-y-0.5">
                     {csvResult.errors.slice(0, 8).map((entry, index) => <li key={index}>{entry}</li>)}
                   </ul>
                 )}
@@ -820,17 +820,17 @@ export default function SchoolBeneficiaries() {
 
             <div className="space-y-3">
               <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFileUpload} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-white">
+              <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-white">
                 Choose CSV File
               </button>
               {csvData && (
-                <button onClick={handleCsvImport} disabled={csvImporting} className="block px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
+                <button onClick={handleCsvImport} disabled={csvImporting} className="block px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
                   {csvImporting ? "Importing..." : "Import Partners"}
                 </button>
               )}
             </div>
 
-            <div className="mt-6 rounded bg-white p-3 text-xs text-gray-600">
+            <div className="mt-6 rounded bg-white p-3 text-xs text-[var(--text-sec)]">
               <p className="font-medium mb-1">CSV Example</p>
               <pre className="overflow-x-auto">name,category,email,phone,website,address,city,state,zip,description,visibility{"\n"}Green Earth,Environment,team@greenearth.org,6175551234,https://greenearth.org,123 Main St,Boston,MA,02110,Environmental org,PRIVATE</pre>
             </div>
@@ -840,34 +840,34 @@ export default function SchoolBeneficiaries() {
 
       {drawerBeneficiary && (
         <div className="fixed inset-0 z-30 bg-black/30">
-          <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-white shadow-2xl border-l border-gray-200">
-            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="absolute inset-y-0 right-0 w-full max-w-xl bg-white shadow-2xl border-l border-[var(--border)]">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--border)]">
               <div>
-                <div className="font-semibold text-gray-900">{toTitleCase(drawerBeneficiary.name)}</div>
-                <div className="text-sm text-gray-500">Partner opportunities</div>
+                <div className="font-semibold text-[var(--text)]">{toTitleCase(drawerBeneficiary.name)}</div>
+                <div className="text-sm text-[var(--text-sec)]">Partner opportunities</div>
               </div>
-              <button onClick={() => { setDrawerBeneficiary(null); setExpandedBeneficiaryId(null); }} className="text-sm text-gray-500 hover:text-gray-700">
+              <button onClick={() => { setDrawerBeneficiary(null); setExpandedBeneficiaryId(null); }} className="text-sm text-[var(--text-sec)] hover:text-[var(--text)]">
                 Close
               </button>
             </div>
             <div className="p-5 overflow-y-auto h-[calc(100%-73px)]">
               {loadingOpportunityId === drawerBeneficiary.id ? (
-                <div className="text-sm text-gray-500">Loading opportunities...</div>
+                <div className="text-sm text-[var(--text-sec)]">Loading opportunities...</div>
               ) : !opportunitiesByBeneficiary[drawerBeneficiary.id] || opportunitiesByBeneficiary[drawerBeneficiary.id].length === 0 ? (
-                <div className="text-sm text-gray-500">No opportunities published yet.</div>
+                <div className="text-sm text-[var(--text-sec)]">No opportunities published yet.</div>
               ) : (
                 <div className="space-y-3">
                   {opportunitiesByBeneficiary[drawerBeneficiary.id].map((opportunity) => {
                     const signupCount = opportunity.timeSlots.reduce((sum, slot) => sum + slot._count.signups, 0);
                     return (
-                      <div key={opportunity.id} className="rounded-lg border border-gray-200 p-4">
-                        <div className="font-medium text-gray-900">{opportunity.title}</div>
-                        <div className="mt-1 text-xs text-gray-500">
+                      <div key={opportunity.id} className="rounded-[3px] border border-[var(--border)] p-4">
+                        <div className="font-medium text-[var(--text)]">{opportunity.title}</div>
+                        <div className="mt-1 text-xs text-[var(--text-sec)]">
                           {opportunity.category || "General"} · {opportunity.timeSlots.length} slot{opportunity.timeSlots.length !== 1 ? "s" : ""} · {signupCount} signup{signupCount !== 1 ? "s" : ""}
                         </div>
                         <div className="mt-2 space-y-1">
                           {opportunity.timeSlots.slice(0, 6).map((slot) => (
-                            <div key={slot.id} className="text-xs text-gray-600">
+                            <div key={slot.id} className="text-xs text-[var(--text-sec)]">
                               {new Date(slot.date).toLocaleDateString()} · {slot.durationHours}h · {slot._count.signups} signup{slot._count.signups !== 1 ? "s" : ""}
                             </div>
                           ))}

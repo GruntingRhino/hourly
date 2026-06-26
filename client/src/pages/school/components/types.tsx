@@ -177,13 +177,13 @@ export function formatDate(value: string | null): string {
 export function summaryClasses(readiness: LaunchWorkspace["summary"]["readiness"]): string {
   switch (readiness) {
     case "LIVE":
-      return "border-green-200 bg-green-50 text-green-900";
+      return "border-[var(--ok-b)] bg-[var(--ok-bg)] text-green-900";
     case "ATTENTION":
-      return "border-red-200 bg-red-50 text-red-900";
+      return "border-[var(--er-b)] bg-[var(--er-bg)] text-red-900";
     case "PILOTING":
-      return "border-amber-200 bg-amber-50 text-amber-900";
+      return "border-[var(--wn-b)] bg-[var(--wn-bg)] text-amber-900";
     default:
-      return "border-blue-200 bg-blue-50 text-blue-900";
+      return "border-[var(--in-b)] bg-[var(--in-bg)] text-blue-900";
   }
 }
 
@@ -191,31 +191,31 @@ export function badgeClasses(value: string): string {
   switch (value) {
     case "CRITICAL":
     case "BLOCKED":
-      return "bg-red-50 text-red-700";
+      return "bg-[var(--er-bg)] text-[var(--er-t)]";
     case "HIGH":
     case "OPEN":
     case "ATTENTION":
-      return "bg-amber-50 text-amber-700";
+      return "bg-[var(--wn-bg)] text-[var(--wn-t)]";
     case "FIXED":
     case "LIVE":
-      return "bg-green-50 text-green-700";
+      return "bg-[var(--ok-bg)] text-[var(--ok-t)]";
     case "MONITORING":
     case "INVESTIGATING":
     case "PILOTING":
-      return "bg-blue-50 text-blue-700";
+      return "bg-[var(--in-bg)] text-[var(--action)]";
     case "NOT_READY":
-      return "bg-blue-50 text-blue-700";
+      return "bg-[var(--in-bg)] text-[var(--action)]";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-[var(--surface-alt)] text-[var(--text)]";
   }
 }
 
 export function MetricCard({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="text-sm text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
-      {subtext && <div className="mt-1 text-xs text-gray-400">{subtext}</div>}
+    <div className="rounded-[3px] border border-[var(--border)] bg-white p-4">
+      <div className="text-sm text-[var(--text-sec)]">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{value}</div>
+      {subtext && <div className="mt-1 text-xs text-[var(--text-faint)]">{subtext}</div>}
     </div>
   );
 }

@@ -139,28 +139,28 @@ function CalendarGrid({
   const todayKey = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+    <div className="border border-[var(--border)] rounded-[3px] p-4 mb-4" style={{ background: "var(--surface)" }}>
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => onMonthChange(-1)}
-          className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
+          className="p-1.5 rounded-[2px] hover:bg-[var(--surface-alt)]"
+          style={{ color: "var(--text-sec)" }}
         >
           ‹
         </button>
-        <h2 className="font-semibold text-gray-900">{monthLabel}</h2>
+        <h2 className="font-semibold" style={{ color: "var(--text)" }}>{monthLabel}</h2>
         <button
           onClick={() => onMonthChange(1)}
-          className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
+          className="p-1.5 rounded-[2px] hover:bg-[var(--surface-alt)]"
+          style={{ color: "var(--text-sec)" }}
         >
           ›
         </button>
       </div>
 
-      <div className="grid grid-cols-7 text-center text-xs text-gray-400 mb-1">
+      <div className="grid grid-cols-7 text-center text-[11px] mb-1" style={{ color: "var(--text-faint)" }}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="py-1">
-            {d}
-          </div>
+          <div key={d} className="py-1">{d}</div>
         ))}
       </div>
 
@@ -176,18 +176,21 @@ function CalendarGrid({
             <button
               key={i}
               onClick={() => onSelectDate(isSelected ? null : dateKey)}
-              className={`relative flex flex-col items-center justify-center py-1.5 rounded-md text-sm transition-colors
-                ${isSelected ? "bg-blue-600 text-white" : count > 0 ? "hover:bg-blue-50" : "hover:bg-gray-50"}
-                ${isToday && !isSelected ? "ring-1 ring-blue-400" : ""}
-                ${count === 0 ? "text-gray-300" : isSelected ? "text-white" : "text-gray-800 font-medium"}
+              className={`relative flex flex-col items-center justify-center py-1.5 rounded-[2px] text-[13px] transition-colors
+                ${isToday && !isSelected ? "ring-1 ring-[var(--action)]" : ""}
+                ${count === 0 ? "opacity-30" : ""}
               `}
+              style={{
+                background: isSelected ? "var(--navy)" : undefined,
+                color: isSelected ? "#fff" : count > 0 ? "var(--text)" : "var(--text-faint)",
+                fontWeight: count > 0 ? 500 : undefined,
+              }}
             >
               <span>{day}</span>
               {count > 0 && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                    isSelected ? "bg-white" : "bg-blue-500"
-                  }`}
+                  className="w-1.5 h-1.5 rounded-full mt-0.5"
+                  style={{ background: isSelected ? "#fff" : "var(--action)" }}
                 />
               )}
             </button>
@@ -196,7 +199,7 @@ function CalendarGrid({
       </div>
 
       {selectedDate && (
-        <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 text-center">
+        <div className="mt-3 pt-3 border-t border-[var(--border)] text-[12px] text-center" style={{ color: "var(--text-faint)" }}>
           Showing slots for{" "}
           {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", {
             weekday: "long",
@@ -206,7 +209,8 @@ function CalendarGrid({
           {" · "}
           <button
             onClick={() => onSelectDate(null)}
-            className="text-blue-600 hover:underline"
+            className="hover:underline"
+            style={{ color: "var(--action)" }}
           >
             Clear
           </button>
@@ -291,40 +295,38 @@ export default function StudentBrowse() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Browse Opportunities</h1>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => { setView("list"); setSelectedDate(null); }}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
-              view === "list"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            ☰ List
-          </button>
-          <button
-            onClick={() => setView("calendar")}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
-              view === "calendar"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            ▦ Calendar
-          </button>
+      <div className="mb-6">
+        <div className="text-[12px] mb-1" style={{ color: "var(--text-faint)" }}>Student / Browse</div>
+        <div className="flex items-center justify-between">
+          <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>Browse Opportunities</h1>
+          <div className="flex gap-1 p-1 rounded-[3px] border border-[var(--border)]" style={{ background: "var(--surface-alt)" }}>
+            <button
+              onClick={() => { setView("list"); setSelectedDate(null); }}
+              className="px-3 py-1 text-[13px] rounded-[2px] font-medium transition-colors"
+              style={view === "list" ? { background: "var(--surface)", color: "var(--text)" } : { color: "var(--text-faint)" }}
+            >
+              ☰ List
+            </button>
+            <button
+              onClick={() => setView("calendar")}
+              className="px-3 py-1 text-[13px] rounded-[2px] font-medium transition-colors"
+              style={view === "calendar" ? { background: "var(--surface)", color: "var(--text)" } : { color: "var(--text-faint)" }}
+            >
+              ▦ Calendar
+            </button>
+          </div>
         </div>
       </div>
 
       {view === "list" && (
-        <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
           <input
             type="text"
             placeholder="Search opportunities, organizations, or categories..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
+            style={{ background: "var(--surface)", color: "var(--text)" }}
           />
           <SearchableSelect
             value={selectedCategory}
@@ -332,19 +334,19 @@ export default function StudentBrowse() {
             options={categoryOptions}
             placeholder="Filter by category"
             clearable
-            className="w-full px-4 py-2 pr-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full h-[34px] px-3 pr-9 border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] text-[13.5px]"
           />
         </div>
       )}
 
       {!loading && blockedCategories.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 rounded-[3px] border border-[var(--wn-b)] px-4 py-3 text-[13px]" style={{ background: "var(--wn-bg)", color: "var(--wn-t)" }}>
           Your school has capped these categories for you: {blockedCategories.join(", ")}. You have already reached the maximum allowed hours there, so new opportunities in those categories are hidden.
         </div>
       )}
 
       {blockedSelectedCategory && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-[3px] border border-[var(--er-b)] px-4 py-3 text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
           Your school is preventing you from doing more {blockedSelectedCategory.category}. You have already completed {blockedSelectedCategory.approvedHours.toFixed(1)}h, which meets or exceeds the {blockedSelectedCategory.cap}h maximum.
         </div>
       )}
@@ -360,22 +362,20 @@ export default function StudentBrowse() {
       )}
 
       {loading ? (
-        <div className="text-gray-500">Loading opportunities...</div>
+        <div style={{ color: "var(--text-faint)" }}>Loading opportunities...</div>
       ) : error ? (
-        <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
           {error}
         </div>
       ) : visibleSlots.length === 0 ? (
         <div className="text-center py-12">
-          <div className="text-3xl mb-3">
+          <div className="text-[28px] mb-3" style={{ color: "var(--text-faint)" }}>
             {view === "calendar" && selectedDate ? "📅" : "⌕"}
           </div>
-          <div className="font-medium text-gray-700 mb-1">
-            {view === "calendar" && selectedDate
-              ? "No opportunities on this date"
-              : "No opportunities found"}
+          <div className="font-medium mb-1" style={{ color: "var(--text-sec)" }}>
+            {view === "calendar" && selectedDate ? "No opportunities on this date" : "No opportunities found"}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-[13px]" style={{ color: "var(--text-faint)" }}>
             {view === "calendar" && selectedDate
               ? "Select a highlighted date to see available slots."
               : search
@@ -388,7 +388,7 @@ export default function StudentBrowse() {
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {visibleSlots.map((slot) => {
             const signupStatus = mySignupStatuses.get(slot.id);
             const isSignedUp = !!signupStatus && signupStatus !== "CANCELLED";
@@ -399,70 +399,62 @@ export default function StudentBrowse() {
                 key={slot.id}
                 to={`/slot/${slot.id}`}
                 state={{ slot }}
-                className="block bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
+                className="block border border-[var(--border)] rounded-[3px] p-4 transition-colors hover:border-[var(--action)]"
+                style={{ background: "var(--surface)" }}
                 aria-label={`View ${slot.opportunity.title} details`}
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
-                    <div className="text-lg font-semibold text-gray-900">
+                    <div className="text-[14px] font-semibold" style={{ color: "var(--text)" }}>
                       {slot.opportunity.title}
                     </div>
-                    <div className="text-sm text-gray-500 mt-0.5">
+                    <div className="text-[13px] mt-0.5" style={{ color: "var(--text-sec)" }}>
                       {slot.opportunity.beneficiary.name}
                     </div>
                     {slot.opportunity.category && (
-                      <div className="text-xs text-purple-600 mt-0.5">
+                      <div className="text-[12px] mt-0.5" style={{ color: "var(--action)" }}>
                         {slot.opportunity.category}
                       </div>
                     )}
-                    <div className="text-sm text-gray-600 mt-2">
+                    <div className="text-[13px] mt-2" style={{ color: "var(--text-sec)" }}>
                       {new Date(slot.date).toLocaleDateString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        timeZone: "UTC",
+                        weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
                       })}
+                      {" · "}{slot.startTime}–{slot.endTime}
                       {" · "}
-                      {slot.startTime}–{slot.endTime}
-                      {" · "}
-                      <span className="font-medium text-blue-700">
-                        {slot.durationHours}h
-                      </span>
+                      <span className="font-semibold" style={{ color: "var(--navy)" }}>{slot.durationHours}h</span>
                     </div>
                     {slot.opportunity.location && (
-                      <div className="text-sm text-gray-500 mt-0.5">
+                      <div className="text-[12.5px] mt-0.5" style={{ color: "var(--text-faint)" }}>
                         {slot.opportunity.location}
                       </div>
                     )}
                     {slot.opportunity.requirementsNote && (
-                      <div className="text-xs text-orange-600 mt-1">
+                      <div className="text-[12px] mt-1" style={{ color: "var(--wn-t)" }}>
                         Note: {slot.opportunity.requirementsNote}
                       </div>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-medium text-gray-700">
+                    <div className="text-[13px] font-medium" style={{ color: "var(--text-sec)" }}>
                       {slot._count.signups}/{slot.capacity}
                     </div>
-                    <div className="text-xs text-gray-400">spots</div>
+                    <div className="text-[12px]" style={{ color: "var(--text-faint)" }}>spots</div>
                     <div className="mt-3">
                       {isSignedUp ? (
-                        <span
-                          className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-                            isWaitlisted
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
-                        >
+                        <span className="text-[11px] px-2 py-0.5 rounded-[2px] font-semibold uppercase tracking-wide border" style={
+                          isWaitlisted
+                            ? { background: "var(--wn-bg)", color: "var(--wn-t)", borderColor: "var(--wn-b)" }
+                            : { background: "var(--ok-bg)", color: "var(--ok-t)", borderColor: "var(--ok-b)" }
+                        }>
                           {isWaitlisted ? "Waitlisted" : "Signed Up"}
                         </span>
                       ) : isFull ? (
-                        <span className="text-xs px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                        <span className="text-[11px] px-2 py-0.5 border rounded-[2px] font-semibold" style={{ background: "var(--wn-bg)", color: "var(--wn-t)", borderColor: "var(--wn-b)" }}>
                           Join Waitlist →
                         </span>
                       ) : (
-                        <span className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-200">
+                        <span className="text-[11px] px-2 py-0.5 border rounded-[2px] font-semibold" style={{ background: "var(--in-bg)", color: "var(--in-t)", borderColor: "var(--in-b)" }}>
                           View Details →
                         </span>
                       )}

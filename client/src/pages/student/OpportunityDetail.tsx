@@ -238,8 +238,8 @@ export default function OpportunityDetail() {
   const showVerificationUnlockNotice =
     !!opp && !!mySession && new Date(opp.date) > new Date() && !canSubmitVerification;
 
-  if (loading) return <div className="text-gray-500">Loading...</div>;
-  if (!opp) return <div className="text-red-500">Opportunity not found</div>;
+  if (loading) return <div className="text-[var(--text-sec)]">Loading...</div>;
+  if (!opp) return <div className="text-[var(--er-t)]">Opportunity not found</div>;
 
   const tags = opp.tags ? JSON.parse(opp.tags) : [];
   const spotsLeft = opp.capacity - opp._count.signups;
@@ -283,30 +283,30 @@ export default function OpportunityDetail() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:text-gray-700 mb-4">
+      <button onClick={() => navigate(-1)} className="text-sm text-[var(--text-sec)] hover:text-[var(--text)] mb-4">
         &larr; Back
       </button>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h1 className="text-2xl font-bold">{opp.title}</h1>
-            <div className="text-gray-500 mt-1">{opp.organization.name}</div>
+            <h1 className="text-[28px] font-bold">{opp.title}</h1>
+            <div className="text-[var(--text-sec)] mt-1">{opp.organization.name}</div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-[28px] font-bold text-[var(--action)]">
               {opp._count.signups}/{opp.capacity}
             </div>
-            <div className="text-xs text-gray-400">signed up</div>
+            <div className="text-xs text-[var(--text-faint)]">signed up</div>
           </div>
         </div>
 
-        <p className="text-gray-700 mb-4">{opp.description}</p>
+        <p className="text-[var(--text)] mb-4">{opp.description}</p>
 
         {tags.length > 0 && (
           <div className="flex gap-2 mb-4">
             {tags.map((tag: string) => (
-              <span key={tag} className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
+              <span key={tag} className="text-xs px-2 py-1 bg-[var(--in-bg)] text-[var(--action)] rounded-full">
                 {tag}
               </span>
             ))}
@@ -315,36 +315,36 @@ export default function OpportunityDetail() {
 
         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
           <div>
-            <span className="text-gray-500">Location:</span>
+            <span className="text-[var(--text-sec)]">Location:</span>
             <div className="font-medium">{opp.location}</div>
           </div>
           <div>
-            <span className="text-gray-500">Date:</span>
+            <span className="text-[var(--text-sec)]">Date:</span>
             <div className="font-medium">{new Date(opp.date).toLocaleDateString()}</div>
           </div>
           <div>
-            <span className="text-gray-500">Time:</span>
+            <span className="text-[var(--text-sec)]">Time:</span>
             <div className="font-medium">{opp.startTime} - {opp.endTime}</div>
           </div>
           <div>
-            <span className="text-gray-500">Duration:</span>
+            <span className="text-[var(--text-sec)]">Duration:</span>
             <div className="font-medium">{opp.durationHours} hours</div>
           </div>
           {opp.ageRequirement != null && opp.ageRequirement > 0 && (
             <div>
-              <span className="text-gray-500">Age Requirement:</span>
+              <span className="text-[var(--text-sec)]">Age Requirement:</span>
               <div className="font-medium">{opp.ageRequirement}+</div>
             </div>
           )}
           {opp.gradeRequirement && (
             <div>
-              <span className="text-gray-500">Grade Requirement:</span>
+              <span className="text-[var(--text-sec)]">Grade Requirement:</span>
               <div className="font-medium">{opp.gradeRequirement}</div>
             </div>
           )}
           {opp.isRecurring && (
             <div>
-              <span className="text-gray-500">Recurring:</span>
+              <span className="text-[var(--text-sec)]">Recurring:</span>
               <div className="font-medium">Yes</div>
             </div>
           )}
@@ -352,25 +352,25 @@ export default function OpportunityDetail() {
 
         {/* Custom fields */}
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Custom Fields</h3>
+          <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Custom Fields</h3>
           {customFields.length > 0 ? (
             <div className="space-y-2">
               {customFields.map((f, i) => (
                 <div key={`${f.label}-${i}`} className="flex gap-2 text-sm">
-                  <span className="text-gray-500 min-w-24">{f.label}:</span>
+                  <span className="text-[var(--text-sec)] min-w-24">{f.label}:</span>
                   <span className="font-medium">{f.value}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-sm text-gray-500">No custom fields provided.</div>
+            <div className="text-sm text-[var(--text-sec)]">No custom fields provided.</div>
           )}
         </div>
 
         {/* Action buttons */}
-        <div className="border-t border-gray-200 pt-4">
+        <div className="border-t border-[var(--border)] pt-4">
           {actionError && (
-            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            <div className="mb-3 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
               {actionError}
             </div>
           )}
@@ -379,12 +379,12 @@ export default function OpportunityDetail() {
               <button
                 onClick={handleSignup}
                 disabled={actionLoading}
-                className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="w-full py-3 bg-[var(--action)] text-white rounded-[2px] font-medium hover:bg-[var(--action)] disabled:opacity-50"
               >
                 {actionLoading ? "Signing up..." : spotsLeft <= 0 ? "Join Waitlist" : "Sign Up"}
               </button>
               {actionLoading && spotsLeft <= 0 && (
-                <div className="mt-3 p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                <div className="mt-3 p-3 bg-[var(--wn-bg)] rounded-[2px] text-[var(--wn-t)] text-sm text-center">
                   Joining waitlist...
                 </div>
               )}
@@ -393,7 +393,7 @@ export default function OpportunityDetail() {
 
           {mySignup && mySignup.status === "CONFIRMED" && (
             <div className="space-y-3">
-              <div className="p-3 bg-green-50 rounded-md text-green-700 text-sm text-center">
+              <div className="p-3 bg-[var(--ok-bg)] rounded-[2px] text-[var(--ok-t)] text-sm text-center">
                 You're signed up for this opportunity
               </div>
 
@@ -401,7 +401,7 @@ export default function OpportunityDetail() {
                 <button
                   onClick={handleCheckIn}
                   disabled={actionLoading}
-                  className="w-full py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50"
+                  className="w-full py-3 bg-[var(--ok-t)] text-white rounded-[2px] font-medium hover:bg-[var(--ok-t)] disabled:opacity-50"
                 >
                   {actionLoading ? "Checking in..." : "Check In"}
                 </button>
@@ -409,13 +409,13 @@ export default function OpportunityDetail() {
 
               {mySession?.status === "CHECKED_IN" && (
                 <div>
-                  <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center mb-3">
+                  <div className="p-3 bg-[var(--in-bg)] rounded-[2px] text-[var(--action)] text-sm text-center mb-3">
                     Checked in at {new Date(mySession.checkInTime!).toLocaleTimeString()}
                   </div>
                   <button
                     onClick={handleCheckOut}
                     disabled={actionLoading}
-                    className="w-full py-3 bg-orange-600 text-white rounded-md font-medium hover:bg-orange-700 disabled:opacity-50"
+                    className="w-full py-3 bg-orange-600 text-white rounded-[2px] font-medium hover:bg-orange-700 disabled:opacity-50"
                   >
                     {actionLoading ? "Checking out..." : "Check Out"}
                   </button>
@@ -424,14 +424,14 @@ export default function OpportunityDetail() {
 
               {mySession?.status === "CHECKED_OUT" && (
                 <>
-                  <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                  <div className="p-3 bg-[var(--wn-bg)] rounded-[2px] text-[var(--wn-t)] text-sm text-center">
                     Checked out &middot; {mySession.totalHours} hours
                   </div>
                 </>
               )}
 
               {showVerificationUnlockNotice && (
-                <div className="p-3 bg-blue-50 rounded-md text-blue-700 text-sm text-center">
+                <div className="p-3 bg-[var(--in-bg)] rounded-[2px] text-[var(--action)] text-sm text-center">
                   Verification unlocks after {new Date(opp.date).toLocaleDateString()}
                 </div>
               )}
@@ -439,32 +439,32 @@ export default function OpportunityDetail() {
               {canSubmitVerification && !showVerifyForm && (
                 <button
                   onClick={() => setShowVerifyForm(true)}
-                  className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
+                  className="w-full py-3 bg-[var(--action)] text-white rounded-[2px] font-medium hover:bg-[var(--action)]"
                 >
                   Submit Verification
                 </button>
               )}
 
               {canSubmitVerification && showVerifyForm && (
-                <div className="border border-gray-200 rounded-lg p-4 space-y-4">
+                <div className="border border-[var(--border)] rounded-[3px] p-4 space-y-4">
                   <h3 className="font-medium">Submit Verification</h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--text-sec)]">
                     Provide a supervisor signature to verify your {mySession!.totalHours} hours.
                   </p>
 
                   <div className="flex gap-2">
                     <button
                       onClick={() => setVerifyMethod("DRAWN")}
-                      className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                        verifyMethod === "DRAWN" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-50 text-gray-600 border border-gray-200"
+                      className={`flex-1 py-2 rounded-[2px] text-sm font-medium ${
+                        verifyMethod === "DRAWN" ? "bg-[var(--in-bg)] text-[var(--action)] border border-[var(--in-b)]" : "bg-[var(--surface-alt)] text-[var(--text-sec)] border border-[var(--border)]"
                       }`}
                     >
                       Draw Signature
                     </button>
                     <button
                       onClick={() => setVerifyMethod("FILE")}
-                      className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                        verifyMethod === "FILE" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-50 text-gray-600 border border-gray-200"
+                      className={`flex-1 py-2 rounded-[2px] text-sm font-medium ${
+                        verifyMethod === "FILE" ? "bg-[var(--in-bg)] text-[var(--action)] border border-[var(--in-b)]" : "bg-[var(--surface-alt)] text-[var(--text-sec)] border border-[var(--border)]"
                       }`}
                     >
                       Upload File
@@ -479,9 +479,9 @@ export default function OpportunityDetail() {
                         type="file"
                         accept=".pdf,.png,.jpg,.jpeg"
                         onChange={(e) => setSignatureFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        className="block w-full text-sm text-[var(--text-sec)] file:mr-4 file:py-2 file:px-4 file:rounded-[2px] file:border-0 file:text-sm file:font-medium file:bg-[var(--in-bg)] file:text-[var(--action)] hover:file:bg-[var(--in-bg)]"
                       />
-                      <p className="text-xs text-gray-400 mt-1">PDF, PNG, or JPG up to 5MB</p>
+                      <p className="text-xs text-[var(--text-faint)] mt-1">PDF, PNG, or JPG up to 5MB</p>
                     </div>
                   )}
 
@@ -489,13 +489,13 @@ export default function OpportunityDetail() {
                     <button
                       onClick={handleSubmitVerification}
                       disabled={actionLoading}
-                      className="flex-1 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                      className="flex-1 py-2 bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:bg-[var(--action)] disabled:opacity-50"
                     >
                       {actionLoading ? "Submitting..." : "Submit for Review"}
                     </button>
                     <button
                       onClick={() => setShowVerifyForm(false)}
-                      className="py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                      className="py-2 px-4 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
                     >
                       Cancel
                     </button>
@@ -504,19 +504,19 @@ export default function OpportunityDetail() {
               )}
 
               {mySession?.status === "PENDING_VERIFICATION" && (
-                <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+                <div className="p-3 bg-[var(--wn-bg)] rounded-[2px] text-[var(--wn-t)] text-sm text-center">
                   Status: PENDING_VERIFICATION &middot; {mySession.totalHours}h
                 </div>
               )}
 
               {mySession?.status === "VERIFIED" && (
-                <div className="p-3 bg-green-50 rounded-md text-green-700 text-sm text-center">
+                <div className="p-3 bg-[var(--ok-bg)] rounded-[2px] text-[var(--ok-t)] text-sm text-center">
                   Verified! {mySession.totalHours} hours approved
                 </div>
               )}
 
               {mySession?.status === "REJECTED" && (
-                <div className="p-3 bg-red-50 rounded-md text-red-700 text-sm">
+                <div className="p-3 bg-[var(--er-bg)] rounded-[2px] text-[var(--er-t)] text-sm">
                   <div className="text-center font-medium">Hours rejected</div>
                   {mySession.rejectionReason && (
                     <div className="mt-1 text-center">Reason: {mySession.rejectionReason}</div>
@@ -528,7 +528,7 @@ export default function OpportunityDetail() {
                 <button
                   onClick={handleCancelSignup}
                   disabled={actionLoading}
-                  className="w-full py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+                  className="w-full py-2 border border-[var(--er-b)] text-[var(--er-t)] rounded-[2px] text-sm hover:bg-[var(--er-bg)]"
                 >
                   Cancel Signup
                 </button>
@@ -538,13 +538,13 @@ export default function OpportunityDetail() {
 
           {mySignup?.status === "WAITLISTED" && (
             <div className="space-y-3">
-              <div className="p-3 bg-yellow-50 rounded-md text-yellow-700 text-sm text-center">
+              <div className="p-3 bg-[var(--wn-bg)] rounded-[2px] text-[var(--wn-t)] text-sm text-center">
                 Status: WAITLISTED
               </div>
               <button
                 onClick={handleCancelSignup}
                 disabled={actionLoading}
-                className="w-full py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+                className="w-full py-2 border border-[var(--er-b)] text-[var(--er-t)] rounded-[2px] text-sm hover:bg-[var(--er-bg)]"
               >
                 Leave Waitlist
               </button>
@@ -555,7 +555,7 @@ export default function OpportunityDetail() {
             <button
               onClick={handleSignup}
               disabled={actionLoading}
-              className="w-full py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="w-full py-3 bg-[var(--action)] text-white rounded-[2px] font-medium hover:bg-[var(--action)] disabled:opacity-50"
             >
               Sign Up Again
             </button>

@@ -104,51 +104,53 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <Link to="/" className="flex justify-center mb-8">
+        <Link to="/" className="flex justify-center mb-7">
           <img
             src="/logo-full.png"
             alt="GoodHours"
-            className="h-10 w-auto"
+            className="h-9 w-auto"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
               (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
             }}
           />
-          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          <span className="hidden text-[22px] font-bold" style={{ color: "var(--navy)" }}>GoodHours</span>
         </Link>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-          <h2 className="text-xl font-bold mb-1 text-center text-gray-900">Welcome back</h2>
-          <p className="text-sm text-gray-500 text-center mb-6">Sign in to your GoodHours account</p>
+        <div className="rounded-[3px] border border-[var(--border)] p-7" style={{ background: "var(--surface)" }}>
+          <h2 className="text-[18px] font-semibold mb-1 text-center" style={{ color: "var(--text)" }}>Welcome back</h2>
+          <p className="text-[13px] text-center mb-6" style={{ color: "var(--text-sec)" }}>Sign in to your GoodHours account</p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
+                style={{ background: "var(--surface)", color: "var(--text)" }}
                 placeholder="you@school.edu or your email"
               />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium text-gray-700">Password</label>
+                <label className="text-[13px] font-medium" style={{ color: "var(--text)" }}>Password</label>
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-[12px] hover:underline"
+                  style={{ color: "var(--action)" }}
                 >
                   Forgot password?
                 </Link>
@@ -160,12 +162,14 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-10"
+                  className="w-full h-[34px] px-3 pr-9 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
+                  style={{ background: "var(--surface)", color: "var(--text)" }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 hover:opacity-70"
+                  style={{ color: "var(--text-faint)" }}
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -185,11 +189,12 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full h-[34px] text-white rounded-[2px] font-semibold text-[13.5px] disabled:opacity-50 transition-colors"
+              style={{ background: "var(--navy)" }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   Signing in…
                 </span>
               ) : (
@@ -199,17 +204,18 @@ export default function Login() {
           </form>
 
           <div className="my-5 flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">or</span>
-            <div className="flex-1 h-px bg-gray-200" />
+            <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+            <span className="text-[12px] font-medium" style={{ color: "var(--text-faint)" }}>or</span>
+            <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
           </div>
 
           <button
             onClick={() => googleUrl && (window.location.href = googleUrl)}
             disabled={!googleUrl || loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-300 rounded-lg font-medium text-sm hover:bg-gray-50 text-gray-700 disabled:opacity-40 transition-colors"
+            className="w-full flex items-center justify-center gap-3 px-4 h-[34px] border rounded-[2px] font-medium text-[13px] disabled:opacity-40 transition-colors hover:bg-[var(--surface-alt)]"
+            style={{ background: "var(--surface)", borderColor: "var(--border-s)", color: "var(--text)" }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -219,11 +225,11 @@ export default function Login() {
           </button>
 
           {(import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "development") && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-2">
+            <div className="mt-4 rounded-[3px] border border-[var(--wn-b)] p-4" style={{ background: "var(--wn-bg)" }}>
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--wn-t)" }}>
                 Dev Only
               </div>
-              <p className="text-sm text-amber-900 mb-3">
+              <p className="text-[13px] mb-3" style={{ color: "var(--wn-t)" }}>
                 Bypass Google and sign in with any email domain in development.
               </p>
               <div className="flex gap-2">
@@ -232,13 +238,15 @@ export default function Login() {
                   value={devGoogleEmail}
                   onChange={(e) => setDevGoogleEmail(e.target.value)}
                   placeholder="dev@any-domain.test"
-                  className="flex-1 h-9 px-3 border border-amber-200 rounded-md focus:outline-none focus:border-amber-400 text-[13.5px]"
+                  className="flex-1 h-[34px] px-3 border rounded-[2px] focus:outline-none text-[13px]"
+                  style={{ borderColor: "var(--wn-b)", background: "var(--surface)", color: "var(--text)" }}
                 />
                 <button
                   type="button"
                   onClick={handleDevGoogleSignin}
                   disabled={devGoogleLoading || !devGoogleEmail.trim()}
-                  className="px-4 h-9 bg-amber-600 text-white rounded-md font-medium text-[13.5px] disabled:opacity-50"
+                  className="px-4 h-[34px] rounded-[2px] font-medium text-[13px] text-white disabled:opacity-50"
+                  style={{ background: "#7a4e00" }}
                 >
                   {devGoogleLoading ? "Signing in…" : "Dev Google"}
                 </button>
@@ -246,9 +254,9 @@ export default function Login() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-sm text-gray-500">
+          <p className="mt-6 text-center text-[13px]" style={{ color: "var(--text-sec)" }}>
             Registering a new school?{" "}
-            <Link to="/school/register" className="text-blue-600 hover:underline font-medium">
+            <Link to="/school/register" className="hover:underline font-medium" style={{ color: "var(--action)" }}>
               Register here
             </Link>
           </p>

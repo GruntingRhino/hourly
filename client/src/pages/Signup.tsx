@@ -6,7 +6,7 @@ const AUDIENCES = [
     id: "school" as const,
     label: "School Administrator",
     title: "Register your school",
-    body: "Create a school workspace with Google Sign-In. You’ll use your official school email to verify ownership.",
+    body: "Create a school workspace with Google Sign-In. You'll use your official school email to verify ownership.",
     cta: { to: "/school/register", label: "Register My School →" },
   },
   {
@@ -30,12 +30,12 @@ export default function Signup() {
   const selected = AUDIENCES.find((item) => item.id === audience) ?? AUDIENCES[0];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-2xl text-center">
-        <Link to="/" className="block text-2xl font-bold italic mb-8">GoodHours</Link>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 text-left shadow-sm">
-          <h2 className="text-xl font-bold mb-2 text-gray-900">How to Join GoodHours</h2>
-          <p className="text-sm text-gray-500 mb-5">Pick the path that matches you. Only school admins create new school workspaces here; students and partners join through invitations.</p>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
+      <div className="w-full max-w-xl text-center">
+        <Link to="/" className="block text-[20px] font-bold mb-7" style={{ color: "var(--navy)" }}>GoodHours</Link>
+        <div className="border border-[var(--border)] rounded-[3px] p-6 text-left" style={{ background: "var(--surface)" }}>
+          <h2 className="text-[18px] font-semibold mb-2" style={{ color: "var(--text)" }}>How to Join GoodHours</h2>
+          <p className="text-[13px] mb-5" style={{ color: "var(--text-sec)" }}>Pick the path that matches you. Only school admins create new school workspaces here; students and partners join through invitations.</p>
 
           <div className="grid gap-2 sm:grid-cols-3 mb-5" role="tablist" aria-label="Join GoodHours as">
             {AUDIENCES.map((item) => {
@@ -45,30 +45,35 @@ export default function Signup() {
                   key={item.id}
                   type="button"
                   onClick={() => setAudience(item.id)}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                    active
-                      ? "border-blue-500 bg-blue-50 text-blue-900"
-                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`rounded-[3px] border px-3 py-3 text-left transition-colors`}
+                  style={active
+                    ? { borderColor: "var(--action)", background: "var(--action-lt)", color: "var(--navy)" }
+                    : { borderColor: "var(--border)", background: "var(--surface)", color: "var(--text-sec)" }
+                  }
                   aria-pressed={active}
                 >
-                  <div className="text-sm font-semibold">{item.label}</div>
-                  <div className="mt-1 text-xs leading-5 text-gray-500">{item.id === "school" ? "Public registration" : "Invitation-based"}</div>
+                  <div className="text-[13px] font-semibold" style={{ color: active ? "var(--navy)" : "var(--text)" }}>{item.label}</div>
+                  <div className="mt-1 text-[12px] leading-5" style={{ color: "var(--text-faint)" }}>{item.id === "school" ? "Public registration" : "Invitation-based"}</div>
                 </button>
               );
             })}
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-1">{selected.title}</div>
-            <div className="text-sm text-gray-600 mb-4">{selected.body}</div>
-            <Link to={selected.cta.to} className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <div className="rounded-[3px] border border-[var(--border)] p-4" style={{ background: "var(--surface-alt)" }}>
+            <div className="text-[13px] font-semibold mb-1" style={{ color: "var(--text)" }}>{selected.title}</div>
+            <div className="text-[13px] mb-4" style={{ color: "var(--text-sec)" }}>{selected.body}</div>
+            <Link
+              to={selected.cta.to}
+              className="inline-flex items-center h-[34px] px-4 rounded-[2px] text-[13px] font-medium text-white"
+              style={{ background: "var(--navy)" }}
+            >
               {selected.cta.label}
             </Link>
           </div>
 
-          <div className="mt-4 text-sm text-gray-500">
-            Already have an account? <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
+          <div className="mt-4 text-[13px]" style={{ color: "var(--text-sec)" }}>
+            Already have an account?{" "}
+            <Link to="/login" className="hover:underline font-medium" style={{ color: "var(--action)" }}>Sign in</Link>
           </div>
         </div>
       </div>

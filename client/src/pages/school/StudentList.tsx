@@ -221,9 +221,9 @@ export default function StudentList() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <Link to={backLink} className="text-gray-500 hover:text-gray-800 text-sm">{backLabel}</Link>
-        <span className="text-gray-300">/</span>
-        <h1 className="text-2xl font-bold">{title}</h1>
+        <Link to={backLink} className="text-[var(--text-sec)] hover:text-[var(--text)] text-sm">{backLabel}</Link>
+        <span className="text-[var(--text-faint)]">/</span>
+        <h1 className="text-[20px] font-semibold">{title}</h1>
       </div>
 
       {/* School-wide filter tabs */}
@@ -239,8 +239,8 @@ export default function StudentList() {
               to={t.path}
               className={`pb-2 text-sm font-medium border-b-2 ${
                 location.pathname === t.path
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-600 text-[var(--action)]"
+                  : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"
               }`}
             >
               {t.label}
@@ -249,56 +249,56 @@ export default function StudentList() {
         </div>
       )}
 
-      {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm mb-4">{error}</div>}
+      {error && <div className="p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded text-[var(--er-t)] text-sm mb-4">{error}</div>}
 
       {loading ? (
-        <div className="text-gray-500 text-sm py-8 text-center">Loading...</div>
+        <div className="text-[var(--text-sec)] text-sm py-8 text-center">Loading...</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+        <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)]">
           No students found.
         </div>
       ) : (
         <div>
-          <div className="text-sm text-gray-500 mb-3">{filtered.length} student{filtered.length !== 1 ? "s" : ""}</div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="text-sm text-[var(--text-sec)] mb-3">{filtered.length} student{filtered.length !== 1 ? "s" : ""}</div>
+          <div className="border border-[var(--border)] rounded-[3px] overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--surface-alt)] border-b">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">Name</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">Email</th>
-                  {!cohortId && <th className="text-left px-4 py-2 font-medium text-gray-600">Cohort</th>}
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Hours</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Remaining</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Required</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Status</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">Intervention</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Inspect</th>
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-sec)]">Name</th>
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-sec)]">Email</th>
+                  {!cohortId && <th className="text-left px-4 py-2 font-medium text-[var(--text-sec)]">Cohort</th>}
+                  <th className="text-right px-4 py-2 font-medium text-[var(--text-sec)]">Hours</th>
+                  <th className="text-right px-4 py-2 font-medium text-[var(--text-sec)]">Remaining</th>
+                  <th className="text-right px-4 py-2 font-medium text-[var(--text-sec)]">Required</th>
+                  <th className="text-right px-4 py-2 font-medium text-[var(--text-sec)]">Status</th>
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-sec)]">Intervention</th>
+                  <th className="text-right px-4 py-2 font-medium text-[var(--text-sec)]">Inspect</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s.id} className="hover:bg-[var(--surface-alt)]">
                     <td className="px-4 py-2 font-medium">{s.name}</td>
-                    <td className="px-4 py-2 text-gray-500 text-xs">{s.email}</td>
-                    {!cohortId && <td className="px-4 py-2 text-gray-500 text-xs">{s.cohortName}</td>}
+                    <td className="px-4 py-2 text-[var(--text-sec)] text-xs">{s.email}</td>
+                    {!cohortId && <td className="px-4 py-2 text-[var(--text-sec)] text-xs">{s.cohortName}</td>}
                     <td className="px-4 py-2 text-right font-medium">{s.approvedHours.toFixed(1)}</td>
-                    <td className="px-4 py-2 text-right font-medium text-red-700">{(s.remainingHours ?? Math.max(0, s.requiredHours - s.approvedHours)).toFixed(1)}h</td>
-                    <td className="px-4 py-2 text-right text-gray-400">{s.requiredHours}h</td>
+                    <td className="px-4 py-2 text-right font-medium text-[var(--er-t)]">{(s.remainingHours ?? Math.max(0, s.requiredHours - s.approvedHours)).toFixed(1)}h</td>
+                    <td className="px-4 py-2 text-right text-[var(--text-faint)]">{s.requiredHours}h</td>
                     <td className="px-4 py-2 text-right">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        s.status === "COMPLETED" ? "bg-green-50 text-green-700" :
-                        s.status === "ON_TRACK" ? "bg-blue-50 text-blue-700" :
-                        "bg-red-50 text-red-600"
+                        s.status === "COMPLETED" ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" :
+                        s.status === "ON_TRACK" ? "bg-[var(--in-bg)] text-[var(--action)]" :
+                        "bg-[var(--er-bg)] text-[var(--er-t)]"
                       }`}>{s.status.replace("_", " ")}</span>
                     </td>
-                    <td className="px-4 py-2 text-xs text-gray-600">
+                    <td className="px-4 py-2 text-xs text-[var(--text-sec)]">
                       {s.interventionCase ? (
                         <div>
-                          <div className={`inline-flex px-2 py-0.5 rounded-full font-medium ${s.interventionCase.status === 'RESOLVED' ? 'bg-green-50 text-green-700' : s.interventionCase.priority === 'URGENT' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{s.interventionCase.status.replaceAll('_', ' ')}</div>
-                          {s.interventionCase.summary && <div className="mt-1 text-gray-500">{s.interventionCase.summary}</div>}
+                          <div className={`inline-flex px-2 py-0.5 rounded-full font-medium ${s.interventionCase.status === 'RESOLVED' ? 'bg-[var(--ok-bg)] text-[var(--ok-t)]' : s.interventionCase.priority === 'URGENT' ? 'bg-[var(--er-bg)] text-[var(--er-t)]' : 'bg-[var(--in-bg)] text-[var(--action)]'}`}>{s.interventionCase.status.replaceAll('_', ' ')}</div>
+                          {s.interventionCase.summary && <div className="mt-1 text-[var(--text-sec)]">{s.interventionCase.summary}</div>}
                         </div>
                       ) : (
-                        <span className="text-gray-400">No case</span>
+                        <span className="text-[var(--text-faint)]">No case</span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-right">
@@ -306,14 +306,14 @@ export default function StudentList() {
                         <button
                           onClick={() => loadHourBreakdown(s.id)}
                           disabled={breakdownLoadingId === s.id}
-                          className="px-2.5 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          className="px-2.5 py-1 border border-[var(--border-s)] rounded text-xs text-[var(--text-sec)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
                         >
                           {breakdownLoadingId === s.id ? "..." : "Hours"}
                         </button>
                         <button
                           onClick={() => loadVerificationHistory(s.id)}
                           disabled={historyLoadingId === s.id}
-                          className="px-2.5 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          className="px-2.5 py-1 border border-[var(--border-s)] rounded text-xs text-[var(--text-sec)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
                         >
                           {historyLoadingId === s.id ? "..." : "History"}
                         </button>
@@ -329,36 +329,36 @@ export default function StudentList() {
 
       {breakdownData && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl bg-white rounded-xl shadow-xl border border-gray-200 max-h-[88vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div className="w-full max-w-5xl bg-[var(--surface)] rounded-[3px]  border border-[var(--border)] max-h-[88vh] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-start justify-between gap-4">
               <div>
-                <div className="font-semibold text-gray-900">Student Hour Breakdown</div>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="font-semibold text-[var(--text)]">Student Hour Breakdown</div>
+                <div className="text-sm text-[var(--text-sec)] mt-1">
                   {breakdownData.student.name} · {breakdownData.student.email}
                   {breakdownData.student.cohortName ? ` · ${breakdownData.student.cohortName}` : ""}
                 </div>
               </div>
-              <button onClick={() => setBreakdownData(null)} className="text-gray-400 hover:text-gray-600 text-sm">
+              <button onClick={() => setBreakdownData(null)} className="text-[var(--text-faint)] hover:text-[var(--text-sec)] text-sm">
                 Close
               </button>
             </div>
             <div className="p-5 overflow-y-auto max-h-[75vh] space-y-6">
               <div className="grid sm:grid-cols-4 gap-3">
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500">Approved</div>
-                  <div className="text-2xl font-bold text-green-600">{breakdownData.totals.approved.toFixed(1)}h</div>
+                <div className="rounded-[3px] border border-[var(--border)] p-3">
+                  <div className="text-xs text-[var(--text-sec)]">Approved</div>
+                  <div className="text-[28px] font-bold text-[var(--ok-t)]">{breakdownData.totals.approved.toFixed(1)}h</div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500">Pending</div>
-                  <div className="text-2xl font-bold text-yellow-600">{breakdownData.totals.pending.toFixed(1)}h</div>
+                <div className="rounded-[3px] border border-[var(--border)] p-3">
+                  <div className="text-xs text-[var(--text-sec)]">Pending</div>
+                  <div className="text-[28px] font-bold text-yellow-600">{breakdownData.totals.pending.toFixed(1)}h</div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500">Expected Approved</div>
-                  <div className="text-2xl font-bold text-gray-900">{breakdownData.totals.reconciliation.expectedApproved.toFixed(1)}h</div>
+                <div className="rounded-[3px] border border-[var(--border)] p-3">
+                  <div className="text-xs text-[var(--text-sec)]">Expected Approved</div>
+                  <div className="text-[28px] font-bold text-[var(--text)]">{breakdownData.totals.reconciliation.expectedApproved.toFixed(1)}h</div>
                 </div>
-                <div className={`rounded-lg border p-3 ${breakdownData.totals.reconciliation.reconciled ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
-                  <div className="text-xs text-gray-500">Reconciliation</div>
-                  <div className={`text-sm font-semibold mt-1 ${breakdownData.totals.reconciliation.reconciled ? "text-green-700" : "text-red-700"}`}>
+                <div className={`rounded-[3px] border p-3 ${breakdownData.totals.reconciliation.reconciled ? "border-[var(--ok-b)] bg-[var(--ok-bg)]" : "border-[var(--er-b)] bg-[var(--er-bg)]"}`}>
+                  <div className="text-xs text-[var(--text-sec)]">Reconciliation</div>
+                  <div className={`text-sm font-semibold mt-1 ${breakdownData.totals.reconciliation.reconciled ? "text-[var(--ok-t)]" : "text-[var(--er-t)]"}`}>
                     {breakdownData.totals.reconciliation.reconciled ? "Reconciled" : "Mismatch detected"}
                   </div>
                 </div>
@@ -370,9 +370,9 @@ export default function StudentList() {
                   { label: "Self-Submitted", totals: breakdownData.totals.bySource.selfSubmission },
                   { label: "Legacy", totals: breakdownData.totals.bySource.legacy },
                 ]).map(({ label, totals }) => (
-                  <div key={label} className="rounded-lg border border-gray-200 p-4">
-                    <div className="text-sm font-semibold text-gray-800">{label}</div>
-                    <div className="text-xs text-gray-500 mt-1">{totals.count} record{totals.count === 1 ? "" : "s"}</div>
+                  <div key={label} className="rounded-[3px] border border-[var(--border)] p-4">
+                    <div className="text-sm font-semibold text-[var(--text)]">{label}</div>
+                    <div className="text-xs text-[var(--text-sec)] mt-1">{totals.count} record{totals.count === 1 ? "" : "s"}</div>
                     <div className="mt-3 space-y-1 text-sm">
                       <div>Approved: <strong>{totals.approved.toFixed(1)}h</strong></div>
                       <div>Pending: <strong>{totals.pending.toFixed(1)}h</strong></div>
@@ -387,43 +387,43 @@ export default function StudentList() {
                 { label: "Legacy Records", records: breakdownData.records.legacy },
               ] as const).map((section) => (
                 <div key={section.label}>
-                  <div className="font-medium text-gray-900 mb-3">{section.label}</div>
+                  <div className="font-medium text-[var(--text)] mb-3">{section.label}</div>
                   {section.records.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                    <div className="rounded-[3px] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--text-sec)]">
                       No records in this source.
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {section.records.map((record) => (
-                        <div key={record.id} className="rounded-lg border border-gray-200 p-4">
+                        <div key={record.id} className="rounded-[3px] border border-[var(--border)] p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <div className="font-medium text-sm text-gray-900">{record.title}</div>
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="font-medium text-sm text-[var(--text)]">{record.title}</div>
+                              <div className="text-xs text-[var(--text-sec)] mt-1">
                                 {record.organizationName} · {new Date(record.date).toLocaleDateString()}
                                 {record.category ? ` · ${record.category}` : ""}
                               </div>
                               {record.source === "SELF_SUBMISSION" && record.status === "PENDING" && record.revisionNote && (
-                                <div className="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200">
+                                <div className="mt-2 inline-flex items-center rounded-full bg-[var(--wn-bg)] px-2.5 py-1 text-xs font-medium text-[var(--wn-t)] border border-[var(--wn-b)]">
                                   {`Revision ${Math.max(1, record.timesRevised ?? 1)}`}
                                 </div>
                               )}
                             </div>
                             <div className="text-right text-xs">
-                              <div className="font-semibold text-gray-700">{record.status}{record.verificationStatus ? ` · ${record.verificationStatus}` : ""}</div>
-                              <div className="text-gray-500 mt-1">
+                              <div className="font-semibold text-[var(--text)]">{record.status}{record.verificationStatus ? ` · ${record.verificationStatus}` : ""}</div>
+                              <div className="text-[var(--text-sec)] mt-1">
                                 {record.approvedHours > 0 ? `${record.approvedHours.toFixed(1)}h approved` : `${record.pendingHours.toFixed(1)}h pending`}
                               </div>
                             </div>
                           </div>
 
                           {(record.description || record.evidenceNote || record.rejectionReason || record.revisionNote) && (
-                            <div className="mt-3 space-y-1 text-xs text-gray-600">
+                            <div className="mt-3 space-y-1 text-xs text-[var(--text-sec)]">
                               {record.description && <div>Description: {record.description}</div>}
                               {record.evidenceNote && <div>Evidence: {record.evidenceNote}</div>}
-                              {record.rejectionReason && <div className="text-red-600">Rejected: {record.rejectionReason}</div>}
+                              {record.rejectionReason && <div className="text-[var(--er-t)]">Rejected: {record.rejectionReason}</div>}
                               {record.revisionNote && (
-                                <div className="text-amber-700">
+                                <div className="text-[var(--wn-t)]">
                                   {record.status === "PENDING"
                                     ? `Revised after note (${`Revision ${Math.max(1, record.timesRevised ?? 1)}`}):`
                                     : "Revision requested:"}{" "}
@@ -434,7 +434,7 @@ export default function StudentList() {
                           )}
 
                           {record.reviewer && (
-                            <div className="mt-3 text-xs text-gray-500">
+                            <div className="mt-3 text-xs text-[var(--text-sec)]">
                               Reviewed by {record.reviewer.name} ({record.reviewer.role})
                               {record.reviewedAt ? ` · ${new Date(record.reviewedAt).toLocaleString()}` : ""}
                             </div>
@@ -443,14 +443,14 @@ export default function StudentList() {
                           {record.auditTrail && record.auditTrail.length > 0 && (
                             <div className="mt-3 space-y-2">
                               {record.auditTrail.map((entry) => (
-                                <div key={entry.id} className="rounded bg-gray-50 border border-gray-100 p-2">
+                                <div key={entry.id} className="rounded bg-[var(--surface-alt)] border border-[var(--border)] p-2">
                                   <div className="flex justify-between gap-3">
-                                    <div className="text-xs font-medium text-gray-800">{entry.action}</div>
-                                    <div className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</div>
+                                    <div className="text-xs font-medium text-[var(--text)]">{entry.action}</div>
+                                    <div className="text-xs text-[var(--text-faint)]">{new Date(entry.createdAt).toLocaleString()}</div>
                                   </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
+                                  <div className="text-xs text-[var(--text-sec)] mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
                                   {formatHistoryDetails(entry.details) && (
-                                    <div className="text-xs text-gray-600 mt-1">{formatHistoryDetails(entry.details)}</div>
+                                    <div className="text-xs text-[var(--text-sec)] mt-1">{formatHistoryDetails(entry.details)}</div>
                                   )}
                                 </div>
                               ))}
@@ -469,51 +469,51 @@ export default function StudentList() {
 
       {historyData && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-gray-200 max-h-[85vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div className="w-full max-w-3xl bg-[var(--surface)] rounded-[3px]  border border-[var(--border)] max-h-[85vh] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-start justify-between gap-4">
               <div>
-                <div className="font-semibold text-gray-900">Beneficiary Verification History</div>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="font-semibold text-[var(--text)]">Beneficiary Verification History</div>
+                <div className="text-sm text-[var(--text-sec)] mt-1">
                   {historyData.student.name} · {historyData.student.email}
                 </div>
               </div>
-              <button onClick={() => setHistoryData(null)} className="text-gray-400 hover:text-gray-600 text-sm">
+              <button onClick={() => setHistoryData(null)} className="text-[var(--text-faint)] hover:text-[var(--text-sec)] text-sm">
                 Close
               </button>
             </div>
             <div className="p-5 overflow-y-auto max-h-[70vh] space-y-4">
               {historyData.signups.length === 0 ? (
-                <div className="text-sm text-gray-500">No beneficiary verification activity recorded for this student.</div>
+                <div className="text-sm text-[var(--text-sec)]">No beneficiary verification activity recorded for this student.</div>
               ) : (
                 historyData.signups.map((signup) => (
-                  <div key={signup.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={signup.id} className="border border-[var(--border)] rounded-[3px] p-4">
                     <div className="flex justify-between gap-4">
                       <div>
                         <div className="font-medium text-sm">{signup.slot.opportunity.title}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
+                        <div className="text-xs text-[var(--text-sec)] mt-0.5">
                           {signup.slot.opportunity.beneficiary.name} · {new Date(signup.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {signup.totalHours ?? signup.slot.durationHours}h
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs font-medium text-gray-700">{signup.status === "NO_SHOW" ? "NO_SHOW" : signup.verificationStatus}</div>
+                        <div className="text-xs font-medium text-[var(--text)]">{signup.status === "NO_SHOW" ? "NO_SHOW" : signup.verificationStatus}</div>
                         {signup.rejectionReason && (
-                          <div className="text-xs text-red-500 mt-1">{signup.rejectionReason}</div>
+                          <div className="text-xs text-[var(--er-t)] mt-1">{signup.rejectionReason}</div>
                         )}
                       </div>
                     </div>
                     <div className="mt-3 space-y-2">
                       {signup.history.length === 0 ? (
-                        <div className="text-xs text-gray-400">No audit events recorded.</div>
+                        <div className="text-xs text-[var(--text-faint)]">No audit events recorded.</div>
                       ) : (
                         signup.history.map((entry) => (
-                          <div key={entry.id} className="bg-gray-50 border border-gray-100 rounded p-2">
+                          <div key={entry.id} className="bg-[var(--surface-alt)] border border-[var(--border)] rounded p-2">
                             <div className="flex justify-between gap-3">
-                              <div className="text-xs font-medium text-gray-800">{entry.action}</div>
-                              <div className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</div>
+                              <div className="text-xs font-medium text-[var(--text)]">{entry.action}</div>
+                              <div className="text-xs text-[var(--text-faint)]">{new Date(entry.createdAt).toLocaleString()}</div>
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
+                            <div className="text-xs text-[var(--text-sec)] mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
                             {formatHistoryDetails(entry.details) && (
-                              <div className="text-xs text-gray-600 mt-1">{formatHistoryDetails(entry.details)}</div>
+                              <div className="text-xs text-[var(--text-sec)] mt-1">{formatHistoryDetails(entry.details)}</div>
                             )}
                           </div>
                         ))

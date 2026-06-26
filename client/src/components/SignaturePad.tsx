@@ -80,7 +80,7 @@ export default function SignaturePad({ onSignatureChange }: SignaturePadProps) {
 
   return (
     <div>
-      <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white relative">
+      <div className="border-2 border-dashed border-[var(--border-s)] rounded-[3px] bg-white relative">
         <canvas
           ref={canvasRef}
           className="w-full h-40 cursor-crosshair touch-none"
@@ -93,7 +93,7 @@ export default function SignaturePad({ onSignatureChange }: SignaturePadProps) {
           onTouchEnd={endDraw}
         />
         {!hasSignature && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-400 text-sm">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[var(--text-faint)] text-sm">
             Sign here
           </div>
         )}
@@ -102,7 +102,7 @@ export default function SignaturePad({ onSignatureChange }: SignaturePadProps) {
         <button
           type="button"
           onClick={clear}
-          className="mt-2 text-sm text-red-600 hover:underline"
+          className="mt-2 text-sm text-[var(--er-t)] hover:underline"
         >
           Clear Signature
         </button>

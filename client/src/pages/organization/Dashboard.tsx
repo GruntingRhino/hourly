@@ -135,8 +135,8 @@ export default function OrgDashboard() {
     }
   };
 
-  if (loading) return <div className="text-gray-500">Loading dashboard...</div>;
-  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>;
+  if (loading) return <div className="text-[var(--text-sec)]">Loading dashboard...</div>;
+  if (error) return <div className="p-4 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[3px] text-[var(--er-t)] text-sm">{error}</div>;
 
   const upcoming = opportunities
     .filter((o) => o.status === "ACTIVE" && new Date(o.date) >= new Date())
@@ -144,25 +144,28 @@ export default function OrgDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <div className="mb-5">
+        <div className="text-[12px] mb-0.5" style={{ color: "var(--text-faint)" }}>Organization</div>
+        <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>Dashboard</h1>
+      </div>
 
       {/* Actions */}
       <div className="flex gap-3 mb-6">
         <Link
           to="/opportunities/new"
-          className="px-6 py-[9px] bg-blue-600 text-white rounded-md font-medium hover:opacity-85"
+          className="px-6 py-[9px] bg-[var(--action)] text-white rounded-[2px] font-medium hover:opacity-85"
         >
           Create Opportunity
         </Link>
         <Link
           to="/opportunities"
-          className="px-6 py-3 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200"
+          className="px-6 py-3 bg-[var(--surface-alt)] text-[var(--text)] rounded-[2px] font-medium hover:bg-[var(--border)]"
         >
           My Opportunities
         </Link>
         <button
           onClick={() => { setShowAnnounce(true); setAnnounceResult(""); }}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
+          className="px-6 py-3 bg-[var(--action)] text-white rounded-[2px] font-medium hover:bg-[var(--action)]"
         >
           Make Announcement
         </button>
@@ -171,24 +174,24 @@ export default function OrgDashboard() {
       {/* Announcement Modal */}
       {showAnnounce && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-[var(--surface)] rounded-[3px] p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Make Announcement</h2>
             {announceResult ? (
               <div>
-                <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm mb-4">
+                <div className="p-3 bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded-[2px] text-[var(--ok-t)] text-sm mb-4">
                   {announceResult}
                 </div>
-                <button onClick={() => { setShowAnnounce(false); setAnnounceResult(""); }} className="w-full py-[7px] bg-blue-600 text-white rounded-md hover:opacity-85">Done</button>
+                <button onClick={() => { setShowAnnounce(false); setAnnounceResult(""); }} className="w-full py-[7px] bg-[var(--action)] text-white rounded-[2px] hover:opacity-85">Done</button>
               </div>
             ) : (
               <form onSubmit={handleAnnounce} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Opportunity</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Opportunity</label>
                   <select
                     value={announceOppId}
                     onChange={(e) => setAnnounceOppId(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
                   >
                     <option value="">Select opportunity...</option>
                     {opportunities.filter((o) => o.status === "ACTIVE").map((o) => (
@@ -197,21 +200,21 @@ export default function OrgDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Message</label>
                   <textarea
                     value={announceMsg}
                     onChange={(e) => setAnnounceMsg(e.target.value)}
                     required
                     rows={4}
                     placeholder="Write your announcement..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button type="submit" disabled={announcing} className="flex-1 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50">
+                  <button type="submit" disabled={announcing} className="flex-1 py-2 bg-[var(--action)] text-white rounded-[2px] font-medium hover:bg-[var(--action)] disabled:opacity-50">
                     {announcing ? "Sending..." : "Send to All Signups"}
                   </button>
-                  <button type="button" onClick={() => setShowAnnounce(false)} className="flex-1 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+                  <button type="button" onClick={() => setShowAnnounce(false)} className="flex-1 py-2 border border-[var(--border-s)] rounded-[2px] hover:bg-[var(--surface-alt)]">
                     Cancel
                   </button>
                 </div>
@@ -224,28 +227,28 @@ export default function OrgDashboard() {
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+          <div className="bg-[var(--surface)] rounded-[3px] p-6 w-full max-w-sm">
             <h2 className="text-lg font-bold mb-3">Reject Hours</h2>
-            <p className="text-sm text-gray-600 mb-4">A rejection reason is required.</p>
+            <p className="text-sm text-[var(--text-sec)] mb-4">A rejection reason is required.</p>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Reason (required)"
               rows={3}
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+              className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm mb-4"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmReject}
                 disabled={rejecting}
-                className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 py-2 bg-red-600 text-white rounded-[2px] text-sm font-medium hover:bg-red-700 disabled:opacity-50"
               >
                 {rejecting ? "Rejecting..." : "Reject"}
               </button>
               <button
                 onClick={() => setRejectModal(null)}
-                className="flex-1 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                className="flex-1 py-2 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
               >
                 Cancel
               </button>
@@ -261,16 +264,16 @@ export default function OrgDashboard() {
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3">Pending Verifications</h2>
             {pending.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-500">
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 text-sm text-[var(--text-sec)]">
                 No pending verifications.
               </div>
             ) : (
               <div className="space-y-2">
                 {pending.map((p) => (
-                  <div key={p.id} className="bg-white border border-yellow-200 rounded-lg p-4 flex justify-between items-center gap-4">
+                  <div key={p.id} className="bg-[var(--surface)] border border-[var(--wn-b)] rounded-[3px] p-4 flex justify-between items-center gap-4">
                     <div>
                       <div className="font-medium text-sm">{p.user.label}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-[var(--text-sec)]">
                         {p.opportunity.title} &middot; {p.totalHours} hours
                       </div>
                     </div>
@@ -284,17 +287,19 @@ export default function OrgDashboard() {
                         onChange={(e) =>
                           setOverrideHours((prev) => ({ ...prev, [p.id]: e.target.value }))
                         }
-                        className="w-28 px-2 py-1 border border-gray-300 rounded text-xs"
+                        className="w-28 px-2 py-1 border border-[var(--border-s)] rounded text-xs"
                       />
                       <button
                         onClick={() => handleApprove(p.id)}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                        className="h-[28px] px-3 rounded-[2px] text-white text-[12px] font-medium"
+                        style={{ background: "var(--ok-t)" }}
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => handleReject(p.id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                        className="h-[28px] px-3 rounded-[2px] text-white text-[12px] font-medium"
+                        style={{ background: "var(--er-t)" }}
                       >
                         Reject
                       </button>
@@ -307,15 +312,15 @@ export default function OrgDashboard() {
 
           {/* Recent activity */}
           <h2 className="text-lg font-semibold mb-3">Recent Activity Feed</h2>
-          <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5">
             {notifications.length === 0 ? (
-              <div className="text-gray-500 text-sm">No recent activity.</div>
+              <div className="text-[var(--text-sec)] text-sm">No recent activity.</div>
             ) : (
               <div className="space-y-3">
                 {notifications.map((n) => (
-                  <div key={n.id} className="text-sm text-gray-700">
+                  <div key={n.id} className="text-sm text-[var(--text)]">
                     {n.body}
-                    <span className="text-gray-400 ml-2 text-xs">
+                    <span className="text-[var(--text-faint)] ml-2 text-xs">
                       {new Date(n.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -326,22 +331,22 @@ export default function OrgDashboard() {
 
           {/* Stats */}
           {stats && (
-            <div className="grid grid-cols-2 gap-3 mt-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-sm text-gray-500">Total Opportunities</div>
-                <div className="text-2xl font-bold">{stats.totalOpportunities}</div>
+            <div className="mt-6 border rounded-[3px] overflow-hidden grid grid-cols-2" style={{ borderColor: "var(--border)", gap: "1px", background: "var(--border)" }}>
+              <div className="bg-[var(--surface)] p-4">
+                <div className="text-[12px]" style={{ color: "var(--text-sec)" }}>Total Opportunities</div>
+                <div className="text-[28px] font-bold" style={{ color: "var(--text)" }}>{stats.totalOpportunities}</div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-sm text-gray-500">Total Signups</div>
-                <div className="text-2xl font-bold">{stats.totalSignups}</div>
+              <div className="bg-[var(--surface)] p-4">
+                <div className="text-[12px]" style={{ color: "var(--text-sec)" }}>Total Signups</div>
+                <div className="text-[28px] font-bold" style={{ color: "var(--text)" }}>{stats.totalSignups}</div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-sm text-gray-500">Approved Hours</div>
-                <div className="text-2xl font-bold">{stats.totalApprovedHours}</div>
+              <div className="bg-[var(--surface)] p-4">
+                <div className="text-[12px]" style={{ color: "var(--text-sec)" }}>Approved Hours</div>
+                <div className="text-[28px] font-bold" style={{ color: "var(--text)" }}>{stats.totalApprovedHours}</div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-sm text-gray-500">Unique Volunteers</div>
-                <div className="text-2xl font-bold">{stats.uniqueVolunteers}</div>
+              <div className="bg-[var(--surface)] p-4">
+                <div className="text-[12px]" style={{ color: "var(--text-sec)" }}>Unique Volunteers</div>
+                <div className="text-[28px] font-bold" style={{ color: "var(--text)" }}>{stats.uniqueVolunteers}</div>
               </div>
             </div>
           )}
@@ -351,22 +356,22 @@ export default function OrgDashboard() {
         <div>
           <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
           {upcoming.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-5 text-gray-500 text-sm">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5 text-[var(--text-sec)] text-sm">
               No upcoming events.
             </div>
           ) : (
             <div className="space-y-2">
               {upcoming.slice(0, 6).map((opp) => (
-                <div key={opp.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                <div key={opp.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="text-sm font-medium">
                         {new Date(opp.date).toLocaleDateString()} &middot; {opp.startTime} - {opp.endTime}
                       </div>
-                      <div className="text-xs text-gray-500">{opp.title}</div>
-                      <div className="text-xs text-gray-400">{opp.location}</div>
+                      <div className="text-xs text-[var(--text-sec)]">{opp.title}</div>
+                      <div className="text-xs text-[var(--text-faint)]">{opp.location}</div>
                     </div>
-                    <div className="text-sm font-bold text-blue-600">
+                    <div className="text-sm font-bold text-[var(--action)]">
                       {opp._count.signups}/{opp.capacity}
                     </div>
                   </div>

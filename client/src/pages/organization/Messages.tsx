@@ -84,20 +84,20 @@ export default function OrgMessages() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Messages</h1>
+        <h1 className="text-[28px] font-bold">Messages</h1>
         <button
           onClick={() => setShowCompose(!showCompose)}
-          className="px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85"
+          className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:opacity-85"
         >
           {showCompose ? "Cancel" : "Create Message"}
         </button>
       </div>
 
       {showCompose && (
-        <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5 mb-6">
           <h3 className="font-semibold mb-3">Compose Message</h3>
           {sendError && (
-            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            <div className="mb-3 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
               {sendError}
             </div>
           )}
@@ -108,14 +108,14 @@ export default function OrgMessages() {
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
             />
             <input
               type="text"
               placeholder="Subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
             />
             <textarea
               placeholder="Write your message..."
@@ -123,12 +123,12 @@ export default function OrgMessages() {
               onChange={(e) => setBody(e.target.value)}
               required
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
             />
             <button
               type="submit"
               disabled={sending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm hover:bg-[var(--action)] disabled:opacity-50"
             >
               {sending ? "Sending..." : "Send"}
             </button>
@@ -141,8 +141,8 @@ export default function OrgMessages() {
           <button
             key={f}
             onClick={() => setFolder(f)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${
-              folder === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            className={`px-4 py-2 rounded-[2px] text-sm font-medium capitalize ${
+              folder === f ? "bg-[var(--action)] text-white" : "bg-[var(--surface-alt)] text-[var(--text)] hover:bg-[var(--border)]"
             }`}
           >
             {f === "notifications" ? "Priority" : f}
@@ -153,13 +153,13 @@ export default function OrgMessages() {
       {/* Sender filter (inbox only) */}
       {folder === "inbox" && (
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-gray-500">Filter:</span>
+          <span className="text-sm text-[var(--text-sec)]">Filter:</span>
           {(["all", "students", "organizations", "schools"] as SenderFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setSenderFilter(f)}
               className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                senderFilter === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                senderFilter === f ? "bg-[var(--action)] text-white" : "bg-[var(--surface-alt)] text-[var(--text-sec)] hover:bg-[var(--border)]"
               }`}
             >
               {f}
@@ -169,20 +169,20 @@ export default function OrgMessages() {
       )}
 
       {loading ? (
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-[var(--text-sec)]">Loading...</div>
       ) : folder === "notifications" ? (
         <div className="space-y-2">
           {notifications.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">No notifications.</div>
+            <div className="text-[var(--text-sec)] text-center py-8">No notifications.</div>
           ) : (
             notifications.map((n) => (
-              <div key={n.id} className={`bg-white border rounded-lg p-4 ${n.read ? "border-gray-200" : "border-blue-300"}`}>
+              <div key={n.id} className={`bg-[var(--surface)] border rounded-[3px] p-4 ${n.read ? "border-[var(--border)]" : "border-[var(--in-b)]"}`}>
                 <div className="flex justify-between">
                   <div>
                     <div className="font-medium text-sm">{n.title}</div>
-                    <div className="text-sm text-gray-600">{n.body}</div>
+                    <div className="text-sm text-[var(--text-sec)]">{n.body}</div>
                   </div>
-                  <div className="text-xs text-gray-400">{new Date(n.createdAt).toLocaleDateString()}</div>
+                  <div className="text-xs text-[var(--text-faint)]">{new Date(n.createdAt).toLocaleDateString()}</div>
                 </div>
               </div>
             ))
@@ -196,17 +196,17 @@ export default function OrgMessages() {
               ? messages.filter((m) => allowedRoles.includes(m.sender.role))
               : messages;
             return filtered.length === 0 ? (
-              <div className="text-gray-500 text-center py-8">No messages.</div>
+              <div className="text-[var(--text-sec)] text-center py-8">No messages.</div>
             ) : (
               filtered.map((m) => (
-                <div key={m.id} className={`bg-white border rounded-lg p-4 ${m.priority ? "border-l-4 border-l-red-500" : "border-gray-200"}`}>
+                <div key={m.id} className={`bg-[var(--surface)] border rounded-[3px] p-4 ${m.priority ? "border-l-4 border-l-red-500" : "border-[var(--border)]"}`}>
                   <div className="flex justify-between">
                     <div>
                       <div className="font-medium text-sm">{folder === "inbox" ? m.sender.name : m.receiver.name}</div>
-                      {m.subject && <div className="text-sm text-gray-700">{m.subject}</div>}
-                      <div className="text-sm text-gray-500 mt-1">{m.body}</div>
+                      {m.subject && <div className="text-sm text-[var(--text)]">{m.subject}</div>}
+                      <div className="text-sm text-[var(--text-sec)] mt-1">{m.body}</div>
                     </div>
-                    <div className="text-xs text-gray-400">{new Date(m.createdAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-[var(--text-faint)]">{new Date(m.createdAt).toLocaleDateString()}</div>
                   </div>
                 </div>
               ))

@@ -79,107 +79,107 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr,1fr]">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">First-user monitoring</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-[16px] font-semibold text-[var(--text)]">First-user monitoring</h2>
+              <p className="mt-1 text-sm text-[var(--text-sec)]">
                 Watch the rollout funnel and keep the review queue small while the first student group goes live.
               </p>
             </div>
             <button
               onClick={handleRunReminders}
               disabled={runningReminders}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
             >
               {runningReminders ? "Running..." : "Run Reminders"}
             </button>
           </div>
 
           {monitoringMessage && (
-            <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <div className="mt-4 rounded-[2px] border border-[var(--border)] bg-[var(--surface-alt)] px-3 py-2 text-sm text-[var(--text)]">
               {monitoringMessage}
             </div>
           )}
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Launch Window</div>
-              <div className="mt-2 text-sm text-gray-700">
+            <div className="rounded-[3px] border border-[var(--border)] p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-sec)]">Launch Window</div>
+              <div className="mt-2 text-sm text-[var(--text)]">
                 Start: <span className="font-medium">{formatDate(workspace.plan.firstUserMonitoring.launchStartDate)}</span>
               </div>
-              <div className="mt-1 text-sm text-gray-700">
+              <div className="mt-1 text-sm text-[var(--text)]">
                 Cadence: <span className="font-medium">{workspace.plan.firstUserMonitoring.checkCadence.replace("_", " ")}</span>
               </div>
-              <div className="mt-1 text-sm text-gray-700">
+              <div className="mt-1 text-sm text-[var(--text)]">
                 Target: <span className="font-medium">{workspace.plan.firstUserMonitoring.activeStudentTarget} students with hours</span>
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-4">
+            <div className="rounded-[3px] border border-[var(--border)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Target Progress</div>
-                  <div className="mt-1 text-2xl font-semibold text-gray-900">{targetProgress}%</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-sec)]">Target Progress</div>
+                  <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{targetProgress}%</div>
                 </div>
-                <div className="text-right text-sm text-gray-500">
+                <div className="text-right text-sm text-[var(--text-sec)]">
                   {workspace.metrics.studentsWithHours} / {workspace.plan.firstUserMonitoring.activeStudentTarget}
                 </div>
               </div>
-              <div className="mt-3 h-2 rounded-full bg-gray-100">
-                <div className="h-2 rounded-full bg-blue-600" style={{ width: `${targetProgress}%` }} />
+              <div className="mt-3 h-2 rounded-full bg-[var(--surface-alt)]">
+                <div className="h-2 rounded-full bg-[var(--action)]" style={{ width: `${targetProgress}%` }} />
               </div>
             </div>
           </div>
 
           {latestReminderSummary && (
-            <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <div className="font-medium text-blue-900">Latest reminder run</div>
+            <div className="mt-5 rounded-[3px] border border-[var(--in-b)] bg-[var(--in-bg)] p-4">
+              <div className="font-medium text-[var(--navy)]">Latest reminder run</div>
               <div className="mt-3 grid gap-3 sm:grid-cols-5 text-center">
                 <div>
-                  <div className="text-lg font-semibold text-blue-900">{latestReminderSummary.deadlineReminders}</div>
-                  <div className="text-xs text-blue-700">Deadline reminders</div>
+                  <div className="text-[16px] font-semibold text-[var(--navy)]">{latestReminderSummary.deadlineReminders}</div>
+                  <div className="text-xs text-[var(--action)]">Deadline reminders</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-blue-900">{latestReminderSummary.behindAlerts}</div>
-                  <div className="text-xs text-blue-700">Behind alerts</div>
+                  <div className="text-[16px] font-semibold text-[var(--navy)]">{latestReminderSummary.behindAlerts}</div>
+                  <div className="text-xs text-[var(--action)]">Behind alerts</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-blue-900">{latestReminderSummary.adminAlerts}</div>
-                  <div className="text-xs text-blue-700">Admin alerts</div>
+                  <div className="text-[16px] font-semibold text-[var(--navy)]">{latestReminderSummary.adminAlerts}</div>
+                  <div className="text-xs text-[var(--action)]">Admin alerts</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-blue-900">{latestReminderSummary.pendingReviewCount}</div>
-                  <div className="text-xs text-blue-700">Pending reviews</div>
+                  <div className="text-[16px] font-semibold text-[var(--navy)]">{latestReminderSummary.pendingReviewCount}</div>
+                  <div className="text-xs text-[var(--action)]">Pending reviews</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-blue-900">{latestReminderSummary.atRiskStudents}</div>
-                  <div className="text-xs text-blue-700">At-risk students</div>
+                  <div className="text-[16px] font-semibold text-[var(--navy)]">{latestReminderSummary.atRiskStudents}</div>
+                  <div className="text-xs text-[var(--action)]">At-risk students</div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">Monitoring plan</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-[3px] border border-[var(--border)] bg-white p-5">
+          <h2 className="text-[16px] font-semibold text-[var(--text)]">Monitoring plan</h2>
+          <p className="mt-1 text-sm text-[var(--text-sec)]">
             Persist the operating target and the people you want to watch most closely.
           </p>
 
           <div className="mt-5 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Launch start date</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Launch start date</label>
               <input
                 type="date"
                 aria-label="Launch start date"
                 value={monitoringForm.launchStartDate}
                 onChange={(e) => setMonitoringForm((current) => ({ ...current, launchStartDate: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Check cadence</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Check cadence</label>
               <select
                 aria-label="Check cadence"
                 value={monitoringForm.checkCadence}
@@ -189,7 +189,7 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
                     checkCadence: e.target.value as MonitoringForm["checkCadence"],
                   }))
                 }
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               >
                 <option value="DAILY">Daily</option>
                 <option value="TWICE_DAILY">Twice daily</option>
@@ -197,41 +197,41 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Students with hours target</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Students with hours target</label>
               <input
                 type="number"
                 min="1"
                 aria-label="Students with hours target"
                 value={monitoringForm.activeStudentTarget}
                 onChange={(e) => setMonitoringForm((current) => ({ ...current, activeStudentTarget: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Watch list</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Watch list</label>
               <input
                 type="text"
                 aria-label="Watch list"
                 value={monitoringForm.watchList}
                 onChange={(e) => setMonitoringForm((current) => ({ ...current, watchList: e.target.value }))}
                 placeholder="Student names or owners, comma-separated"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monitoring notes</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text)]">Monitoring notes</label>
               <textarea
                 rows={5}
                 aria-label="Monitoring notes"
                 value={monitoringForm.notes}
                 onChange={(e) => setMonitoringForm((current) => ({ ...current, notes: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-[2px] border border-[var(--border-s)] px-3 py-2 text-sm"
               />
             </div>
             <button
               onClick={handleSaveMonitoring}
               disabled={savingMonitoring}
-              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+              className="rounded-[2px] bg-[var(--action)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--navy)] disabled:opacity-50"
             >
               {savingMonitoring ? "Saving..." : "Save First-User Monitoring"}
             </button>

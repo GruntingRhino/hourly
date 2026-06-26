@@ -71,7 +71,7 @@ function AppRoutes() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500 text-lg">Loading...</div>
+        <div className="text-[var(--text-sec)] text-lg">Loading...</div>
       </div>
     );
   }
@@ -157,8 +157,8 @@ function AppRoutes() {
           {user.role === "ORG_ADMIN" && (
             <Route path="*" element={
               <div className="text-center py-16">
-                <h2 className="text-xl font-semibold text-gray-700 mb-2">Account Upgrade Required</h2>
-                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Account Upgrade Required</h2>
+                <p className="text-[var(--text-sec)] text-sm max-w-sm mx-auto">
                   Your account type has been updated. Please contact support or sign up again as a Beneficiary Admin.
                 </p>
               </div>

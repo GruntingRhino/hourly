@@ -82,76 +82,76 @@ export default function JoinBeneficiary() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="text-gray-500">Loading invitation...</div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)]"><div className="text-[var(--text-sec)]">Loading invitation...</div></div>;
 
   if (loadError) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="max-w-md w-full">
         <Link to="/" className="flex justify-center mb-8">
           <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
-          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-          <h2 className="text-xl font-semibold mb-2 text-red-700">Invitation Error</h2>
-          <p className="text-sm text-gray-600 break-words">{loadError}</p>
+        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-[var(--er-t)]">Invitation Error</h2>
+          <p className="text-sm text-[var(--text-sec)] break-words">{loadError}</p>
         </div>
       </div>
     </div>
   );
 
   if (declined) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="max-w-md w-full">
         <Link to="/" className="flex justify-center mb-8">
           <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
-          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900">Invitation Declined</h2>
-          <p className="text-sm text-gray-600 break-words">You declined the partnership from {invInfo?.schoolName}. You can contact them if you change your mind.</p>
+        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-[var(--text)]">Invitation Declined</h2>
+          <p className="text-sm text-[var(--text-sec)] break-words">You declined the partnership from {invInfo?.schoolName}. You can contact them if you change your mind.</p>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
       <div className="w-full max-w-md">
         <Link to="/" className="flex justify-center mb-8">
           <img src="/logo-full.png" alt="GoodHours" className="h-10 w-auto"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block"; }} />
-          <span className="hidden text-2xl font-bold text-blue-700">GoodHours</span>
+          <span className="hidden text-[20px] font-semibold text-[var(--action)]">GoodHours</span>
         </Link>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-          <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 text-center">
+        <div className="bg-white rounded-[3px] border border-[var(--border)]  p-8">
+          <div className="mb-5 rounded-[3px] border border-blue-100 bg-[var(--in-bg)] px-4 py-3 text-sm text-[var(--navy)] text-center">
             <div className="font-semibold break-words">{invInfo?.schoolName}</div>
-            <div className="text-xs mt-1 text-blue-700">has invited <strong>{invInfo?.beneficiaryName}</strong> to partner</div>
+            <div className="text-xs mt-1 text-[var(--action)]">has invited <strong>{invInfo?.beneficiaryName}</strong> to partner</div>
           </div>
 
-          <h2 className="text-2xl font-semibold text-gray-900 mb-1">Accept Partnership</h2>
-          <p className="text-sm text-gray-500 mb-5 break-words">
+          <h2 className="text-2xl font-semibold text-[var(--text)] mb-1">Accept Partnership</h2>
+          <p className="text-sm text-[var(--text-sec)] mb-5 break-words">
             Create your administrator account for <strong>{invInfo?.beneficiaryName}</strong>.<br />
             Account email: <strong>{invInfo?.sentTo}</strong>
           </p>
 
-          {error && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+          {error && <div className="mb-3 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded text-[var(--er-t)] text-sm">{error}</div>}
 
           <form onSubmit={handleAccept} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Your Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2.5 border border-[var(--border-s)] rounded-[3px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-3 py-2.5 border border-[var(--border-s)] rounded-[3px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]" />
               {password.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
                   {PASSWORD_RULES.map((r) => (
-                    <li key={r.label} className={`text-xs flex items-center gap-1.5 ${r.test(password) ? "text-green-600" : "text-gray-400"}`}>
+                    <li key={r.label} className={`text-xs flex items-center gap-1.5 ${r.test(password) ? "text-[var(--ok-t)]" : "text-[var(--text-faint)]"}`}>
                       <span>{r.test(password) ? "✓" : "○"}</span> {r.label}
                     </li>
                   ))}
@@ -159,14 +159,14 @@ export default function JoinBeneficiary() {
               )}
             </div>
             <button type="submit" disabled={submitting || !passwordOk}
-              className="w-full py-[10px] bg-blue-600 text-white rounded-xl font-medium hover:opacity-85 disabled:opacity-50 text-sm">
+              className="w-full py-[10px] bg-[var(--action)] text-white rounded-[3px] font-medium hover:opacity-85 disabled:opacity-50 text-sm">
               {submitting ? "Creating account..." : "Accept & Create Account"}
             </button>
           </form>
 
           <div className="mt-4 text-center">
             <button onClick={handleDecline} disabled={declining}
-              className="text-xs text-gray-400 hover:text-red-500 underline">
+              className="text-xs text-[var(--text-faint)] hover:text-[var(--er-t)] underline">
               {declining ? "Declining..." : "Decline this invitation"}
             </button>
           </div>

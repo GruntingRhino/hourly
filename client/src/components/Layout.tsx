@@ -3,13 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 
-const AVATAR_COLORS: Record<string, string> = {
-  STUDENT: "#2563EB",
-  SCHOOL_ADMIN: "#0891B2",
-  TEACHER: "#0891B2",
-  BENEFICIARY_ADMIN: "#7C3AED",
-};
-
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -31,8 +24,6 @@ export default function Layout() {
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
-
-  const avatarColor = AVATAR_COLORS[user?.role ?? ""] ?? "#2563EB";
 
   useEffect(() => {
     let active = true;
@@ -58,38 +49,35 @@ export default function Layout() {
   }, [location.pathname, user?.id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top nav — 58px, white, underline active indicator */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40" style={{ height: 58 }}>
-        <div className="max-w-[960px] mx-auto px-4 h-full relative flex items-center justify-between sm:px-8">
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+      {/* Top nav — navy, 54px */}
+      <header style={{ background: "var(--navy)", height: 54 }} className="sticky top-0 z-40 flex items-center">
+        <div className="max-w-[1080px] mx-auto px-6 h-full flex items-center justify-between w-full">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center shrink-0 relative z-10">
+          <Link to="/dashboard" className="flex items-center shrink-0">
             <img
               src="/logo-full.png"
               alt="GoodHours"
-              className="h-10 w-auto"
+              className="h-8 w-auto brightness-0 invert"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
                 (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
               }}
             />
-            <span className="hidden text-xl font-bold text-blue-700">GoodHours</span>
+            <span className="hidden text-white font-semibold text-[15px] tracking-tight">GoodHours</span>
           </Link>
 
-          {/* Nav links — underline active state */}
-          <nav
-            className="absolute inset-y-0 left-1/2 hidden -translate-x-1/2 items-stretch justify-center gap-0.5 lg:flex"
-            aria-label="Main navigation"
-          >
+          {/* Nav links — desktop */}
+          <nav className="hidden lg:flex items-stretch h-full gap-0" aria-label="Main navigation">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 aria-label={item.label}
-                className={`flex items-center px-3.5 text-sm transition-colors border-b-2 ${
+                className={`flex items-center px-4 text-[13.5px] border-b-2 transition-colors ${
                   isActive(item.path)
-                    ? "border-blue-600 text-blue-600 font-semibold"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
+                    ? "text-white border-white font-medium"
+                    : "text-white/60 border-transparent hover:text-white/90"
                 }`}
               >
                 {item.label}
@@ -97,16 +85,17 @@ export default function Layout() {
             ))}
           </nav>
 
-          <nav className="flex items-stretch h-full gap-0.5 lg:hidden" aria-label="Main navigation">
+          {/* Mobile nav */}
+          <nav className="flex items-stretch h-full gap-0 lg:hidden" aria-label="Main navigation">
             {visibleNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 aria-label={item.label}
-                className={`flex items-center px-3 text-sm transition-colors border-b-2 ${
+                className={`flex items-center px-3 text-[12.5px] border-b-2 transition-colors ${
                   isActive(item.path)
-                    ? "border-blue-600 text-blue-600 font-semibold"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
+                    ? "text-white border-white font-medium"
+                    : "text-white/60 border-transparent hover:text-white/90"
                 }`}
               >
                 {item.label}
@@ -116,7 +105,7 @@ export default function Layout() {
               <div className="relative flex items-stretch">
                 <button
                   onClick={() => setMobileMenuOpen((prev) => !prev)}
-                  className="flex items-center px-3 text-sm text-gray-600 hover:text-gray-900 border-b-2 border-transparent"
+                  className="flex items-center px-3 text-white/60 hover:text-white border-b-2 border-transparent"
                   aria-label="More navigation items"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
@@ -124,16 +113,16 @@ export default function Layout() {
                   </svg>
                 </button>
                 {mobileMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                  <div className="absolute right-0 top-full mt-1 w-48 border border-[var(--border)] rounded-[3px] py-1 z-50" style={{ background: "var(--surface)" }}>
                     {overflowNavItems.map((item) => (
                       <Link
                         key={item.path}
                         to={item.path}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`block px-4 py-2 text-sm ${
+                        className={`block px-4 py-2 text-[13px] ${
                           isActive(item.path)
-                            ? "text-blue-600 font-semibold bg-blue-50"
-                            : "text-gray-700 hover:bg-gray-50"
+                            ? "text-[var(--action)] font-semibold bg-[var(--action-lt)]"
+                            : "text-[var(--text)] hover:bg-[var(--surface-alt)]"
                         }`}
                       >
                         {item.label}
@@ -145,11 +134,12 @@ export default function Layout() {
             )}
           </nav>
 
-          {/* User profile */}
-          <div className="flex items-center gap-2.5 pl-4 border-l border-gray-200 shrink-0 relative z-10">
+          {/* Right side */}
+          <div className="flex items-center gap-3">
+            {/* Bell icon */}
             <button
               onClick={() => navigate("/messages?tab=notifications")}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              className="text-white/60 hover:text-white relative"
               aria-label="Open notifications"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -157,31 +147,41 @@ export default function Layout() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 17a2 2 0 1 0 4 0" />
               </svg>
               {unreadNotifications > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center px-1">
                   {unreadNotifications > 99 ? "99+" : unreadNotifications}
                 </span>
               )}
             </button>
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0 select-none"
-              style={{ background: avatarColor }}
-            >
-              {initials}
+            {/* Gear → settings */}
+            <Link to="/settings" className="text-white/60 hover:text-white" aria-label="Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </Link>
+            {/* Avatar + name + logout */}
+            <div className="flex items-center gap-2 pl-3 border-l border-white/15">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0 select-none"
+                style={{ background: "var(--navy-mid)" }}
+              >
+                {initials}
+              </div>
+              <span className="text-[13px] text-white/80 hidden md:inline max-w-[140px] truncate">{user?.name}</span>
+              <button
+                onClick={handleLogout}
+                className="text-[12.5px] text-white/50 hover:text-white/90 transition-colors"
+                aria-label="Log out"
+              >
+                Sign out
+              </button>
             </div>
-            <span className="text-sm text-gray-700 font-medium hidden md:inline max-w-[180px] truncate">{user?.name}</span>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label="Log out"
-            >
-              Log out
-            </button>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-[960px] mx-auto px-4 py-6 pb-12 sm:px-8">
+      <main className="max-w-[1080px] mx-auto px-6 py-6 pb-12">
         <Outlet />
       </main>
     </div>

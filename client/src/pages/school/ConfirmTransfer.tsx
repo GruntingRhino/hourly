@@ -27,20 +27,20 @@ export default function SchoolConfirmTransfer() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900 mb-3">School Ownership Transfer</h1>
-        <div className={`rounded-lg border px-4 py-3 text-sm ${
+    <div className="min-h-screen bg-[var(--surface-alt)] flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white border border-[var(--border)] rounded-[3px] p-6 ">
+        <h1 className="text-xl font-bold text-[var(--text)] mb-3">School Ownership Transfer</h1>
+        <div className={`rounded-[3px] border px-4 py-3 text-sm ${
           status === "success"
-            ? "border-green-200 bg-green-50 text-green-700"
+            ? "border-[var(--ok-b)] bg-[var(--ok-bg)] text-[var(--ok-t)]"
             : status === "error"
-            ? "border-red-200 bg-red-50 text-red-700"
-            : "border-gray-200 bg-gray-50 text-gray-600"
+            ? "border-[var(--er-b)] bg-[var(--er-bg)] text-[var(--er-t)]"
+            : "border-[var(--border)] bg-[var(--surface-alt)] text-[var(--text-sec)]"
         }`}>
           {message}
         </div>
         <div className="mt-5">
-          <Link to="/login" className="text-sm text-blue-600 hover:underline">
+          <Link to="/login" className="text-sm text-[var(--action)] hover:underline">
             Back to sign in
           </Link>
         </div>

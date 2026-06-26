@@ -51,14 +51,14 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
   }, [toast.id, onRemove]);
 
   const colors = {
-    success: "bg-green-600 text-white",
-    error: "bg-red-600 text-white",
+    success: "bg-[var(--ok-t)] text-white",
+    error: "bg-[var(--er-t)] text-white",
     info: "bg-gray-800 text-white",
   };
 
   return (
     <div
-      className={`${colors[toast.type]} px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-slide-up flex items-center justify-between gap-3`}
+      className={`${colors[toast.type]} px-4 py-3 rounded-[3px]  text-sm font-medium animate-slide-up flex items-center justify-between gap-3`}
     >
       <span>{toast.message}</span>
       <button onClick={() => onRemove(toast.id)} className="opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>

@@ -728,29 +728,29 @@ export default function BeneficiaryOpportunities() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Opportunities</h1>
+        <h1 className="text-[20px] font-semibold">Opportunities</h1>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-4 border-b mb-6">
         <button onClick={() => setTab("opportunities")}
-          className={`pb-2 text-sm font-medium border-b-2 ${tab === "opportunities" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          className={`pb-2 text-sm font-medium border-b-2 ${tab === "opportunities" ? "border-blue-600 text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}>
           Opportunities
         </button>
         <button onClick={() => setTab("signups")}
-          className={`pb-2 text-sm font-medium border-b-2 ${tab === "signups" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          className={`pb-2 text-sm font-medium border-b-2 ${tab === "signups" ? "border-blue-600 text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}>
           Student Signups
           {pendingSignups.length > 0 && tab !== "signups" && (
-            <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">{pendingSignups.length}</span>
+            <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-[var(--wn-bg)] text-[var(--wn-t)] rounded-full">{pendingSignups.length}</span>
           )}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="mb-4 rounded-[3px] border border-[var(--er-b)] bg-[var(--er-bg)] px-4 py-3 text-sm text-red-800">
           <div className="font-medium">{error}</div>
           {errorDetails.length > 0 && (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-red-700">
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--er-t)]">
               {errorDetails.map((detail, index) => (
                 <li key={`${detail}-${index}`}>{detail}</li>
               ))}
@@ -763,23 +763,23 @@ export default function BeneficiaryOpportunities() {
       {tab === "opportunities" && (
         <div className="flex gap-6 items-start">
           {/* Left panel: Create / Edit form */}
-          <div className="w-[55%] flex-shrink-0 bg-white border border-gray-200 rounded-lg p-5">
+          <div className="w-[55%] flex-shrink-0 bg-white border border-[var(--border)] rounded-[3px] p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">{editOppId ? "Edit Opportunity" : "Create New Opportunity"}</h2>
               {editOppId && (
-                <button type="button" onClick={handleCancelEdit} className="text-xs text-gray-400 hover:text-gray-600">
+                <button type="button" onClick={handleCancelEdit} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-sec)]">
                   Cancel edit
                 </button>
               )}
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Title *</label>
                 <input type="text" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                  required className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  required className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Category *</label>
                 <SearchableSelect
                   value={form.category}
                   onChange={(category) => setForm((p) => ({ ...p, category, customCategory: category }))}
@@ -787,39 +787,39 @@ export default function BeneficiaryOpportunities() {
                   placeholder="Search categories or type your own"
                   required
                   allowCustomValue
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Location</label>
                 <input type="text" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-                  placeholder="Address or virtual" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  placeholder="Address or virtual" className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Description</label>
                 <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                  rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  rows={2} className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Requirements / Notes for Volunteers</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Requirements / Notes for Volunteers</label>
                 <input type="text" value={form.requirementsNote} onChange={(e) => setForm((p) => ({ ...p, requirementsNote: e.target.value }))}
                   placeholder="e.g. Bring closed-toe shoes, minimum age 16"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               {/* Schedule — shown for both create and edit */}
               <div>
                   {/* Recurring toggle */}
                   <div className="flex items-center gap-2 mb-3">
-                    <label className="text-sm font-medium text-gray-700">Schedule</label>
-                    <div className="flex rounded-md overflow-hidden border border-gray-300 text-xs">
+                    <label className="text-sm font-medium text-[var(--text)]">Schedule</label>
+                    <div className="flex rounded-[2px] overflow-hidden border border-[var(--border-s)] text-xs">
                       <button type="button"
                         onClick={() => setForm((p) => ({ ...p, recurring: false }))}
-                        className={`px-3 py-1.5 ${!form.recurring ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                        className={`px-3 py-1.5 ${!form.recurring ? "bg-[var(--action)] text-white" : "bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                         Manual
                       </button>
                       <button type="button"
                         onClick={() => setForm((p) => ({ ...p, recurring: true }))}
-                        className={`px-3 py-1.5 border-l border-gray-300 ${form.recurring ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                        className={`px-3 py-1.5 border-l border-[var(--border-s)] ${form.recurring ? "bg-[var(--action)] text-white" : "bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                         Recurring
                       </button>
                     </div>
@@ -828,24 +828,24 @@ export default function BeneficiaryOpportunities() {
                   {!form.recurring ? (
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-gray-600">Time Slots *</span>
-                        <button type="button" onClick={addSlot} className="text-xs text-blue-600 hover:underline">+ Add slot</button>
+                        <span className="text-sm text-[var(--text-sec)]">Time Slots *</span>
+                        <button type="button" onClick={addSlot} className="text-xs text-[var(--action)] hover:underline">+ Add slot</button>
                       </div>
                       <div className="space-y-2">
                         {form.slots.map((slot, i) => (
                           <div key={i} className="grid grid-cols-5 gap-2 items-center">
                             <input type="date" value={slot.date} onChange={(e) => updateSlot(i, "date", e.target.value)}
-                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm col-span-2" />
+                              required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm col-span-2" />
                             <input type="time" value={slot.startTime} onChange={(e) => updateSlot(i, "startTime", e.target.value)}
-                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                              required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                             <input type="time" value={slot.endTime} onChange={(e) => updateSlot(i, "endTime", e.target.value)}
-                              required className="px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                              required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                             <div className="flex gap-1 items-center">
                               <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
-                                placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                                placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
                                 title="Maximum # Volunteers" />
                               {form.slots.length > 1 && (
-                                <button type="button" onClick={() => removeSlot(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                                <button type="button" onClick={() => removeSlot(i)} className="text-red-400 hover:text-[var(--er-t)] text-xs">✕</button>
                               )}
                             </div>
                           </div>
@@ -853,7 +853,7 @@ export default function BeneficiaryOpportunities() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3 bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                    <div className="space-y-3 bg-[var(--in-bg)]/50 border border-blue-100 rounded-[3px] p-3">
                       {/* Recurrence type */}
                       <div className="flex gap-4 text-sm">
                         <label className="flex items-center gap-1.5 cursor-pointer">
@@ -871,7 +871,7 @@ export default function BeneficiaryOpportunities() {
                       {form.recurrenceType === "monthly_day_of_week" ? (
                         <div className="space-y-2">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Days of week</div>
+                            <div className="text-xs text-[var(--text-sec)] mb-1">Days of week</div>
                             <div className="flex flex-wrap gap-1">
                               {DAY_NAMES.map((name, idx) => {
                                 const active = form.recurrenceDaysOfWeek.includes(idx);
@@ -883,7 +883,7 @@ export default function BeneficiaryOpportunities() {
                                         ? p.recurrenceDaysOfWeek.filter((d) => d !== idx)
                                         : [...p.recurrenceDaysOfWeek, idx].sort(),
                                     }))}
-                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-[var(--action)] text-white border-blue-600" : "border-[var(--border-s)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                                     {name.slice(0, 3)}
                                   </button>
                                 );
@@ -891,7 +891,7 @@ export default function BeneficiaryOpportunities() {
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Which weeks of the month</div>
+                            <div className="text-xs text-[var(--text-sec)] mb-1">Which weeks of the month</div>
                             <div className="flex gap-1">
                               {WEEK_LABELS.map((label, idx) => {
                                 const week = idx + 1;
@@ -904,7 +904,7 @@ export default function BeneficiaryOpportunities() {
                                         ? p.recurrenceWeeksOfMonth.filter((w) => w !== week)
                                         : [...p.recurrenceWeeksOfMonth, week].sort(),
                                     }))}
-                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                    className={`px-2 py-1 text-xs rounded border ${active ? "bg-[var(--action)] text-white border-blue-600" : "border-[var(--border-s)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                                     {label}
                                   </button>
                                 );
@@ -914,7 +914,7 @@ export default function BeneficiaryOpportunities() {
                         </div>
                       ) : (
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Dates of the month</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">Dates of the month</div>
                           <div className="flex flex-wrap gap-1">
                             {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
                               const active = form.recurrenceDatesOfMonth.includes(d);
@@ -926,7 +926,7 @@ export default function BeneficiaryOpportunities() {
                                       ? p.recurrenceDatesOfMonth.filter((x) => x !== d)
                                       : [...p.recurrenceDatesOfMonth, d].sort((a, b) => a - b),
                                   }))}
-                                  className={`w-8 h-8 text-xs rounded border ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                                  className={`w-8 h-8 text-xs rounded border ${active ? "bg-[var(--action)] text-white border-blue-600" : "border-[var(--border-s)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                                   {d}
                                 </button>
                               );
@@ -938,38 +938,38 @@ export default function BeneficiaryOpportunities() {
                       {/* Time & capacity */}
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Start time</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">Start time</div>
                           <input type="time" value={form.recurrenceStartTime}
                             onChange={(e) => setForm((p) => ({ ...p, recurrenceStartTime: e.target.value }))}
-                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            required className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">End time</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">End time</div>
                           <input type="time" value={form.recurrenceEndTime}
                             onChange={(e) => setForm((p) => ({ ...p, recurrenceEndTime: e.target.value }))}
-                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            required className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Max volunteers</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">Max volunteers</div>
                           <input type="number" min={1} value={form.recurrenceCapacity}
                             onChange={(e) => setForm((p) => ({ ...p, recurrenceCapacity: e.target.value }))}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                         </div>
                       </div>
 
                       {/* Start date + months ahead */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Starting from</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">Starting from</div>
                           <input type="date" value={form.recurrenceStartDate}
                             onChange={(e) => setForm((p) => ({ ...p, recurrenceStartDate: e.target.value }))}
-                            required className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                            required className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Generate for</div>
+                          <div className="text-xs text-[var(--text-sec)] mb-1">Generate for</div>
                           <select value={form.recurrenceMonthsAhead}
                             onChange={(e) => setForm((p) => ({ ...p, recurrenceMonthsAhead: parseInt(e.target.value) }))}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                            className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm">
                             {[1,2,3,4,5,6,9,12].map((m) => (
                               <option key={m} value={m}>{m} month{m > 1 ? "s" : ""}</option>
                             ))}
@@ -981,34 +981,34 @@ export default function BeneficiaryOpportunities() {
                 </div>
 
               {editOppId && !form.recurring && (
-                <div className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
+                <div className="text-xs text-[var(--text-faint)] bg-[var(--surface-alt)] rounded px-3 py-2">
                   Existing slots can be edited using the pencil icon on each slot. Add new slots above.
                 </div>
               )}
               {editOppId && form.recurring && (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-3 py-2">
+                <div className="text-xs text-[var(--wn-t)] bg-[var(--wn-bg)] border border-amber-100 rounded px-3 py-2">
                   Saving will replace all future unbooked slots with a new schedule. Slots with sign-ups are kept.
                 </div>
               )}
 
               {/* Schools panel */}
               <div className="border-t pt-4">
-                <div className="text-sm font-medium text-gray-700 mb-2">Schools that can participate</div>
+                <div className="text-sm font-medium text-[var(--text)] mb-2">Schools that can participate</div>
                 {approvedSchools.length === 0 ? (
-                  <p className="text-xs text-gray-400">No schools have approved this beneficiary yet.</p>
+                  <p className="text-xs text-[var(--text-faint)]">No schools have approved this beneficiary yet.</p>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={selectedSchools.length === approvedSchools.length}
-                        onChange={toggleAllSchools} className="h-4 w-4 rounded border-gray-300" />
-                      <span className="font-medium text-gray-700">All schools</span>
+                        onChange={toggleAllSchools} className="h-4 w-4 rounded border-[var(--border-s)]" />
+                      <span className="font-medium text-[var(--text)]">All schools</span>
                     </label>
                     <div className="ml-1 space-y-1">
                       {approvedSchools.map((school) => (
                         <label key={school.id} className="flex items-center gap-2 text-sm cursor-pointer">
                           <input type="checkbox" checked={selectedSchools.includes(school.id)}
-                            onChange={() => toggleSchool(school.id)} className="h-4 w-4 rounded border-gray-300" />
-                          <span className="text-gray-600">{school.name}</span>
+                            onChange={() => toggleSchool(school.id)} className="h-4 w-4 rounded border-[var(--border-s)]" />
+                          <span className="text-[var(--text-sec)]">{school.name}</span>
                         </label>
                       ))}
                     </div>
@@ -1017,7 +1017,7 @@ export default function BeneficiaryOpportunities() {
               </div>
 
               <button type="submit" disabled={creating || saving}
-                className="w-full px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
+                className="w-full px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
                 {editOppId
                   ? (saving ? "Saving..." : "Save Changes")
                   : (creating ? "Creating..." : "Create Opportunity")}
@@ -1028,27 +1028,27 @@ export default function BeneficiaryOpportunities() {
           {/* Right panel: Opportunities list */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-700">Created Opportunities</h2>
+              <h2 className="font-semibold text-[var(--text)]">Created Opportunities</h2>
               <div className="relative">
                 <button onClick={() => setFilterOpen((p) => !p)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border ${visibleStatuses.length < 3 ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[2px] border ${visibleStatuses.length < 3 ? "border-blue-600 bg-[var(--action)] text-white" : "border-[var(--border-s)] text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"}`}>
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                   </svg>
                   Filter
                   {visibleStatuses.length < 3 && (
-                    <span className="bg-white text-gray-900 rounded-full px-1.5 font-semibold">{visibleStatuses.length}</span>
+                    <span className="bg-white text-[var(--text)] rounded-full px-1.5 font-semibold">{visibleStatuses.length}</span>
                   )}
                 </button>
                 {filterOpen && (
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3 space-y-2">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Show</div>
+                  <div className="absolute right-0 mt-1 w-44 bg-white border border-[var(--border)] rounded-[3px]  z-10 p-3 space-y-2">
+                    <div className="text-xs font-semibold text-[var(--text-sec)] uppercase tracking-wide mb-1">Show</div>
                     {(["Active", "Upcoming", "Expired"] as const).map((status) => (
                       <label key={status} className="flex items-center gap-2 text-sm cursor-pointer">
                         <input type="checkbox" checked={visibleStatuses.includes(status)}
                           onChange={() => setVisibleStatuses((prev) => prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status])}
-                          className="h-4 w-4 rounded border-gray-300" />
-                        <span className={status === "Active" ? "text-green-700" : status === "Upcoming" ? "text-blue-700" : "text-gray-500"}>{status}</span>
+                          className="h-4 w-4 rounded border-[var(--border-s)]" />
+                        <span className={status === "Active" ? "text-[var(--ok-t)]" : status === "Upcoming" ? "text-[var(--action)]" : "text-[var(--text-sec)]"}>{status}</span>
                       </label>
                     ))}
                   </div>
@@ -1057,9 +1057,9 @@ export default function BeneficiaryOpportunities() {
             </div>
 
             {loading ? (
-              <div className="text-gray-500 text-sm">Loading...</div>
+              <div className="text-[var(--text-sec)] text-sm">Loading...</div>
             ) : opportunities.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500 text-sm">No opportunities yet.</div>
+              <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-6 text-center text-[var(--text-sec)] text-sm">No opportunities yet.</div>
             ) : (() => {
               const statusOrder: Record<string, number> = { Active: 0, Upcoming: 1, Expired: 2 };
               const sorted = [...opportunities]
@@ -1068,46 +1068,46 @@ export default function BeneficiaryOpportunities() {
                 .sort((a, b) => (statusOrder[a.displayStatus] ?? 3) - (statusOrder[b.displayStatus] ?? 3));
 
               return sorted.length === 0 ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500 text-sm">No opportunities match the current filter.</div>
+                <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-6 text-center text-[var(--text-sec)] text-sm">No opportunities match the current filter.</div>
               ) : (
                 <div className="space-y-3">
                   {sorted.map(({ opp, displayStatus }) => (
-                    <div key={opp.id} className={`bg-white border rounded-lg p-4 ${editOppId === opp.id ? "border-blue-400 ring-1 ring-blue-200" : "border-gray-200"}`}>
+                    <div key={opp.id} className={`bg-white border rounded-[3px] p-4 ${editOppId === opp.id ? "border-blue-400 ring-1 ring-blue-200" : "border-[var(--border)]"}`}>
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-medium text-sm">{opp.title}</div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${displayStatus === "Active" ? "bg-green-50 text-green-700" : displayStatus === "Upcoming" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${displayStatus === "Active" ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" : displayStatus === "Upcoming" ? "bg-[var(--in-bg)] text-[var(--action)]" : "bg-[var(--surface-alt)] text-[var(--text-sec)]"}`}>
                             {displayStatus}
                           </span>
                           <button onClick={() => handleEdit(opp)}
-                            className="text-xs text-blue-600 hover:underline">
+                            className="text-xs text-[var(--action)] hover:underline">
                             Edit
                           </button>
                           {deleteConfirmId === opp.id ? (
                             <span className="flex items-center gap-1 text-xs">
                               <button onClick={() => handleDelete(opp.id)} disabled={deleting}
-                                className="text-red-600 hover:underline disabled:opacity-50">
+                                className="text-[var(--er-t)] hover:underline disabled:opacity-50">
                                 {deleting ? "..." : "Confirm"}
                               </button>
-                              <button onClick={() => setDeleteConfirmId(null)} className="text-gray-400 hover:text-gray-600">Cancel</button>
+                              <button onClick={() => setDeleteConfirmId(null)} className="text-[var(--text-faint)] hover:text-[var(--text-sec)]">Cancel</button>
                             </span>
                           ) : (
                             <button onClick={() => setDeleteConfirmId(opp.id)}
-                              className="text-xs text-red-400 hover:text-red-600">
+                              className="text-xs text-red-400 hover:text-[var(--er-t)]">
                               Delete
                             </button>
                           )}
                         </div>
                       </div>
-                      {opp.location && <div className="text-xs text-gray-500">{opp.location}</div>}
-                      {opp.description && <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{opp.description}</div>}
+                      {opp.location && <div className="text-xs text-[var(--text-sec)]">{opp.location}</div>}
+                      {opp.description && <div className="text-xs text-[var(--text-sec)] mt-0.5 line-clamp-2">{opp.description}</div>}
                       {opp.timeSlots.length > 0 && (
                         <div className="mt-2 border-t pt-2 space-y-1">
                           {opp.timeSlots.map((slot) => {
                             const slotDate = new Date(slot.date);
                             const isEditable = slotDate.getTime() > Date.now() + 24 * 60 * 60 * 1000;
                             return (
-                              <div key={slot.id} className="flex justify-between items-center text-xs text-gray-600">
+                              <div key={slot.id} className="flex justify-between items-center text-xs text-[var(--text-sec)]">
                                 <span className="flex items-center gap-1.5">
                                   {slot.recurringGroupId && (
                                     <span title="Recurring" className="text-blue-400">↻</span>
@@ -1115,12 +1115,12 @@ export default function BeneficiaryOpportunities() {
                                   {slotDate.toLocaleDateString(undefined, { timeZone: "UTC" })} · {slot.startTime}–{slot.endTime}
                                   {isEditable && (
                                     <button type="button" onClick={() => openEditSlot(slot)}
-                                      className="text-gray-300 hover:text-blue-500 ml-0.5" title="Edit slot">
+                                      className="text-[var(--text-faint)] hover:text-[var(--action)] ml-0.5" title="Edit slot">
                                       ✎
                                     </button>
                                   )}
                                 </span>
-                                <span className="text-gray-400">{slot._count?.signups || 0}{slot.capacity ? `/${slot.capacity}` : ""} signed up</span>
+                                <span className="text-[var(--text-faint)]">{slot._count?.signups || 0}{slot.capacity ? `/${slot.capacity}` : ""} signed up</span>
                               </div>
                             );
                           })}
@@ -1139,13 +1139,13 @@ export default function BeneficiaryOpportunities() {
       {tab === "signups" && (
         <div>
           {signupsLoading ? (
-            <div className="text-gray-500 text-sm">Loading signups...</div>
+            <div className="text-[var(--text-sec)] text-sm">Loading signups...</div>
           ) : signups.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-gray-500">No student signups yet.</div>
+            <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)]">No student signups yet.</div>
           ) : (
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4">
-                <div className="text-sm text-gray-500">Show pending by default, or switch to a specific reviewed status.</div>
+                <div className="text-sm text-[var(--text-sec)]">Show pending by default, or switch to a specific reviewed status.</div>
                 <div className="flex flex-wrap gap-2">
                   {([
                     ["PENDING", "Pending"],
@@ -1160,17 +1160,17 @@ export default function BeneficiaryOpportunities() {
                         key={value}
                         type="button"
                         onClick={() => setSignupFilter(value)}
-                        className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                        className={`flex items-center gap-2 rounded-[2px] border px-3 py-2 text-sm ${
                           active
-                            ? "border-blue-600 bg-blue-50 text-blue-700"
-                            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                            ? "border-blue-600 bg-[var(--in-bg)] text-[var(--action)]"
+                            : "border-[var(--border-s)] bg-white text-[var(--text-sec)] hover:bg-[var(--surface-alt)]"
                         }`}
                       >
                         <span
                           className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
                             active
-                              ? "border-blue-600 bg-blue-600 text-white"
-                              : "border-gray-300 bg-white text-transparent"
+                              ? "border-blue-600 bg-[var(--action)] text-white"
+                              : "border-[var(--border-s)] bg-white text-transparent"
                           }`}
                         >
                           ✓
@@ -1184,18 +1184,18 @@ export default function BeneficiaryOpportunities() {
 
               {(signupFilter === "PENDING" || signupFilter === "ALL") && pendingSignups.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">Pending Review ({pendingSignups.length})</h2>
+                  <h2 className="text-sm font-semibold text-[var(--text)] mb-3">Pending Review ({pendingSignups.length})</h2>
                   <div className="space-y-3">
                     {pendingSignups.map((s) => (
-                      <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div key={s.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
                         <div className="flex justify-between items-start gap-4">
                           <div>
                             <div className="font-medium text-sm">{s.student.label}</div>
-                            <div className="text-xs text-gray-400">Student identity is hidden for school privacy compliance.</div>
-                            <div className="text-xs text-gray-600 mt-1">
+                            <div className="text-xs text-[var(--text-faint)]">Student identity is hidden for school privacy compliance.</div>
+                            <div className="text-xs text-[var(--text-sec)] mt-1">
                               {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} {s.slot.startTime}–{s.slot.endTime}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
+                            <div className="text-xs text-[var(--text-sec)] mt-0.5">
                               Duration: {s.slot.durationHours}h
                               {s.checkedIn && s.checkedOut ? " · Attended" : s.checkedIn ? " · Checked in" : " · Not checked in"}
                             </div>
@@ -1208,11 +1208,11 @@ export default function BeneficiaryOpportunities() {
                                 step={0.25}
                                 value={approvalHours[s.id] ?? String(s.totalHours ?? s.slot.durationHours)}
                                 onChange={(e) => setApprovalHours((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
+                                className="w-16 px-2 py-1 border border-[var(--border-s)] rounded text-xs"
                               />
                               <button onClick={() => handleApprove(s)}
                                 disabled={actionId === s.id}
-                                className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50">
+                                className="px-3 py-1.5 bg-[var(--ok-t)] text-white rounded text-xs hover:bg-[var(--ok-t)] disabled:opacity-50">
                                 {actionId === s.id ? "..." : "Approve"}
                               </button>
                             </div>
@@ -1220,18 +1220,18 @@ export default function BeneficiaryOpportunities() {
                               <input type="text" value={rejectReason[s.id] || ""}
                                 onChange={(e) => setRejectReason((prev) => ({ ...prev, [s.id]: e.target.value }))}
                                 placeholder="Reason..."
-                                className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-xs" />
+                                className="flex-1 min-w-0 px-2 py-1 border border-[var(--border-s)] rounded text-xs" />
                               <button onClick={() => handleReject(s.id)} disabled={rejectingId === s.id}
-                                className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-50">
+                                className="px-2 py-1 bg-[var(--er-bg)] text-[var(--er-t)] border border-[var(--er-b)] rounded text-xs hover:bg-[var(--er-bg)] disabled:opacity-50">
                                 {rejectingId === s.id ? "..." : "Reject"}
                               </button>
                             </div>
                             <button onClick={() => setNoShowConfirmId(s.id)} disabled={noShowId === s.id}
-                              className="px-2 py-1 text-gray-500 border border-gray-200 rounded text-xs hover:bg-gray-50 disabled:opacity-50">
+                              className="px-2 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-[var(--surface-alt)] disabled:opacity-50">
                               {noShowId === s.id ? "..." : "No-Show"}
                             </button>
                             <button onClick={() => loadHistory(s.id)} disabled={historyLoadingId === s.id}
-                              className="px-2 py-1 text-gray-500 border border-gray-200 rounded text-xs hover:bg-gray-50 disabled:opacity-50">
+                              className="px-2 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-[var(--surface-alt)] disabled:opacity-50">
                               {historyLoadingId === s.id ? "..." : "History"}
                             </button>
                           </div>
@@ -1244,7 +1244,7 @@ export default function BeneficiaryOpportunities() {
 
               {(signupFilter === "ALL" || signupFilter === "APPROVED" || signupFilter === "DENIED" || signupFilter === "NO_SHOW") && visibleReviewedSignups.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">
+                  <h2 className="text-sm font-semibold text-[var(--text)] mb-3">
                     {signupFilter === "ALL"
                       ? `Reviewed (${visibleReviewedSignups.length})`
                       : signupFilter === "APPROVED"
@@ -1255,24 +1255,24 @@ export default function BeneficiaryOpportunities() {
                   </h2>
                   <div className="space-y-2">
                       {visibleReviewedSignups.map((s) => (
-                        <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                        <div key={s.id} className="bg-white border border-[var(--border)] rounded-[3px] p-4">
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <div className="font-medium text-sm">{s.student.label}</div>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "NO_SHOW" ? "bg-gray-100 text-gray-600" : s.verificationStatus === "APPROVED" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "NO_SHOW" ? "bg-[var(--surface-alt)] text-[var(--text-sec)]" : s.verificationStatus === "APPROVED" ? "bg-[var(--ok-bg)] text-[var(--ok-t)]" : "bg-[var(--er-bg)] text-[var(--er-t)]"}`}>
                                   {s.status === "NO_SHOW" ? "No-Show" : s.verificationStatus === "REJECTED" ? "Denied" : s.verificationStatus}
                                 </span>
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-[var(--text-sec)] mt-1">
                                 {s.slot.opportunity.title} · {new Date(s.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {s.totalHours ?? s.slot.durationHours}h
                               </div>
-                              {s.rejectionReason && <div className="text-xs text-red-500 mt-1 italic">{s.rejectionReason}</div>}
+                              {s.rejectionReason && <div className="text-xs text-[var(--er-t)] mt-1 italic">{s.rejectionReason}</div>}
                             </div>
 
                             <div className="w-full lg:w-[420px] space-y-2">
-                              <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
-                                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500 mb-2">Change decision</div>
+                              <div className="rounded-[2px] border border-[var(--border)] bg-[var(--surface-alt)] p-2">
+                                <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-sec)] mb-2">Change decision</div>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <input
                                     type="number"
@@ -1280,36 +1280,36 @@ export default function BeneficiaryOpportunities() {
                                     step={0.25}
                                     value={approvalHours[s.id] ?? String(s.totalHours ?? s.slot.durationHours)}
                                     onChange={(e) => setApprovalHours((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-xs bg-white"
+                                    className="w-20 px-2 py-1 border border-[var(--border-s)] rounded text-xs bg-white"
                                   />
                                   <button onClick={() => handleApprove(s)} disabled={actionId === s.id}
-                                    className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-xs hover:bg-green-100 disabled:opacity-50">
+                                    className="px-2.5 py-1 bg-[var(--ok-bg)] text-[var(--ok-t)] border border-[var(--ok-b)] rounded text-xs hover:bg-[var(--ok-bg)] disabled:opacity-50">
                                     {actionId === s.id ? "..." : "Approve"}
                                   </button>
                                   <button onClick={() => handleResetReview(s.id)} disabled={actionId === s.id}
-                                    className="px-2.5 py-1 text-amber-700 border border-amber-200 rounded text-xs hover:bg-amber-50 disabled:opacity-50">
+                                    className="px-2.5 py-1 text-[var(--wn-t)] border border-[var(--wn-b)] rounded text-xs hover:bg-[var(--wn-bg)] disabled:opacity-50">
                                     {actionId === s.id ? "..." : "Undo"}
                                   </button>
                                   <button onClick={() => loadHistory(s.id)} disabled={historyLoadingId === s.id}
-                                    className="px-2.5 py-1 text-gray-600 border border-gray-200 rounded text-xs hover:bg-white disabled:opacity-50">
+                                    className="px-2.5 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-white disabled:opacity-50">
                                     {historyLoadingId === s.id ? "..." : "History"}
                                   </button>
                                 </div>
                               </div>
 
-                              <div className="rounded-md border border-red-100 bg-red-50/50 p-2">
-                                <div className="text-[11px] font-medium uppercase tracking-wide text-red-500 mb-2">Override outcome</div>
+                              <div className="rounded-[2px] border border-red-100 bg-[var(--er-bg)]/50 p-2">
+                                <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--er-t)] mb-2">Override outcome</div>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <input type="text" value={rejectReason[s.id] || ""}
                                     onChange={(e) => setRejectReason((prev) => ({ ...prev, [s.id]: e.target.value }))}
                                     placeholder="Reason for denial"
-                                    className="flex-1 min-w-[150px] px-2 py-1 border border-red-200 rounded text-xs bg-white" />
+                                    className="flex-1 min-w-[150px] px-2 py-1 border border-[var(--er-b)] rounded text-xs bg-white" />
                                   <button onClick={() => handleReject(s.id)} disabled={rejectingId === s.id}
-                                    className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-50">
+                                    className="px-2.5 py-1 bg-[var(--er-bg)] text-[var(--er-t)] border border-[var(--er-b)] rounded text-xs hover:bg-[var(--er-bg)] disabled:opacity-50">
                                     {rejectingId === s.id ? "..." : "Deny"}
                                   </button>
                                   <button onClick={() => setNoShowConfirmId(s.id)} disabled={noShowId === s.id}
-                                    className="px-2.5 py-1 text-gray-600 border border-gray-200 rounded text-xs hover:bg-white disabled:opacity-50">
+                                    className="px-2.5 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-white disabled:opacity-50">
                                     {noShowId === s.id ? "..." : "Mark No-Show"}
                                   </button>
                                 </div>
@@ -1329,15 +1329,15 @@ export default function BeneficiaryOpportunities() {
       {/* Slot edit modal */}
       {editSlot && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200 p-6">
+          <div className="w-full max-w-sm bg-white rounded-[3px]  border border-[var(--border)] p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Edit Time Slot</h3>
+              <h3 className="font-semibold text-[var(--text)]">Edit Time Slot</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleDeleteSlot(confirmDeleteSlot)}
                   disabled={deletingSlot || savingSlot}
                   title="Delete time slot"
-                  className="text-red-400 hover:text-red-600 disabled:opacity-40 p-1 rounded"
+                  className="text-red-400 hover:text-[var(--er-t)] disabled:opacity-40 p-1 rounded"
                 >
                   {deletingSlot ? (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1355,52 +1355,52 @@ export default function BeneficiaryOpportunities() {
                     setEditSlot(null);
                     setConfirmDeleteSlot(false);
                   }}
-                  className="text-gray-400 hover:text-gray-600 text-sm"
+                  className="text-[var(--text-faint)] hover:text-[var(--text-sec)] text-sm"
                 >
                   ✕
                 </button>
               </div>
             </div>
             {confirmDeleteSlot && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <div className="mb-4 rounded-[3px] border border-[var(--er-b)] bg-[var(--er-bg)] px-3 py-2 text-xs text-[var(--er-t)]">
                 This slot has {editSlot._count?.signups || 0} signup{(editSlot._count?.signups || 0) === 1 ? "" : "s"}. Delete again to cancel the slot, remove those signups, and notify affected students automatically.
               </div>
             )}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Date</label>
+                <label className="block text-xs text-[var(--text-sec)] mb-1">Date</label>
                 <input type="date" value={slotForm.date}
                   onChange={(e) => setSlotForm((p) => ({ ...p, date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Start time</label>
+                  <label className="block text-xs text-[var(--text-sec)] mb-1">Start time</label>
                   <input type="time" value={slotForm.startTime}
                     onChange={(e) => setSlotForm((p) => ({ ...p, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">End time</label>
+                  <label className="block text-xs text-[var(--text-sec)] mb-1">End time</label>
                   <input type="time" value={slotForm.endTime}
                     onChange={(e) => setSlotForm((p) => ({ ...p, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Max volunteers</label>
+                <label className="block text-xs text-[var(--text-sec)] mb-1">Max volunteers</label>
                 <input type="number" min={1} value={slotForm.capacity}
                   onChange={(e) => setSlotForm((p) => ({ ...p, capacity: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
 
               {/* Propagate checkbox — only for recurring slots with date/time change */}
               {editSlot.recurringGroupId && slotChanged && (
-                <label className="flex items-start gap-2 cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <label className="flex items-start gap-2 cursor-pointer p-3 bg-[var(--in-bg)] rounded-[3px] border border-blue-100">
                   <input type="checkbox" checked={propagateFuture}
                     onChange={(e) => setPropagateFuture(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300" />
-                  <span className="text-xs text-blue-800">
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border-s)]" />
+                  <span className="text-xs text-[var(--navy)]">
                     Apply this date/time change to all future slots in this recurring series
                   </span>
                 </label>
@@ -1408,11 +1408,11 @@ export default function BeneficiaryOpportunities() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={handleSaveSlot} disabled={savingSlot}
-                className="flex-1 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85 disabled:opacity-50">
+                className="flex-1 px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
                 {savingSlot ? "Saving..." : "Save"}
               </button>
               <button onClick={() => setEditSlot(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-md text-sm hover:bg-gray-50">
+                className="flex-1 px-4 py-2 border border-[var(--border-s)] text-[var(--text-sec)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]">
                 Cancel
               </button>
             </div>
@@ -1426,22 +1426,22 @@ export default function BeneficiaryOpportunities() {
         if (!signup) return null;
         return (
           <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-2">Mark as No-Show?</h3>
-              <p className="text-sm text-gray-600 mb-1">
+            <div className="w-full max-w-sm bg-white rounded-[3px]  border border-[var(--border)] p-6">
+              <h3 className="font-semibold text-[var(--text)] mb-2">Mark as No-Show?</h3>
+              <p className="text-sm text-[var(--text-sec)] mb-1">
                 <strong>{signup.student.label}</strong> will be marked as a no-show for:
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-[var(--text-sec)] mb-4">
                 {signup.slot.opportunity.title} · {new Date(signup.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
               </p>
-              <p className="text-xs text-gray-400 mb-5">This cannot be undone. The student's hours will not be counted.</p>
+              <p className="text-xs text-[var(--text-faint)] mb-5">This cannot be undone. The student's hours will not be counted.</p>
               <div className="flex gap-3">
                 <button onClick={() => handleNoShow(noShowConfirmId)}
-                  className="flex-1 px-4 py-[7px] bg-blue-600 text-white rounded-md text-sm hover:opacity-85">
+                  className="flex-1 px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85">
                   Confirm No-Show
                 </button>
                 <button onClick={() => setNoShowConfirmId(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-md text-sm hover:bg-gray-50">
+                  className="flex-1 px-4 py-2 border border-[var(--border-s)] text-[var(--text-sec)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]">
                   Cancel
                 </button>
               </div>
@@ -1453,36 +1453,36 @@ export default function BeneficiaryOpportunities() {
       {/* Verification history modal */}
       {historySignup && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 max-h-[85vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div className="w-full max-w-2xl bg-white rounded-[3px]  border border-[var(--border)] max-h-[85vh] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-start justify-between gap-4">
               <div>
-                <div className="font-semibold text-gray-900">Verification History</div>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="font-semibold text-[var(--text)]">Verification History</div>
+                <div className="text-sm text-[var(--text-sec)] mt-1">
                   {(historySignup.signup.student?.label || "Anonymous volunteer")} · {historySignup.signup.slot.opportunity.title}
                 </div>
               </div>
-              <button onClick={() => setHistorySignup(null)} className="text-gray-400 hover:text-gray-600 text-sm">Close</button>
+              <button onClick={() => setHistorySignup(null)} className="text-[var(--text-faint)] hover:text-[var(--text-sec)] text-sm">Close</button>
             </div>
-            <div className="px-5 py-4 border-b border-gray-100 text-sm text-gray-600">
+            <div className="px-5 py-4 border-b border-[var(--border)] text-sm text-[var(--text-sec)]">
               <div>{new Date(historySignup.signup.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {historySignup.signup.slot.startTime}–{historySignup.signup.slot.endTime} · {historySignup.signup.totalHours ?? historySignup.signup.slot.durationHours}h</div>
               <div className="mt-1">Current status: <strong>{historySignup.signup.status === "NO_SHOW" ? "No-Show" : historySignup.signup.verificationStatus}</strong></div>
-              {historySignup.signup.rejectionReason && <div className="mt-1 text-red-600">Reason: {historySignup.signup.rejectionReason}</div>}
+              {historySignup.signup.rejectionReason && <div className="mt-1 text-[var(--er-t)]">Reason: {historySignup.signup.rejectionReason}</div>}
             </div>
             <div className="p-5 overflow-y-auto max-h-[55vh] space-y-3">
               {historySignup.history.length === 0 ? (
-                <div className="text-sm text-gray-500">No audit events recorded yet.</div>
+                <div className="text-sm text-[var(--text-sec)]">No audit events recorded yet.</div>
               ) : (
                 historySignup.history.map((entry) => (
-                  <div key={entry.id} className="border border-gray-200 rounded-lg p-3">
+                  <div key={entry.id} className="border border-[var(--border)] rounded-[3px] p-3">
                     <div className="flex justify-between gap-4">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{entry.action}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
+                        <div className="text-sm font-medium text-[var(--text)]">{entry.action}</div>
+                        <div className="text-xs text-[var(--text-sec)] mt-0.5">{entry.actor.name} · {entry.actor.role}</div>
                       </div>
-                      <div className="text-xs text-gray-400 shrink-0">{new Date(entry.createdAt).toLocaleString()}</div>
+                      <div className="text-xs text-[var(--text-faint)] shrink-0">{new Date(entry.createdAt).toLocaleString()}</div>
                     </div>
                     {formatHistoryDetails(entry.details) && (
-                      <div className="text-xs text-gray-600 mt-2">{formatHistoryDetails(entry.details)}</div>
+                      <div className="text-xs text-[var(--text-sec)] mt-2">{formatHistoryDetails(entry.details)}</div>
                     )}
                   </div>
                 ))

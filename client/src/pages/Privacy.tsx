@@ -71,62 +71,62 @@ export default function Privacy() {
       title: "3. Information We Collect",
       content: (
         <>
-          <p className="font-medium text-gray-900">3.1 Information You Provide</p>
+          <p className="font-medium text-[var(--text)]">3.1 Information You Provide</p>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-[13px] border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px] border border-[var(--border)] rounded-[3px] overflow-hidden">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200 w-1/3">Category</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Examples</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200 w-1/4">Who Provides It</th>
+                <tr className="bg-[var(--surface-alt)] text-left">
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)] w-1/3">Category</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Examples</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)] w-1/4">Who Provides It</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Identity data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Full name, email address, school or organization affiliation</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">All users</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Identity data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Full name, email address, school or organization affiliation</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All users</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Authentication data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Hashed password or Google OAuth identifier</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">All users</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Authentication data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Hashed password or Google OAuth identifier</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All users</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Profile data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Phone number (encrypted), grade level, house/cohort affiliation, optional bio, optional age (10–25)</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">Students, school staff</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Profile data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Phone number (encrypted), grade level, house/cohort affiliation, optional bio, optional age (10–25)</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Students, school staff</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Service activity data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Check-in/check-out timestamps, hours logged, service categories, opportunity signups, cancellations</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">Students</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Service activity data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Check-in/check-out timestamps, hours logged, service categories, opportunity signups, cancellations</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Students</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Self-submitted content</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Organization name, date, description of service, supporting notes submitted for review</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">Students</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Self-submitted content</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Organization name, date, description of service, supporting notes submitted for review</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Students</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Verification data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Drawn or uploaded signatures (PNG/PDF, max 5 MB), verifier names and timestamps</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">Students, organizations</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Verification data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Drawn or uploaded signatures (PNG/PDF, max 5 MB), verifier names and timestamps</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Students, organizations</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Messages</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">In-platform messages between students, school staff, and organizations</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">All users</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Messages</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">In-platform messages between students, school staff, and organizations</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All users</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Organization data</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Organization name, mission, contact details, opportunity listings, time slots</td>
-                  <td className="px-3 py-2.5 text-gray-500 align-top">Beneficiary admins</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Organization data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Organization name, mission, contact details, opportunity listings, time slots</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Beneficiary admins</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <p className="font-medium text-gray-900 mt-5">3.2 Information Collected Automatically</p>
+          <p className="font-medium text-[var(--text)] mt-5">3.2 Information Collected Automatically</p>
           <p className="mt-2">
             When you use the Service, we automatically collect limited technical information
             including:
@@ -142,7 +142,7 @@ export default function Privacy() {
             tracking pixels, or behavioral profiling technologies.
           </p>
 
-          <p className="font-medium text-gray-900 mt-5">3.3 Information from Third Parties</p>
+          <p className="font-medium text-[var(--text)] mt-5">3.3 Information from Third Parties</p>
           <p className="mt-2">
             If you register or sign in using <strong>Google OAuth</strong>, we receive your name
             and email address from Google as confirmed by you during the OAuth flow. We do not
@@ -204,93 +204,93 @@ export default function Privacy() {
             information only as described below.
           </p>
 
-          <p className="font-medium text-gray-900 mt-4">5.1 Within the Platform (Role-Based Access)</p>
+          <p className="font-medium text-[var(--text)] mt-4">5.1 Within the Platform (Role-Based Access)</p>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-[13px] border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px] border border-[var(--border)] rounded-[3px] overflow-hidden">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Your Role</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Who Can See Your Data</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">What They See</th>
+                <tr className="bg-[var(--surface-alt)] text-left">
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Your Role</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Who Can See Your Data</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">What They See</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Student</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Your school's administrators and teachers; partner organizations whose opportunities you've attended</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Student</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Your school's administrators and teachers; partner organizations whose opportunities you've attended</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">
                     School staff: your name, hours, status, cohort<br />
                     Organizations: anonymized label ("Volunteer [ID]") by default; your name only after explicit school approval
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">School admin / teacher</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Other administrators and teachers at the same school</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Account profile; no cross-school access</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">School admin / teacher</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Other administrators and teachers at the same school</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Account profile; no cross-school access</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top">Beneficiary admin</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Schools that have approved their organization</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Organization name, mission, contact; attendance records for their own events</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top">Beneficiary admin</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Schools that have approved their organization</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Organization name, mission, contact; attendance records for their own events</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <p className="font-medium text-gray-900 mt-5">5.2 Parent Progress Sharing</p>
+          <p className="font-medium text-[var(--text)] mt-5">5.2 Parent Progress Sharing</p>
           <p className="mt-2">
             School administrators may generate a time-limited, read-only parent progress link for
             a student. This link discloses only the student's hours completed, service goal, and
             deadline status. No other personal data is shared through this link.
           </p>
 
-          <p className="font-medium text-gray-900 mt-5">5.3 Service Providers</p>
+          <p className="font-medium text-[var(--text)] mt-5">5.3 Service Providers</p>
           <p className="mt-2">
             We engage the following sub-processors who handle personal data solely on our
             instruction:
           </p>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-[13px] border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px] border border-[var(--border)] rounded-[3px] overflow-hidden">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Provider</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Purpose</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Data Shared</th>
+                <tr className="bg-[var(--surface-alt)] text-left">
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Provider</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Purpose</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Data Shared</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top font-medium">Neon (database)</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Serverless PostgreSQL database hosting</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">All stored platform data (encrypted at rest and in transit)</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Neon (database)</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Serverless PostgreSQL database hosting</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All stored platform data (encrypted at rest and in transit)</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top font-medium">Resend</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Transactional email delivery</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Recipient email address and first name (for email personalization)</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Resend</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Transactional email delivery</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Recipient email address and first name (for email personalization)</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top font-medium">Google OAuth</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Optional single sign-on authentication</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Name and email (only if you choose Google sign-in)</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Google OAuth</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Optional single sign-on authentication</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Name and email (only if you choose Google sign-in)</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700 align-top font-medium">Vercel</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Application hosting and serverless compute</td>
-                  <td className="px-3 py-2.5 text-gray-600 align-top">Request logs (IP, path, timestamp) — standard access logs, short retention</td>
+                  <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Vercel</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Application hosting and serverless compute</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Request logs (IP, path, timestamp) — standard access logs, short retention</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <p className="font-medium text-gray-900 mt-5">5.4 Legal and Safety Disclosures</p>
+          <p className="font-medium text-[var(--text)] mt-5">5.4 Legal and Safety Disclosures</p>
           <p className="mt-2">
             We may disclose personal information if we believe disclosure is required by law,
             court order, or government regulation; necessary to protect the safety of any person;
             or necessary to investigate fraud or a violation of our Terms.
           </p>
 
-          <p className="font-medium text-gray-900 mt-5">5.5 Business Transfers</p>
+          <p className="font-medium text-[var(--text)] mt-5">5.5 Business Transfers</p>
           <p className="mt-2">
             If GoodHours is involved in a merger, acquisition, or sale of assets, user data may
             be transferred as part of that transaction. We will notify affected users before
@@ -365,7 +365,7 @@ export default function Privacy() {
           <p className="mt-3">
             Parents or guardians who believe their child's information was collected without proper
             consent may contact us at{" "}
-            <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
               {CONTACT_EMAIL}
             </a>
             . We will promptly review and, if confirmed, delete the information.
@@ -415,7 +415,7 @@ export default function Privacy() {
           <p className="mt-3">
             No security measure is perfect. If you discover a potential security vulnerability,
             please report it responsibly to{" "}
-            <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
               {CONTACT_EMAIL}
             </a>
             .
@@ -433,41 +433,41 @@ export default function Privacy() {
             provide the Service. The following specific retention practices apply:
           </p>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-[13px] border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px] border border-[var(--border)] rounded-[3px] overflow-hidden">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Data Type</th>
-                  <th className="px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Retention Period</th>
+                <tr className="bg-[var(--surface-alt)] text-left">
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Data Type</th>
+                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Retention Period</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Account profile data</td>
-                  <td className="px-3 py-2.5 text-gray-600">Until account deletion is requested</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Account profile data</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Until account deletion is requested</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Service-hour records</td>
-                  <td className="px-3 py-2.5 text-gray-600">Until account deletion; schools should export records before deleting</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Service-hour records</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Until account deletion; schools should export records before deleting</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Email verification tokens</td>
-                  <td className="px-3 py-2.5 text-gray-600">24 hours from issuance</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Email verification tokens</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">24 hours from issuance</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Password reset tokens</td>
-                  <td className="px-3 py-2.5 text-gray-600">1 hour from issuance</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Password reset tokens</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">1 hour from issuance</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Student invitation tokens</td>
-                  <td className="px-3 py-2.5 text-gray-600">72 hours from issuance</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Student invitation tokens</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">72 hours from issuance</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Audit log entries</td>
-                  <td className="px-3 py-2.5 text-gray-600">Retained for compliance purposes even after account deletion; personally identifiable actor information is subject to review upon request</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Audit log entries</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Retained for compliance purposes even after account deletion; personally identifiable actor information is subject to review upon request</td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2.5 text-gray-700">Uploaded signature files</td>
-                  <td className="px-3 py-2.5 text-gray-600">Retained with the associated verification record; deleted upon account deletion</td>
+                  <td className="px-3 py-2.5 text-[var(--text)]">Uploaded signature files</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Retained with the associated verification record; deleted upon account deletion</td>
                 </tr>
               </tbody>
             </table>
@@ -495,7 +495,7 @@ export default function Privacy() {
             <li>
               <strong>Correction.</strong> You may update your name, email, and profile
               information in account settings. Contact{" "}
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
                 {SUPPORT_EMAIL}
               </a>{" "}
               if you need help correcting data you cannot edit directly.
@@ -529,7 +529,7 @@ export default function Privacy() {
             <strong>California residents</strong> may have additional rights under the California
             Consumer Privacy Act (CCPA/CPRA). GoodHours does not sell personal information.
             For California rights inquiries, contact{" "}
-            <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
               {CONTACT_EMAIL}
             </a>
             .
@@ -591,17 +591,17 @@ export default function Privacy() {
       content: (
         <>
           <p>If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact:</p>
-          <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-[13px]">
-            <p className="font-semibold text-gray-800">GoodHours — Privacy</p>
-            <p className="text-gray-600 mt-1">
+          <div className="mt-3 bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] px-4 py-3 text-[13px]">
+            <p className="font-semibold text-[var(--text)]">GoodHours — Privacy</p>
+            <p className="text-[var(--text-sec)] mt-1">
               Email:{" "}
-              <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
                 {CONTACT_EMAIL}
               </a>
             </p>
-            <p className="text-gray-600">
+            <p className="text-[var(--text-sec)]">
               Support:{" "}
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 underline hover:opacity-80">
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
                 {SUPPORT_EMAIL}
               </a>
             </p>
@@ -615,9 +615,9 @@ export default function Privacy() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img
             src="/logo-full.png"
@@ -628,15 +628,15 @@ export default function Privacy() {
               (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
             }}
           />
-          <span className="hidden font-bold text-blue-700 text-lg">GoodHours</span>
+          <span className="hidden font-bold text-[var(--action)] text-lg">GoodHours</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link to="/terms" className="text-sm text-gray-500 hover:text-gray-800">
+          <Link to="/terms" className="text-sm text-[var(--text-sec)] hover:text-[var(--text)]">
             Terms of Service
           </Link>
           <Link
             to="/login"
-            className="text-sm text-blue-600 hover:underline font-medium"
+            className="text-sm text-[var(--action)] hover:underline font-medium"
           >
             Sign in
           </Link>
@@ -646,20 +646,20 @@ export default function Privacy() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-[30px] font-bold text-gray-900 mb-2">Privacy Policy</h1>
-          <p className="text-[13.5px] text-gray-500">Effective date: {EFFECTIVE_DATE}</p>
-          <p className="text-[14px] text-gray-600 mt-4 leading-relaxed">
+          <h1 className="text-[30px] font-bold text-[var(--text)] mb-2">Privacy Policy</h1>
+          <p className="text-[13.5px] text-[var(--text-sec)]">Effective date: {EFFECTIVE_DATE}</p>
+          <p className="text-[14px] text-[var(--text-sec)] mt-4 leading-relaxed">
             GoodHours is built for educational use. This Privacy Policy describes how we
             collect, use, and protect personal information — including student data — when you
             use our platform. We do not sell personal information and never will.
           </p>
 
           {/* Quick-summary callout */}
-          <div className="mt-5 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
-            <p className="text-[12px] font-semibold text-blue-700 uppercase tracking-wide mb-2">
+          <div className="mt-5 bg-[var(--in-bg)] border border-[var(--in-b)] rounded-[3px] px-5 py-4">
+            <p className="text-[12px] font-semibold text-[var(--action)] uppercase tracking-wide mb-2">
               At a Glance
             </p>
-            <ul className="text-[13px] text-blue-900 space-y-1">
+            <ul className="text-[13px] text-[var(--navy)] space-y-1">
               <li>✓ We never sell personal data to advertisers or data brokers.</li>
               <li>✓ Student data is only visible to their school and approved partner organizations.</li>
               <li>✓ Student names are anonymized to partner organizations by default.</li>
@@ -670,8 +670,8 @@ export default function Privacy() {
         </div>
 
         {/* Table of Contents */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-8">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        <div className="bg-white border border-[var(--border)] rounded-[3px] p-5 mb-8">
+          <p className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wide mb-3">
             Table of Contents
           </p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -679,7 +679,7 @@ export default function Privacy() {
               <a
                 key={s.id}
                 href={`#${s.id}`}
-                className="text-[13px] text-blue-600 hover:underline py-0.5"
+                className="text-[13px] text-[var(--action)] hover:underline py-0.5"
               >
                 {s.title}
               </a>
@@ -693,32 +693,32 @@ export default function Privacy() {
             <div
               key={s.id}
               id={s.id}
-              className="bg-white border border-gray-200 rounded-xl px-6 py-5 scroll-mt-6"
+              className="bg-white border border-[var(--border)] rounded-[3px] px-6 py-5 scroll-mt-6"
             >
-              <h2 className="text-[16px] font-semibold text-gray-900 mb-3">{s.title}</h2>
-              <div className="text-[13.5px] text-gray-600 leading-relaxed">{s.content}</div>
+              <h2 className="text-[16px] font-semibold text-[var(--text)] mb-3">{s.title}</h2>
+              <div className="text-[13.5px] text-[var(--text-sec)] leading-relaxed">{s.content}</div>
             </div>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="mt-10 bg-white border border-gray-200 rounded-xl p-6 text-center">
-          <div className="text-[14px] font-semibold text-gray-900 mb-1">
+        <div className="mt-10 bg-white border border-[var(--border)] rounded-[3px] p-6 text-center">
+          <div className="text-[14px] font-semibold text-[var(--text)] mb-1">
             Privacy questions or concerns?
           </div>
-          <p className="text-[13px] text-gray-500 mb-3">
+          <p className="text-[13px] text-[var(--text-sec)] mb-3">
             We respond to all privacy inquiries within 10 business days.
           </p>
           <a
             href={`mailto:${CONTACT_EMAIL}`}
-            className="inline-block px-5 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85 transition-opacity"
+            className="inline-block px-5 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85 transition-opacity"
           >
             Email {CONTACT_EMAIL}
           </a>
-          <div className="mt-5 pt-5 border-t border-gray-100 flex justify-center gap-5 text-[12.5px] text-gray-400">
-            <Link to="/terms" className="hover:text-gray-600">Terms of Service</Link>
-            <Link to="/faq" className="hover:text-gray-600">FAQ</Link>
-            <Link to="/" className="hover:text-gray-600">Home</Link>
+          <div className="mt-5 pt-5 border-t border-[var(--border)] flex justify-center gap-5 text-[12.5px] text-[var(--text-faint)]">
+            <Link to="/terms" className="hover:text-[var(--text-sec)]">Terms of Service</Link>
+            <Link to="/faq" className="hover:text-[var(--text-sec)]">FAQ</Link>
+            <Link to="/" className="hover:text-[var(--text-sec)]">Home</Link>
           </div>
         </div>
       </div>

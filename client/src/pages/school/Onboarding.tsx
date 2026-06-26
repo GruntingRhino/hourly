@@ -53,7 +53,7 @@ export default function SchoolOnboarding() {
     <div className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-8">
-          <div className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700 mb-3">School Activation</div>
+          <div className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--action)] mb-3">School Activation</div>
           <h1 className="text-4xl font-semibold text-slate-900 mb-3">Finish initial school setup</h1>
           <p className="max-w-2xl text-base text-slate-600">
             Set the graduation goal once, then continue straight into Launch Center so onboarding follows one clean path.
@@ -61,9 +61,9 @@ export default function SchoolOnboarding() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 ">
             <div className="mb-6">
-              <div className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">Primary Action</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-[var(--action)] mb-2">Primary Action</div>
               <h2 className="text-2xl font-semibold text-slate-900 mb-2">Set the required service hours</h2>
               <p className="text-sm text-slate-600">
                 This is the only decision required on this page. After saving, you move directly into the live setup workflow.
@@ -71,14 +71,14 @@ export default function SchoolOnboarding() {
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+              <div className="mb-4 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-[var(--er-t)] text-sm">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">
                   Required Hours per Student
                 </label>
                 <input
@@ -89,13 +89,13 @@ export default function SchoolOnboarding() {
                   max="1000"
                   step="1"
                   required
-                  className="w-full max-w-xs px-4 py-3 border border-gray-300 rounded-2xl text-2xl text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full max-w-xs px-4 py-3 border border-[var(--border-s)] rounded-[3px] text-2xl text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="text-xs text-gray-400 mt-2">hours</div>
+                <div className="text-xs text-[var(--text-faint)] mt-2">hours</div>
               </div>
 
               {goalAlreadyConfigured && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                <div className="rounded-[3px] border border-[var(--in-b)] bg-[var(--in-bg)] p-4 text-sm text-blue-800">
                   A school goal is already configured at <strong>{user?.school?.requiredHours}</strong> hours.
                   Saving here will overwrite it and complete onboarding.
                 </div>
@@ -104,14 +104,14 @@ export default function SchoolOnboarding() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex min-w-[260px] items-center justify-center rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="inline-flex min-w-[260px] items-center justify-center rounded-[3px] bg-[var(--action)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--action)] disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Goal and Open Launch Center"}
               </button>
             </form>
           </div>
 
-          <aside className="bg-slate-900 text-slate-50 rounded-3xl p-7 shadow-sm">
+          <aside className="bg-slate-900 text-slate-50 rounded-3xl p-7 ">
             <div className="text-xs font-semibold uppercase tracking-wide text-blue-200 mb-3">Next Steps</div>
             <div className="space-y-4">
               <div>

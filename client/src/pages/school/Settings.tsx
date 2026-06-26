@@ -929,7 +929,7 @@ export default function SchoolSettings() {
     && requiredHoursValue > 0
     && totalConfiguredCapHours > requiredHoursValue;
 
-  if (loading) return <div className="text-gray-500">Loading settings...</div>;
+  if (loading) return <div className="text-[var(--text-sec)]">Loading settings...</div>;
 
   const visibleTabs: Tab[] = isAdmin
     ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data"]
@@ -937,17 +937,17 @@ export default function SchoolSettings() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <h1 className="text-[28px] font-bold mb-6">Settings</h1>
 
-      <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
+      <div className="flex flex-wrap gap-1 mb-6 border-b border-[var(--border)]">
         {visibleTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
               tab === t
-                ? "border-blue-700 text-blue-700"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? "border-blue-700 text-[var(--action)]"
+                : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"
             }`}
           >
             {t === "rules" ? "Service Rules" : t}
@@ -956,19 +956,19 @@ export default function SchoolSettings() {
       </div>
 
       {tab === "profile" && (
-        <div data-testid="canvas-integration-card" className="bg-white border border-gray-200 rounded-lg p-6">
+        <div data-testid="canvas-integration-card" className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-blue-700 rounded-full flex items-center justify-center text-xl font-semibold text-white select-none">
+            <div className="w-16 h-16 bg-[var(--action)] rounded-full flex items-center justify-center text-xl font-semibold text-white select-none">
               {user?.name ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() : "?"}
             </div>
             <div>
               <div className="font-semibold text-lg">{user?.name}</div>
-              <div className="text-sm text-gray-500">{user?.email}</div>
+              <div className="text-sm text-[var(--text-sec)]">{user?.email}</div>
               {school && (
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-[var(--text-faint)]">
                   {school.name}
                   {!school.verified && (
-                    <span className="ml-2 text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
+                    <span className="ml-2 text-xs px-2 py-0.5 bg-[var(--wn-bg)] text-[var(--wn-t)] rounded">
                       Unverified
                     </span>
                   )}
@@ -978,10 +978,10 @@ export default function SchoolSettings() {
           </div>
 
           {message && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${
               isError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
+                ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
             }`}>
               {message}
             </div>
@@ -989,27 +989,27 @@ export default function SchoolSettings() {
 
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Your Name</label>
               <input
                 type="text"
                 value={adminName}
                 onChange={(e) => setAdminName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">School Name</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">School Name</label>
               <input
                 type="text"
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Domain <span className="text-gray-400">(optional)</span>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
+                Domain <span className="text-[var(--text-faint)]">(optional)</span>
               </label>
               <input
                 type="text"
@@ -1017,11 +1017,11 @@ export default function SchoolSettings() {
                 onChange={(e) => setDomain(e.target.value)}
                 disabled={!isAdmin}
                 placeholder="e.g. lincoln.edu"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Required Service Hours</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Required Service Hours</label>
               <input
                 type="number"
                 value={requiredHours}
@@ -1029,12 +1029,12 @@ export default function SchoolSettings() {
                 disabled={!isAdmin}
                 min="0"
                 step="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                School ZIP Codes <span className="text-gray-400">(comma-separated, for proximity matching)</span>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
+                School ZIP Codes <span className="text-[var(--text-faint)]">(comma-separated, for proximity matching)</span>
               </label>
               <input
                 type="text"
@@ -1042,14 +1042,14 @@ export default function SchoolSettings() {
                 onChange={(e) => setZipCodes(e.target.value)}
                 disabled={!isAdmin}
                 placeholder="e.g. 02101, 02102"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
 
-            <div className="border-t border-gray-100 pt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="border-t border-[var(--border)] pt-4">
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
                 School Address{" "}
-                <span className="text-gray-400 font-normal">(used to show nearby partners on the map)</span>
+                <span className="text-[var(--text-faint)] font-normal">(used to show nearby partners on the map)</span>
               </label>
               <input
                 type="text"
@@ -1057,7 +1057,7 @@ export default function SchoolSettings() {
                 onChange={(e) => setSchoolAddress(e.target.value)}
                 disabled={!isAdmin}
                 placeholder="123 Main St"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] mb-2"
               />
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-1">
@@ -1067,7 +1067,7 @@ export default function SchoolSettings() {
                     onChange={(e) => setSchoolCity(e.target.value)}
                     disabled={!isAdmin}
                     placeholder="City"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                   />
                 </div>
                 <div>
@@ -1078,7 +1078,7 @@ export default function SchoolSettings() {
                     disabled={!isAdmin}
                     placeholder="State"
                     maxLength={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm uppercase"
+                    className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm uppercase"
                   />
                 </div>
                 <div>
@@ -1088,12 +1088,12 @@ export default function SchoolSettings() {
                     onChange={(e) => setSchoolZip(e.target.value)}
                     disabled={!isAdmin}
                     placeholder="ZIP"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                   />
                 </div>
               </div>
               {school?.latitude && school?.longitude && (
-                <p className="mt-1.5 text-xs text-green-600">
+                <p className="mt-1.5 text-xs text-[var(--ok-t)]">
                   Location set — map will center on your school.
                 </p>
               )}
@@ -1105,8 +1105,8 @@ export default function SchoolSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Partner Invite Template <span className="text-gray-400">(used as the default message for partner invites)</span>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">
+                Partner Invite Template <span className="text-[var(--text-faint)]">(used as the default message for partner invites)</span>
               </label>
               <textarea
                 value={partnerInviteTemplate}
@@ -1114,18 +1114,18 @@ export default function SchoolSettings() {
                 disabled={!isAdmin}
                 rows={5}
                 placeholder="Tell partners why your school is inviting them and what students need from the partnership."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
               />
             </div>
 
             {isAdmin && (
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="border border-[var(--border)] rounded-[3px] p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-[var(--text)]">
                       Allow students to join with invite code
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-[var(--text-sec)]">
                       When off, students cannot join using an invite code.
                     </p>
                   </div>
@@ -1137,11 +1137,11 @@ export default function SchoolSettings() {
                     onClick={handleToggleAllowJoinByCode}
                     disabled={updatingJoinByCode}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      allowJoinByCode ? "bg-blue-600" : "bg-gray-300"
+                      allowJoinByCode ? "bg-[var(--action)]" : "bg-[var(--border-s)]"
                     } ${updatingJoinByCode ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      className={`inline-block h-5 w-5 transform rounded-full bg-[var(--surface)] shadow transition-transform ${
                         allowJoinByCode ? "translate-x-5" : "translate-x-0.5"
                       }`}
                     />
@@ -1153,23 +1153,23 @@ export default function SchoolSettings() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50 transition-colors"
             >
               {saving ? "Saving..." : isAdmin ? "Save Changes" : "Save Profile"}
             </button>
           </form>
 
           {isAdmin && (
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-2">Transfer School Ownership</h3>
-              <p className="text-sm text-gray-500 mb-4">
+            <div className="mt-8 pt-6 border-t border-[var(--border)]">
+              <h3 className="font-semibold text-[var(--text)] mb-2">Transfer School Ownership</h3>
+              <p className="text-sm text-[var(--text-sec)] mb-4">
                 Transfer this school admin role to an existing teacher account. A confirmation email will be sent to your current admin email before anything changes.
               </p>
               {transferMessage && (
-                <div className={`mb-4 p-3 rounded-md text-sm ${
+                <div className={`mb-4 p-3 rounded-[2px] text-sm ${
                   transferIsError
-                    ? "bg-red-50 border border-red-200 text-red-700"
-                    : "bg-green-50 border border-green-200 text-green-700"
+                    ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                    : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
                 }`}>
                   {transferMessage}
                 </div>
@@ -1178,7 +1178,7 @@ export default function SchoolSettings() {
                 <select
                   value={transferTargetEmail}
                   onChange={(e) => setTransferTargetEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                   required
                 >
                   <option value="">Select a teacher account</option>
@@ -1193,7 +1193,7 @@ export default function SchoolSettings() {
                 <button
                   type="submit"
                   disabled={transferringOwnership}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-4 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
                 >
                   {transferringOwnership ? "Sending..." : "Send Confirmation Email"}
                 </button>
@@ -1201,8 +1201,8 @@ export default function SchoolSettings() {
             </div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <button onClick={logout} className="text-red-600 text-sm hover:underline">
+          <div className="mt-8 pt-6 border-t border-[var(--border)]">
+            <button onClick={logout} className="text-[var(--er-t)] text-sm hover:underline">
               Log Out
             </button>
           </div>
@@ -1210,21 +1210,21 @@ export default function SchoolSettings() {
       )}
 
       {tab === "rules" && (
-        <div data-testid="google-classroom-integration-card" className="bg-white border border-gray-200 rounded-lg p-6">
+        <div data-testid="google-classroom-integration-card" className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <h2 className="font-semibold text-lg mb-1">Service Rules</h2>
-          <p className="text-sm text-gray-500 mb-6">Configure requirements and restrictions for your school's service hours program.</p>
+          <p className="text-sm text-[var(--text-sec)] mb-6">Configure requirements and restrictions for your school's service hours program.</p>
 
           {rulesMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${
               rulesIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
+                ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
             }`}>
               {rulesMessage}
             </div>
           )}
           {!rulesIsError && categoryCapWarnings.length > 0 && (
-            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mb-4 rounded-[2px] border border-[var(--wn-b)] bg-[var(--wn-bg)] p-3 text-sm text-[var(--wn-t)]">
               <div className="font-medium mb-2">Students already above a new cap</div>
               <CollapsibleList
                 limit={5}
@@ -1240,38 +1240,38 @@ export default function SchoolSettings() {
           <form onSubmit={handleSaveRules} className="space-y-6">
             {/* Section 1: Service Window */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-1">Service Window</h3>
-              <p className="text-xs text-gray-500 mb-3">Students cannot log hours outside this date range. Leave blank for no restriction.</p>
+              <h3 className="text-sm font-semibold text-[var(--text)] mb-1">Service Window</h3>
+              <p className="text-xs text-[var(--text-sec)] mb-3">Students cannot log hours outside this date range. Leave blank for no restriction.</p>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Start Date</label>
                   <input
                     type="date"
                     value={serviceStartDate}
                     onChange={(e) => setServiceStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Deadline)</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">End Date (Deadline)</label>
                   <input
                     type="date"
                     value={serviceEndDate}
                     onChange={(e) => setServiceEndDate(e.target.value)}
                     min={serviceStartDate || undefined}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Section 2: Self-Submission */}
-            <div className="border-t border-gray-100 pt-5">
-              <h3 className="text-sm font-semibold text-gray-800 mb-1">Self-Submitted Hours</h3>
+            <div className="border-t border-[var(--border)] pt-5">
+              <h3 className="text-sm font-semibold text-[var(--text)] mb-1">Self-Submitted Hours</h3>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Allow students to self-submit hours</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm text-[var(--text-sec)]">Allow students to self-submit hours</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">
                     When off, students cannot submit hours from activities not organized by a beneficiary partner.
                   </p>
                 </div>
@@ -1281,10 +1281,10 @@ export default function SchoolSettings() {
                   aria-checked={allowSelfSubmission}
                   onClick={() => setAllowSelfSubmission((v) => !v)}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    allowSelfSubmission ? "bg-blue-600" : "bg-gray-300"
+                    allowSelfSubmission ? "bg-[var(--action)]" : "bg-[var(--border-s)]"
                   }`}
                 >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-[var(--surface)] shadow transition-transform ${
                     allowSelfSubmission ? "translate-x-5" : "translate-x-0.5"
                   }`} />
                 </button>
@@ -1292,10 +1292,10 @@ export default function SchoolSettings() {
             </div>
 
             {/* Section 3: Verification */}
-            <div className="border-t border-gray-100 pt-5">
-              <h3 className="text-sm font-semibold text-gray-800 mb-1">Verification Requirements</h3>
+            <div className="border-t border-[var(--border)] pt-5">
+              <h3 className="text-sm font-semibold text-[var(--text)] mb-1">Verification Requirements</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Verification Workflow</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Verification Workflow</label>
                 <select
                   value={verificationStandard}
                   onChange={(e) => {
@@ -1305,19 +1305,19 @@ export default function SchoolSettings() {
                       setRequireOrgVerification(true);
                     }
                   }}
-                  className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full max-w-sm h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                 >
                   <option value="STANDARD">Standard: school staff can review immediately</option>
                   <option value="BENEFICIARY_REQUIRED">Beneficiary-first: partner verification required first</option>
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-[var(--text-faint)] mt-1">
                   This setting now affects actual approval flow for pending verifications.
                 </p>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Require beneficiary organization verification before school approval</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm text-[var(--text-sec)]">Require beneficiary organization verification before school approval</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">
                     When on, school staff cannot approve legacy service sessions — organization must verify first.
                   </p>
                 </div>
@@ -1328,10 +1328,10 @@ export default function SchoolSettings() {
                   disabled={verificationStandard === "BENEFICIARY_REQUIRED"}
                   onClick={() => setRequireOrgVerification((v) => !v)}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    requireOrgVerification ? "bg-blue-600" : "bg-gray-300"
+                    requireOrgVerification ? "bg-[var(--action)]" : "bg-[var(--border-s)]"
                   }`}
                 >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-[var(--surface)] shadow transition-transform ${
                     requireOrgVerification ? "translate-x-5" : "translate-x-0.5"
                   }`} />
                 </button>
@@ -1339,24 +1339,24 @@ export default function SchoolSettings() {
             </div>
 
             {/* Section 4: Category Hour Caps */}
-            <div className="border-t border-gray-100 pt-5">
-              <h3 className="text-sm font-semibold text-gray-800 mb-1">Category Hour Caps</h3>
-              <p className="text-xs text-gray-500 mb-3">
+            <div className="border-t border-[var(--border)] pt-5">
+              <h3 className="text-sm font-semibold text-[var(--text)] mb-1">Category Hour Caps</h3>
+              <p className="text-xs text-[var(--text-sec)] mb-3">
                 Students need {requiredHoursValue || 0} total community service hours. The community service total is fixed by the school requirement below. Category caps carve up that same total and do not add extra hours on top. Leave hours blank for no cap.
               </p>
               <div className="mb-3 grid grid-cols-[1fr_100px_32px] gap-2 items-center">
-                <div className="px-2 py-1.5 border border-gray-200 bg-gray-50 rounded text-sm text-gray-700">
+                <div className="px-2 py-1.5 border border-[var(--border)] bg-[var(--surface-alt)] rounded text-sm text-[var(--text)]">
                   {REQUIRED_CATEGORY_CAP}
                 </div>
-                <div className="px-2 py-1.5 border border-gray-200 bg-gray-50 rounded text-sm text-gray-700 text-right">
+                <div className="px-2 py-1.5 border border-[var(--border)] bg-[var(--surface-alt)] rounded text-sm text-[var(--text)] text-right">
                   {requiredHoursValue || 0}
                 </div>
                 <div />
               </div>
-              <div className={`mb-3 rounded-md border px-3 py-2 text-xs ${
+              <div className={`mb-3 rounded-[2px] border px-3 py-2 text-xs ${
                 capHoursExceeded
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-gray-200 bg-gray-50 text-gray-600"
+                  ? "border-[var(--er-b)] bg-[var(--er-bg)] text-[var(--er-t)]"
+                  : "border-[var(--border)] bg-[var(--surface-alt)] text-[var(--text-sec)]"
               }`}>
                 Configured cap hours: <strong>{totalConfiguredCapHours.toFixed(0)}h</strong>
                 {Number.isFinite(requiredHoursValue) && requiredHoursValue > 0 ? (
@@ -1365,7 +1365,7 @@ export default function SchoolSettings() {
               </div>
               {capRows.length > 0 && (
                 <div className="mb-2 space-y-2">
-                  <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-xs font-medium text-gray-500 uppercase tracking-wide px-1">
+                  <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-xs font-medium text-[var(--text-sec)] uppercase tracking-wide px-1">
                     <div>Category</div>
                     <div>Max Hours</div>
                     <div />
@@ -1379,7 +1379,7 @@ export default function SchoolSettings() {
                           next[i] = { ...next[i], category: e.target.value };
                           setCapRows(normalizeCapRows(next));
                         }}
-                        className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
                       >
                         <option value="">Select category</option>
                         {CATEGORY_CAP_OPTIONS.filter((option) => (
@@ -1401,12 +1401,12 @@ export default function SchoolSettings() {
                         min={1}
                         step={1}
                         placeholder="40"
-                        className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => setCapRows((rows) => rows.filter((_, j) => j !== i))}
-                        className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                        className="text-[var(--text-faint)] hover:text-[var(--er-t)] text-lg leading-none"
                         aria-label="Remove category"
                       >
                         ×
@@ -1419,7 +1419,7 @@ export default function SchoolSettings() {
                 type="button"
                 onClick={() => setCapRows((rows) => [...rows, { category: "", hours: "" }])}
                 disabled={capRows.filter((row) => row.category.trim()).length >= CATEGORY_CAP_OPTIONS.length}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-sm text-[var(--action)] hover:text-[var(--navy)]"
               >
                 + Add category cap
               </button>
@@ -1428,7 +1428,7 @@ export default function SchoolSettings() {
             <button
               type="submit"
               disabled={savingRules}
-              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50 transition-colors"
             >
               {savingRules ? "Saving..." : "Save Service Rules"}
             </button>
@@ -1437,74 +1437,74 @@ export default function SchoolSettings() {
       )}
 
       {tab === "security" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <h3 className="font-semibold mb-4">Change Password</h3>
           {passwordMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${
               passwordIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
+                ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
             }`}>
               {passwordMessage}
             </div>
           )}
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Current Password</label>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">New Password</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Confirm New Password</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)]"
               />
             </div>
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50 transition-colors"
             >
               {changingPassword ? "Changing..." : "Change Password"}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="font-semibold text-red-600 mb-1">Delete Account</h3>
-            <p className="text-sm text-gray-500 mb-3">
+          <div className="mt-8 pt-6 border-t border-[var(--border)]">
+            <h3 className="font-semibold text-[var(--er-t)] mb-1">Delete Account</h3>
+            <p className="text-sm text-[var(--text-sec)] mb-3">
               Permanently deletes your account and removes all associated school data, cohorts, and student associations. This cannot be undone.
             </p>
             {!deleteConfirm ? (
               <button
                 onClick={() => setDeleteConfirm(true)}
-                className="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50"
+                className="px-4 py-2 border border-[var(--er-b)] text-[var(--er-t)] rounded-[2px] text-sm hover:bg-[var(--er-bg)]"
               >
                 Delete My Account
               </button>
             ) : (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm font-medium text-red-800 mb-3">
+              <div className="p-4 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[3px]">
+                <p className="text-sm font-medium text-[var(--er-t)] mb-3">
                   Type <span className="font-mono font-bold">DELETE</span> to confirm:
                 </p>
                 <input
@@ -1512,19 +1512,19 @@ export default function SchoolSettings() {
                   value={deleteInput}
                   onChange={(e) => setDeleteInput(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full px-3 py-2 border border-red-300 rounded-md text-sm mb-3"
+                  className="w-full px-3 py-2 border border-[var(--er-b)] rounded-[2px] text-sm mb-3"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleDeleteAccount}
                     disabled={deleteInput !== "DELETE" || deleting}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-[var(--er-t)] text-white rounded-[2px] text-sm hover:bg-[var(--er-t)] disabled:opacity-50"
                   >
                     {deleting ? "Deleting..." : "Permanently Delete"}
                   </button>
                   <button
                     onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    className="px-4 py-2 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
                   >
                     Cancel
                   </button>
@@ -1536,33 +1536,33 @@ export default function SchoolSettings() {
       )}
 
       {tab === "notifications" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <h3 className="font-semibold mb-1">Notification Preferences</h3>
-          <p className="text-sm text-gray-500 mb-6">Choose how you want to be notified.</p>
+          <p className="text-sm text-[var(--text-sec)] mb-6">Choose how you want to be notified.</p>
 
           {notifMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${notifIsError ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${notifIsError ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]" : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"}`}>
               {notifMessage}
             </div>
           )}
 
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-2">
+            <div className="grid grid-cols-3 gap-4 text-xs font-medium text-[var(--text-sec)] uppercase tracking-wide border-b border-[var(--border)] pb-2">
               <div>Notification</div>
               <div className="text-center">Email</div>
               <div className="text-center">In-App</div>
             </div>
             {notifRows.map(({ key, label }) => (
               <div key={key} className="grid grid-cols-3 gap-4 items-center">
-                <div className="text-sm font-medium text-gray-700">{label}</div>
+                <div className="text-sm font-medium text-[var(--text)]">{label}</div>
                 <div className="flex justify-center">
                   <button
                     onClick={() => toggleNotif(key, "email")}
                     className={`w-10 h-5 rounded-full transition-colors relative ${
-                      notifPrefs[key].email ? "bg-blue-600" : "bg-gray-300"
+                      notifPrefs[key].email ? "bg-[var(--action)]" : "bg-[var(--border-s)]"
                     }`}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface)] rounded-full shadow transition-transform ${
                       notifPrefs[key].email ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>
@@ -1571,10 +1571,10 @@ export default function SchoolSettings() {
                   <button
                     onClick={() => toggleNotif(key, "inApp")}
                     className={`w-10 h-5 rounded-full transition-colors relative ${
-                      notifPrefs[key].inApp ? "bg-blue-600" : "bg-gray-300"
+                      notifPrefs[key].inApp ? "bg-[var(--action)]" : "bg-[var(--border-s)]"
                     }`}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface)] rounded-full shadow transition-transform ${
                       notifPrefs[key].inApp ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </button>
@@ -1586,7 +1586,7 @@ export default function SchoolSettings() {
           <button
             onClick={handleSaveNotifications}
             disabled={savingNotif}
-            className="mt-6 px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+            className="mt-6 h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50 transition-colors"
           >
             {savingNotif ? "Saving..." : "Save Preferences"}
           </button>
@@ -1594,23 +1594,23 @@ export default function SchoolSettings() {
       )}
 
       {tab === "privacy" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <h3 className="font-semibold mb-1">Privacy Settings</h3>
-          <p className="text-sm text-gray-500 mb-6">Control visibility and message restrictions.</p>
+          <p className="text-sm text-[var(--text-sec)] mb-6">Control visibility and message restrictions.</p>
 
           {privacyMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${privacyIsError ? "bg-red-50 border border-red-200 text-red-700" : "bg-green-50 border border-green-200 text-green-700"}`}>
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${privacyIsError ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]" : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"}`}>
               {privacyMessage}
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Profile Visibility</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Profile Visibility</label>
               <select
                 value={msgPrefs.profileVisibility}
                 onChange={(e) => setMsgPrefs((p) => ({ ...p, profileVisibility: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
               >
                 <option value="EVERYONE">Everyone</option>
                 <option value="SCHOOL">School Only</option>
@@ -1618,11 +1618,11 @@ export default function SchoolSettings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Message Restrictions</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Message Restrictions</label>
               <select
                 value={msgPrefs.allowFrom}
                 onChange={(e) => setMsgPrefs((p) => ({ ...p, allowFrom: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
               >
                 <option value="EVERYONE">Everyone</option>
                 <option value="ORGS_ONLY">Organizations Only</option>
@@ -1634,7 +1634,7 @@ export default function SchoolSettings() {
           <button
             onClick={handleSavePrivacy}
             disabled={savingPrivacy}
-            className="mt-6 px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
+            className="mt-6 h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50 transition-colors"
           >
             {savingPrivacy ? "Saving..." : "Save Settings"}
           </button>
@@ -1642,24 +1642,24 @@ export default function SchoolSettings() {
       )}
 
       {tab === "data" && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <h3 className="font-semibold mb-2">Export Activity Log</h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[var(--text-sec)] mb-6">
             Download a CSV of all student service sessions at your school.
           </p>
           <button
             onClick={handleExportActivityLog}
-            className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 transition-colors"
+            className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] transition-colors"
           >
             Export Activity Log (CSV)
           </button>
 
           {isAdmin && (
-            <div className="mt-8 border-t border-gray-100 pt-6">
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
               <div className="flex items-center justify-between gap-4 mb-3">
                 <div>
-                  <h3 className="font-semibold text-gray-900">Recent Data Access</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-semibold text-[var(--text)]">Recent Data Access</h3>
+                  <p className="text-sm text-[var(--text-sec)]">
                     FERPA audit trail for staff access to student reporting and hour data.
                   </p>
                 </div>
@@ -1673,45 +1673,45 @@ export default function SchoolSettings() {
                       .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
                       .finally(() => setLogsLoading(false));
                   }}
-                  className="px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50"
+                  className="px-3 py-1.5 border border-[var(--border-s)] rounded text-xs hover:bg-[var(--surface-alt)]"
                 >
                   Refresh
                 </button>
               </div>
 
               {logsError && (
-                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="mb-3 rounded-[2px] border border-[var(--er-b)] bg-[var(--er-bg)] px-3 py-2 text-sm text-[var(--er-t)]">
                   {logsError}
                 </div>
               )}
 
               {logsLoading ? (
-                <div className="text-sm text-gray-500">Loading access logs...</div>
+                <div className="text-sm text-[var(--text-sec)]">Loading access logs...</div>
               ) : dataAccessLogs.length === 0 ? (
-                <div className="text-sm text-gray-500">No access events recorded yet.</div>
+                <div className="text-sm text-[var(--text-sec)]">No access events recorded yet.</div>
               ) : (
                 <div className="space-y-3">
                   <CollapsibleList
                     limit={10}
                     items={dataAccessLogs.slice(0, 50).map((entry) => (
-                    <div key={entry.id} className="rounded-lg border border-gray-200 p-3 overflow-hidden">
+                    <div key={entry.id} className="rounded-[3px] border border-[var(--border)] p-3 overflow-hidden">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-gray-900 break-words">
+                          <div className="text-sm font-medium text-[var(--text)] break-words">
                             {entry.actor.name} · {entry.actor.role}
                           </div>
-                          <div className="text-xs text-gray-500 break-all">{entry.actor.email}</div>
+                          <div className="text-xs text-[var(--text-sec)] break-all">{entry.actor.email}</div>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-[var(--text-faint)]">
                           {new Date(entry.createdAt).toLocaleString()}
                         </div>
                       </div>
-                      <div className="mt-2 text-sm text-gray-700 break-words">
+                      <div className="mt-2 text-sm text-[var(--text)] break-words">
                         {entry.action.replaceAll("_", " ")}
                         {entry.targetLabel ? ` · ${entry.targetLabel}` : ""}
                       </div>
                       {entry.details && (
-                        <div className="mt-1 text-xs text-gray-500 break-words">
+                        <div className="mt-1 text-xs text-[var(--text-sec)] break-words">
                           {formatAccessDetails(entry.details)}
                         </div>
                       )}
@@ -1726,35 +1726,35 @@ export default function SchoolSettings() {
 
       {tab === "integrations" && isAdmin && (
         <div className="space-y-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
-              <h3 className="font-semibold text-gray-900">Canvas Integration</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="font-semibold text-[var(--text)]">Canvas Integration</h3>
+              <p className="text-sm text-[var(--text-sec)]">
                 Canvas sync is optional. CSV onboarding remains the default path. Each GoodHours school connects to one Canvas school tenant.
               </p>
             </div>
             <div className={`rounded-full px-3 py-1 text-xs font-medium ${
               canvasStatus?.connection?.status === "CONNECTED"
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-600"
+                ? "bg-[var(--ok-bg)] text-[var(--ok-t)]"
+                : "bg-[var(--surface-alt)] text-[var(--text-sec)]"
             }`}>
               {canvasStatus?.connection?.status ?? "DISCONNECTED"}
             </div>
           </div>
 
           {canvasMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${
               canvasIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
+                ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
             }`}>
               {canvasMessage}
             </div>
           )}
 
           {(canvasStatus?.ops?.warnings?.length ?? 0) > 0 && (
-            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mb-4 rounded-[2px] border border-[var(--wn-b)] bg-[var(--wn-bg)] p-3 text-sm text-[var(--wn-t)]">
               <CollapsibleList
                 limit={5}
                 items={canvasStatus?.ops?.warnings.map((warning, index) => (
@@ -1766,12 +1766,12 @@ export default function SchoolSettings() {
 
           <div className="grid gap-4 md:grid-cols-[220px_1fr] mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mock Scenario</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Mock Scenario</label>
               <select
                 data-testid="canvas-scenario"
                 value={canvasScenario}
                 onChange={(e) => setCanvasScenario(e.target.value as typeof canvasScenario)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                 disabled={canvasConnectMode !== "MOCK" || canvasStatus?.capabilities?.mockAllowed === false}
               >
             <option value="default">Default</option>
@@ -1782,29 +1782,29 @@ export default function SchoolSettings() {
           </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Connection Mode</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Connection Mode</label>
               <select
                 data-testid="canvas-mode"
                 value={canvasConnectMode}
                 onChange={(e) => setCanvasConnectMode(e.target.value as "MOCK" | "OAUTH")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
               >
                 {(canvasStatus?.capabilities?.mockAllowed ?? true) && <option value="MOCK">Mock Sandbox</option>}
                 <option value="OAUTH">Real OAuth</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Canvas Base URL</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Canvas Base URL</label>
               <input
                 data-testid="canvas-base-url"
                 type="url"
                 value={canvasBaseUrl}
                 onChange={(e) => setCanvasBaseUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                 placeholder="https://schoolname.instructure.com"
               />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+            <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4 text-sm text-[var(--text-sec)]">
               <div><strong>Connection:</strong> {canvasStatus?.connection?.displayName ?? "Not connected"}</div>
               <div><strong>Base URL:</strong> {canvasStatus?.connection?.baseUrl ?? "N/A"}</div>
               <div><strong>Mode:</strong> {canvasStatus?.connection?.mode ?? canvasConnectMode}</div>
@@ -1824,7 +1824,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleCanvasConnect}
               disabled={canvasBusyAction !== ""}
-              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50"
             >
               {canvasBusyAction === "connect" ? "Connecting..." : canvasConnectMode === "OAUTH" ? "Connect With Canvas OAuth" : "Connect Canvas"}
             </button>
@@ -1833,7 +1833,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleCanvasDisconnect}
               disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-[var(--border-s)] rounded-[2px] text-sm font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
             >
               {canvasBusyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
             </button>
@@ -1842,7 +1842,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleCanvasPreview}
               disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
-              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-50 disabled:opacity-50"
+              className="px-4 py-2 border border-[var(--in-b)] text-[var(--action)] rounded-[2px] text-sm font-medium hover:bg-[var(--in-bg)] disabled:opacity-50"
             >
               {canvasBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
             </button>
@@ -1851,16 +1851,16 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleCanvasApply}
               disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
-              className="px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50"
+              className="px-4 py-2 bg-[var(--ok-t)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {canvasBusyAction === "apply" ? "Applying..." : "Apply Sync"}
             </button>
           </div>
 
           {canvasPreview && (
-            <div className="mb-6 rounded-lg border border-gray-200 p-4">
-              <h4 className="font-medium text-gray-900 mb-2">Latest Preview Result</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-gray-700 mb-3">
+            <div className="mb-6 rounded-[3px] border border-[var(--border)] p-4">
+              <h4 className="font-medium text-[var(--text)] mb-2">Latest Preview Result</h4>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-[var(--text)] mb-3">
                 <div>Cohorts created: {canvasPreview.counts.cohortsCreated}</div>
                 <div>Cohorts updated: {canvasPreview.counts.cohortsUpdated}</div>
                 <div>Cohorts archived: {canvasPreview.counts.cohortsArchived}</div>
@@ -1871,7 +1871,7 @@ export default function SchoolSettings() {
                 <div>Users assigned: {canvasPreview.counts.usersAssignedToCohort}</div>
                 <div>Errors: {canvasPreview.counts.errors}</div>
               </div>
-              <div className="max-h-64 overflow-auto rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+              <div className="max-h-64 overflow-auto rounded border border-[var(--border)] bg-[var(--surface-alt)] p-3 text-xs text-[var(--text)] space-y-1">
                 {canvasPreview.operations.map((operation, index) => (
                   <div key={`${operation.type}-${index}`}>
                     <strong>{operation.type}</strong> · {operation.action} · {operation.target}
@@ -1883,9 +1883,9 @@ export default function SchoolSettings() {
           )}
 
           <div className="mb-6">
-            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
+            <h4 className="font-medium text-[var(--text)] mb-2">Recent Sync Jobs</h4>
             {(!canvasStatus?.jobs || canvasStatus.jobs.length === 0) ? (
-              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+              <div className="rounded border border-dashed border-[var(--border-s)] p-3 text-sm text-[var(--text-sec)]">
                 No Canvas sync jobs yet.
               </div>
             ) : (
@@ -1893,17 +1893,17 @@ export default function SchoolSettings() {
                 limit={5}
                 className="space-y-2"
                 items={canvasStatus.jobs.map((job) => (
-                  <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                  <div key={job.id} className="rounded border border-[var(--border)] p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <strong>{job.mode}</strong> · {job.status}
                       </div>
-                      <div className="text-gray-500">
+                      <div className="text-[var(--text-sec)]">
                         {new Date(job.startedAt).toLocaleString()}
                       </div>
                     </div>
                     {job.summary && (
-                      <div className="mt-2 text-xs text-gray-600">
+                      <div className="mt-2 text-xs text-[var(--text-sec)]">
                         Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
                       </div>
                     )}
@@ -1914,9 +1914,9 @@ export default function SchoolSettings() {
           </div>
 
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
+            <h4 className="font-medium text-[var(--text)] mb-2">Recent Sync Errors</h4>
             {canvasErrors.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+              <div className="rounded border border-dashed border-[var(--border-s)] p-3 text-sm text-[var(--text-sec)]">
                 No Canvas sync errors recorded.
               </div>
             ) : (
@@ -1924,7 +1924,7 @@ export default function SchoolSettings() {
                 limit={5}
                 className="space-y-2"
                 items={canvasErrors.map((error) => (
-                  <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div key={error.id} className="rounded border border-[var(--er-b)] bg-[var(--er-bg)] p-3 text-sm text-[var(--er-t)]">
                     <div><strong>{error.code}</strong> · {error.message}</div>
                     <div className="text-xs mt-1">
                       {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
@@ -1936,35 +1936,35 @@ export default function SchoolSettings() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
-              <h3 className="font-semibold text-gray-900">Google Classroom Integration</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="font-semibold text-[var(--text)]">Google Classroom Integration</h3>
+              <p className="text-sm text-[var(--text-sec)]">
                 Google Classroom sync is optional. CSV onboarding remains the default path. Each GoodHours school connects to one Google Classroom school tenant.
               </p>
             </div>
             <div className={`rounded-full px-3 py-1 text-xs font-medium ${
               googleClassroomStatus?.connection?.status === "CONNECTED"
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-600"
+                ? "bg-[var(--ok-bg)] text-[var(--ok-t)]"
+                : "bg-[var(--surface-alt)] text-[var(--text-sec)]"
             }`}>
               {googleClassroomStatus?.connection?.status ?? "DISCONNECTED"}
             </div>
           </div>
 
           {googleClassroomMessage && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
+            <div className={`mb-4 p-3 rounded-[2px] text-sm ${
               googleClassroomIsError
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
+                ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]"
+                : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"
             }`}>
               {googleClassroomMessage}
             </div>
           )}
 
           {(googleClassroomStatus?.ops?.warnings?.length ?? 0) > 0 && (
-            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mb-4 rounded-[2px] border border-[var(--wn-b)] bg-[var(--wn-bg)] p-3 text-sm text-[var(--wn-t)]">
               <CollapsibleList
                 limit={5}
                 items={googleClassroomStatus?.ops?.warnings.map((warning, index) => (
@@ -1976,12 +1976,12 @@ export default function SchoolSettings() {
 
           <div className="grid gap-4 md:grid-cols-[220px_1fr] mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mock Scenario</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Mock Scenario</label>
               <select
                 data-testid="google-classroom-scenario"
                 value={googleClassroomScenario}
                 onChange={(e) => setGoogleClassroomScenario(e.target.value as typeof googleClassroomScenario)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                 disabled={googleClassroomConnectMode !== "MOCK" || googleClassroomStatus?.capabilities?.mockAllowed === false}
               >
                 <option value="default">Default</option>
@@ -1992,29 +1992,29 @@ export default function SchoolSettings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Connection Mode</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Connection Mode</label>
               <select
                 data-testid="google-classroom-mode"
                 value={googleClassroomConnectMode}
                 onChange={(e) => setGoogleClassroomConnectMode(e.target.value as "MOCK" | "OAUTH")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
               >
                 {(googleClassroomStatus?.capabilities?.mockAllowed ?? true) && <option value="MOCK">Mock Sandbox</option>}
                 <option value="OAUTH">Real OAuth</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Google Classroom Base URL</label>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Google Classroom Base URL</label>
               <input
                 data-testid="google-classroom-base-url"
                 type="url"
                 value={googleClassroomBaseUrl}
                 onChange={(e) => setGoogleClassroomBaseUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
                 placeholder="https://classroom.googleapis.com"
               />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+            <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4 text-sm text-[var(--text-sec)]">
               <div><strong>Connection:</strong> {googleClassroomStatus?.connection?.displayName ?? "Not connected"}</div>
               <div><strong>Base URL:</strong> {googleClassroomStatus?.connection?.baseUrl ?? "N/A"}</div>
               <div><strong>Mode:</strong> {googleClassroomStatus?.connection?.mode ?? googleClassroomConnectMode}</div>
@@ -2034,7 +2034,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleGoogleClassroomConnect}
               disabled={googleClassroomBusyAction !== ""}
-              className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
+              className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-sm font-medium hover:bg-[var(--navy)] disabled:opacity-50"
             >
               {googleClassroomBusyAction === "connect" ? "Connecting..." : googleClassroomConnectMode === "OAUTH" ? "Connect With Google Classroom OAuth" : "Connect Google Classroom"}
             </button>
@@ -2043,7 +2043,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleGoogleClassroomDisconnect}
               disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-[var(--border-s)] rounded-[2px] text-sm font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
             >
               {googleClassroomBusyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
             </button>
@@ -2052,7 +2052,7 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleGoogleClassroomPreview}
               disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
-              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-50 disabled:opacity-50"
+              className="px-4 py-2 border border-[var(--in-b)] text-[var(--action)] rounded-[2px] text-sm font-medium hover:bg-[var(--in-bg)] disabled:opacity-50"
             >
               {googleClassroomBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
             </button>
@@ -2061,16 +2061,16 @@ export default function SchoolSettings() {
               type="button"
               onClick={handleGoogleClassroomApply}
               disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
-              className="px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50"
+              className="px-4 py-2 bg-[var(--ok-t)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {googleClassroomBusyAction === "apply" ? "Applying..." : "Apply Sync"}
             </button>
           </div>
 
           {googleClassroomPreview && (
-            <div className="mb-6 rounded-lg border border-gray-200 p-4">
-              <h4 className="font-medium text-gray-900 mb-2">Latest Preview Result</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-gray-700 mb-3">
+            <div className="mb-6 rounded-[3px] border border-[var(--border)] p-4">
+              <h4 className="font-medium text-[var(--text)] mb-2">Latest Preview Result</h4>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-[var(--text)] mb-3">
                 <div>Cohorts created: {googleClassroomPreview.counts.cohortsCreated}</div>
                 <div>Cohorts updated: {googleClassroomPreview.counts.cohortsUpdated}</div>
                 <div>Cohorts archived: {googleClassroomPreview.counts.cohortsArchived}</div>
@@ -2081,7 +2081,7 @@ export default function SchoolSettings() {
                 <div>Users assigned: {googleClassroomPreview.counts.usersAssignedToCohort}</div>
                 <div>Errors: {googleClassroomPreview.counts.errors}</div>
               </div>
-              <div className="max-h-64 overflow-auto rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+              <div className="max-h-64 overflow-auto rounded border border-[var(--border)] bg-[var(--surface-alt)] p-3 text-xs text-[var(--text)] space-y-1">
                 {googleClassroomPreview.operations.map((operation, index) => (
                   <div key={`${operation.type}-${index}`}>
                     <strong>{operation.type}</strong> · {operation.action} · {operation.target}
@@ -2093,9 +2093,9 @@ export default function SchoolSettings() {
           )}
 
           <div className="mb-6">
-            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Jobs</h4>
+            <h4 className="font-medium text-[var(--text)] mb-2">Recent Sync Jobs</h4>
             {(!googleClassroomStatus?.jobs || googleClassroomStatus.jobs.length === 0) ? (
-              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+              <div className="rounded border border-dashed border-[var(--border-s)] p-3 text-sm text-[var(--text-sec)]">
                 No Google Classroom sync jobs yet.
               </div>
             ) : (
@@ -2103,17 +2103,17 @@ export default function SchoolSettings() {
                 limit={5}
                 className="space-y-2"
                 items={googleClassroomStatus.jobs.map((job) => (
-                  <div key={job.id} className="rounded border border-gray-200 p-3 text-sm">
+                  <div key={job.id} className="rounded border border-[var(--border)] p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <strong>{job.mode}</strong> · {job.status}
                       </div>
-                      <div className="text-gray-500">
+                      <div className="text-[var(--text-sec)]">
                         {new Date(job.startedAt).toLocaleString()}
                       </div>
                     </div>
                     {job.summary && (
-                      <div className="mt-2 text-xs text-gray-600">
+                      <div className="mt-2 text-xs text-[var(--text-sec)]">
                         Scenario: {job.summary.scenario} · Cohorts +{job.summary.counts.cohortsCreated} / updated {job.summary.counts.cohortsUpdated} / archived {job.summary.counts.cohortsArchived} · Errors {job.summary.counts.errors}
                       </div>
                     )}
@@ -2124,9 +2124,9 @@ export default function SchoolSettings() {
           </div>
 
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Recent Sync Errors</h4>
+            <h4 className="font-medium text-[var(--text)] mb-2">Recent Sync Errors</h4>
             {googleClassroomErrors.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+              <div className="rounded border border-dashed border-[var(--border-s)] p-3 text-sm text-[var(--text-sec)]">
                 No Google Classroom sync errors recorded.
               </div>
             ) : (
@@ -2134,7 +2134,7 @@ export default function SchoolSettings() {
                 limit={5}
                 className="space-y-2"
                 items={googleClassroomErrors.map((error) => (
-                  <div key={error.id} className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div key={error.id} className="rounded border border-[var(--er-b)] bg-[var(--er-bg)] p-3 text-sm text-[var(--er-t)]">
                     <div><strong>{error.code}</strong> · {error.message}</div>
                     <div className="text-xs mt-1">
                       {error.externalType ? `${error.externalType} ${error.externalId ?? ""}` : ""}
@@ -2152,10 +2152,10 @@ export default function SchoolSettings() {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed bottom-4 right-4 z-50 rounded-md border px-4 py-3 text-sm shadow-lg ${
+          className={`fixed bottom-4 right-4 z-50 rounded-[2px] border px-4 py-3 text-sm  ${
             joinByCodeToast.type === "success"
-              ? "border-green-200 bg-green-50 text-green-700"
-              : "border-red-200 bg-red-50 text-red-700"
+              ? "border-[var(--ok-b)] bg-[var(--ok-bg)] text-[var(--ok-t)]"
+              : "border-[var(--er-b)] bg-[var(--er-bg)] text-[var(--er-t)]"
           }`}
         >
           {joinByCodeToast.text}

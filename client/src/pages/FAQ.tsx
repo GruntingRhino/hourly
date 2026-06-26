@@ -101,22 +101,22 @@ const SECTIONS: FAQSection[] = [
 function AccordionItem({ q, a }: FAQItem) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-gray-100 last:border-b-0">
+    <div className="border-b border-[var(--border)] last:border-b-0">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex justify-between items-center py-4 text-left gap-4 group"
       >
-        <span className="text-[14.5px] font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+        <span className="text-[14.5px] font-medium text-[var(--text)] group-hover:text-[var(--action)] transition-colors">
           {q}
         </span>
-        <span className={`shrink-0 w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center transition-transform ${open ? "rotate-45" : ""}`}>
-          <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className={`shrink-0 w-5 h-5 rounded-full border border-[var(--border-s)] flex items-center justify-center transition-transform ${open ? "rotate-45" : ""}`}>
+          <svg className="w-3 h-3 text-[var(--text-sec)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
           </svg>
         </span>
       </button>
       {open && (
-        <div className="pb-4 text-[13.5px] text-gray-600 leading-relaxed pr-8">
+        <div className="pb-4 text-[13.5px] text-[var(--text-sec)] leading-relaxed pr-8">
           {a}
         </div>
       )}
@@ -126,29 +126,29 @@ function AccordionItem({ q, a }: FAQItem) {
 
 export default function FAQ() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img src="/logo-full.png" alt="GoodHours" className="h-7 w-auto"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
               (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
             }} />
-          <span className="hidden font-bold text-blue-700 text-lg">GoodHours</span>
+          <span className="hidden font-bold text-[var(--action)] text-lg">GoodHours</span>
         </Link>
-        <Link to="/login" className="text-sm text-blue-600 hover:underline font-medium">Sign in</Link>
+        <Link to="/login" className="text-sm text-[var(--action)] hover:underline font-medium">Sign in</Link>
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-[28px] font-bold text-gray-900 mb-2">Frequently Asked Questions</h1>
-        <p className="text-[14.5px] text-gray-500 mb-10">Everything you need to know about GoodHours.</p>
+        <h1 className="text-[28px] font-bold text-[var(--text)] mb-2">Frequently Asked Questions</h1>
+        <p className="text-[14.5px] text-[var(--text-sec)] mb-10">Everything you need to know about GoodHours.</p>
 
         <div className="space-y-6">
           {SECTIONS.map((section) => (
-            <div key={section.title} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-                <h2 className="text-[11.5px] font-semibold text-gray-500 uppercase tracking-wide">{section.title}</h2>
+            <div key={section.title} className="bg-white border border-[var(--border)] rounded-[3px] overflow-hidden">
+              <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-alt)]">
+                <h2 className="text-[11.5px] font-semibold text-[var(--text-sec)] uppercase tracking-wide">{section.title}</h2>
               </div>
               <div className="px-5">
                 {section.items.map((item) => (
@@ -160,21 +160,21 @@ export default function FAQ() {
         </div>
 
         {/* Contact footer */}
-        <div className="mt-10 bg-white border border-gray-200 rounded-xl p-6 text-center">
-          <div className="text-[15px] font-semibold text-gray-900 mb-1">Still have questions?</div>
-          <p className="text-[13.5px] text-gray-500 mb-3">
+        <div className="mt-10 bg-white border border-[var(--border)] rounded-[3px] p-6 text-center">
+          <div className="text-[15px] font-semibold text-[var(--text)] mb-1">Still have questions?</div>
+          <p className="text-[13.5px] text-[var(--text-sec)] mb-3">
             Our team is happy to help. Reach out and we'll get back to you as soon as possible.
           </p>
           <a
             href="mailto:help@goodhours.app"
-            className="inline-block px-5 py-[7px] bg-blue-600 text-white rounded-md text-sm font-medium hover:opacity-85 transition-opacity"
+            className="inline-block px-5 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85 transition-opacity"
           >
             Email help@goodhours.app
           </a>
-          <div className="mt-5 pt-5 border-t border-gray-100 flex justify-center gap-5 text-[12.5px] text-gray-400">
-            <Link to="/terms" className="hover:text-gray-600">Terms of Service</Link>
-            <Link to="/privacy" className="hover:text-gray-600">Privacy Policy</Link>
-            <Link to="/" className="hover:text-gray-600">Home</Link>
+          <div className="mt-5 pt-5 border-t border-[var(--border)] flex justify-center gap-5 text-[12.5px] text-[var(--text-faint)]">
+            <Link to="/terms" className="hover:text-[var(--text-sec)]">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-[var(--text-sec)]">Privacy Policy</Link>
+            <Link to="/" className="hover:text-[var(--text-sec)]">Home</Link>
           </div>
         </div>
       </div>
