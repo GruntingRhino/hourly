@@ -73,6 +73,13 @@ export default function BeneficiarySettings() {
     const t = searchParams.get("tab");
     return (["profile","reminders","branding","account","billing"].includes(t ?? "") ? t as Tab : "profile");
   });
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (["profile","reminders","branding","account","billing"].includes(t ?? "")) {
+      setTab(t as Tab);
+    }
+  }, [searchParams]);
   const [profile, setProfile] = useState<BeneficiaryProfile | null>(null);
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
   const [form, setForm] = useState({
