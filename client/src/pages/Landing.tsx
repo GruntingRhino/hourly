@@ -450,11 +450,6 @@ export default function Landing() {
                     {tab === "school" ? "School Admin" : tab === "student" ? "Student" : "Community Partner"}
                   </button>
                 ))}
-                <Link to="/school/register"
-                  className="ml-auto h-[32px] px-4 text-[13px] font-semibold text-white rounded-[2px] flex items-center whitespace-nowrap"
-                  style={{ background: "var(--action)" }}>
-                  Register Free →
-                </Link>
               </div>
               <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
                 {activeTab === "school" && (
