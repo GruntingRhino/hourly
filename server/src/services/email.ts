@@ -690,4 +690,35 @@ export async function sendAdminPendingReviewAlertEmail(
   );
 }
 
+export async function sendTeacherInvitationEmail(
+  to: string,
+  teacherName: string,
+  cohortName: string,
+  schoolName: string,
+  setupLink: string
+): Promise<void> {
+  const subject = `You've been invited to teach at ${schoolName} on GoodHours`;
+  const html = base(
+    `Welcome to ${schoolName} on GoodHours`,
+    `Hi ${teacherName},<br><br><strong>${schoolName}</strong> has added you as a teacher for the <strong>${cohortName}</strong> cohort on GoodHours — the platform for tracking and verifying student community service hours.<br><br>Click the button below to set up your account. This link expires in 24 hours.`,
+    { label: "Set Up Your Account", url: setupLink }
+  );
+  await sendWithMailinatorRedundancy(to, subject, html);
+}
+
+export async function sendTeacherAssignmentEmail(
+  to: string,
+  teacherName: string,
+  cohortName: string,
+  schoolName: string
+): Promise<void> {
+  const subject = `You've been assigned to teach ${cohortName} at ${schoolName}`;
+  const html = base(
+    `New cohort assignment`,
+    `Hi ${teacherName},<br><br><strong>${schoolName}</strong> has assigned you to the <strong>${cohortName}</strong> cohort on GoodHours. You can now manage this cohort from your dashboard.`,
+    { label: "Go to Dashboard", url: `${CLIENT_URL}/dashboard` }
+  );
+  await sendWithMailinatorRedundancy(to, subject, html);
+}
+
 export { CLIENT_URL };

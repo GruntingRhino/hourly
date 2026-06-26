@@ -6,7 +6,7 @@ import prisma from "../lib/prisma";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { sendPasswordResetEmail, sendStudentInvitationEmail, CLIENT_URL } from "../services/email";
+import { sendPasswordResetEmail, sendStudentInvitationEmail, sendTeacherInvitationEmail, sendTeacherAssignmentEmail, CLIENT_URL } from "../services/email";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { safeSchoolSelect } from "../lib/schoolSelect";
@@ -88,6 +88,7 @@ function normalizeTeacherEmail(email: string): string {
 async function findOrCreateTeacherForCohort(params: {
   schoolId: string;
   cohortId: string;
+  cohortName: string;
   actorId: string;
   actorEmail: string;
   name: string;
@@ -105,6 +106,9 @@ async function findOrCreateTeacherForCohort(params: {
       reason: "you already have control over this cohort",
     };
   }
+
+  const school = await prisma.school.findUnique({ where: { id: params.schoolId }, select: { name: true } });
+  const schoolName = school?.name ?? "Your school";
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -136,11 +140,15 @@ async function findOrCreateTeacherForCohort(params: {
     await prisma.cohortTeacherAssignment.create({
       data: { cohortId: params.cohortId, teacherId: existing.id },
     });
+    const resolvedName = newName || existing.name;
+    sendTeacherAssignmentEmail(existing.email, resolvedName, params.cohortName, schoolName).catch((err) => {
+      console.error("[cohort teacher] Failed to send assignment notification email:", err);
+    });
     return {
       status: "assigned-existing",
       teacherId: existing.id,
       teacherEmail: existing.email,
-      teacherName: newName || existing.name,
+      teacherName: resolvedName,
     };
   }
 
@@ -168,9 +176,9 @@ async function findOrCreateTeacherForCohort(params: {
     data: { cohortId: params.cohortId, teacherId: created.id },
   });
 
-  const resetLink = `${CLIENT_URL}/reset-password?token=${passwordResetToken}`;
-  sendPasswordResetEmail(created.email, resetLink).catch((err) => {
-    console.error("[cohort teacher] Failed to send teacher setup email:", err);
+  const setupLink = `${CLIENT_URL}/reset-password?token=${passwordResetToken}`;
+  sendTeacherInvitationEmail(created.email, created.name, params.cohortName, schoolName, setupLink).catch((err) => {
+    console.error("[cohort teacher] Failed to send teacher invitation email:", err);
   });
 
   return {
@@ -742,6 +750,7 @@ router.post("/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), async
       const action = await findOrCreateTeacherForCohort({
         schoolId: scope.schoolId,
         cohortId: cohort.id,
+        cohortName: cohort.name,
         actorId: req.user!.userId,
         actorEmail: actor.email,
         name,
@@ -1343,6 +1352,7 @@ router.post("/:id/teachers", authenticate, requireRole("SCHOOL_ADMIN"), async (r
     const result = await findOrCreateTeacherForCohort({
       schoolId: cohort.schoolId,
       cohortId: cohort.id,
+      cohortName: cohort.name,
       actorId: req.user!.userId,
       actorEmail: actor.email,
       name,
@@ -1440,6 +1450,7 @@ router.post("/:id/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), a
       const action = await findOrCreateTeacherForCohort({
         schoolId: cohort.schoolId,
         cohortId: cohort.id,
+        cohortName: cohort.name,
         actorId: req.user!.userId,
         actorEmail: actor.email,
         name,
