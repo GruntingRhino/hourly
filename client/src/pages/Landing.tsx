@@ -525,7 +525,11 @@ export default function Landing() {
           <div className="max-w-xl mx-auto px-6">
             <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(255,255,255,0.1)" }}>
               <img src="/logo-icon.png" alt="" className="w-7 h-7 object-contain brightness-0 invert"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = "block";
+                }} />
+              <span className="hidden text-white font-bold text-[13px] tracking-tight">GH</span>
             </div>
             <h2 className="text-[28px] font-bold text-white mb-3">Ready to get started?</h2>
             <p className="text-white/75 text-[14px] mb-7 leading-relaxed">
