@@ -333,10 +333,6 @@ export default function Landing() {
         {/* Hero */}
         <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-20 grid md:grid-cols-2 gap-12 items-start">
           <div>
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full px-3 py-1.5 mb-5">
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              School-first community service tracking
-            </div>
             <h1 className="text-4xl md:text-[42px] font-extrabold text-gray-900 leading-tight tracking-tight mb-6">
               The Trusted System of Record for Student Volunteer Hours
             </h1>
