@@ -143,6 +143,21 @@ export default function SchoolRegister() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const completeGoogleRegistration = async (regToken: string, schoolName: string, directorySchoolId?: string) => {
+    setSubmitting(true);
+    setError("");
+    try {
+      const payload: any = { registrationToken: regToken, schoolName };
+      if (directorySchoolId) payload.directorySchoolId = directorySchoolId;
+      const result = await api.post<any>("/auth/google/complete-registration", payload);
+      loginWithToken(result.token, result.user);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
   const handleOAuthCallback = async (code: string) => {
     const isLoginFlow = searchParams.get("state") === "login";
     try {
@@ -162,10 +177,18 @@ export default function SchoolRegister() {
         }
         setRegistrationToken(result.registrationToken);
         setUserName(result.name);
-        if (result.domainSuggestions?.length) {
-          setDomainSuggestions(result.domainSuggestions);
+
+        // If there's exactly one unclaimed domain match, auto-register immediately
+        const suggestions: SchoolEntry[] = result.domainSuggestions || [];
+        if (suggestions.length === 1 && !suggestions[0].claimed) {
+          const school = suggestions[0];
+          await completeGoogleRegistration(result.registrationToken, school.name, school.id);
+          return;
         }
-        // Pre-fill contact email with the Google account email
+
+        if (suggestions.length) {
+          setDomainSuggestions(suggestions);
+        }
         setContactEmail(result.email || "");
         setStep("search");
       }
@@ -192,7 +215,15 @@ export default function SchoolRegister() {
       if (result.requiresSchoolRegistration) {
         setRegistrationToken(result.registrationToken);
         setUserName(result.name);
-        setDomainSuggestions(result.domainSuggestions || []);
+
+        const suggestions: SchoolEntry[] = result.domainSuggestions || [];
+        if (suggestions.length === 1 && !suggestions[0].claimed) {
+          const school = suggestions[0];
+          await completeGoogleRegistration(result.registrationToken, school.name, school.id);
+          return;
+        }
+
+        setDomainSuggestions(suggestions);
         setContactEmail(result.email || "");
         setStep("search");
         return;
@@ -253,12 +284,15 @@ export default function SchoolRegister() {
       setAlreadyClaimed(school);
       setSelectedSchool(null);
     } else {
-      setSelectedSchool(school);
       setAlreadyClaimed(null);
       setError("");
-      // For email/password path, keep the email already collected in step 1
-      if (signupMode !== "email") setContactEmail("");
-      setStep("contact");
+      if (signupMode === "google") {
+        void completeGoogleRegistration(registrationToken, school.name, school.id);
+      } else {
+        setSelectedSchool(school);
+        if (signupMode !== "email") setContactEmail("");
+        setStep("contact");
+      }
     }
   };
 
@@ -285,8 +319,12 @@ export default function SchoolRegister() {
     setSelectedSchool(null);
     setAlreadyClaimed(null);
     setError("");
-    if (signupMode !== "email") setContactEmail("");
-    setStep("contact");
+    if (signupMode === "google") {
+      void completeGoogleRegistration(registrationToken, customSchoolName.trim());
+    } else {
+      if (signupMode !== "email") setContactEmail("");
+      setStep("contact");
+    }
   };
 
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -546,6 +584,16 @@ export default function SchoolRegister() {
 
   // ─── Step: Smart school search ───────────────────────────────────────────────
   if (step === "search") {
+    if (submitting) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)]">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-[var(--action)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-[var(--text-sec)]">Setting up your school…</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-[var(--surface-alt)] px-4 py-8">
         <div className="max-w-lg mx-auto">

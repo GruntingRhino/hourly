@@ -152,7 +152,7 @@ function buildUserPayload(user: any) {
 
 async function findDomainSuggestions(email: string) {
   const emailDomain = getEmailDomain(email);
-  if (!emailDomain || (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email))) {
+  if (!emailDomain) {
     return [];
   }
 
@@ -755,6 +755,160 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Register school error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const completeRegistrationSchema = strictObject({
+  registrationToken: tokenSchema,
+  directorySchoolId: opaqueIdSchema.optional(),
+  schoolName: trimmedString(255, 1),
+});
+
+// POST /api/auth/google/complete-registration — directly create school from Google-authenticated session (no magic link needed)
+router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
+  try {
+    const data = completeRegistrationSchema.parse(req.body);
+
+    let googleProfile: any;
+    try {
+      const jwt = await import("jsonwebtoken");
+      googleProfile = jwt.default.verify(data.registrationToken, process.env.JWT_SECRET!);
+    } catch {
+      return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
+    }
+
+    if (!googleProfile.pendingSchoolAdmin) {
+      return res.status(400).json({ error: "Invalid registration token" });
+    }
+
+    let adminUser = await prisma.user.findFirst({
+      where: { OR: [{ googleId: googleProfile.googleId }, { email: googleProfile.email }] },
+    });
+
+    if (!adminUser) {
+      adminUser = await prisma.user.create({
+        data: {
+          email: googleProfile.email,
+          name: googleProfile.name || googleProfile.email,
+          role: "SCHOOL_ADMIN",
+          googleId: googleProfile.googleId,
+          emailVerified: true,
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    // If user already has a school, return existing session
+    if (adminUser.schoolId) {
+      const fullUser = await prisma.user.findUnique({
+        where: { id: adminUser.id },
+        include: {
+          school: true,
+          cohort: { include: { school: true } },
+          cohortMemberships: { where: { isActive: true }, include: { cohort: { include: { school: true } } }, orderBy: { updatedAt: "desc" as const } },
+          beneficiary: true,
+        },
+      });
+      const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+      return res.json({ token, user: buildUserPayload(fullUser) });
+    }
+
+    const dirEntry = data.directorySchoolId
+      ? await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } })
+      : null;
+
+    if (data.directorySchoolId && !dirEntry) {
+      return res.status(400).json({ error: "Selected school is no longer available. Please search again." });
+    }
+
+    if (data.directorySchoolId) {
+      const existing = await prisma.school.findFirst({ where: { directoryId: data.directorySchoolId } });
+      if (existing) {
+        return res.status(409).json({ error: "This school is already registered." });
+      }
+    }
+
+    const school = await prisma.$transaction(async (tx) => {
+      const txSchool = await tx.school.create({
+        data: {
+          name: dirEntry?.name || data.schoolName,
+          verified: true,
+          registrationEmail: googleProfile.email,
+        },
+        select: { id: true, name: true },
+      });
+
+      if (dirEntry) {
+        await tx.school.update({
+          where: { id: txSchool.id },
+          data: {
+            type: dirEntry.type || undefined,
+            address: dirEntry.address || undefined,
+            city: dirEntry.city || undefined,
+            state: dirEntry.state || undefined,
+            zip: dirEntry.zip || undefined,
+            latitude: dirEntry.latitude ?? undefined,
+            longitude: dirEntry.longitude ?? undefined,
+            directoryId: data.directorySchoolId,
+            domain: dirEntry.emailDomain || undefined,
+          },
+        }).catch((err: any) => console.error("[complete-registration] metadata update failed:", err));
+      }
+
+      await tx.user.update({ where: { id: adminUser.id }, data: { schoolId: txSchool.id } });
+      return txSchool;
+    });
+
+    if (data.directorySchoolId) {
+      await prisma.schoolDirectory.update({
+        where: { id: data.directorySchoolId },
+        data: { claimed: true, claimedBySchoolId: school.id },
+      }).catch((err: any) => console.error("[complete-registration] claimed update failed:", err));
+    }
+
+    await prisma.school.update({ where: { id: school.id }, data: { createdById: adminUser.id } })
+      .catch((err: any) => console.error("[complete-registration] createdBy update failed:", err));
+
+    try {
+      const schoolBeneficiary =
+        (await prisma.beneficiary.findFirst({ where: { createdBySchoolId: school.id, visibility: "PRIVATE" } })) ??
+        (await prisma.beneficiary.create({
+          data: { name: school.name, visibility: "PRIVATE", status: "ACTIVE", createdBySchoolId: school.id },
+        }));
+      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
+      });
+      if (!existingApproval) {
+        await prisma.schoolBeneficiaryApproval.create({
+          data: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id, status: "APPROVED", approvedAt: new Date() },
+        });
+      }
+    } catch (err) {
+      console.error("[complete-registration] Failed to create default beneficiary:", err);
+    }
+
+    try {
+      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
+    } catch (err) {
+      console.error("[complete-registration] Failed to link to BeneficiaryDirectory:", err);
+    }
+
+    const fullUser = await prisma.user.findUnique({
+      where: { id: adminUser.id },
+      include: {
+        school: true,
+        cohort: { include: { school: true } },
+        cohortMemberships: { where: { isActive: true }, include: { cohort: { include: { school: true } } }, orderBy: { updatedAt: "desc" as const } },
+        beneficiary: true,
+      },
+    });
+
+    const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+    res.json({ token, user: buildUserPayload(fullUser) });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    console.error("Complete registration error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
