@@ -4,7 +4,7 @@ import * as fs from "fs";
 
 const BASE = "http://localhost:5173";
 const OUT = path.join(__dirname, "../design");
-// PW Cohort A belongs to PW School Admin A (school-admin@test.goodhours.app)
+// PW Cohort A belongs to PW School Admin A (test account)
 const COHORT_ID = "cmo2yzkx7000dmubfp4owmtwz";
 
 async function main() {

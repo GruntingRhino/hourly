@@ -29,6 +29,9 @@ tests/.auth/*.json
 .claude/
 .claude/settings.local.json
 
+# QA results — may contain seed credentials
+tests/qa-results.md
+
 # Large data files (kept locally, not in git)
 server/data/*.zip
 server/data/eo2.csv

@@ -16,7 +16,7 @@ async function main() {
   const page = await ctx.newPage();
 
   // Login as PW School Admin using email/password if possible
-  // From the seed data, the account is school-admin@test.goodhours.app but uses Google OAuth
+  // This account uses Google OAuth — need a different approach
   // Instead, let's use the API directly to get a token, then inject it
 
   // Try email/password login with the test account
