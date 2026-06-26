@@ -24,6 +24,13 @@ interface DeleteSlotResponse {
   cancelledSignupCount?: number;
 }
 
+interface AttachmentMeta {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
 interface Opportunity {
   id: string;
   title: string;
@@ -35,6 +42,7 @@ interface Opportunity {
   status: string;
   recurrenceRule: string | null;
   timeSlots: TimeSlotBasic[];
+  attachments: AttachmentMeta[];
 }
 
 interface SignupRecord {
@@ -275,6 +283,10 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const [selectedSchools, setSelectedSchools] = useState<string[]>([]);
   const [form, setForm] = useState(emptyForm);
 
+  // File attachment state
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+
   // Edit / delete state
   const [editOppId, setEditOppId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -294,6 +306,46 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const clearError = () => {
     setError("");
     setErrorDetails([]);
+  };
+
+  const validateFiles = (files: File[]): string | null => {
+    if (files.length > 5) return "Maximum 5 files per upload.";
+    for (const f of files) {
+      if (f.size > 10 * 1024 * 1024) return `"${f.name}" exceeds the 10 MB per-file limit.`;
+    }
+    const total = files.reduce((s, f) => s + f.size, 0);
+    if (total > 25 * 1024 * 1024) return "Total file size exceeds 25 MB.";
+    return null;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    const merged = [...attachmentFiles, ...picked].slice(0, 5);
+    const err = validateFiles(merged);
+    if (err) { showError(err); return; }
+    setAttachmentFiles(merged);
+    e.target.value = "";
+  };
+
+  const removeQueuedFile = (idx: number) =>
+    setAttachmentFiles((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleDeleteAttachment = async (opp: Opportunity, attachmentId: string) => {
+    if (!benId) return;
+    setDeletingAttachmentId(attachmentId);
+    try {
+      await api.delete(`/beneficiaries/${benId}/opportunities/${opp.id}/attachments/${attachmentId}`);
+      setOpportunities((prev) =>
+        prev.map((o) => o.id === opp.id
+          ? { ...o, attachments: o.attachments.filter((a) => a.id !== attachmentId) }
+          : o
+        )
+      );
+    } catch (err: any) {
+      showError(err.message || "Failed to delete attachment.");
+    } finally {
+      setDeletingAttachmentId(null);
+    }
   };
 
   const showError = (message: string, details: string[] = []) => {
@@ -398,6 +450,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const handleCancelEdit = () => {
     setEditOppId(null);
     setForm(emptyForm);
+    setAttachmentFiles([]);
     setSelectedSchools(approvedSchools.map((s) => s.id));
     prefillLocation();
     clearError();
@@ -503,8 +556,18 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
         }));
       }
 
-      await api.post(`/beneficiaries/${benId}/opportunities`, body);
+      const created = await api.post<{ id: string }>(`/beneficiaries/${benId}/opportunities`, body);
+      if (attachmentFiles.length > 0) {
+        const fd = new FormData();
+        for (const f of attachmentFiles) fd.append("files", f);
+        try {
+          await api.post(`/beneficiaries/${benId}/opportunities/${created.id}/attachments`, fd);
+        } catch (uploadErr: any) {
+          showError(uploadErr.message || "Opportunity created, but file upload failed.");
+        }
+      }
       setForm(emptyForm);
+      setAttachmentFiles([]);
       prefillLocation();
       setSelectedSchools(approvedSchools.map((s) => s.id));
       void loadOpportunities();
@@ -806,6 +869,35 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                   placeholder="e.g. Bring closed-toe shoes, minimum age 16"
                   className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
+
+              {/* Attachments */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">
+                  Attachments <span className="text-[var(--text-faint)] font-normal text-xs">(optional · up to 5 files · 10 MB each · 25 MB total)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer w-fit px-3 py-1.5 border border-dashed border-[var(--border-s)] rounded-[2px] text-sm text-[var(--text-sec)] hover:bg-[var(--surface-alt)] transition-colors">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                  </svg>
+                  Attach files
+                  <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*" className="hidden" onChange={handleFileChange} disabled={attachmentFiles.length >= 5} />
+                </label>
+                {attachmentFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {attachmentFiles.map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs text-[var(--text-sec)]">
+                        <svg className="w-3.5 h-3.5 shrink-0 text-[var(--text-faint)]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span className="truncate max-w-[200px]">{f.name}</span>
+                        <span className="text-[var(--text-faint)]">({(f.size / 1024).toFixed(0)} KB)</span>
+                        <button type="button" onClick={() => removeQueuedFile(i)} className="text-red-400 hover:text-[var(--er-t)] ml-auto">✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               {/* Schedule — shown for both create and edit */}
               <div>
                   {/* Recurring toggle */}
@@ -1101,6 +1193,38 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                       </div>
                       {opp.location && <div className="text-xs text-[var(--text-sec)]">{opp.location}</div>}
                       {opp.description && <div className="text-xs text-[var(--text-sec)] mt-0.5 line-clamp-2">{opp.description}</div>}
+                      {opp.attachments?.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {opp.attachments.map((att) => (
+                            <div key={att.id} className="flex items-center gap-1 text-xs border border-[var(--border-s)] rounded px-2 py-0.5 bg-[var(--surface-alt)]">
+                              <svg className="w-3 h-3 shrink-0 text-[var(--text-faint)]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                              </svg>
+                              <a
+                                href={`/api/beneficiaries/attachments/${att.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[var(--action)] hover:underline max-w-[160px] truncate"
+                                title={att.originalName}
+                              >
+                                {att.originalName}
+                              </a>
+                              <span className="text-[var(--text-faint)]">({(att.size / 1024).toFixed(0)} KB)</span>
+                              {editOppId === opp.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAttachment(opp, att.id)}
+                                  disabled={deletingAttachmentId === att.id}
+                                  className="text-red-400 hover:text-[var(--er-t)] disabled:opacity-50 ml-0.5"
+                                  title="Remove attachment"
+                                >
+                                  {deletingAttachmentId === att.id ? "…" : "✕"}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {opp.timeSlots.length > 0 && (
                         <div className="mt-2 border-t pt-2 space-y-1">
                           {opp.timeSlots.map((slot) => {
