@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 interface ProGateProps {
   feature: string;
@@ -21,12 +22,12 @@ export function ProGate({ feature, benefit, children, isPro }: ProGateProps) {
         </span>
         <p className="mt-2 text-sm font-medium text-gray-900">{feature}</p>
         <p className="mt-1 text-xs text-gray-500">{benefit}</p>
-        <a
-          href="mailto:hello@goodhours.app?subject=GoodHours Pro"
+        <Link
+          to="/settings?tab=billing"
           className="mt-3 inline-block rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
         >
           Upgrade to Pro — $30/month
-        </a>
+        </Link>
       </div>
     </div>
   );
