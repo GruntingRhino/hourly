@@ -974,50 +974,155 @@ router.delete("/account", authenticate, async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, schoolId: true },
+      select: { id: true, role: true, schoolId: true, beneficiaryId: true, organizationId: true },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     await prisma.$transaction(async (tx) => {
-      // Delete audit logs created by this user
-      await tx.auditLog.deleteMany({ where: { actorId: userId } });
+      const deleteUserServiceSessionAuditLogs = async () => {
+        const sessions = await tx.serviceSession.findMany({
+          where: { userId },
+          select: { id: true },
+        });
+        if (sessions.length > 0) {
+          await tx.auditLog.deleteMany({ where: { sessionId: { in: sessions.map((session) => session.id) } } });
+        }
+      };
 
-      // Delete audit logs that reference this user's sessions
-      const sessions = await tx.serviceSession.findMany({
-        where: { userId },
-        select: { id: true },
-      });
-      if (sessions.length > 0) {
-        await tx.auditLog.deleteMany({ where: { sessionId: { in: sessions.map((s) => s.id) } } });
-      }
+      const deleteUserBeneficiaryAuditLogs = async () => {
+        const signups = await tx.beneficiarySignup.findMany({
+          where: { studentId: userId },
+          select: { id: true },
+        });
+        if (signups.length > 0) {
+          await tx.beneficiaryAuditLog.deleteMany({ where: { signupId: { in: signups.map((signup) => signup.id) } } });
+        }
+      };
 
-      // Delete personal data
-      await tx.notification.deleteMany({ where: { userId } });
-      await tx.message.deleteMany({ where: { OR: [{ senderId: userId }, { receiverId: userId }] } });
-      await tx.savedOpportunity.deleteMany({ where: { userId } });
-      await tx.studentGroupMember.deleteMany({ where: { studentId: userId } });
-      await tx.signup.deleteMany({ where: { userId } });
-      await tx.serviceSession.deleteMany({ where: { userId } });
+      const deleteInterventionMessagesForCampaigns = async (campaignIds: string[]) => {
+        if (campaignIds.length === 0) return;
+        const recipients = await tx.interventionRecipient.findMany({
+          where: { campaignId: { in: campaignIds } },
+          select: { messageId: true },
+        });
+        const messageIds = recipients
+          .map((recipient) => recipient.messageId)
+          .filter((messageId): messageId is string => Boolean(messageId));
+        await tx.interventionCampaign.deleteMany({ where: { id: { in: campaignIds } } });
+        if (messageIds.length > 0) {
+          await tx.message.deleteMany({ where: { id: { in: messageIds } } });
+        }
+      };
 
-      // School admin: clean up school and classrooms (circular FK requires this)
-      if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
-        const schoolId = user.schoolId;
+      const deleteSchoolData = async (schoolId: string) => {
+        const cohorts = await tx.cohort.findMany({
+          where: { schoolId },
+          select: { id: true },
+        });
+        const cohortIds = cohorts.map((cohort) => cohort.id);
 
-        // Detach all students and staff from the school
-        await tx.user.updateMany({
-          where: { schoolId, id: { not: userId } },
-          data: { classroomId: null, schoolId: null },
+        const invitations = cohortIds.length > 0
+          ? await tx.studentInvitation.findMany({
+              where: { cohortId: { in: cohortIds } },
+              select: { id: true },
+            })
+          : [];
+        const invitationIds = invitations.map((invitation) => invitation.id);
+
+        const schoolCampaigns = await tx.interventionCampaign.findMany({
+          where: { schoolId },
+          select: { id: true },
         });
 
-        // Delete classrooms, org links, groups
-        await tx.classroom.deleteMany({ where: { schoolId } });
+        await deleteInterventionMessagesForCampaigns(schoolCampaigns.map((campaign) => campaign.id));
+        await tx.interventionCase.deleteMany({ where: { schoolId } });
+        await tx.schoolLaunchBug.deleteMany({ where: { schoolId } });
+        await tx.selfSubmittedRequest.deleteMany({ where: { schoolId } });
+        await tx.beneficiaryInvitation.deleteMany({ where: { schoolId } });
+        await tx.schoolBeneficiaryApproval.deleteMany({ where: { schoolId } });
         await tx.schoolOrganization.deleteMany({ where: { schoolId } });
+        await tx.verifiedDomain.deleteMany({ where: { schoolId } });
+        await tx.integrationSyncError.deleteMany({ where: { schoolId } });
+        await tx.integrationSyncJob.deleteMany({ where: { schoolId } });
+        await tx.integrationExternalMapping.deleteMany({ where: { schoolId } });
+        await tx.integrationConnection.deleteMany({ where: { schoolId } });
+        await tx.dataAccessLog.deleteMany({ where: { schoolId } });
+
+        if (cohortIds.length > 0) {
+          await tx.integrationExternalMapping.deleteMany({
+            where: {
+              OR: [
+                { localType: "Cohort", localId: { in: cohortIds } },
+                { localType: "StudentInvitation", localId: { in: invitationIds } },
+              ],
+            },
+          });
+          await tx.cohortTeacherAssignment.deleteMany({ where: { cohortId: { in: cohortIds } } });
+          await tx.studentCohortMembership.deleteMany({ where: { cohortId: { in: cohortIds } } });
+          await tx.studentInvitation.deleteMany({ where: { cohortId: { in: cohortIds } } });
+          await tx.user.updateMany({
+            where: { cohortId: { in: cohortIds } },
+            data: { cohortId: null },
+          });
+          await tx.cohort.deleteMany({ where: { id: { in: cohortIds } } });
+        }
+
+        const classrooms = await tx.classroom.findMany({
+          where: { schoolId },
+          select: { id: true },
+        });
+        if (classrooms.length > 0) {
+          await tx.user.updateMany({
+            where: { classroomId: { in: classrooms.map((classroom) => classroom.id) } },
+            data: { classroomId: null },
+          });
+        }
+        await tx.classroom.deleteMany({ where: { schoolId } });
+
         const groups = await tx.studentGroup.findMany({ where: { schoolId }, select: { id: true } });
         if (groups.length > 0) {
-          await tx.studentGroupMember.deleteMany({ where: { groupId: { in: groups.map((g) => g.id) } } });
+          await tx.studentGroupMember.deleteMany({ where: { groupId: { in: groups.map((group) => group.id) } } });
           await tx.studentGroup.deleteMany({ where: { schoolId } });
         }
+
+        await tx.user.updateMany({
+          where: { schoolId, id: { not: userId } },
+          data: { classroomId: null, cohortId: null, schoolId: null },
+        });
+
         await tx.school.delete({ where: { id: schoolId } });
+      };
+
+      // Delete audit logs created by this user
+      await tx.auditLog.deleteMany({ where: { actorId: userId } });
+      await deleteUserServiceSessionAuditLogs();
+      await deleteUserBeneficiaryAuditLogs();
+
+      // Delete personal data
+      await tx.dataAccessLog.deleteMany({ where: { actorId: userId } });
+      await tx.notification.deleteMany({ where: { userId } });
+      await tx.savedOpportunity.deleteMany({ where: { userId } });
+      await tx.studentGroupMember.deleteMany({ where: { studentId: userId } });
+      await tx.selfSubmittedRequest.deleteMany({ where: { studentId: userId } });
+      await tx.cohortTeacherAssignment.deleteMany({ where: { teacherId: userId } });
+      await tx.studentCohortMembership.deleteMany({ where: { studentId: userId } });
+      await tx.interventionCase.deleteMany({ where: { studentId: userId } });
+      await tx.interventionCase.updateMany({
+        where: { ownerId: userId },
+        data: { ownerId: null },
+      });
+      const userCampaigns = await tx.interventionCampaign.findMany({
+        where: { actorId: userId },
+        select: { id: true },
+      });
+      await deleteInterventionMessagesForCampaigns(userCampaigns.map((campaign) => campaign.id));
+      await tx.interventionRecipient.deleteMany({ where: { studentId: userId } });
+      await tx.message.deleteMany({ where: { OR: [{ senderId: userId }, { receiverId: userId }] } });
+      await tx.beneficiarySignup.deleteMany({ where: { studentId: userId } });
+      await tx.signup.deleteMany({ where: { userId } });
+      await tx.serviceSession.deleteMany({ where: { userId } });
+      if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
+        await deleteSchoolData(user.schoolId);
       }
 
       // Delete the user

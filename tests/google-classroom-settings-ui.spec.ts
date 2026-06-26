@@ -4,7 +4,7 @@ const UI_BASE = process.env.PW_BASE_URL || process.env.UI_BASE_URL || "http://12
 
 test("school settings integrations tab hides the session banner and runs Google Classroom mock sync", async ({ page }) => {
   await page.goto(`${UI_BASE}/login`, { waitUntil: "networkidle" });
-  await page.locator('input[type="email"]').first().fill("school-admin@test.goodhours.app");
+  await page.locator('input[type="email"]').first().fill("abhay.sivaram+1@gmail.com");
   await page.locator('input[type="password"]').fill("Playwright1!");
   await page.getByRole("button", { name: /sign in/i }).click();
 

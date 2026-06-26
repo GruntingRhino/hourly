@@ -5,7 +5,7 @@
  * school/beneficiary/student lists. Safe to run repeatedly — upserts by email.
  *
  * Accounts:
- *   +1  school-admin@test.goodhours.app  SCHOOL_ADMIN   → Playwright School A
+ *   +1  abhay.sivaram+1@gmail.com  SCHOOL_ADMIN   → Playwright School A
  *   +2  abhay.sivaram+2@gmail.com  SCHOOL_ADMIN   → Playwright School B
  *   +3  abhay.sivaram+3@gmail.com  BENEFICIARY_ADMIN → Playwright Org A
  *   +4  abhay.sivaram+4@gmail.com  BENEFICIARY_ADMIN → Playwright Org B
@@ -26,16 +26,29 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const PASSWORD = "Playwright1!";
+const SCHOOL_ADMIN_A_EMAIL = "abhay.sivaram+1@gmail.com";
+const LEGACY_SCHOOL_ADMIN_A_EMAIL = "school-admin@test.goodhours.app";
 
 async function main() {
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
 
+  const existingAdminA = await prisma.user.findUnique({
+    where: { email: SCHOOL_ADMIN_A_EMAIL },
+    select: { id: true },
+  });
+  if (!existingAdminA) {
+    await prisma.user.updateMany({
+      where: { email: LEGACY_SCHOOL_ADMIN_A_EMAIL, isTestAccount: true },
+      data: { email: SCHOOL_ADMIN_A_EMAIL },
+    });
+  }
+
   // ── School A admin ───────────────────────────────────────────────────────────
   const adminA = await prisma.user.upsert({
-    where: { email: "school-admin@test.goodhours.app" },
+    where: { email: SCHOOL_ADMIN_A_EMAIL },
     update: { passwordHash, isTestAccount: true, emailVerified: true },
     create: {
-      email: "school-admin@test.goodhours.app",
+      email: SCHOOL_ADMIN_A_EMAIL,
       name: "PW School Admin A",
       role: "SCHOOL_ADMIN",
       passwordHash,
@@ -293,7 +306,7 @@ async function main() {
   });
 
   console.log("✓ Playwright test accounts seeded");
-  console.log("  School A admin : school-admin@test.goodhours.app");
+  console.log(`  School A admin : ${SCHOOL_ADMIN_A_EMAIL}`);
   console.log("  School B admin : abhay.sivaram+2@gmail.com");
   console.log("  Org admin A    : abhay.sivaram+3@gmail.com");
   console.log("  Org admin B    : abhay.sivaram+4@gmail.com");

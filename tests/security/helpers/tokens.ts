@@ -11,7 +11,7 @@ export const BASE = process.env.API_BASE_URL ?? "http://localhost:3001";
 export const PW = "Playwright1!";
 
 export const ACCOUNTS = {
-  schoolA:  { email: "school-admin@test.goodhours.app", password: PW },
+  schoolA:  { email: "abhay.sivaram+1@gmail.com", password: PW },
   schoolB:  { email: "abhay.sivaram+2@gmail.com", password: PW },
   orgA:     { email: "abhay.sivaram+3@gmail.com", password: PW },
   orgB:     { email: "abhay.sivaram+4@gmail.com", password: PW },

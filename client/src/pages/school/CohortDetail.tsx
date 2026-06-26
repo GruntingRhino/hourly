@@ -73,8 +73,7 @@ interface CohortDetail {
   status: string;
   requiredHours: number;
   usesHouseField: boolean;
-  startYear: number | null;
-  endYear: number | null;
+  graduationYear: number | null;
   publishedAt: string | null;
   students: Student[];
   invitations: Invitation[];

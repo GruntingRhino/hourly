@@ -31,6 +31,10 @@ import { createHybridRateLimit } from "./middleware/rateLimit";
 const app = express();
 const PORT = process.env.PORT || 3001;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const IS_PROD_LIKE =
+  process.env.APP_ENV === "production" ||
+  process.env.NODE_ENV === "production" ||
+  process.env.VERCEL_ENV === "production";
 
 // Trust Vercel/reverse-proxy X-Forwarded-For so express-rate-limit
 // can identify real client IPs instead of always seeing the proxy IP.
@@ -83,7 +87,7 @@ app.use(
     windowMs: 5 * 60 * 1000,
     maxPerIp: 300,
     maxPerUser: 600,
-    skip: (req) => req.path === "/health",
+    skip: (req) => !IS_PROD_LIKE || req.path === "/health",
   })
 );
 

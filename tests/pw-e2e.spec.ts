@@ -5,7 +5,7 @@
  * Tests run serially within each describe block; state flows between tests via `ctx`.
  *
  * Accounts (password: Playwright1! for all):
- *   +1  school-admin@test.goodhours.app  SCHOOL_ADMIN   → Playwright School A
+ *   +1  abhay.sivaram+1@gmail.com  SCHOOL_ADMIN   → Playwright School A
  *   +2  abhay.sivaram+2@gmail.com  SCHOOL_ADMIN   → Playwright School B
  *   +3  abhay.sivaram+3@gmail.com  BENEFICIARY_ADMIN → Playwright Org A
  *   +4  abhay.sivaram+4@gmail.com  BENEFICIARY_ADMIN → Playwright Org B
@@ -24,7 +24,7 @@ const BASE = process.env.PW_BASE_URL || 'http://localhost:5173';
 
 const PW = 'Playwright1!';
 const ACCOUNTS = {
-  schoolA:  { email: 'school-admin@test.goodhours.app', password: PW },
+  schoolA:  { email: 'abhay.sivaram+1@gmail.com', password: PW },
   schoolB:  { email: 'abhay.sivaram+2@gmail.com', password: PW },
   orgA:     { email: 'abhay.sivaram+3@gmail.com', password: PW },
   orgB:     { email: 'abhay.sivaram+4@gmail.com', password: PW },

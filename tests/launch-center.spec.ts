@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const BASE = process.env.PW_BASE_URL || "http://localhost:5173";
 const ACCOUNT = {
-  email: "school-admin@test.goodhours.app",
+  email: "abhay.sivaram+1@gmail.com",
   password: "Playwright1!",
 };
 

@@ -228,8 +228,7 @@ model Cohort {
   allowSelfSubmission Boolean?   // null = inherit from school
   categoryHourCaps    String?    // JSON override; null = inherit from school
   usesHouseField      Boolean    @default(false)
-  startYear     Int?
-  endYear       Int?
+  graduationYear Int?
   status        String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
   publishedAt   DateTime?
   createdAt     DateTime @default(now())

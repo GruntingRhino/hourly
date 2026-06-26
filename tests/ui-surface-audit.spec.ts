@@ -7,7 +7,7 @@ const PASSWORD = "Playwright1!";
 type RoleKey = "school" | "student" | "org";
 
 const ACCOUNTS: Record<RoleKey, { email: string; password: string }> = {
-  school: { email: "school-admin@test.goodhours.app", password: PASSWORD },
+  school: { email: "abhay.sivaram+1@gmail.com", password: PASSWORD },
   student: { email: "abhay.sivaram+5@gmail.com", password: PASSWORD },
   org: { email: "abhay.sivaram+3@gmail.com", password: PASSWORD },
 };

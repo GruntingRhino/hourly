@@ -52,8 +52,7 @@ type CohortSummary = {
   name: string;
   status: string;
   requiredHours: number;
-  startYear: number | null;
-  endYear: number | null;
+  graduationYear: number | null;
   publishedAt: Date | null;
   studentCount: number;
   invitationsSent: number;
@@ -314,8 +313,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
         name: true,
         status: true,
         requiredHours: true,
-        startYear: true,
-        endYear: true,
+        graduationYear: true,
         publishedAt: true,
         createdAt: true,
         _count: { select: { students: true, invitations: true } },
@@ -422,8 +420,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
       name: c.name,
       status: c.status,
       requiredHours: c.requiredHours ?? requiredHours,
-      startYear: c.startYear,
-      endYear: c.endYear,
+      graduationYear: c.graduationYear,
       publishedAt: c.publishedAt,
       studentCount: cohortProgress.length,
       invitationsSent: c._count.invitations,
@@ -462,8 +459,7 @@ router.get("/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
       "Cohort Name",
       "Status",
       "Required Hours",
-      "Start Year",
-      "End Year",
+      "Graduation Year",
       "Published At",
       "Student Count",
       "Invitations Sent",
@@ -481,8 +477,7 @@ router.get("/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
         cohort.name,
         cohort.status,
         String(cohort.requiredHours),
-        cohort.startYear != null ? String(cohort.startYear) : "",
-        cohort.endYear != null ? String(cohort.endYear) : "",
+        cohort.graduationYear != null ? String(cohort.graduationYear) : "",
         cohort.publishedAt ? cohort.publishedAt.toISOString().split("T")[0] : "",
         String(cohort.studentCount),
         String(cohort.invitationsSent),
@@ -513,8 +508,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
     const schema = z.object({
       name: z.string().min(1).max(255),
       requiredHours: z.number().min(1).max(10000).optional(),
-      startYear: z.number().int().optional(),
-      endYear: z.number().int().optional(),
+      graduationYear: z.number().int().optional(),
     });
     const data = schema.parse(req.body);
 
@@ -526,8 +520,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
         name: data.name,
         schoolId: user.schoolId,
         requiredHours: data.requiredHours ?? null,
-        startYear: data.startYear ?? null,
-        endYear: data.endYear ?? null,
+        graduationYear: data.graduationYear ?? null,
         status: "DRAFT",
       },
     });
@@ -815,8 +808,7 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
           status: true,
           schoolId: true,
           requiredHours: true,
-          startYear: true,
-          endYear: true,
+          graduationYear: true,
           publishedAt: true,
           serviceStartDate: true,
           serviceEndDate: true,
@@ -943,8 +935,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     const cohortUpdateSchema = z.object({
       name: z.string().min(1).max(255).optional(),
       requiredHours: z.number().min(1).max(10000).nullable().optional(),
-      startYear: z.number().int().nullable().optional(),
-      endYear: z.number().int().nullable().optional(),
+      graduationYear: z.number().int().nullable().optional(),
       serviceStartDate: z.string().datetime({ offset: true }).nullable().optional(),
       serviceEndDate: z.string().datetime({ offset: true }).nullable().optional(),
       allowSelfSubmission: z.boolean().nullable().optional(),
@@ -971,8 +962,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     const data: any = {
       name: body.name ?? cohort.name,
       requiredHours: body.requiredHours !== undefined ? body.requiredHours : cohort.requiredHours,
-      startYear: body.startYear !== undefined ? body.startYear : cohort.startYear,
-      endYear: body.endYear !== undefined ? body.endYear : cohort.endYear,
+      graduationYear: body.graduationYear !== undefined ? body.graduationYear : cohort.graduationYear,
     };
     if (body.serviceStartDate !== undefined) data.serviceStartDate = body.serviceStartDate ? new Date(body.serviceStartDate) : null;
     if (body.serviceEndDate !== undefined) data.serviceEndDate = body.serviceEndDate ? new Date(body.serviceEndDate) : null;

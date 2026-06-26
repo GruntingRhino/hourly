@@ -25,12 +25,13 @@ dist-ssr/
 google_oAuth_secrets.json
 
 # Test auth tokens — never commit live JWT tokens
-tests/.auth/*.json
+tests/.auth/
 .claude/
 .claude/settings.local.json
 
 # QA results — may contain seed credentials
 tests/qa-results.md
+test-results/
 
 # Large data files (kept locally, not in git)
 server/data/*.zip

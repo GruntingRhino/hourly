@@ -10,7 +10,7 @@ const API_BASE_URL =
   'http://localhost:3001/api';
 
 const SCHOOL_ADMIN = {
-  email: process.env.PW_SCHOOL_ADMIN_EMAIL || 'school-admin@test.goodhours.app',
+  email: process.env.PW_SCHOOL_ADMIN_EMAIL || 'abhay.sivaram+1@gmail.com',
   password: process.env.PW_SCHOOL_ADMIN_PASSWORD || 'Playwright1!',
 };
 

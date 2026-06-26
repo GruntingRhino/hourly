@@ -8,8 +8,7 @@ interface Cohort {
   name: string;
   status: string;
   requiredHours: number;
-  startYear: number | null;
-  endYear: number | null;
+  graduationYear: number | null;
   publishedAt: string | null;
   studentCount: number;
   invitationsSent: number;
@@ -57,7 +56,7 @@ export default function SchoolCohorts() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createHours, setCreateHours] = useState("");
-  const [createStartYear, setCreateStartYear] = useState("");
+  const [createGraduationYear, setCreateGraduationYear] = useState("");
   const [creating, setCreating] = useState(false);
   const [publishToast, setPublishToast] = useState("");
   const [teacherCsvData, setTeacherCsvData] = useState("");
@@ -94,12 +93,11 @@ export default function SchoolCohorts() {
       await api.post("/cohorts", {
         name: createName,
         requiredHours: createHours ? parseFloat(createHours) : undefined,
-        startYear: createStartYear ? parseInt(createStartYear) : undefined,
-        endYear: createStartYear ? parseInt(createStartYear) + 4 : undefined,
+        graduationYear: createGraduationYear ? parseInt(createGraduationYear) : undefined,
       });
       setCreateName("");
       setCreateHours("");
-      setCreateStartYear("");
+      setCreateGraduationYear("");
       setShowCreateForm(false);
       void loadCohorts();
     } catch (err: any) {
@@ -255,9 +253,9 @@ export default function SchoolCohorts() {
                   placeholder="Use school goal" min={0} className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--text)] mb-1">Start Year</label>
-                <input type="number" value={createStartYear} onChange={(e) => setCreateStartYear(e.target.value)}
-                  placeholder="e.g. 2024" min={2020} max={2040} className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm" />
+                <label className="block text-xs font-medium text-[var(--text)] mb-1">Graduation Year</label>
+                <input type="number" value={createGraduationYear} onChange={(e) => setCreateGraduationYear(e.target.value)}
+                  placeholder="e.g. 2028" min={2024} max={2044} className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm" />
               </div>
             </div>
             <div className="flex gap-2">
@@ -353,17 +351,17 @@ export default function SchoolCohorts() {
                 <div className="flex items-center gap-2.5">
                   <div>
                     <div className="font-bold text-[15px] text-[var(--text)]">{cohort.name}</div>
-                    {(cohort.startYear || cohort.endYear) && (
-                    <div className="text-[12.5px] text-[var(--text-sec)] mt-0.5">
-                      {cohort.startYear && cohort.endYear ? `${cohort.startYear}–${cohort.endYear}` : cohort.startYear ?? cohort.endYear} · {cohort.requiredHours}h goal
-                    </div>
-                  )}
-                  {!!cohort.teachers?.length && (
-                    <div className="mt-1 text-[12px] text-[var(--text-sec)]">
-                      Teachers: {cohort.teachers.map((teacher) => teacher.name).join(", ")}
-                    </div>
-                  )}
-                </div>
+                    {cohort.graduationYear && (
+                      <div className="text-[12.5px] text-[var(--text-sec)] mt-0.5">
+                        Class of {cohort.graduationYear} · {cohort.requiredHours}h goal
+                      </div>
+                    )}
+                    {!!cohort.teachers?.length && (
+                      <div className="mt-1 text-[12px] text-[var(--text-sec)]">
+                        Teachers: {cohort.teachers.map((teacher) => teacher.name).join(", ")}
+                      </div>
+                    )}
+                  </div>
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide ${
                     cohort.status === "PUBLISHED" ? "bg-[var(--in-bg)] text-[var(--action)]" :
                     cohort.status === "ARCHIVED" ? "bg-[var(--surface-alt)] text-[var(--text-sec)]" :

@@ -217,7 +217,7 @@ Recommended mapping rules:
 - `Cohort.name`
   - use section name when available
   - otherwise use course name
-- `Cohort.startYear` / `endYear`
+- `Cohort.graduationYear`
   - leave null in MVP unless district naming convention is explicitly parsed
 - `StudentInvitation.email`
   - from Canvas user data if present

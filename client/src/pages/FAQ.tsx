@@ -67,7 +67,7 @@ const SECTIONS: FAQSection[] = [
       },
       {
         q: "How do cohorts work and how do I create one?",
-        a: "A cohort is a graduating class or group of students with a shared service hour requirement and timeline (e.g., Class of 2028). Go to the Cohorts page and click '+ New Cohort'. You can set the required hours, start year, and then import students via CSV or invite them individually.",
+        a: "A cohort is a graduating class or group of students with a shared service hour requirement and timeline (e.g., Class of 2028). Go to the Cohorts page and click '+ New Cohort'. You can set the required hours, graduation year, and then import students via CSV or invite them individually.",
       },
       {
         q: "How do I invite students to join?",
