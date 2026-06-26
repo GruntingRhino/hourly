@@ -180,6 +180,22 @@ model School {
   interventionCases      InterventionCase[]
   billingRecord  SchoolBillingRecord?
   quoteRequests  SchoolQuoteRequest[]
+  partnerRequestsSent     SchoolPartnerRequest[] @relation("PartnerRequestFrom")
+  partnerRequestsReceived SchoolPartnerRequest[] @relation("PartnerRequestTo")
+}
+
+model SchoolPartnerRequest {
+  id           String   @id @default(cuid())
+  fromSchoolId String
+  toSchoolId   String
+  fromSchool   School   @relation("PartnerRequestFrom", fields: [fromSchoolId], references: [id])
+  toSchool     School   @relation("PartnerRequestTo",   fields: [toSchoolId],   references: [id])
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  message      String?
+  respondedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  @@unique([fromSchoolId, toSchoolId])
 }
 
 // ─── School Directory (imported from CSV data) ───────────────────

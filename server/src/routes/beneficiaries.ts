@@ -533,9 +533,60 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       claimed: r.claimed,
       distanceMiles: Math.round(parseFloat(r.distance_miles) * 10) / 10,
       approvalStatus: approvalMap.get(r.id) ?? null,
+      entityType: "org" as const,
     }));
 
-    res.json({ items: annotated, total, geocodingInProgress });
+    // Also include nearby schools (using their stored lat/lng)
+    const nearbySchools: any[] = schoolId
+      ? await prisma.$queryRawUnsafe(
+          `SELECT s.id, s.name, s.address, s.city, s.state, s.zip, s.latitude, s.longitude,
+                  (3959 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(s.latitude)) * cos(radians(s.longitude) - radians($2)) + sin(radians($1)) * sin(radians(s.latitude))))) AS distance_miles
+           FROM "School" s
+           WHERE s.id != $4
+             AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+             AND (3959 * acos(LEAST(1.0, cos(radians($1)) * cos(radians(s.latitude)) * cos(radians(s.longitude) - radians($2)) + sin(radians($1)) * sin(radians(s.latitude))))) < $3
+           ORDER BY distance_miles ASC
+           LIMIT 50`,
+          lat, lng, radius, schoolId
+        )
+      : [];
+
+    // Check existing partner request status for each nearby school
+    const schoolPartnerStatuses = new Map<string, string>();
+    if (schoolId && nearbySchools.length > 0) {
+      const ids = nearbySchools.map((s: any) => s.id);
+      const requests = await prisma.schoolPartnerRequest.findMany({
+        where: {
+          OR: [
+            { fromSchoolId: schoolId, toSchoolId: { in: ids } },
+            { toSchoolId: schoolId, fromSchoolId: { in: ids } },
+          ],
+        },
+      });
+      for (const r of requests) {
+        const otherId = r.fromSchoolId === schoolId ? r.toSchoolId : r.fromSchoolId;
+        schoolPartnerStatuses.set(otherId, r.status);
+      }
+    }
+
+    const annotatedSchools = nearbySchools.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      category: "School",
+      address: s.address,
+      city: s.city,
+      state: s.state,
+      zip: s.zip,
+      latitude: parseFloat(s.latitude),
+      longitude: parseFloat(s.longitude),
+      distanceMiles: Math.round(parseFloat(s.distance_miles) * 10) / 10,
+      entityType: "school" as const,
+      partnerStatus: schoolPartnerStatuses.get(s.id) ?? null,
+    }));
+
+    const allItems = [...annotated, ...annotatedSchools].sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+    res.json({ items: allItems, total: total + nearbySchools.length, geocodingInProgress });
   } catch (err) {
     console.error("Nearby beneficiary directory error:", err);
     res.status(500).json({ error: "Internal server error" });

@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import SearchableSelect from "../../components/SearchableSelect";
 import BeneficiaryDiscover from "./Discover";
 import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
+
+interface PartnerRequest {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  direction: "incoming" | "outgoing";
+  message: string | null;
+  fromSchool: { id: string; name: string; city: string | null; state: string | null };
+  toSchool:   { id: string; name: string; city: string | null; state: string | null };
+  createdAt: string;
+}
 
 function toTitleCase(str: string) {
   return str.toLowerCase().replace(/(?:^|[\s-])\w/g, (w) => w.toUpperCase());
@@ -112,10 +123,16 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 
 export default function SchoolBeneficiaries() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"pending" | "approved" | "opportunities" | "search" | "map" | "manage">("approved");
+  const [tab, setTab] = useState<"pending" | "approved" | "opportunities" | "search" | "map" | "manage" | "requests">(() => {
+    const t = searchParams.get("tab");
+    return (["pending","approved","opportunities","search","map","manage","requests"].includes(t ?? "") ? t as any : "approved");
+  });
+  const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [smartResults, setSmartResults] = useState<DirEntry[]>([]);
   const [smartLoading, setSmartLoading] = useState(false);
@@ -162,6 +179,27 @@ export default function SchoolBeneficiaries() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    if (tab !== "requests") return;
+    api.get<PartnerRequest[]>("/school-partners/requests")
+      .then(setPartnerRequests)
+      .catch(() => {});
+  }, [tab]);
+
+  const handlePartnerRespond = async (requestId: string, approve: boolean) => {
+    setRespondingId(requestId);
+    try {
+      await api.post(`/school-partners/requests/${requestId}/respond`, { approve });
+      setPartnerRequests((prev) =>
+        prev.map((r) => r.id === requestId ? { ...r, status: approve ? "APPROVED" : "REJECTED" } : r)
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to respond to request.");
+    } finally {
+      setRespondingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!user?.schoolId) return;
@@ -524,6 +562,7 @@ const handleDrop = async (benId: string, name: string) => {
           { key: "approved", label: "Approved" },
           { key: "opportunities", label: "Approved Opportunities" },
           ...(isAdmin ? [
+            { key: "requests", label: "School Partners" },
             { key: "search", label: "Add from Directory" },
             { key: "map", label: "Add from Map" },
             { key: "manage", label: editingBenId ? "Edit Custom" : "Create Custom + CSV" },
@@ -700,6 +739,69 @@ const handleDrop = async (benId: string, name: string) => {
       )}
 
       {tab === "map" && isAdmin && <BeneficiaryDiscover embedded />}
+
+      {tab === "requests" && isAdmin && (
+        <div className="space-y-4 max-w-2xl">
+          <p className="text-sm text-[var(--text-sec)]">
+            Partner with another school to share their hosted opportunities with your students. When approved, each school's students can access the other's volunteer events.
+          </p>
+
+          {partnerRequests.length === 0 ? (
+            <div className="bg-[var(--surface-alt)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)] text-sm">
+              No school partnership requests yet. Use the <strong>Add from Map</strong> tab to find and invite nearby schools.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {partnerRequests.map((r) => {
+                const other = r.direction === "incoming" ? r.fromSchool : r.toSchool;
+                const location = [other.city, other.state].filter(Boolean).join(", ");
+                return (
+                  <div key={r.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500 flex-none" />
+                        <span className="font-medium text-sm text-[var(--text)]">{other.name}</span>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">School</span>
+                      </div>
+                      {location && <div className="text-xs text-[var(--text-sec)] mt-0.5 ml-4">{location}</div>}
+                      {r.message && <div className="text-xs text-[var(--text-faint)] mt-1 ml-4 italic">"{r.message}"</div>}
+                      <div className="text-xs text-[var(--text-faint)] mt-1 ml-4">
+                        {r.direction === "incoming" ? "Incoming request" : "Sent by you"} · {new Date(r.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex-none">
+                      {r.status === "APPROVED" ? (
+                        <span className="text-xs bg-[var(--ok-bg)] text-[var(--ok-t)] border border-[var(--ok-b)] px-2 py-0.5 rounded-full">Partners</span>
+                      ) : r.status === "REJECTED" ? (
+                        <span className="text-xs bg-gray-100 text-[var(--text-faint)] px-2 py-0.5 rounded-full">Declined</span>
+                      ) : r.direction === "incoming" ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handlePartnerRespond(r.id, true)}
+                            disabled={respondingId === r.id}
+                            className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            {respondingId === r.id ? "..." : "Accept"}
+                          </button>
+                          <button
+                            onClick={() => handlePartnerRespond(r.id, false)}
+                            disabled={respondingId === r.id}
+                            className="px-3 py-1 text-xs border border-[var(--border-s)] text-[var(--text-sec)] rounded hover:bg-[var(--surface-alt)]"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Awaiting response</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === "manage" && isAdmin && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

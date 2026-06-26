@@ -31,6 +31,10 @@ export function getNotificationHref(notification: AppNotification): string {
       return "/messages?tab=inbox";
     case "SCHOOL_ANNOUNCEMENT":
       return "/messages?tab=notifications";
+    case "SCHOOL_PARTNER_REQUEST":
+      return "/partners?tab=requests";
+    case "SCHOOL_PARTNER_APPROVED":
+      return "/partners";
     case "ADMIN_PENDING_REVIEW_ALERT":
       return "/submissions";
     case "VERIFICATION_UPDATE":

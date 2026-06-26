@@ -26,6 +26,7 @@ import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
 import billingRoutes from "./routes/billing";
 import schoolProcurementRoutes from "./routes/schoolProcurement";
+import schoolPartnerRoutes from "./routes/schoolPartners";
 import stripeWebhookRoutes from "./routes/stripeWebhooks";
 import { startReminderScheduler } from "./lib/reminders";
 import { startUploadCleanupJob } from "./lib/uploadCleanup";
@@ -108,6 +109,7 @@ app.use("/api/integrations", integrationRoutes);
 // New architecture routes
 app.use("/api/billing/organizations", billingRoutes);
 app.use("/api/school-procurement", schoolProcurementRoutes);
+app.use("/api/school-partners", schoolPartnerRoutes);
 app.use("/api/cohorts", cohortRoutes);
 app.use("/api/beneficiaries", beneficiaryRoutes);
 app.use("/api/invitations", invitationRoutes);

@@ -39,6 +39,8 @@ interface NearbyBeneficiary {
   phone: string | null;
   nteeCode: string | null;
   claimed: boolean;
+  entityType?: "org" | "school";
+  partnerStatus?: "PENDING" | "APPROVED" | "REJECTED" | null;
 }
 
 interface SchoolLocation {
@@ -286,7 +288,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
     );
   });
 
-  // ─── Approve handler ───────────────────────────────────────────────────────
+  // ─── Approve handler (orgs) ────────────────────────────────────────────────
 
   const handleApprove = async (directoryId: string) => {
     setApproving(directoryId);
@@ -296,8 +298,24 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
         prev.map((b) => (b.id === directoryId ? { ...b, approvalStatus: "APPROVED" } : b))
       );
     } catch (err) {
-      // Silently show error state — could add toast here
       console.error("Approve failed:", err);
+    } finally {
+      setApproving(null);
+      setApproveConfirm(null);
+    }
+  };
+
+  // ─── School partner request handler ────────────────────────────────────────
+
+  const handlePartnerRequest = async (schoolId: string) => {
+    setApproving(schoolId);
+    try {
+      await api.post("/school-partners", { toSchoolId: schoolId });
+      setBeneficiaries((prev) =>
+        prev.map((b) => (b.id === schoolId ? { ...b, partnerStatus: "PENDING" } : b))
+      );
+    } catch (err) {
+      console.error("Partner request failed:", err);
     } finally {
       setApproving(null);
       setApproveConfirm(null);
@@ -632,20 +650,30 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full flex-none"
-                            style={{ backgroundColor: categoryColor(b.category) }}
-                          />
+                          {b.entityType === "school" ? (
+                            <span className="w-2.5 h-2.5 rounded-full flex-none bg-purple-500" />
+                          ) : (
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-none"
+                              style={{ backgroundColor: categoryColor(b.category) }}
+                            />
+                          )}
                           <span className="font-medium text-sm text-[var(--text)] truncate">
                             {toTitleCase(b.name)}
                           </span>
-                          {b.approvalStatus === "APPROVED" && (
+                          {b.entityType === "school" && (
+                            <span className="flex-none text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">School</span>
+                          )}
+                          {(b.approvalStatus === "APPROVED" || b.partnerStatus === "APPROVED") && (
                             <span className="flex-none text-xs bg-[var(--in-bg)] text-[var(--action)] px-1.5 py-0.5 rounded font-medium">✓ Partner</span>
                           )}
                         </div>
 
-                        {b.category && (
+                        {b.category && b.entityType !== "school" && (
                           <div className="text-xs text-[var(--text-sec)] mt-0.5 ml-4">{b.category}</div>
+                        )}
+                        {b.entityType === "school" && (
+                          <div className="text-xs text-purple-600 mt-0.5 ml-4">Partner school</div>
                         )}
 
                         <div className="text-xs text-[var(--text-faint)] mt-0.5 ml-4">
@@ -703,37 +731,78 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
                       </div>
 
                       <div className="flex-none">
-                        {b.approvalStatus === "APPROVED" ? (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-[var(--in-bg)] text-[var(--action)] rounded-full">
-                            Approved
-                          </span>
-                        ) : b.approvalStatus === "PENDING" ? (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-yellow-100 text-[var(--wn-t)] rounded-full">
-                            Pending
-                          </span>
-                        ) : approveConfirm === b.id ? (
-                          <div className="flex gap-1">
+                        {b.entityType === "school" ? (
+                          // School-to-school partnership action
+                          b.partnerStatus === "APPROVED" ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-[var(--in-bg)] text-[var(--action)] rounded-full">
+                              Partners
+                            </span>
+                          ) : b.partnerStatus === "PENDING" ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                              Request sent
+                            </span>
+                          ) : b.partnerStatus === "REJECTED" ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-gray-100 text-[var(--text-faint)] rounded-full">
+                              Declined
+                            </span>
+                          ) : approveConfirm === b.id ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handlePartnerRequest(b.id); }}
+                                disabled={approving === b.id}
+                                className="px-2 py-0.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                              >
+                                {approving === b.id ? "..." : "Send request"}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setApproveConfirm(null); }}
+                                className="px-2 py-0.5 text-xs border border-[var(--border-s)] text-[var(--text-sec)] rounded hover:bg-[var(--surface-alt)]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleApprove(b.id); }}
-                              disabled={approving === b.id}
-                              className="px-2 py-0.5 text-xs bg-[var(--action)] text-white rounded hover:bg-[var(--action)] disabled:opacity-50"
+                              onClick={(e) => { e.stopPropagation(); setApproveConfirm(b.id); }}
+                              className="px-2 py-0.5 text-xs border border-purple-300 text-purple-700 rounded hover:bg-purple-50"
                             >
-                              {approving === b.id ? "..." : "Confirm"}
+                              + Partner
                             </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setApproveConfirm(null); }}
-                              className="px-2 py-0.5 text-xs border border-[var(--border-s)] text-[var(--text-sec)] rounded hover:bg-[var(--surface-alt)]"
-                            >
-                              Cancel
-                            </button>
-                          </div>
+                          )
                         ) : (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setApproveConfirm(b.id); }}
-                            className="px-2 py-0.5 text-xs border border-[var(--in-b)] text-[var(--action)] rounded hover:bg-[var(--in-bg)]"
-                          >
-                            + Approve
-                          </button>
+                          // Org approval action
+                          b.approvalStatus === "APPROVED" ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-[var(--in-bg)] text-[var(--action)] rounded-full">
+                              Approved
+                            </span>
+                          ) : b.approvalStatus === "PENDING" ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-yellow-100 text-[var(--wn-t)] rounded-full">
+                              Pending
+                            </span>
+                          ) : approveConfirm === b.id ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleApprove(b.id); }}
+                                disabled={approving === b.id}
+                                className="px-2 py-0.5 text-xs bg-[var(--action)] text-white rounded hover:bg-[var(--action)] disabled:opacity-50"
+                              >
+                                {approving === b.id ? "..." : "Confirm"}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setApproveConfirm(null); }}
+                                className="px-2 py-0.5 text-xs border border-[var(--border-s)] text-[var(--text-sec)] rounded hover:bg-[var(--surface-alt)]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setApproveConfirm(b.id); }}
+                              className="px-2 py-0.5 text-xs border border-[var(--in-b)] text-[var(--action)] rounded hover:bg-[var(--in-bg)]"
+                            >
+                              + Approve
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
