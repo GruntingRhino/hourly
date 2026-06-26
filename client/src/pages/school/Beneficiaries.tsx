@@ -469,7 +469,7 @@ export default function SchoolBeneficiaries() {
           )}
         </div>
 
-        {isAdmin && !beneficiary.claimed && (
+        {isAdmin && !beneficiary.claimed && mode !== "approved" && (
           <div className="mt-3">
             <div className="flex gap-2">
               <input

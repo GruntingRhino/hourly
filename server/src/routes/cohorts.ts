@@ -115,9 +115,10 @@ async function findOrCreateTeacherForCohort(params: {
       };
     }
     if (existing.role !== "TEACHER" || existing.schoolId !== params.schoolId) {
+      const roleLabel = existing.role === "STUDENT" ? "student" : existing.role === "ORG_ADMIN" ? "community partner" : existing.role.toLowerCase();
       return {
         status: "conflict",
-        reason: "A user with this email already exists outside this school's teacher roster",
+        reason: `This person already has a GoodHours account (as a ${roleLabel}). Only new users or existing teachers from your school can be assigned as cohort admins.`,
       };
     }
 
