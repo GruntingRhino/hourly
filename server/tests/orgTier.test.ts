@@ -149,11 +149,51 @@ test("parseTimeString handles midnight (12:00 AM)", () => {
   assert.equal(minutes, 0);
 });
 
-test("slotDateTime combines date and time string correctly", () => {
+test("slotDateTime combines date and time string correctly (UTC timezone)", () => {
   const slotDate = new Date("2025-09-15T00:00:00Z");
-  const dt = slotDateTime(slotDate, "2:30 PM");
+  const dt = slotDateTime(slotDate, "2:30 PM", "UTC");
   assert.equal(dt.getUTCHours(), 14);
   assert.equal(dt.getUTCMinutes(), 30);
+});
+
+test("slotDateTime converts wall-clock time to UTC using org timezone (America/New_York, EDT = UTC-4)", () => {
+  // Sept 15 2025 is in EDT (UTC-4). "2:30 PM" ET = 18:30 UTC.
+  const slotDate = new Date("2025-09-15T00:00:00Z");
+  const dt = slotDateTime(slotDate, "2:30 PM", "America/New_York");
+  assert.equal(dt.getUTCHours(), 18, "EDT offset should shift 2:30 PM → 18:30 UTC");
+  assert.equal(dt.getUTCMinutes(), 30);
+});
+
+test("slotDateTime handles DST transition (America/Los_Angeles, PST = UTC-8)", () => {
+  // Jan 15 2025 is in PST (UTC-8). "10:00 AM" PT = 18:00 UTC.
+  const slotDate = new Date("2025-01-15T00:00:00Z");
+  const dt = slotDateTime(slotDate, "10:00 AM", "America/Los_Angeles");
+  assert.equal(dt.getUTCHours(), 18, "PST offset should shift 10:00 AM → 18:00 UTC");
+});
+
+test("slotDateTime defaults to UTC when no timezone supplied", () => {
+  const slotDate = new Date("2025-09-15T00:00:00Z");
+  const utcDt = slotDateTime(slotDate, "9:00 AM");
+  assert.equal(utcDt.getUTCHours(), 9);
+});
+
+// ── ICS line folding ────────────────────────────────────────────
+
+test("generateICS folds long lines and preserves multi-byte UTF-8 characters", () => {
+  // Craft a title that, when encoded, will require folding and contains a multi-byte char
+  const emoji = "\u{1F333}"; // 🌳 = 4 bytes in UTF-8
+  const longTitle = "Community " + emoji + " Garden Cleanup Event That Has A Very Long Name Exceeding 75 Bytes";
+  const ics = generateICS({
+    uid: "fold-test",
+    title: longTitle,
+    startUtc: new Date("2025-09-15T14:00:00Z"),
+    endUtc: new Date("2025-09-15T17:00:00Z"),
+  });
+  // The SUMMARY line must be present and must decode back to the original title
+  const match = ics.match(/SUMMARY:([\s\S]*?)(?=\r\n[^\s])/);
+  assert.ok(match, "SUMMARY line should be present");
+  const decoded = match![1].replace(/\r\n /g, ""); // unfold
+  assert.equal(decoded, longTitle.replace(/,/g, "\\,").replace(/;/g, "\\;"), "unfolded SUMMARY should match escaped title");
 });
 
 // ── Tier boundary enforcement (pure logic) ─────────────────────

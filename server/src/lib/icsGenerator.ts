@@ -19,7 +19,9 @@ function icsEscape(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
-// ICS line folding: lines > 75 octets must be folded at 75 with CRLF + SPACE
+// ICS line folding: lines > 75 octets must be folded at 75 with CRLF + SPACE.
+// We walk back from the chunk boundary to avoid splitting multi-byte UTF-8 sequences
+// (continuation bytes have the bit pattern 10xxxxxx = 0x80..0xBF).
 function foldLine(line: string): string {
   const bytes = Buffer.from(line, "utf8");
   if (bytes.length <= 75) return line;
@@ -28,10 +30,17 @@ function foldLine(line: string): string {
   let offset = 0;
   let first = true;
   while (offset < bytes.length) {
-    const chunkLen = first ? 75 : 74;
-    parts.push(bytes.slice(offset, offset + chunkLen).toString("utf8"));
-    offset += chunkLen;
+    const limit = offset + (first ? 75 : 74);
     first = false;
+    if (limit >= bytes.length) {
+      parts.push(bytes.slice(offset).toString("utf8"));
+      break;
+    }
+    // Walk back to the start of a UTF-8 code point
+    let end = limit;
+    while (end > offset && (bytes[end]! & 0xc0) === 0x80) end--;
+    parts.push(bytes.slice(offset, end).toString("utf8"));
+    offset = end;
   }
   return parts.join("\r\n ");
 }
@@ -71,11 +80,37 @@ export function parseTimeString(t: string): { hours: number; minutes: number } {
 }
 
 // Build UTC Date from a date field (just the calendar date part) + a time string.
-// The stored `date` is stored in UTC midnight; we interpret startTime as local wall-clock
-// and approximate UTC by treating the slot date as the day reference.
-export function slotDateTime(slotDate: Date, timeStr: string): Date {
+// `timezone` is an IANA timezone name (e.g. "America/New_York"). When provided, the
+// time string is interpreted as wall-clock time in that zone and converted to UTC
+// correctly, including DST transitions. Defaults to "UTC" so existing callers that
+// store times as UTC continue to work unchanged.
+export function slotDateTime(slotDate: Date, timeStr: string, timezone = "UTC"): Date {
   const { hours, minutes } = parseTimeString(timeStr);
-  const d = new Date(slotDate);
-  d.setUTCHours(hours, minutes, 0, 0);
-  return d;
+
+  // Get the calendar date string in the target timezone (e.g. "2025-09-15")
+  const localDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(slotDate);
+
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+
+  // Treat the wall-clock time as UTC first (a reference point), then measure how
+  // far it drifts when viewed through the target timezone — that drift is the UTC
+  // offset — and compensate for it.
+  const nominalUTC = new Date(`${localDateStr}T${hh}:${mm}:00Z`);
+
+  // Re-read what that UTC moment looks like in the target timezone
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(nominalUTC);
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  const tzDate = new Date(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`);
+
+  // offsetMs = how many ms we need to ADD to the nominal UTC to get the true UTC moment
+  return new Date(nominalUTC.getTime() + (nominalUTC.getTime() - tzDate.getTime()));
 }

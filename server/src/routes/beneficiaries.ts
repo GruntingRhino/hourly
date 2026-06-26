@@ -2743,15 +2743,26 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
     });
 
     if (!signup) return res.status(404).json({ error: "Cancellation link not found or already used." });
-    if (signup.status === "CANCELLED") {
-      return res.status(200).json({ message: "You were already cancelled from this event." });
-    }
     if (signup.verificationStatus === "APPROVED") {
       return res.status(400).json({ error: "Cannot cancel an already-approved signup." });
     }
 
     const result = await runSerializableTransaction(async (tx) => {
+      // Lock the slot row first to serialize concurrent cancellations for the same slot
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${signup.slotId} FOR UPDATE`;
+
+      // Re-read the signup under lock to catch the double-submit race: two requests
+      // may both pass the pre-transaction check above, but only the first one should win
+      const liveSignup = await tx.beneficiarySignup.findUnique({
+        where: { id: signup.id },
+        select: { status: true, cancellationToken: true, verificationStatus: true },
+      });
+      if (!liveSignup || liveSignup.status === "CANCELLED" || !liveSignup.cancellationToken) {
+        return { kind: "already_cancelled" as const };
+      }
+      if (liveSignup.verificationStatus === "APPROVED") {
+        return { kind: "already_approved" as const };
+      }
 
       await tx.beneficiarySignup.update({
         where: { id: signup.id },
@@ -2790,8 +2801,15 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
         }
       }
 
-      return { promotedStudentId };
+      return { kind: "cancelled" as const, promotedStudentId };
     });
+
+    if (result.kind === "already_cancelled") {
+      return res.status(200).json({ message: "You were already cancelled from this event." });
+    }
+    if (result.kind === "already_approved") {
+      return res.status(400).json({ error: "Cannot cancel an already-approved signup." });
+    }
 
     if (result.promotedStudentId) {
       await prisma.notification.create({

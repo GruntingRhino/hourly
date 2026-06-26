@@ -413,6 +413,7 @@ model Beneficiary {
 
   planTier             String    @default("FREE") // FREE, PRO
   proActivatedAt       DateTime?
+  timezone             String    @default("America/New_York") // IANA timezone for event times
   uploadAbuseStrikes   Int       @default(0)
   uploadSuspendedUntil DateTime?
 

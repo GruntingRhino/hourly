@@ -46,6 +46,7 @@ interface ReminderSignup {
       requiredFormIsRequired: boolean;
       beneficiary: {
         planTier: string;
+        timezone: string;
         brandColor: string | null;
         logoUrl: string | null;
         emailSignature: string | null;
@@ -84,7 +85,7 @@ async function processReminder(
           beneficiaryId: signup.slot.opportunity.beneficiaryId,
           opportunityId: signup.slot.opportunity.id,
           reminderType,
-          scheduledFor: new Date(slotDateTime(signup.slot.date, signup.slot.startTime).getTime() - minutesBefore * 60 * 1000),
+          scheduledFor: new Date(slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime() - minutesBefore * 60 * 1000),
           deliveryStatus: "PENDING",
         },
       });
@@ -93,8 +94,8 @@ async function processReminder(
   const ben = opp.beneficiary;
   const tierLimits = ORGANIZATION_TIER_LIMITS[tier];
 
-  const startDt = slotDateTime(signup.slot.date, signup.slot.startTime);
-  const endDt = slotDateTime(signup.slot.date, signup.slot.endTime);
+  const startDt = slotDateTime(signup.slot.date, signup.slot.startTime, ben.timezone);
+  const endDt = slotDateTime(signup.slot.date, signup.slot.endTime, ben.timezone);
 
   const icsContent = generateICS({
     uid: `${signup.id}-${minutesBefore}`,
@@ -217,7 +218,7 @@ async function runEventReminderCycle(): Promise<void> {
               include: {
                 beneficiary: {
                   select: {
-                    id: true, planTier: true, name: true,
+                    id: true, planTier: true, name: true, timezone: true,
                     brandColor: true, logoUrl: true, emailSignature: true,
                     reminderConfig: { select: { reminders: true } },
                   },
