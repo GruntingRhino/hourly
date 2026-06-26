@@ -115,7 +115,11 @@ function stepState(step: typeof TIMELINE_STEPS[0], current: SchoolBillingStatus)
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function cents(n: number): string {
-  return `$${(n / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+  const dollars = n / 100;
+  const formatted = dollars % 1 === 0
+    ? dollars.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : dollars.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `$${formatted}`;
 }
 
 function fmtDate(d: string | null): string {

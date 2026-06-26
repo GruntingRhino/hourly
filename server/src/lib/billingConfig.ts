@@ -20,5 +20,9 @@ export function calculateSchoolEstimate(enrollment: number): number {
 }
 
 export function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+  const dollars = cents / 100;
+  const formatted = dollars % 1 === 0
+    ? dollars.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : dollars.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `$${formatted}`;
 }
