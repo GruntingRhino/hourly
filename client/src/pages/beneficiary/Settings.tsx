@@ -67,7 +67,7 @@ const MINUTES_OPTIONS = [
 export default function BeneficiarySettings() {
   const { user } = useAuth();
   const benId = user?.beneficiaryId;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
@@ -80,6 +80,10 @@ export default function BeneficiarySettings() {
       setTab(t as Tab);
     }
   }, [searchParams]);
+
+  function navigateTab(id: Tab) {
+    setSearchParams({ tab: id }, { replace: true });
+  }
   const [profile, setProfile] = useState<BeneficiaryProfile | null>(null);
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
   const [form, setForm] = useState({
@@ -242,7 +246,7 @@ export default function BeneficiarySettings() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => { setTab(t.id); setError(""); setSuccess(""); }}
+            onClick={() => { navigateTab(t.id); setError(""); setSuccess(""); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.id
                 ? "border-[var(--action)] text-[var(--action)]"
@@ -483,7 +487,7 @@ export default function BeneficiarySettings() {
             {!isPro && (
               <p className="text-xs text-[var(--text-sec)] mt-1">
                 Upgrade to Pro for configurable reminders, custom branding, and attendance analytics.{" "}
-                <button onClick={() => setTab("billing")} className="text-[var(--action)] hover:underline">
+                <button onClick={() => navigateTab("billing")} className="text-[var(--action)] hover:underline">
                   View Plans &amp; Billing
                 </button>
               </p>
