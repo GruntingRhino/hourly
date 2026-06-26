@@ -937,8 +937,8 @@ export default function SchoolSettings() {
     : ["profile", "security", "notifications", "privacy", "billing"];
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-[28px] font-bold mb-6">Settings</h1>
+    <div>
+      <h1 className="max-w-2xl text-[28px] font-bold mb-6">Settings</h1>
 
       <div className="flex gap-0.5 mb-6 border-b border-[var(--border)] overflow-x-auto">
         {visibleTabs.map((t) => (
@@ -955,6 +955,7 @@ export default function SchoolSettings() {
           </button>
         ))}
       </div>
+      <div className="max-w-2xl">
 
       {tab === "profile" && (
         <div data-testid="canvas-integration-card" className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
@@ -2153,6 +2154,7 @@ export default function SchoolSettings() {
       {tab === "billing" && user?.schoolId && (
         <SchoolBilling schoolId={user.schoolId} />
       )}
+      </div>
 
       {joinByCodeToast && (
         <div

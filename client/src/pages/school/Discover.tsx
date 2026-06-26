@@ -235,10 +235,21 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
       setError(null);
       try {
         const schoolData = await api.get<SchoolLocation>("/schools/location");
-        setSchool(schoolData);
         if (schoolData.latitude && schoolData.longitude) {
+          setSchool(schoolData);
           await loadData(schoolData);
+        } else if (navigator.geolocation) {
+          setSchool(schoolData);
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const geoSchool = { ...schoolData, latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+              setSchool(geoSchool);
+              loadData(geoSchool);
+            },
+            () => { setSchool(schoolData); setLoading(false); }
+          );
         } else {
+          setSchool(schoolData);
           setLoading(false);
         }
       } catch (err) {
