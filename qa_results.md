@@ -38,10 +38,10 @@ The validated flow now includes:
 
 ## Environment
 
-- Database: fresh local Postgres `goodhours_canvas_finish`
+- Database: fresh local Postgres QA database
 - Server env:
-  - `DATABASE_URL=postgresql://abhay@localhost:5432/goodhours_canvas_finish`
-  - `DEV_DATABASE_URL=postgresql://abhay@localhost:5432/goodhours_canvas_finish`
+  - `DATABASE_URL` set to a local Postgres QA database
+  - `DEV_DATABASE_URL` set to the same local Postgres QA database
   - `FIELD_ENCRYPTION_KEY` set to a valid 64-hex-char key
   - `APP_ENV=development`
   - `CANVAS_CLIENT_ID` set
@@ -58,9 +58,9 @@ Commands executed:
 
 ```bash
 cd /Users/abhay/RTB/GoodHours
-DATABASE_URL=postgresql://abhay@localhost:5432/goodhours_canvas_finish npx prisma generate --schema=server/prisma/schema.prisma
-DATABASE_URL=postgresql://abhay@localhost:5432/goodhours_canvas_finish npx prisma migrate deploy --schema=server/prisma/schema.prisma
-DATABASE_URL=postgresql://abhay@localhost:5432/goodhours_canvas_finish npx tsx server/prisma/seed-playwright.ts
+DATABASE_URL="$LOCAL_QA_DATABASE_URL" npx prisma generate --schema=server/prisma/schema.prisma
+DATABASE_URL="$LOCAL_QA_DATABASE_URL" npx prisma migrate deploy --schema=server/prisma/schema.prisma
+DATABASE_URL="$LOCAL_QA_DATABASE_URL" npx tsx server/prisma/seed-playwright.ts
 npm --prefix server run build
 npm --prefix client run build
 API_BASE_URL=http://localhost:3001 npx playwright test tests/canvas-integration.spec.ts tests/canvas-oauth.spec.ts

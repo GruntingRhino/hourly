@@ -32,6 +32,7 @@ tests/.auth/
 # QA results — may contain seed credentials
 tests/qa-results.md
 test-results/
+uploads/
 
 # Large data files (kept locally, not in git)
 server/data/*.zip
