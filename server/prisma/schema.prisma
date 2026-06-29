@@ -1124,3 +1124,9 @@ model SchoolBillingAuditLog {
   changedAt       DateTime            @default(now())
   note            String?
 }
+
+// Stripe webhook idempotency — prevents duplicate processing of replayed events
+model StripeProcessedEvent {
+  id          String   @id  // Stripe event ID (e.g. "evt_...")
+  processedAt DateTime @default(now())
+}

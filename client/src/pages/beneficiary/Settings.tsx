@@ -220,7 +220,7 @@ export default function BeneficiarySettings() {
 
   if (loading) return <div className="text-[var(--text-sec)] py-8 text-center">Loading...</div>;
 
-  const isPro = import.meta.env.DEV || tierInfo?.tier === "PRO";
+  const isPro = (import.meta.env.DEV && !import.meta.env.VITE_FORCE_FREE_TIER) || tierInfo?.tier === "PRO";
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "profile", label: "Profile" },

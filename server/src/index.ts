@@ -66,11 +66,16 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no Origin (server-to-server, curl, mobile apps)
     if (!origin) return callback(null, true);
+    // Exact-match only — wildcard subdomain matching risks subdomain-takeover attacks
+    const PRODUCTION_GOODHOURS_ORIGINS = [
+      "https://goodhours.app",
+      "https://www.goodhours.app",
+      "https://app.goodhours.app",
+    ];
     if (
       EXPLICIT_ALLOWED_ORIGINS.includes(origin) ||
       (!IS_PRODUCTION && isLocalDevOrigin(origin)) ||
-      origin.endsWith(".goodhours.app") ||
-      origin === "https://goodhours.app"
+      PRODUCTION_GOODHOURS_ORIGINS.includes(origin)
     ) {
       return callback(null, true);
     }

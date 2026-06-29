@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
@@ -33,7 +34,9 @@ import {
 } from "../services/email";
 
 const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  process.env.NODE_ENV === "production" ||
+  process.env.VERCEL_ENV === "production" ||
+  process.env.APP_ENV === "production";
 const ENABLE_IMPERSONATION = process.env.ENABLE_IMPERSONATION === "true";
 
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
@@ -133,12 +136,13 @@ const signupLimiter = rateLimit({
   skipFailedRequests: true,
   // Allow authenticated users to create additional accounts during guided
   // onboarding/testing flows without tripping anonymous IP abuse limits.
+  // Must verify the JWT signature — bare base64-decode allows forgery.
   skip: (req) => {
     const authHeader = req.get("authorization") || "";
     if (!/^Bearer\s+/i.test(authHeader)) return false;
     try {
       const token = authHeader.slice(7);
-      const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+      const payload = jwt.verify(token, process.env.JWT_SECRET as string) as { userId?: string };
       return !!payload.userId;
     } catch {
       return false;
@@ -258,6 +262,16 @@ function buildLoginUserPayload(user: {
   beneficiaryId: string | null;
 }, profile: Awaited<ReturnType<typeof loadLoginProfile>> | null) {
   const enriched = profile ?? null;
+  const enrichedUser = enriched as (typeof enriched & {
+    phone?: string | null;
+    grade?: string | null;
+    house?: string | null;
+    bio?: string | null;
+    avatarUrl?: string | null;
+    socialLinks?: string | null;
+    notificationPreferences?: string | null;
+    messagePreferences?: string | null;
+  }) | null;
   let studentSchool = null;
   let schoolId = user.schoolId;
 
@@ -268,12 +282,46 @@ function buildLoginUserPayload(user: {
     console.warn("[auth] Failed to resolve school associations for login payload:", err);
   }
 
+  let socialLinks = null;
+  let notificationPreferences = null;
+  let messagePreferences = null;
+
+  try {
+    socialLinks = enrichedUser?.socialLinks ? JSON.parse(enrichedUser.socialLinks) : null;
+  } catch (err) {
+    console.warn("[auth] Failed to parse social links for login payload:", err);
+  }
+
+  try {
+    notificationPreferences = enrichedUser?.notificationPreferences
+      ? JSON.parse(enrichedUser.notificationPreferences)
+      : null;
+  } catch (err) {
+    console.warn("[auth] Failed to parse notification preferences for login payload:", err);
+  }
+
+  try {
+    messagePreferences = enrichedUser?.messagePreferences
+      ? JSON.parse(enrichedUser.messagePreferences)
+      : null;
+  } catch (err) {
+    console.warn("[auth] Failed to parse message preferences for login payload:", err);
+  }
+
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
     emailVerified: user.emailVerified,
+    phone: enrichedUser?.phone ? decryptField(enrichedUser.phone) : undefined,
+    grade: enrichedUser?.grade ?? undefined,
+    house: enrichedUser?.house ?? undefined,
+    bio: enrichedUser?.bio ?? undefined,
+    avatarUrl: enrichedUser?.avatarUrl ?? null,
+    socialLinks,
+    notificationPreferences,
+    messagePreferences,
     organizationId: user.organizationId,
     organization: enriched?.organization ?? null,
     schoolId,
@@ -357,23 +405,14 @@ const resetPasswordSchema = strictObject({
 });
 
 const messagePreferenceSchema = strictObject({
-  allowFrom: z.enum(["EVERYONE", "PARTNERS_ONLY", "NOBODY"]).optional(),
-  profileVisibility: z.enum(["EVERYONE", "PARTNERS_ONLY", "NOBODY"]).optional(),
+  allowFrom: z.enum(["EVERYONE", "ORGS_ONLY", "ADMINS_ONLY"]).optional(),
+  profileVisibility: z.enum(["EVERYONE", "SCHOOL", "PRIVATE"]).optional(),
 });
 
 const profileSchema = strictObject({
   name: optionalTrimmedString(255, 1),
   phone: optionalTrimmedString(20),
-  bio: optionalTrimmedString(1000),
-  age: z.number().int().min(10).max(25).optional(),
   grade: optionalTrimmedString(50),
-  avatarUrl: z.string().trim().max(50_000).nullable().optional(),
-  socialLinks: strictObject({
-    instagram: optionalTrimmedString(255),
-    tiktok: optionalTrimmedString(255),
-    twitter: optionalTrimmedString(255),
-    youtube: optionalTrimmedString(255),
-  }).optional(),
   notificationPreferences: z.record(
     z.string().trim().min(1).max(64),
     strictObject({
@@ -801,12 +840,8 @@ router.put("/profile", authenticate, async (req: Request, res: Response) => {
     const updateData: any = {
       name: data.name,
       phone: data.phone !== undefined ? encryptField(data.phone) : undefined,
-      bio: data.bio,
-      age: data.age,
       grade: data.grade,
-      socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
     };
-    if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
     if (data.notificationPreferences !== undefined) {
       updateData.notificationPreferences = JSON.stringify(data.notificationPreferences);
     }

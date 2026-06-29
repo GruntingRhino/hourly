@@ -21,7 +21,18 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Webhook signature invalid" });
   }
 
-  // Idempotency: all handlers are safe to replay
+  // Idempotency: skip events we've already processed (handles Stripe retries and duplicates)
+  try {
+    const existing = await prisma.stripeProcessedEvent.findUnique({ where: { id: event.id } });
+    if (existing) {
+      return res.json({ received: true, skipped: true });
+    }
+    await prisma.stripeProcessedEvent.create({ data: { id: event.id } });
+  } catch (err) {
+    console.error("[stripeWebhook] idempotency check failed:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {

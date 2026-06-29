@@ -966,6 +966,8 @@ router.get("/slots/:slotId", authenticate, async (req: Request, res: Response) =
 });
 
 // GET /api/beneficiaries/attachments/:attachmentId — serve attachment file (auth required)
+// BENEFICIARY_ADMIN: may access their own org's attachments only.
+// SCHOOL_ADMIN / STUDENT: may access only if their school has an APPROVED relationship with the beneficiary.
 router.get("/attachments/:attachmentId", authenticate, async (req: Request, res: Response) => {
   try {
     const attachment = await prisma.beneficiaryOpportunityAttachment.findUnique({
@@ -973,6 +975,28 @@ router.get("/attachments/:attachmentId", authenticate, async (req: Request, res:
       select: { filename: true, originalName: true, mimeType: true, beneficiaryId: true },
     });
     if (!attachment) return res.status(404).json({ error: "Attachment not found" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { role: true, beneficiaryId: true, schoolId: true, cohort: { select: { schoolId: true } }, classroom: { select: { schoolId: true } } },
+    });
+    if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+    if (user.role === "BENEFICIARY_ADMIN") {
+      if (user.beneficiaryId !== attachment.beneficiaryId) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+    } else {
+      // School staff and students must have an APPROVED relationship with this beneficiary
+      const schoolId = user ? await resolveStudentSchoolId(req.user!.userId) ?? user.schoolId : null;
+      if (!schoolId) return res.status(403).json({ error: "Not associated with a school" });
+      const approval = await prisma.schoolBeneficiaryApproval.findFirst({
+        where: { schoolId, beneficiaryId: attachment.beneficiaryId, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!approval) return res.status(403).json({ error: "Not authorized to access this file" });
+    }
+
     const filePath = path.join(UPLOAD_DIR, attachment.filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found on disk" });
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(attachment.originalName)}"`);
@@ -1019,8 +1043,22 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
       if (!approval) return res.status(403).json({ error: "This beneficiary is not available to your school" });
     }
 
-    // Strip cross-school approval details from response for non-BENEFICIARY_ADMIN callers
-    const { schoolApprovals: _sa, ...benPublic } = ben as any;
+    // Strip internal/billing fields from response for non-BENEFICIARY_ADMIN callers
+    const {
+      schoolApprovals: _sa,
+      stripeCustomerId: _sc,
+      stripeSubscriptionId: _ss,
+      stripePriceId: _sp,
+      subscriptionStatus: _subst,
+      planTier: _pt,
+      currentPeriodEnd: _cpe,
+      cancelAtPeriodEnd: _cap,
+      billingInterval: _bi,
+      proActivatedAt: _pa,
+      uploadAbuseStrikes: _uas,
+      uploadSuspendedUntil: _usu,
+      ...benPublic
+    } = ben as any;
     res.json(user?.role === "BENEFICIARY_ADMIN" ? ben : benPublic);
   } catch (err) {
     console.error("Get beneficiary error:", err);
