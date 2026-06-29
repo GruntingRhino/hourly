@@ -132,8 +132,9 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Email</label>
+              <label htmlFor="login-email" className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Email</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -146,7 +147,7 @@ export default function Login() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[13px] font-medium" style={{ color: "var(--text)" }}>Password</label>
+                <label htmlFor="login-password" className="text-[13px] font-medium" style={{ color: "var(--text)" }}>Password</label>
                 <Link
                   to="/forgot-password"
                   className="text-[12px] hover:underline"
@@ -157,6 +158,7 @@ export default function Login() {
               </div>
               <div className="relative">
                 <input
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -168,6 +170,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 hover:opacity-70"
                   style={{ color: "var(--text-faint)" }}
                   tabIndex={-1}

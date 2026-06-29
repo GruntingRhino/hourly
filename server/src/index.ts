@@ -1,8 +1,10 @@
 import "./lib/env"; // Validate required env vars at startup
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { randomUUID } from "crypto";
+import prisma from "./lib/prisma";
 import path from "path";
 import { geocodeAddress } from "./lib/geocode";
 import authRoutes from "./routes/auth";
@@ -36,6 +38,35 @@ import { createHybridRateLimit } from "./middleware/rateLimit";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Attach a correlation ID to every request for log tracing
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const id = (req.headers["x-request-id"] as string) || randomUUID();
+  (req as any).requestId = id;
+  res.setHeader("x-request-id", id);
+  next();
+});
+
+// Structured request logger
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    if (req.path === "/api/health") return; // suppress health-check noise
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    console[level](JSON.stringify({
+      type: "request",
+      requestId: (req as any).requestId,
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      ms,
+      ip: req.ip,
+      userId: (req as any).user?.userId ?? null,
+    }));
+  });
+  next();
+});
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const IS_PROD_LIKE =
   process.env.APP_ENV === "production" ||
@@ -160,9 +191,30 @@ app.get("/api/geocode", geocodeLimiter, async (req, res) => {
   res.json(coords);
 });
 
-// Health check
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+// Health check — includes DB connectivity
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "ok", db: "ok", timestamp: new Date().toISOString() });
+  } catch {
+    console.error(JSON.stringify({ type: "health_check_failed", db: "unreachable" }));
+    res.status(503).json({ status: "degraded", db: "unreachable", timestamp: new Date().toISOString() });
+  }
+});
+
+// Structured global error handler — catches any unhandled errors thrown in routes
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  console.error(JSON.stringify({
+    type: "unhandled_error",
+    requestId: (req as any).requestId,
+    method: req.method,
+    path: req.path,
+    status,
+    message: err.message,
+    stack: IS_PRODUCTION ? undefined : err.stack,
+  }));
+  res.status(status).json({ error: status < 500 ? err.message : "Internal server error" });
 });
 
 if (require.main === module) {

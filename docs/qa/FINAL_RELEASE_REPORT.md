@@ -27,11 +27,21 @@ The core product works correctly. Critical workflow automation passes. Authoriza
 | API Authorization Tests | 18 | 18 | 0 | 0 | 0 |
 | Data Integrity Tests | 8 | 7 | 0 | 0 | 1* |
 | File Upload Security Tests | 7 | 7 | 0 | 0 | 0 |
+| Server Unit Tests (new) | 134 | 134 | 0 | 0 | 0 |
+| Accessibility Tests (axe-core) | 12 | 4 | 8 | 0 | 0 |
+| Edge-Case API Tests | See `EDGE_CASE_REPORT.md` | — | — | 0 | 0 |
 | TypeScript Compilation | 2 | 2 | 0 | 0 | 0 |
 | Dependency Audit | 3 | 1 | 2** | 0 | 0 |
+| Database Backup/Restore | 1 | 1 | 0 | 0 | 0 |
 
 *Audit log presence for seeded sessions: known gap in seed script (not application logic)  
 **vite high-severity is dev-only/Windows, client moderate vulns are build toolchain only
+
+**New unit test coverage:** hour calculation, state machine transitions, capacity/waitlist logic, input sanitization, audit log structure (5 files, 134 tests, 0 failures).
+
+**Accessibility failures** are predominantly color contrast (`--text-faint` token). The 2 critical violations on the Login page (unlabeled password input, unnamed visibility toggle) were **fixed during this audit**. Color contrast remediation is deferred to post-pilot.
+
+**Monitoring added:** correlation ID middleware, structured JSON request logging, global error handler, and DB-connected health endpoint added to `server/src/index.ts`.
 
 ---
 
@@ -138,10 +148,10 @@ All Critical and High findings discovered during this audit were **fixed** befor
 |---|---|---|
 | HTTPS | ❌ Missing | Local dev only; production deployment not configured |
 | Email delivery | ❌ Unconfigured | `RESEND_API_KEY` is a placeholder; only mailinator addresses work in dev |
-| Monitoring / error tracking | ❌ Missing | No Sentry, Datadog, or equivalent configured |
-| Structured logging | ⚠️ Partial | `console.error` used; no structured log format or correlation IDs |
-| Health endpoint | ✅ Present | `GET /api/health` returns `{"status":"ok"}` |
-| Database backups | ❌ Not tested | No backup/restore procedure documented or tested |
+| Monitoring / error tracking | ⚠️ Partial | Structured JSON logging + correlation IDs added. No Sentry yet. |
+| Structured logging | ✅ Added | JSON format with requestId, method, path, status, ms, userId. Error handler added. |
+| Health endpoint | ✅ Enhanced | `GET /api/health` now returns `{"status":"ok","db":"ok"}` with live DB ping |
+| Database backups | ✅ Verified | Full dump/restore tested; row counts match exactly; procedure documented |
 | Database migrations | ⚠️ Partial | Uses `prisma db push` for dev; production should use `prisma migrate deploy` |
 | Test accounts in production | ⚠️ Action needed | Seed accounts (`john@student.edu` etc.) must not exist in production or must have `isTestAccount=true` |
 | Dev endpoints in production | ✅ Fixed | `IS_PROD_LIKE` now correctly gates dev routes in all deployment environments |
@@ -177,7 +187,7 @@ These 68 items are marked MANUAL REQUIRED in the Playwright suite. The most impo
 3. **Mobile browser testing** — All automated tests ran on Chromium desktop. Safari iOS and Android Chrome require manual testing.
 4. **Load testing** — No load or stress tests run. Basic API latency was adequate for a handful of concurrent requests but untested under realistic traffic.
 5. **Canvas/Google Classroom integration** — Integration routes exist but were not tested; no Canvas or Classroom credentials available.
-6. **Backup restoration** — No backup or restoration procedure was tested. This is a **launch blocker**.
+6. **Backup restoration** — ✅ **Resolved during this audit.** Full dump/restore procedure verified; row counts match. Production backup strategy documented in `BACKUP_RESTORE_REPORT.md`. Automated daily backups still need to be configured on production infrastructure.
 7. **School procurement billing** — `SchoolBillingRecord` and quote-request flows were not exercised; no test data for school-tier billing.
 8. **Admin impersonation** — `POST /api/auth/impersonate` is gated behind `ENABLE_IMPERSONATION=true` env var. Not tested.
 
@@ -196,7 +206,7 @@ The application's core workflows are correct, its authorization boundaries hold,
 | 1 | Configure `RESEND_API_KEY` with a real Resend key and verified sending domain | Founder |
 | 2 | Provision production PostgreSQL database (not localhost) | DevOps / Founder |
 | 3 | Set up HTTPS / production domain | DevOps / Founder |
-| 4 | Test and document database backup and restore procedure | DevOps / Founder |
+| 4 | Configure automated daily database backups in production (procedure verified locally — see `BACKUP_RESTORE_REPORT.md`) | DevOps / Founder |
 | 5 | Complete the pilot-founder manual test checklist (P1 items above) | Founder |
 | 6 | Configure Stripe test-mode keys and run a supervised payment smoke test | Founder (after Stripe account activation) |
 | 7 | Remove or isolate seed test accounts (`isTestAccount=true`) from production DB | DevOps |
@@ -205,8 +215,8 @@ The application's core workflows are correct, its authorization boundaries hold,
 
 | # | Item | Owner |
 |---|---|---|
-| 8 | Add error monitoring (Sentry or equivalent) | DevOps |
-| 9 | Add structured logging with correlation IDs | Engineering |
+| 8 | Add error monitoring (Sentry or equivalent) — structured logging + correlation IDs already in place | DevOps |
+| 9 | Fix color contrast across app (`--text-faint` → `#6b6560` clears ~90% of WCAG violations) | Engineering |
 | 10 | Switch from `prisma db push` to `prisma migrate deploy` for production | Engineering |
 | 11 | Activate Stripe live account and run live smoke test | Founder |
 | 12 | Resolve SEC-007 through SEC-010 (low-severity) | Engineering |
