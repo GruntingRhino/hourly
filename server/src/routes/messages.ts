@@ -213,6 +213,7 @@ async function canSendMessage(senderId: string, receiverId: string): Promise<boo
         role: true,
         schoolId: true,
         beneficiaryId: true,
+        messagePreferences: true,
         cohort: { select: { schoolId: true } },
         classroom: { select: { schoolId: true } },
         cohortMemberships: {
@@ -228,28 +229,58 @@ async function canSendMessage(senderId: string, receiverId: string): Promise<boo
   const sSchool = resolveSchoolId(sender);
   const rSchool = resolveSchoolId(receiver);
 
-  // Same school: staff<->student, staff<->staff — no student<->student
-  if (sSchool && rSchool && sSchool === rSchool && SCHOOL_ROLES.has(sender.role) && SCHOOL_ROLES.has(receiver.role)) {
-    if (sender.role === "STUDENT" && receiver.role === "STUDENT") return false;
-    return true;
-  }
+  const receiverPrefs = (() => {
+    if (!receiver.messagePreferences) return null;
+    try {
+      return JSON.parse(receiver.messagePreferences) as {
+        allowFrom?: "EVERYONE" | "ORGS_ONLY" | "ADMINS_ONLY";
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  const senderAllowedByPrefs = (() => {
+    switch (receiverPrefs?.allowFrom) {
+      case "ORGS_ONLY":
+        return ["ORG_ADMIN", "BENEFICIARY_ADMIN"].includes(sender.role);
+      case "ADMINS_ONLY":
+        return ["SCHOOL_ADMIN", "TEACHER"].includes(sender.role);
+      default:
+        return true;
+    }
+  })();
+
+  const isSameSchoolAllowed =
+    sSchool && rSchool && sSchool === rSchool && SCHOOL_ROLES.has(sender.role) && SCHOOL_ROLES.has(receiver.role)
+      ? sender.role !== "STUDENT" || receiver.role !== "STUDENT"
+      : false;
 
   // School staff or student → BENEFICIARY_ADMIN: requires approved school↔beneficiary relationship
-  if (SCHOOL_ROLES.has(sender.role) && sSchool && receiver.role === "BENEFICIARY_ADMIN" && receiver.beneficiaryId) {
+  const canMessageBeneficiary =
+    SCHOOL_ROLES.has(sender.role) && sSchool && receiver.role === "BENEFICIARY_ADMIN" && receiver.beneficiaryId;
+  if (canMessageBeneficiary) {
     const approval = await prisma.schoolBeneficiaryApproval.findFirst({
       where: { schoolId: sSchool, beneficiaryId: receiver.beneficiaryId, status: "APPROVED" },
       select: { id: true },
     });
-    return !!approval;
+    if (!approval) return false;
+    return senderAllowedByPrefs;
   }
 
   // BENEFICIARY_ADMIN → school staff (not students): requires approved relationship
-  if (sender.role === "BENEFICIARY_ADMIN" && sender.beneficiaryId && rSchool && ["SCHOOL_ADMIN", "TEACHER"].includes(receiver.role)) {
+  const canBeneficiaryMessageSchoolStaff =
+    sender.role === "BENEFICIARY_ADMIN" && sender.beneficiaryId && rSchool && ["SCHOOL_ADMIN", "TEACHER"].includes(receiver.role);
+  if (canBeneficiaryMessageSchoolStaff) {
     const approval = await prisma.schoolBeneficiaryApproval.findFirst({
       where: { schoolId: rSchool, beneficiaryId: sender.beneficiaryId, status: "APPROVED" },
       select: { id: true },
     });
-    return !!approval;
+    if (!approval) return false;
+    return senderAllowedByPrefs;
+  }
+  if (isSameSchoolAllowed) {
+    return senderAllowedByPrefs;
   }
 
   return false;
@@ -316,8 +347,6 @@ router.post("/", authenticate, sendMessageLimiter, async (req: Request, res: Res
     if (!receiver || !(await canSendMessage(req.user!.userId, receiver.id))) {
       return res.status(404).json({ error: "Recipient not found or not eligible to receive messages from you." });
     }
-
-    // Message preferences removed in new architecture
 
     const message = await prisma.message.create({
       data: {

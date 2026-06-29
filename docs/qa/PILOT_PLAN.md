@@ -134,80 +134,151 @@ Track these weekly. Report at the end of each week and cumulatively at pilot clo
 
 ---
 
-## 5. Weekly Monitoring Checklist
+## 5. Monitoring During Pilot
 
-### Every Day During Pilot
+### 5.1 Daily Monitoring (Every Business Day)
 
-- [ ] Review error tracking dashboard (look for 500s, auth errors, data errors)
-- [ ] Check failed email queue in Resend dashboard
-- [ ] Spot-check hour totals for 2–3 random students (API vs. dashboard)
+Each morning:
 
-### Every Week
+- [ ] Check Sentry error dashboard. Review any new errors from the past 24 hours. Categorize as: noise / P2 (log and schedule fix) / P1 (fix same day) / P0 (escalate immediately).
+- [ ] Check server uptime monitor. Confirm no unplanned downtime overnight.
+- [ ] Check support inbox. Respond to any open tickets within the SLA.
+- [ ] Review failed email queue in the Resend dashboard.
+- [ ] Spot-check hour totals for 2–3 random students (API response vs. dashboard display).
 
-- [ ] Export CSV for the school and verify row counts match dashboard
-- [ ] Check audit log for any OVERRIDE entries (unexpected hour corrections)
-- [ ] Review all rejected hour submissions and their reasons
-- [ ] Run data integrity check: `GET /api/reports/student` total vs. session sum
-- [ ] Review Stripe subscription status if billing is active
+### 5.2 Weekly Data Integrity Check
+
+At the end of each week:
+
+- [ ] **Verification count audit:** Confirm every session in CHECKED_OUT state has been actioned (VERIFIED or REJECTED) within the 72-hour SLA. Flag any pending past the SLA.
+- [ ] **Hour record spot-check:** Pick 5 random verified sessions. Confirm recorded hours match the check-in/check-out timestamps (±5 min tolerance). Any discrepancy is a P0.
+- [ ] **Audit trail integrity:** Confirm that the verification audit log has an entry for every state transition. No transitions without a named actor and timestamp.
+- [ ] **CSV reconciliation:** Export the school CSV and verify row counts and hour totals match the dashboard.
+- [ ] **Account count audit:** Confirm active account count matches the expected invited student count. Investigate unexpected accounts.
+- [ ] **Database backup confirmed:** Verify automated backup from the past 7 days is restorable. Do a test restore at least once during the pilot.
+- [ ] **Review all rejection reasons:** Ensure rejection reason text is informative (not blank), and students were notified.
+
+### 5.3 Weekly Email Deliverability Check
+
+- [ ] Review Resend delivery dashboard: open rate, bounce rate, spam complaint rate.
+- [ ] If bounce rate > 2%: investigate and resolve before continuing sends.
+- [ ] If spam complaint rate > 0.1%: escalate immediately and pause non-transactional sends.
+- [ ] Confirm password reset and verification emails are arriving for any new signups that week.
+
+### 5.4 Weekly Check-In Call (With School Admin)
+
+Agenda (15 minutes):
+
+1. How many students are actively using the platform this week?
+2. Any reported issues from students or orgs?
+3. Are reports and CSV exports working as expected?
+4. Any upcoming events that might spike usage?
+5. Anything the admin wishes worked differently?
 
 ---
 
 ## 6. Escalation Triggers
 
-The following events require immediate response. Contact the technical owner within 30 minutes:
+The following events require an immediate response, regardless of day or time. Contact the technical owner within 30 minutes.
 
-| Trigger | Response |
-|---|---|
-| Any student can access another student's verified hours | **P0** — take down service, investigate IDOR |
-| Hour totals don't reconcile | **P0** — freeze all verification, audit database |
-| Unauthorized admin access | **P0** — revoke all tokens, investigate |
-| Email verification links stop working | **P1** — all new signups blocked, investigate email config |
-| Student reports hours disappearing | **P1** — check audit log, do not write new records until root cause found |
-| > 10% of API requests returning 500 | **P1** — roll back most recent deploy if applicable |
-| Database backup failing | **P2** — fix backup before any further data creation |
+| Trigger | Definition | Response |
+|---------|-----------|----------|
+| **Data corruption** | Any verified hours record is altered, deleted, or shows incorrect values | **P0.** Take system offline if needed. Restore from backup. Root-cause analysis before bringing back online. Notify affected users. |
+| **Auth bypass** | Any evidence a user accessed another user's data, or a student accessed org/school admin functionality | **P0.** Take system offline immediately. Audit all access logs. Notify affected users. Consider notifying school admin. |
+| **IDOR on student records** | Student A can retrieve Student B's hour history via API | **P0.** Same as auth bypass. |
+| **Hour totals don't reconcile** | Dashboard total differs from sum of session records | **P0.** Freeze all new verifications. Audit database before allowing new writes. |
+| **Unauthorized admin access** | Org or student JWT accepted by school admin routes | **P0.** Revoke all tokens (roll JWT_SECRET). Investigate. |
+| **Hour submission error rate > 5%** | More than 5% of check-in or check-out calls returning errors over any 1-hour window | **P1.** Investigate immediately. Notify active users. |
+| **Email delivery failure > 1 hour** | Resend API returning errors; verification or reset emails not delivered | **P1.** Check Resend status page. Communicate via alternate channel if needed. |
+| **Unplanned downtime > 15 minutes** | System unavailable for more than 15 continuous minutes | **P1.** Page founder. Investigate and restore. Post-mortem required within 24 hours. |
+| **Student reports hours disappearing** | A student sees fewer hours than previously shown | **P1.** Check audit log. Do not write new records until root cause found. |
+| **> 5% of API requests returning 500** | Sustained error rate over 5 minutes | **P1.** Roll back most recent deploy if applicable. |
+| **Database backup failing** | Automated backup not completing successfully | **P2.** Fix before any further data creation. Do not proceed to next week without confirmed backup. |
 
 ---
 
 ## 7. Pilot Week-by-Week Plan
 
-### Week 1 — Onboarding
-**Goal:** All pilot participants have accounts and at least one signup.  
-**Check:** ≥ 70% of invited students have accepted invitations.  
-**Risk:** Email delivery issues blocking invitation acceptance.  
-**Mitigation:** Have dev bypass endpoint ready (`POST /api/auth/dev/bypass-email-verification`) if production email is misconfigured.
+### Week 1: Onboarding
 
-### Week 2 — First Events
-**Goal:** First round of service events occurs. Students check in and out. Orgs verify hours.  
-**Check:** At least 80% of students who signed up successfully checked out.  
-**Risk:** Students not receiving check-in reminders (email config).  
-**Mitigation:** Orgs manually remind students via the messaging feature.
+**Goal:** All pilot participants have accounts and at least one opportunity signed up.
 
-### Week 3 — Verification Cycle
-**Goal:** Verified hours appear on student dashboards. School admin reviews reports.  
-**Check:** CSV export matches dashboard totals for all students.  
-**Risk:** Hours in "pending" state — org hasn't verified.  
-**Mitigation:** School admin sends a reminder to orgs via messages.
+- Monitor: daily signup counts, email verification completion rate, support tickets
+- Check: ≥ 70% of invited students have accepted invitations by end of week
+- What to measure: signup completion rate, first sign-up rate, email bounce rate
+- Risk: Email delivery issues blocking invitation acceptance
+- Mitigation: Confirm email config with a test send before batch invites go out
 
-### Week 4 — Evaluation and Decision
-**Goal:** Collect feedback, analyze metrics, decide on full launch.  
-**Check:** Run all 5 success metrics (table above). Count support tickets. Read feedback.  
-**Decision criteria:** If all metrics are Green or Yellow and no Critical/P0 issues occurred, proceed to full launch planning.
+**Go/no-go for Week 2:** If signup completion rate < 50% or any P0 bug discovered, pause and address before continuing.
+
+### Week 2: First Events
+
+**Goal:** First round of service events occurs. Students check in and check out. Orgs begin verifying hours.
+
+- Monitor: check-in/check-out error rate, pending verifications count, org response time
+- Check: ≥ 80% of students who signed up successfully checked out
+- What to measure: check-in completion rate, verification response time, server error rate
+- Risk: Students not receiving check-in reminders; org admins not acting on pending verifications
+- Mitigation: Orgs manually remind students via the messaging feature; founder follows up with org admins personally
+
+**Go/no-go for Week 3:** If verification completion rate < 70% or server error rate > 2%, pause and address.
+
+### Week 3: Verification Cycle and Reporting
+
+**Goal:** Verified hours appear on student dashboards. School admin reviews and exports reports.
+
+- Monitor: audit trail integrity spot-checks, CSV export accuracy, any reconciliation discrepancies
+- Check: CSV export matches dashboard totals for all students; at least one student has a fully VERIFIED session
+- What to measure: verified hours accuracy, school admin engagement, support ticket themes
+- Risk: Hours stuck in PENDING state because org hasn't reviewed
+- Mitigation: School admin sends an org reminder via the messages feature; founder follows up personally with any non-responsive org
+
+**Go/no-go for Week 4:** If hour submission error rate > 5% or any audit trail integrity issues found, pause.
+
+### Week 4: Evaluation and Decision
+
+**Goal:** Collect feedback, complete the data quality audit, make a go/no-go decision for general availability.
+
+- Monitor: all prior metrics combined; run full data integrity audit
+- What to measure: all metrics in Section 4; support ticket themes; qualitative feedback from school admin, org admins, and students
+- Complete: post-pilot interviews with school admin, 1–2 org admins, and 2–3 students
+- Decision: if all criteria in Section 8 pass, proceed to GA launch planning
 
 ---
 
 ## 8. Post-Pilot Evaluation Criteria for Full Launch
 
-All of the following must be true before unrestricted launch:
+All of the following must be true before proceeding to unrestricted general availability:
 
-- [ ] Zero Critical or P0 incidents during the pilot
-- [ ] Hour total reconciliation: 100% accuracy across all pilot students
-- [ ] Invitation acceptance rate ≥ 60%
-- [ ] Hour verification rate ≥ 85%
-- [ ] Support ticket volume below 3 per week per 20 students
-- [ ] Email delivery rate ≥ 97%
-- [ ] Audit logs complete for all verification events (no missing entries)
-- [ ] School admin can export accurate CSV without assistance
-- [ ] At least one nonprofit confirms they would recommend the platform
+| Criterion | Pass Threshold | Actual | Pass? |
+|-----------|---------------|--------|-------|
+| P0 incidents during pilot | 0 | | |
+| Hour record spot-check accuracy | 100% | | |
+| Audit trail completeness | 100% of transitions have actor + timestamp | | |
+| Signup completion rate | ≥ 60% | | |
+| Hour verification rate (within 72h) | ≥ 85% | | |
+| Server 5xx error rate | < 1% overall | | |
+| Support ticket volume (average/week) | < 3 per 20 students | | |
+| Email delivery rate | ≥ 97% | | |
+| School admin CSV export (no assistance needed) | Confirmed | | |
+| School admin satisfaction | Would recommend using again | | |
+| At least 1 org confirms they would use again | Confirmed | | |
+
+**Decision rule:** All criteria must pass OR any failures must be addressed and re-validated before proceeding.
+
+### 8.1 Post-Pilot Report
+
+Produce a brief written summary at the end of Week 4 covering:
+
+1. Participation numbers (accounts created, opportunities signed up, sessions completed, hours verified)
+2. Error/bug summary (counts by severity, resolution status)
+3. Support ticket themes (what did users ask about most?)
+4. Usability findings from any observation sessions
+5. Data integrity findings (all spot-checks passed / exceptions noted)
+6. Go/no-go recommendation with rationale
+7. Top 3 improvements to make before general availability
+
+Distribute to all stakeholders before making the GA launch decision.
 
 ---
 

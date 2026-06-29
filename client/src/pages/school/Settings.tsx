@@ -204,11 +204,19 @@ function sumConfiguredCapHours(rows: CapRow[]): number {
   }, 0);
 }
 
+function resolveInitialTab(searchParams: URLSearchParams, isAdmin: boolean): Tab {
+  const requestedTab = searchParams.get("tab");
+  const allowedTabs: Tab[] = isAdmin
+    ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
+    : ["profile", "security", "notifications", "privacy", "billing"];
+  return requestedTab && allowedTabs.includes(requestedTab as Tab) ? (requestedTab as Tab) : "profile";
+}
+
 export default function SchoolSettings() {
   const { user, logout, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
-  const [tab, setTab] = useState<Tab>("profile");
+  const [tab, setTab] = useState<Tab>(() => resolveInitialTab(searchParams, isAdmin));
   const [school, setSchool] = useState<SchoolData | null>(null);
   const [adminName, setAdminName] = useState(user?.name || "");
   const [schoolName, setSchoolName] = useState("");
@@ -418,8 +426,11 @@ export default function SchoolSettings() {
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
-    if (requestedTab === "integrations" && isAdmin) {
-      setTab("integrations");
+    const allowedTabs: Tab[] = isAdmin
+      ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
+      : ["profile", "security", "notifications", "privacy", "billing"];
+    if (requestedTab && allowedTabs.includes(requestedTab as Tab)) {
+      setTab(requestedTab as Tab);
     }
 
     const canvasStatusParam = searchParams.get("canvas");
@@ -449,6 +460,13 @@ export default function SchoolSettings() {
     next.delete("googleClassroomError");
     setSearchParams(next, { replace: true });
   }, [isAdmin, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (next.get("tab") === tab) return;
+    next.set("tab", tab);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, tab]);
 
   const reloadCanvasState = async () => {
     const [status, errors] = await Promise.all([
@@ -838,7 +856,7 @@ export default function SchoolSettings() {
     setNotifIsError(false);
     try {
       await api.put("/auth/profile", { notificationPreferences: notifPrefs });
-      void refreshUser();
+      await refreshUser();
       setNotifMessage("Notification preferences saved!");
     } catch {
       setNotifMessage("Failed to save preferences");
@@ -854,6 +872,7 @@ export default function SchoolSettings() {
     setPrivacyIsError(false);
     try {
       await api.put("/auth/profile", { messagePreferences: msgPrefs });
+      await refreshUser();
       setPrivacyMessage("Privacy settings saved!");
     } catch {
       setPrivacyMessage("Failed to save settings");

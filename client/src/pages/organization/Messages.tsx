@@ -62,6 +62,21 @@ export default function OrgMessages() {
     }
   };
 
+  const loadFolderMessages = async (nextFolder: "inbox" | "sent" | "notifications") => {
+    setLoading(true);
+    try {
+      if (nextFolder === "notifications") {
+        const data = await api.get<Notification[]>("/messages/notifications");
+        setNotifications(data);
+        return;
+      }
+      const data = await api.get<Message[]>(`/messages?folder=${nextFolder}`);
+      setMessages(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
@@ -73,7 +88,7 @@ export default function OrgMessages() {
       setSubject("");
       setBody("");
       setFolder("sent");
-      await loadMessages();
+      await loadFolderMessages("sent");
     } catch (err: any) {
       setSendError(err.message || "Failed to send message");
     } finally {

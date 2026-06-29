@@ -123,9 +123,7 @@ export default function StudentSettings() {
     try {
       await api.put("/auth/profile", {
         name,
-        bio: bio.trim() || undefined,
         grade: grade || undefined,
-        avatarUrl: avatarUrl || undefined,
       });
       await refreshUser();
       setMessage("Profile updated!");
