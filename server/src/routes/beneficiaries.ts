@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
@@ -1371,11 +1372,18 @@ const recurrenceRuleSchema = z.discriminatedUnion("type", [
 ]);
 
 const opportunityTimeSlotSchema = z.object({
-  date: z.string().min(1, "Choose a date for each time slot."),
+  date: z.string().min(1, "Choose a date for each time slot.").refine((d) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return new Date(d) >= today;
+  }, "Slot date must be today or in the future."),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose a valid start time for each time slot."),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose a valid end time for each time slot."),
   durationHours: z.number().positive("End time must be after start time."),
   capacity: z.number().int().positive("Enter a valid volunteer capacity.").default(10),
+}).superRefine((slot, ctx) => {
+  if (slot.startTime >= slot.endTime) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endTime"], message: "End time must be after start time." });
+  }
 });
 
 function addCategoryValidation(
@@ -1442,7 +1450,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
     if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
     const schema = z.object({
-      title: z.string().min(1).max(255),
+      title: z.string().trim().min(1).max(255),
       description: z.string().max(2000),
       category: z.string().max(100),
       customCategory: z.string().max(100).optional(),
@@ -1537,7 +1545,7 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
     if (opp.status === "CANCELLED") return res.status(400).json({ error: "Cannot edit a cancelled opportunity" });
 
     const schema = z.object({
-      title: z.string().min(1).max(255).optional(),
+      title: z.string().trim().min(1).max(255).optional(),
       description: z.string().max(2000).optional(),
       category: z.string().max(100).optional(),
       customCategory: z.string().max(100).nullable().optional(),
@@ -2249,6 +2257,15 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
 
     res.status(201).json(result.signup);
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        return res.status(409).json({ error: "Already signed up for this slot" });
+      }
+      if (err.code === "P2034") {
+        res.setHeader("Retry-After", "1");
+        return res.status(503).json({ error: "Server busy, please retry" });
+      }
+    }
     console.error("Slot signup error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

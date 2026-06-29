@@ -202,6 +202,11 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
+// JSON 404 handler — Express default returns HTML for unmatched routes
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 // Structured global error handler — catches any unhandled errors thrown in routes
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;

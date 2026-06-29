@@ -17,6 +17,16 @@ The core product works correctly. Critical workflow automation passes. Authoriza
 
 **No unresolved Critical or High security defects remain.**
 
+**Additional defects fixed after edge-case testing:**
+
+| ID | Severity | Finding | Fix |
+|---|---|---|---|
+| DEFECT-001 | **HIGH** | Whitespace-only opportunity title accepted (`z.string().min(1)` passes `"   "`) | Added `.trim()` to POST + PATCH title schema in `beneficiaries.ts` |
+| DEFECT-002 | **MEDIUM** | Past dates accepted for opportunity time slots | Added `.refine(date >= today)` to `opportunityTimeSlotSchema` |
+| DEFECT-003 | **MEDIUM** | End time before start time accepted (e.g. start 11:00, end 09:00) | Added `.superRefine()` comparing HH:MM strings in `opportunityTimeSlotSchema` |
+| DEFECT-004 | **HIGH** | Race condition on capacity-1 slot signup returned HTTP 500 (data integrity intact; error surfacing was wrong) | Added P2002 → 409 and P2034 → 503 (`Retry-After: 1`) mapping in signup catch block |
+| DEFECT-005 | **MINOR** | Unmatched routes return Express HTML 404 instead of JSON | Added JSON catch-all 404 handler before global error handler in `index.ts` |
+
 ---
 
 ## Test Results
