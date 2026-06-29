@@ -426,7 +426,7 @@ export default function SchoolDashboard() {
               <div className="text-sm font-semibold text-[var(--text)]">Recent Outreach & Intervention History</div>
               <p className="text-sm text-[var(--text-faint)] mt-1">See who was contacted, from which queue, who sent it, and whether students showed follow-up activity after outreach.</p>
             </div>
-            <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="text-sm font-medium text-[var(--action)] hover:text-[var(--navy)]">
+            <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="text-sm font-medium text-[var(--action)] underline underline-offset-2 hover:text-[var(--navy)]">
               Open roster workflow
             </Link>
           </div>
@@ -606,7 +606,7 @@ export default function SchoolDashboard() {
         {cohorts.length === 0 ? (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 text-center text-[var(--text-faint)] text-sm">
             No cohorts yet.{" "}
-            <Link to="/cohorts" className="text-[var(--action)] hover:underline">Create your first cohort</Link> to get started.
+            <Link to="/cohorts" className="text-[var(--action)] underline underline-offset-2 hover:opacity-85">Create your first cohort</Link> to get started.
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">

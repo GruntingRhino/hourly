@@ -543,6 +543,9 @@ model SelfSubmittedRequest {
   category        String?  // e.g. "environment", "education", "food", "health", "general"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([studentId, status])
+  @@index([schoolId, status])
 }
 
 // ─── Beneficiary Opportunities ───────────────────────────────────
@@ -596,6 +599,7 @@ model BeneficiaryOpportunityAttachment {
   mimeType      String   // verified from magic bytes, not client-supplied header
   size          Int      // bytes, verified from fs.stat after upload
   sha256        String   // SHA-256 hex digest for deduplication
+  contentBytes  Bytes?   // durable DB-backed storage for serverless deployments
   createdAt     DateTime @default(now())
 }
 
@@ -614,6 +618,8 @@ model BeneficiaryTimeSlot {
   createdAt        DateTime @default(now())
 
   signups          BeneficiarySignup[]
+
+  @@index([date])
 }
 
 // ─── Beneficiary Signups (new model) ────────────────────────────
@@ -646,6 +652,9 @@ model BeneficiarySignup {
   reminderLogs OrgEventReminderLog[]
 
   @@unique([slotId, studentId])
+  @@index([studentId, verificationStatus, status])
+  @@index([slotId, status])
+  @@index([status, verificationStatus])
 }
 
 // ─── Beneficiary Audit Log ────────────────────────────────────────
@@ -892,6 +901,8 @@ model ServiceSession {
   auditLogs       AuditLog[]
 
   @@unique([userId, opportunityId])
+  @@index([userId, verificationStatus])
+  @@index([status, verificationStatus])
 }
 
 // ─── Audit Log (immutable) ──────────────────────────────────────
@@ -906,6 +917,9 @@ model AuditLog {
 
   actor           User           @relation("AuditActor", fields: [actorId], references: [id])
   session         ServiceSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([sessionId, createdAt])
 }
 
 // ─── Data Access Log (FERPA compliance — read-access trail) ─────
@@ -920,6 +934,9 @@ model DataAccessLog {
   schoolId    String?  // school context of the access
   details     String?  // JSON
   createdAt   DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 // ─── Messages ───────────────────────────────────────────────────
@@ -937,6 +954,9 @@ model Message {
   sender      User     @relation("SentMessages", fields: [senderId], references: [id])
   receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
   interventionRecipient InterventionRecipient?
+
+  @@index([receiverId, createdAt])
+  @@index([senderId, createdAt])
 }
 
 model InterventionCampaign {
@@ -1019,6 +1039,10 @@ model Notification {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, read, createdAt])
+  @@index([userId, type, createdAt])
 }
 
 // ─── Organization Billing ─────────────────────────────────────────────────
@@ -1109,6 +1133,7 @@ model SchoolProcurementDocument {
   storedPath       String
   fileSizeBytes    Int
   mimeType         String
+  contentBytes     Bytes?
   uploadedByUserId String
   createdAt        DateTime            @default(now())
 }
@@ -1129,4 +1154,24 @@ model SchoolBillingAuditLog {
 model StripeProcessedEvent {
   id          String   @id  // Stripe event ID (e.g. "evt_...")
   processedAt DateTime @default(now())
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model ScheduledJobLease {
+  jobName    String   @id
+  leaseUntil DateTime
+  lastRunAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([leaseUntil])
 }

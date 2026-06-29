@@ -1,6 +1,8 @@
 import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 import jwt from "jsonwebtoken";
+import prisma from "../lib/prisma";
 import type { AuthPayload } from "./auth";
 
 type Bucket = {
@@ -13,16 +15,31 @@ type HybridRateLimitOptions = {
   windowMs: number;
   maxPerIp: number;
   maxPerUser?: number;
+  keySuffix?: (req: Request) => string;
   skip?: (req: Request) => boolean;
 };
 
 const buckets = new Map<string, Bucket>();
-console.warn(
-  "[RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. " +
-  "For production multi-instance deployments, configure an external store like Upstash Redis."
-);
 const cleanupWindowMs = 5 * 60 * 1000;
 let lastCleanupAt = 0;
+
+const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || "";
+const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
+const hasSharedStore = Boolean(upstashUrl && upstashToken);
+const shouldUseDatabaseStore =
+  !hasSharedStore &&
+  (process.env.APP_ENV === "production" || process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production");
+
+if (hasSharedStore) {
+  console.info("[RateLimit] Using Upstash Redis shared bucket store.");
+} else if (shouldUseDatabaseStore) {
+  console.info("[RateLimit] Using PostgreSQL shared bucket store.");
+} else {
+  console.warn(
+    "[RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. " +
+    "Configure shared production rate limiting with PostgreSQL or Upstash."
+  );
+}
 
 function cleanupExpiredBuckets(now: number) {
   if (now - lastCleanupAt < cleanupWindowMs) return;
@@ -61,6 +78,97 @@ function takeBucket(key: string, windowMs: number) {
     remaining: 0,
     resetAt: existing.resetAt,
     count: existing.count,
+  };
+}
+
+type RateLimitBucketResult = {
+  count: number;
+  resetAt: number;
+};
+
+async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
+  const now = Date.now();
+  const windowId = Math.floor(now / windowMs);
+  const windowStart = windowId * windowMs;
+  const resetAt = windowStart + windowMs;
+  const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000) + 60);
+  const bucketKey = `${key}:${windowId}`;
+
+  const response = await fetch(`${upstashUrl}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${upstashToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["INCR", bucketKey],
+      ["EXPIRE", bucketKey, String(ttlSeconds)],
+    ]),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upstash rate limit pipeline failed with ${response.status}`);
+  }
+
+  const payload = await response.json() as Array<{ result?: number | string; error?: string }>;
+  const incrementResult = payload?.[0];
+  if (!incrementResult || incrementResult.error) {
+    throw new Error(incrementResult?.error || "Upstash rate limit increment failed");
+  }
+
+  const count = Number(incrementResult.result);
+  if (!Number.isFinite(count) || count < 1) {
+    throw new Error("Upstash rate limit returned invalid count");
+  }
+
+  return { count, resetAt };
+}
+
+async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
+  const resetAt = new Date(Date.now() + windowMs);
+  const rows = await prisma.$queryRaw<Array<{ count: number; resetAt: Date }>>(
+    Prisma.sql`
+      INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
+      VALUES (${key}, 1, ${resetAt}, NOW(), NOW())
+      ON CONFLICT ("key") DO UPDATE
+      SET
+        "count" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN 1
+          ELSE "RateLimitBucket"."count" + 1
+        END,
+        "resetAt" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN ${resetAt}
+          ELSE "RateLimitBucket"."resetAt"
+        END,
+        "updatedAt" = NOW()
+      RETURNING "count", "resetAt"
+    `
+  );
+
+  const row = rows[0];
+  if (!row) {
+    throw new Error("Database rate limit upsert returned no row");
+  }
+
+  return {
+    count: Number(row.count),
+    resetAt: row.resetAt.getTime(),
+  };
+}
+
+async function takeRateLimitBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
+  if (hasSharedStore) {
+    return takeSharedBucket(key, windowMs);
+  }
+
+  if (shouldUseDatabaseStore) {
+    return takeDatabaseBucket(key, windowMs);
+  }
+
+  const local = takeBucket(key, windowMs);
+  return {
+    count: local.count,
+    resetAt: local.resetAt,
   };
 }
 
@@ -107,67 +215,74 @@ function buildRateLimitResponse(res: Response, message: string, retryAfterMs: nu
 }
 
 export function createHybridRateLimit(options: HybridRateLimitOptions) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     if (options.skip?.(req)) {
       next();
       return;
     }
 
-    const ip = getClientIp(req);
-    const userId = getAuthenticatedUserId(req);
-    const now = Date.now();
+    try {
+      const ip = getClientIp(req);
+      const userId = getAuthenticatedUserId(req);
+      const now = Date.now();
+      const keySuffix = options.keySuffix?.(req)?.trim();
+      const suffix = keySuffix ? `:${hashKey(keySuffix)}` : "";
 
-    const ipBucket = takeBucket(
-      `${options.namespace}:ip:${hashKey(ip)}`,
-      options.windowMs
-    );
-    const ipRemaining = Math.max(0, options.maxPerIp - ipBucket.count);
-
-    let userRemaining: number | null = null;
-    let userResetAt: number | null = null;
-    let blockedRetryAfterMs: number | null = null;
-
-    if (ipBucket.count > options.maxPerIp) {
-      blockedRetryAfterMs = ipBucket.resetAt - now;
-    }
-
-    if (userId && options.maxPerUser) {
-      const userBucket = takeBucket(
-        `${options.namespace}:user:${hashKey(userId)}`,
+      const ipBucket = await takeRateLimitBucket(
+        `${options.namespace}:ip:${hashKey(ip)}${suffix}`,
         options.windowMs
       );
-      userRemaining = Math.max(0, options.maxPerUser - userBucket.count);
-      userResetAt = userBucket.resetAt;
+      const ipRemaining = Math.max(0, options.maxPerIp - ipBucket.count);
 
-      if (userBucket.count > options.maxPerUser) {
-        blockedRetryAfterMs = Math.max(
-          blockedRetryAfterMs ?? 0,
-          userBucket.resetAt - now
-        );
+      let userRemaining: number | null = null;
+      let userResetAt: number | null = null;
+      let blockedRetryAfterMs: number | null = null;
+
+      if (ipBucket.count > options.maxPerIp) {
+        blockedRetryAfterMs = ipBucket.resetAt - now;
       }
-    }
 
-    const resetAt = Math.max(ipBucket.resetAt, userResetAt ?? 0);
-    res.setHeader("RateLimit-Policy", `${options.maxPerIp};w=${Math.ceil(options.windowMs / 1000)}`);
-    res.setHeader(
-      "RateLimit-Limit",
-      String(userId && options.maxPerUser ? Math.min(options.maxPerIp, options.maxPerUser) : options.maxPerIp)
-    );
-    res.setHeader(
-      "RateLimit-Remaining",
-      String(userRemaining === null ? ipRemaining : Math.min(ipRemaining, userRemaining))
-    );
-    res.setHeader("RateLimit-Reset", String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
+      if (userId && options.maxPerUser) {
+        const userBucket = await takeRateLimitBucket(
+          `${options.namespace}:user:${hashKey(userId)}${suffix}`,
+          options.windowMs
+        );
+        userRemaining = Math.max(0, options.maxPerUser - userBucket.count);
+        userResetAt = userBucket.resetAt;
 
-    if (blockedRetryAfterMs !== null && blockedRetryAfterMs > 0) {
-      buildRateLimitResponse(
-        res,
-        "Too many requests. Please wait before trying again.",
-        blockedRetryAfterMs
+        if (userBucket.count > options.maxPerUser) {
+          blockedRetryAfterMs = Math.max(
+            blockedRetryAfterMs ?? 0,
+            userBucket.resetAt - now
+          );
+        }
+      }
+
+      const resetAt = Math.max(ipBucket.resetAt, userResetAt ?? 0);
+      res.setHeader("RateLimit-Policy", `${options.maxPerIp};w=${Math.ceil(options.windowMs / 1000)}`);
+      res.setHeader(
+        "RateLimit-Limit",
+        String(userId && options.maxPerUser ? Math.min(options.maxPerIp, options.maxPerUser) : options.maxPerIp)
       );
-      return;
-    }
+      res.setHeader(
+        "RateLimit-Remaining",
+        String(userRemaining === null ? ipRemaining : Math.min(ipRemaining, userRemaining))
+      );
+      res.setHeader("RateLimit-Reset", String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
 
-    next();
+      if (blockedRetryAfterMs !== null && blockedRetryAfterMs > 0) {
+        buildRateLimitResponse(
+          res,
+          "Too many requests. Please wait before trying again.",
+          blockedRetryAfterMs
+        );
+        return;
+      }
+
+      next();
+    } catch (err) {
+      console.error("[RateLimit] Falling back to open on store error:", err);
+      next();
+    }
   };
 }

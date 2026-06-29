@@ -6,7 +6,6 @@ import fs from "fs";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
 import multer from "multer";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
@@ -28,9 +27,10 @@ import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
+import { createHybridRateLimit } from "../middleware/rateLimit";
+import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 
-const UPLOAD_DIR = path.join(__dirname, "../../../uploads/beneficiary-attachments");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;        // 10 MB per file
 const MAX_FILES_PER_UPLOAD = 5;
@@ -87,6 +87,10 @@ function sha256ofFile(filePath: string): Promise<string> {
   });
 }
 
+function toStoredBytes(bytes: Uint8Array): Uint8Array {
+  return new Uint8Array(Array.from(bytes));
+}
+
 function normalizeInviteEmail(email: unknown): string {
   return typeof email === "string" && email.trim()
     ? email.trim().toLowerCase()
@@ -113,14 +117,12 @@ async function isBeneficiaryPiiEnabled(beneficiaryId: string): Promise<boolean> 
 }
 
 // 10 invitations per school admin/recipient pair per hour — prevents inbox-bombing a beneficiary contact
-const beneficiaryInviteLimiter = rateLimit({
+const beneficiaryInviteLimiter = createHybridRateLimit({
+  namespace: "ben-invite",
   windowMs: 60 * 60 * 1000,
-  max: 10,
-  keyGenerator: (req) =>
-    `ben-invite:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}:${normalizeInviteEmail(req.body?.email)}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many invitation attempts. Please wait before sending more invitations." },
+  maxPerIp: 25,
+  maxPerUser: 10,
+  keySuffix: (req) => normalizeInviteEmail(req.body?.email),
 });
 
 const router = Router();
@@ -973,7 +975,7 @@ router.get("/attachments/:attachmentId", authenticate, async (req: Request, res:
   try {
     const attachment = await prisma.beneficiaryOpportunityAttachment.findUnique({
       where: { id: req.params.attachmentId },
-      select: { filename: true, originalName: true, mimeType: true, beneficiaryId: true },
+      select: { filename: true, originalName: true, mimeType: true, beneficiaryId: true, contentBytes: true },
     });
     if (!attachment) return res.status(404).json({ error: "Attachment not found" });
 
@@ -998,10 +1000,15 @@ router.get("/attachments/:attachmentId", authenticate, async (req: Request, res:
       if (!approval) return res.status(403).json({ error: "Not authorized to access this file" });
     }
 
-    const filePath = path.join(UPLOAD_DIR, attachment.filename);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found on disk" });
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(attachment.originalName)}"`);
     res.setHeader("Content-Type", attachment.mimeType);
+    if (attachment.contentBytes) {
+      res.send(Buffer.from(attachment.contentBytes));
+      return;
+    }
+
+    const filePath = path.join(UPLOAD_DIR, attachment.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
     res.sendFile(filePath);
   } catch (err) {
     console.error("Serve attachment error:", err);
@@ -1829,25 +1836,23 @@ router.post(
         mimeType: string;
         size: number;
         sha256: string;
+        contentBytes: Uint8Array;
       }> = [];
 
       for (const { file, size, mimeType } of mimeResults) {
         const hash = await sha256ofFile(file.path);
+        const fileBytes = fs.readFileSync(file.path);
 
         // Check if an identical file already exists for this beneficiary
         const existing = await prisma.beneficiaryOpportunityAttachment.findFirst({
           where: { sha256: hash, beneficiaryId: req.params.id },
-          select: { filename: true },
+          select: { filename: true, contentBytes: true },
         });
 
-        let storedFilename: string;
-        if (existing) {
-          // Reuse the existing file on disk; delete the newly uploaded duplicate
-          storedFilename = existing.filename;
-          try { fs.unlinkSync(file.path); } catch {}
-        } else {
-          storedFilename = path.basename(file.path);
-        }
+        const storedFilename = existing?.filename ?? path.basename(file.path);
+        const contentBytes = existing?.contentBytes
+          ? toStoredBytes(existing.contentBytes)
+          : toStoredBytes(fileBytes);
 
         newAttachments.push({
           opportunityId: req.params.oppId,
@@ -1857,10 +1862,26 @@ router.post(
           mimeType,
           size,
           sha256: hash,
+          contentBytes,
         });
+
+        try { fs.unlinkSync(file.path); } catch {}
       }
 
-      await prisma.beneficiaryOpportunityAttachment.createMany({ data: newAttachments });
+      for (const attachment of newAttachments) {
+        await prisma.beneficiaryOpportunityAttachment.create({
+          data: {
+            opportunity: { connect: { id: attachment.opportunityId } },
+            beneficiary: { connect: { id: attachment.beneficiaryId } },
+            filename: attachment.filename,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            size: attachment.size,
+            sha256: attachment.sha256,
+            contentBytes: attachment.contentBytes as any,
+          },
+        });
+      }
 
       const attachments = await prisma.beneficiaryOpportunityAttachment.findMany({
         where: { opportunityId: req.params.oppId },
@@ -1884,7 +1905,7 @@ router.delete("/:id/opportunities/:oppId/attachments/:attachmentId", authenticat
 
     const attachment = await prisma.beneficiaryOpportunityAttachment.findUnique({
       where: { id: req.params.attachmentId },
-      select: { id: true, filename: true, opportunityId: true, beneficiaryId: true },
+      select: { id: true, filename: true, opportunityId: true, beneficiaryId: true, contentBytes: true },
     });
     if (!attachment || attachment.beneficiaryId !== req.params.id || attachment.opportunityId !== req.params.oppId) {
       return res.status(404).json({ error: "Attachment not found" });
@@ -1894,7 +1915,7 @@ router.delete("/:id/opportunities/:oppId/attachments/:attachmentId", authenticat
 
     // Only unlink the physical file if no other DB record shares the same filename (dedup).
     const remaining = await prisma.beneficiaryOpportunityAttachment.count({ where: { filename: attachment.filename } });
-    if (remaining === 0) {
+    if (remaining === 0 && !attachment.contentBytes) {
       try { fs.unlinkSync(path.join(UPLOAD_DIR, attachment.filename)); } catch {}
     }
 

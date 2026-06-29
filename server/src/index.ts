@@ -2,7 +2,6 @@ import "./lib/env"; // Validate required env vars at startup
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { randomUUID } from "crypto";
 import prisma from "./lib/prisma";
 import path from "path";
@@ -32,7 +31,7 @@ import schoolPartnerRoutes from "./routes/schoolPartners";
 import stripeWebhookRoutes from "./routes/stripeWebhooks";
 import { startReminderScheduler } from "./lib/reminders";
 import { startUploadCleanupJob } from "./lib/uploadCleanup";
-import { startEventReminderScheduler } from "./lib/eventReminders";
+import { maybeRunEventReminderCycle, startEventReminderScheduler } from "./lib/eventReminders";
 import { authenticate } from "./middleware/auth";
 import { createHybridRateLimit } from "./middleware/rateLimit";
 
@@ -123,6 +122,15 @@ app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), strip
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", authenticate, express.static(path.join(__dirname, "../uploads")));
 
+app.use("/api", (req: Request, _res: Response, next: NextFunction) => {
+  if (req.path !== "/health") {
+    void maybeRunEventReminderCycle().catch((err) => {
+      console.error("[eventReminders] Opportunistic run failed:", err);
+    });
+  }
+  next();
+});
+
 // Baseline protection for every API route.
 // Specialized route limiters below remain in place for sensitive workflows.
 app.use(
@@ -164,13 +172,11 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/saved", savedRoutes);
 
 // 30 geocode requests per IP per minute — Nominatim enforces 1 req/sec; this keeps us well under
-const geocodeLimiter = rateLimit({
+const geocodeLimiter = createHybridRateLimit({
+  namespace: "geocode",
   windowMs: 60 * 1000,
-  max: 30,
-  keyGenerator: (req) => ipKeyGenerator(req.ip || ""),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many geocode requests. Please wait before trying again." },
+  maxPerIp: 30,
+  maxPerUser: 60,
 });
 
 // Geocode endpoint — proxies Nominatim so the client never touches the external API directly
@@ -222,7 +228,12 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ error: status < 500 ? err.message : "Internal server error" });
 });
 
-if (require.main === module) {
+const isDirectNodeEntry =
+  typeof require !== "undefined" &&
+  typeof module !== "undefined" &&
+  require.main === module;
+
+if (isDirectNodeEntry) {
   app.listen(PORT, () => {
     console.log(`GoodHours API running on http://localhost:${PORT}`);
     startReminderScheduler();

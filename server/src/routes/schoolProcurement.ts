@@ -10,9 +10,9 @@ import { requireRole } from "../middleware/rbac";
 import { calculateSchoolEstimate, BILLING_CONFIG } from "../lib/billingConfig";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
+import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 
-const PROC_UPLOAD_DIR = path.join(__dirname, "../../../uploads/school-procurement");
-fs.mkdirSync(PROC_UPLOAD_DIR, { recursive: true });
+const PROC_UPLOAD_DIR = resolveWritableUploadDir("school-procurement");
 
 const MAX_DOC_SIZE = 20 * 1024 * 1024; // 20 MB
 
@@ -39,6 +39,10 @@ const ALLOWED_DOC_TYPES = [
 ] as const;
 
 const router = Router();
+
+function toStoredBytes(bytes: Uint8Array): Uint8Array {
+  return new Uint8Array(Array.from(bytes));
+}
 
 // ── Authorization helper ────────────────────────────────────────────────────
 async function requireSchoolAdmin(userId: string, schoolId: string): Promise<void> {
@@ -226,6 +230,8 @@ router.post("/:id/documents",
         fs.unlinkSync(req.file.path);
         return res.status(400).json({ error: "File type not permitted. Upload PDF, Word, or image files." });
       }
+      const verifiedStat = fs.statSync(req.file.path);
+      const contentBytes = toStoredBytes(fs.readFileSync(req.file.path));
 
       const school = await prisma.school.findUnique({
         where: { id: req.params.id },
@@ -242,11 +248,14 @@ router.post("/:id/documents",
           filename: req.file.filename,
           originalName: req.file.originalname,
           storedPath: req.file.path,
-          fileSizeBytes: req.file.size,
+          fileSizeBytes: verifiedStat.size,
           mimeType: detectedMime,
+          contentBytes: contentBytes as any,
           uploadedByUserId: req.user!.userId,
         },
       });
+
+      try { fs.unlinkSync(req.file.path); } catch {}
 
       res.status(201).json({ id: doc.id, documentType: doc.documentType, originalName: doc.originalName });
     } catch (err: any) {
@@ -267,10 +276,14 @@ router.get("/:id/documents/:docId", authenticate, requireRole("SCHOOL_ADMIN"), a
       where: { id: req.params.docId, schoolId: req.params.id },
     });
     if (!doc) return res.status(404).json({ error: "Document not found" });
-    if (!fs.existsSync(doc.storedPath)) return res.status(404).json({ error: "File not found on server" });
 
     res.setHeader("Content-Disposition", `attachment; filename="${doc.originalName}"`);
     res.setHeader("Content-Type", doc.mimeType);
+    if (doc.contentBytes) {
+      res.send(Buffer.from(doc.contentBytes));
+      return;
+    }
+    if (!fs.existsSync(doc.storedPath)) return res.status(404).json({ error: "File not found" });
     res.sendFile(doc.storedPath);
   } catch (err: any) {
     if (err.status === 403) return res.status(403).json({ error: "Forbidden" });

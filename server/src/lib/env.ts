@@ -38,6 +38,8 @@ const OPTIONAL = [
   "GOOGLE_CLASSROOM_API_BASE_URL",
   "GOOGLE_CLASSROOM_AUTH_BASE_URL",
   "GOOGLE_CLASSROOM_TOKEN_BASE_URL",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
 ] as const;
 
 type RequiredEnv = (typeof REQUIRED)[number];
@@ -104,6 +106,12 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     if (!process.env.CRON_SECRET) {
       console.error("❌ CRON_SECRET is required in production to secure internal scheduled endpoints.");
       process.exit(1);
+    }
+
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      console.warn("⚠️  Shared Redis rate limiting is not configured in production.");
+      console.warn("   Falling back to per-instance in-memory buckets until UPSTASH_REDIS_REST_URL and");
+      console.warn("   UPSTASH_REDIS_REST_TOKEN are added.");
     }
 
     const canvasMockEnabled = process.env.CANVAS_ENABLE_MOCK === "true";

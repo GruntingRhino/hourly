@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { signToken } from "../middleware/auth";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
@@ -37,14 +36,11 @@ function normalizeContactEmail(email: unknown): string {
 }
 
 // 3 registration attempts per IP/contact-email pair per hour — prevents inbox-bombing the contact address
-const registerSchoolLimiter = rateLimit({
+const registerSchoolLimiter = createHybridRateLimit({
+  namespace: "register-school",
   windowMs: 60 * 60 * 1000,
-  max: 3,
-  keyGenerator: (req) =>
-    `register-school:${ipKeyGenerator(req.ip || "")}:${normalizeContactEmail(req.body?.contactEmail)}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many registration attempts from this IP. Please try again later." },
+  maxPerIp: 10,
+  keySuffix: (req) => normalizeContactEmail(req.body?.contactEmail),
 });
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;

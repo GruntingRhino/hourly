@@ -2,11 +2,14 @@ import prisma from "./prisma";
 import { getOrgTier, ORGANIZATION_TIER_LIMITS, DEFAULT_FREE_REMINDERS, DEFAULT_PRO_REMINDERS } from "./orgTierGates";
 import { sendEventReminderEmail } from "../services/email";
 import { generateICS, slotDateTime } from "./icsGenerator";
+import { acquireJobLease, shouldRunJob } from "./jobLease";
 
 // Scheduler fires every 15 min. We look ahead LOOK_AHEAD_MS + guard buffer to
 // ensure no slot falls in a gap between runs.
 const INTERVAL_MS = 15 * 60 * 1000;
 const LOOK_AHEAD_BUFFER_MS = 2 * 60 * 1000; // 2 min buffer per side
+const EVENT_REMINDER_JOB = "event-reminders";
+const EVENT_REMINDER_LEASE_MS = 14 * 60 * 1000;
 
 interface ReminderDefinition {
   minutesBefore: number;
@@ -273,6 +276,7 @@ async function runEventReminderCycle(): Promise<void> {
 }
 
 let reminderTimer: NodeJS.Timeout | null = null;
+let lastOpportunisticCheckAt = 0;
 
 export function startEventReminderScheduler(): void {
   if (reminderTimer) return;
@@ -291,6 +295,26 @@ export function startEventReminderScheduler(): void {
   setTimeout(run, 30_000); // initial delay at startup
   reminderTimer = setInterval(run, INTERVAL_MS);
   console.info("[eventReminders] Event reminder scheduler active (15 min interval)");
+}
+
+export async function maybeRunEventReminderCycle(): Promise<void> {
+  const now = Date.now();
+  if (now - lastOpportunisticCheckAt < 60_000) return;
+  lastOpportunisticCheckAt = now;
+
+  const due = await shouldRunJob(EVENT_REMINDER_JOB, INTERVAL_MS);
+  if (!due) return;
+
+  const lease = await acquireJobLease(EVENT_REMINDER_JOB, EVENT_REMINDER_LEASE_MS);
+  if (!lease) return;
+
+  let markRan = false;
+  try {
+    await runEventReminderCycle();
+    markRan = true;
+  } finally {
+    await lease.release(markRan);
+  }
 }
 
 export { runEventReminderCycle };

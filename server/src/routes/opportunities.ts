@@ -34,6 +34,8 @@ const createSchema = z.object({
 router.get("/", async (req: Request, res: Response) => {
   try {
     const { search, date, tag, organizationId, status, schoolId, approvedOnly } = req.query;
+    const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
+    const take = Number.isFinite(limitRaw) ? Math.min(300, Math.max(1, Math.floor(limitRaw))) : 150;
 
     const where: any = { status: (status as string) || "ACTIVE" };
 
@@ -97,6 +99,7 @@ router.get("/", async (req: Request, res: Response) => {
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
       },
       orderBy,
+      take,
     });
 
     // Filter by tag if provided (tags stored as JSON string)

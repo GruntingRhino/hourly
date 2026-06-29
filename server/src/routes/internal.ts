@@ -2,6 +2,9 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { runReminderCycle } from "../lib/reminders";
+import { runEventReminderCycle } from "../lib/eventReminders";
+import { runUploadCleanupCycle } from "../lib/uploadCleanup";
+import { verifyGithubActionsOidcToken } from "../lib/githubActionsOidc";
 import { getCanvasOperationalStatus } from "../services/canvasIntegration";
 import { getGoogleClassroomOperationalStatus } from "../services/googleClassroomIntegration";
 import { firstZodError, optionalTrimmedString, strictObject } from "../lib/validation";
@@ -25,12 +28,27 @@ function hasValidCronSecret(req: Request): boolean {
   return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
+async function hasValidSchedulerAuth(req: Request): Promise<boolean> {
+  if (hasValidCronSecret(req)) return true;
+
+  const authHeader = req.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
+  if (!token) return false;
+
+  try {
+    return await verifyGithubActionsOidcToken(token);
+  } catch (err) {
+    console.warn("GitHub Actions OIDC verification failed:", err);
+    return false;
+  }
+}
+
 const internalQuerySchema = strictObject({
   schoolId: optionalTrimmedString(191),
 });
 
 async function handleReminderRun(req: Request, res: Response): Promise<void> {
-  if (!hasValidCronSecret(req)) {
+  if (!await hasValidSchedulerAuth(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -69,8 +87,70 @@ router.post("/reminders/run", (req, res) => {
   void handleReminderRun(req, res);
 });
 
+async function handleEventReminderRun(req: Request, res: Response): Promise<void> {
+  if (!await hasValidSchedulerAuth(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (isProdLike() && !process.env.CRON_SECRET) {
+    res.status(503).json({ error: "CRON_SECRET is required in production" });
+    return;
+  }
+
+  try {
+    await runEventReminderCycle();
+    res.json({
+      ok: true,
+      ranAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Internal event reminder run error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.get("/event-reminders/run", (req, res) => {
+  void handleEventReminderRun(req, res);
+});
+
+router.post("/event-reminders/run", (req, res) => {
+  void handleEventReminderRun(req, res);
+});
+
+async function handleUploadCleanupRun(req: Request, res: Response): Promise<void> {
+  if (!await hasValidSchedulerAuth(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (isProdLike() && !process.env.CRON_SECRET) {
+    res.status(503).json({ error: "CRON_SECRET is required in production" });
+    return;
+  }
+
+  try {
+    await runUploadCleanupCycle();
+    res.json({
+      ok: true,
+      ranAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Internal upload cleanup run error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.get("/upload-cleanup/run", (req, res) => {
+  void handleUploadCleanupRun(req, res);
+});
+
+router.post("/upload-cleanup/run", (req, res) => {
+  void handleUploadCleanupRun(req, res);
+});
+
 async function handleCanvasOps(req: Request, res: Response): Promise<void> {
-  if (!hasValidCronSecret(req)) {
+  if (!await hasValidSchedulerAuth(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -101,7 +181,7 @@ router.get("/canvas/ops", (req, res) => {
 });
 
 async function handleGoogleClassroomOps(req: Request, res: Response): Promise<void> {
-  if (!hasValidCronSecret(req)) {
+  if (!await hasValidSchedulerAuth(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

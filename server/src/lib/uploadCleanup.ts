@@ -78,11 +78,15 @@ async function cleanCancelledOpportunityAttachments(): Promise<void> {
   console.log(`[uploadCleanup] Cleaned ${ids.length} attachment record(s), removed ${deleted} file(s) for cancelled opportunities.`);
 }
 
+export async function runUploadCleanupCycle(): Promise<void> {
+  await cleanOrphanedDiskFiles();
+  await cleanCancelledOpportunityAttachments();
+}
+
 export function startUploadCleanupJob(): void {
   const run = async () => {
     try {
-      await cleanOrphanedDiskFiles();
-      await cleanCancelledOpportunityAttachments();
+      await runUploadCleanupCycle();
     } catch (err) {
       console.error("[uploadCleanup] Error during cleanup:", err);
     }

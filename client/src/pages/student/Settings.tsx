@@ -22,7 +22,6 @@ export default function StudentSettings() {
   const [name, setName] = useState(user?.name || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [grade, setGrade] = useState(user?.grade || "");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl || null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatarUrl || null);
   const [signupCount, setSignupCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -110,7 +109,6 @@ export default function StudentSettings() {
     reader.onload = () => {
       const base64 = reader.result as string;
       setAvatarPreview(base64);
-      setAvatarUrl(base64);
     };
     reader.readAsDataURL(file);
   };

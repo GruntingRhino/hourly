@@ -10,10 +10,10 @@ function SchoolDashboardMock() {
       <div className="flex items-center px-4 border-b border-[var(--border)]" style={{ height: 42, background: "var(--navy)" }}>
         <div className="font-semibold text-white text-[12px] mr-5">Lincoln High School</div>
         {["Dashboard", "Cohorts", "Partners", "Submissions"].map((tab, i) => (
-          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/50"}`}>{tab}</div>
+          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/80"}`}>{tab}</div>
         ))}
         <div className="ml-auto flex gap-1.5">
-          <div className="px-2 py-0.5 border border-white/20 rounded-[2px] text-[10px] font-medium text-white/70">Export PDF</div>
+          <div className="px-2 py-0.5 border border-white/40 rounded-[2px] text-[10px] font-medium text-white/90">Export PDF</div>
           <div className="px-2 py-0.5 rounded-[2px] text-[10px] font-medium text-white" style={{ background: "var(--action)" }}>Manage Cohorts</div>
         </div>
       </div>
@@ -129,11 +129,11 @@ function StudentDashboardMock() {
       <div className="flex items-center px-4 border-b border-[var(--border)]" style={{ height: 42, background: "var(--navy)" }}>
         <div className="font-semibold text-white text-[12px] mr-5">GoodHours</div>
         {["Dashboard", "Browse", "Submit Hours", "Settings"].map((tab, i) => (
-          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/50"}`}>{tab}</div>
+          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/80"}`}>{tab}</div>
         ))}
         <div className="ml-auto flex items-center gap-2">
           <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: "var(--navy-mid)" }}>JS</div>
-          <span className="text-[10px] text-white/70">John Smith</span>
+          <span className="text-[10px] text-white/90">John Smith</span>
         </div>
       </div>
       {/* Stats */}
@@ -219,7 +219,7 @@ function PartnerDashboardMock() {
       <div className="flex items-center px-4 border-b border-[var(--border)]" style={{ height: 42, background: "var(--navy)" }}>
         <div className="font-semibold text-white text-[12px] mr-5">City Food Bank</div>
         {["Dashboard", "Opportunities", "Settings"].map((tab, i) => (
-          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/50"}`}>{tab}</div>
+          <div key={tab} className={`px-3 text-[11px] h-full flex items-center border-b-2 ${i === 0 ? "border-white text-white font-medium" : "border-transparent text-white/80"}`}>{tab}</div>
         ))}
         <div className="ml-auto">
           <div className="px-2 py-0.5 rounded-[2px] text-[10px] font-medium text-white" style={{ background: "var(--action)" }}>+ New Opportunity</div>
@@ -313,12 +313,12 @@ export default function Landing() {
             }} />
         </a>
         <div className="hidden md:flex items-center gap-6">
-          <a href="#how" className="text-[13.5px] text-white/60 hover:text-white transition-colors">How It Works</a>
-          <a href="#features" className="text-[13.5px] text-white/60 hover:text-white transition-colors">Features</a>
-          <a href="#demo" className="text-[13.5px] text-white/60 hover:text-white transition-colors">See Demo</a>
+          <a href="#how" className="text-[13.5px] text-white/85 hover:text-white transition-colors">How It Works</a>
+          <a href="#features" className="text-[13.5px] text-white/85 hover:text-white transition-colors">Features</a>
+          <a href="#demo" className="text-[13.5px] text-white/85 hover:text-white transition-colors">See Demo</a>
         </div>
         <div className="flex items-center gap-3">
-          <Link to="/login" className="text-[13.5px] text-white/70 hover:text-white transition-colors">
+          <Link to="/login" className="text-[13.5px] text-white/90 hover:text-white transition-colors">
             Sign In
           </Link>
           <Link to="/school/register"
@@ -533,7 +533,7 @@ export default function Landing() {
                 el.parentNode?.insertBefore(span, el.nextSibling);
               }} />
             <h2 className="text-[28px] font-bold text-white mb-3">Ready to get started?</h2>
-            <p className="text-white/75 text-[14px] mb-7 leading-relaxed">
+            <p className="text-white/90 text-[14px] mb-7 leading-relaxed">
               GoodHours is free for schools. Register with Google Sign-In — students and community partners join through invitation only.
             </p>
             <Link
@@ -548,9 +548,9 @@ export default function Landing() {
               </svg>
               Sign In with Google to Register
             </Link>
-            <p className="text-white/50 text-[13px]">
+            <p className="text-white/85 text-[13px]">
               Already registered?{" "}
-              <Link to="/login" className="text-white font-medium underline hover:text-white/80">Sign in</Link>
+              <Link to="/login" className="text-white font-medium underline hover:text-white/90">Sign in</Link>
             </p>
           </div>
         </section>
@@ -564,14 +564,14 @@ export default function Landing() {
               el.style.display = "none";
               const span = document.createElement("span");
               span.textContent = "GoodHours";
-              span.className = "font-semibold text-white/50 text-[13px]";
+              span.className = "font-semibold text-white/85 text-[13px]";
               el.parentNode?.insertBefore(span, el.nextSibling);
             }} />
-          <div className="text-[12px] text-white/30">© {new Date().getFullYear()} GoodHours. All rights reserved.</div>
+          <div className="text-[12px] text-white/75">© {new Date().getFullYear()} GoodHours. All rights reserved.</div>
           <div className="flex gap-5">
-            <Link to="/faq" className="text-[13px] text-white/40 hover:text-white/70 transition-colors">Help</Link>
-            <Link to="/terms" className="text-[13px] text-white/40 hover:text-white/70 transition-colors">Terms</Link>
-            <Link to="/privacy" className="text-[13px] text-white/40 hover:text-white/70 transition-colors">Privacy</Link>
+            <Link to="/faq" className="text-[13px] text-white/80 hover:text-white transition-colors">Help</Link>
+            <Link to="/terms" className="text-[13px] text-white/80 hover:text-white transition-colors">Terms</Link>
+            <Link to="/privacy" className="text-[13px] text-white/80 hover:text-white transition-colors">Privacy</Link>
           </div>
         </div>
       </footer>

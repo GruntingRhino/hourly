@@ -11,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
   const [devGoogleEmail, setDevGoogleEmail] = useState("");
@@ -72,6 +73,20 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const nextFieldErrors: { email?: string; password?: string } = {};
+    if (!email.trim()) nextFieldErrors.email = "Enter your email address.";
+    if (!password) nextFieldErrors.password = "Enter your password.";
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      if (nextFieldErrors.email) {
+        document.getElementById("login-email")?.focus();
+      } else {
+        document.getElementById("login-password")?.focus();
+      }
+      return;
+    }
+
+    setFieldErrors({});
     setLoading(true);
     try {
       await login(email, password);
@@ -107,7 +122,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <Link to="/" className="flex justify-center mb-7">
+        <Link to="/" tabIndex={-1} className="flex justify-center mb-7">
           <img
             src="/logo-full.png"
             alt="GoodHours"
@@ -125,25 +140,48 @@ export default function Login() {
           <p className="text-[13px] text-center mb-6" style={{ color: "var(--text-sec)" }}>Sign in to your GoodHours account</p>
 
           {error && (
-            <div className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]" style={{ background: "var(--er-bg)", color: "var(--er-t)" }}>
+            <div
+              id="login-error"
+              role="alert"
+              aria-live="polite"
+              className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--er-b)] text-[13px]"
+              style={{ background: "var(--er-bg)", color: "var(--er-t)" }}
+            >
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <label htmlFor="login-email" className="block text-[13px] font-medium mb-1" style={{ color: "var(--text)" }}>Email</label>
               <input
                 id="login-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }
+                }}
                 required
                 autoComplete="email"
                 className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
-                style={{ background: "var(--surface)", color: "var(--text)" }}
+                style={{
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  borderColor: fieldErrors.email ? "var(--er-b)" : undefined,
+                }}
                 placeholder="you@school.edu or your email"
+                aria-invalid={fieldErrors.email ? "true" : "false"}
+                aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
+                tabIndex={1}
               />
+              {fieldErrors.email && (
+                <p id="login-email-error" className="mt-1 text-[12px]" style={{ color: "var(--er-t)" }}>
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -152,6 +190,7 @@ export default function Login() {
                   to="/forgot-password"
                   className="text-[12px] hover:underline"
                   style={{ color: "var(--action)" }}
+                  tabIndex={4}
                 >
                   Forgot password?
                 </Link>
@@ -161,11 +200,23 @@ export default function Login() {
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }
+                  }}
                   required
                   autoComplete="current-password"
                   className="w-full h-[34px] px-3 pr-9 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)]"
-                  style={{ background: "var(--surface)", color: "var(--text)" }}
+                  style={{
+                    background: "var(--surface)",
+                    color: "var(--text)",
+                    borderColor: fieldErrors.password ? "var(--er-b)" : undefined,
+                  }}
+                  aria-invalid={fieldErrors.password ? "true" : "false"}
+                  aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
+                  tabIndex={2}
                 />
                 <button
                   type="button"
@@ -187,6 +238,11 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p id="login-password-error" className="mt-1 text-[12px]" style={{ color: "var(--er-t)" }}>
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             <button
@@ -194,6 +250,7 @@ export default function Login() {
               disabled={loading}
               className="w-full h-[34px] text-white rounded-[2px] font-semibold text-[13.5px] disabled:opacity-50 transition-colors"
               style={{ background: "var(--navy)" }}
+              tabIndex={3}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

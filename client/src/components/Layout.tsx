@@ -54,7 +54,7 @@ export default function Layout() {
       <header style={{ background: "var(--navy)", height: 54 }} className="sticky top-0 z-40 flex items-center">
         <div className="max-w-[1080px] mx-auto px-6 h-full flex items-center justify-between w-full">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center shrink-0">
+          <Link to="/dashboard" tabIndex={-1} className="flex items-center shrink-0">
             <img
               src="/logo-full.png"
               alt="GoodHours"
@@ -147,7 +147,7 @@ export default function Layout() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 17a2 2 0 1 0 4 0" />
               </svg>
               {unreadNotifications > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center px-1">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[var(--er-t)] text-white text-[10px] font-semibold flex items-center justify-center px-1">
                   {unreadNotifications > 99 ? "99+" : unreadNotifications}
                 </span>
               )}

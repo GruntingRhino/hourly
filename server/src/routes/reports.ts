@@ -1,5 +1,4 @@
 import { Router, Request, Response } from "express";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import {
@@ -19,26 +18,23 @@ import {
   getAccessibleTeacherCohorts,
   getStaffAccessScope,
 } from "../lib/cohortAccess";
+import { createHybridRateLimit } from "../middleware/rateLimit";
 
 const router = Router();
 
 // 5 parent-link generations per student per hour — prevents token churn/abuse
-const parentLinkLimiter = rateLimit({
+const parentLinkLimiter = createHybridRateLimit({
+  namespace: "parent-link",
   windowMs: 60 * 60 * 1000,
-  max: 5,
-  keyGenerator: (req) => `parent-link:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many parent link requests. Please wait before generating another." },
+  maxPerIp: 20,
+  maxPerUser: 5,
 });
 
 // 30 reads per IP per 15 minutes — public endpoint, tokens not guessable but still needs a floor
-const parentProgressLimiter = rateLimit({
+const parentProgressLimiter = createHybridRateLimit({
+  namespace: "parent-progress",
   windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests. Please try again later." },
+  maxPerIp: 30,
 });
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];

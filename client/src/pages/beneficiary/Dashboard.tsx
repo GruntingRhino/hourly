@@ -276,7 +276,7 @@ export default function BeneficiaryDashboard() {
 
       {pendingSignups.length === 0 && pendingInvitations.length === 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-8 text-center text-[var(--text-sec)] text-[13.5px]">
-          No pending items. <Link to="/opportunities" className="text-[var(--action)] hover:underline">Create opportunities</Link> for students.
+          No pending items. <Link to="/opportunities" className="text-[var(--action)] underline underline-offset-2 hover:opacity-85">Create opportunities</Link> for students.
         </div>
       )}
     </div>

@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { runReminderCycle } from "../lib/reminders";
 import { resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
+import { createHybridRateLimit } from "../middleware/rateLimit";
 
 const router = Router();
 const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
@@ -288,29 +288,27 @@ async function canSendMessage(senderId: string, receiverId: string): Promise<boo
 
 // 1 manual reminder run per user per hour — prevents staff from spamming students with reminder emails
 // Keyed by userId synchronously (express-rate-limit does not support async keyGenerator)
-const reminderRunLimiter = rateLimit({
+const reminderRunLimiter = createHybridRateLimit({
+  namespace: "reminder-run",
   windowMs: 60 * 60 * 1000,
-  max: 1,
-  keyGenerator: (req) => `reminder-run:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Reminder cycle already triggered this hour. Please wait before running again." },
+  maxPerIp: 3,
+  maxPerUser: 1,
 });
 
 // 20 messages per user per hour — prevents inbox-flooding another user
-const sendMessageLimiter = rateLimit({
+const sendMessageLimiter = createHybridRateLimit({
+  namespace: "msg-send",
   windowMs: 60 * 60 * 1000,
-  max: 20,
-  keyGenerator: (req) => `msg-send:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many messages sent. Please wait before sending more." },
+  maxPerIp: 40,
+  maxPerUser: 20,
 });
 
 // GET /api/messages — get user's messages
 router.get("/", authenticate, async (req: Request, res: Response) => {
   try {
     const { folder } = req.query; // inbox or sent
+    const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
+    const take = Number.isFinite(limitRaw) ? Math.min(200, Math.max(1, Math.floor(limitRaw))) : 100;
     const where = folder === "sent"
       ? { senderId: req.user!.userId }
       : { receiverId: req.user!.userId };
@@ -322,6 +320,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
         receiver: { select: { id: true, name: true, role: true } },
       },
       orderBy: { createdAt: "desc" },
+      take,
     });
     res.json(messages);
   } catch (err) {
@@ -432,13 +431,15 @@ router.put("/:id/read", authenticate, async (req: Request, res: Response) => {
 // GET /api/notifications — get user's notifications
 router.get("/notifications", authenticate, async (req: Request, res: Response) => {
   try {
+    const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
+    const take = Number.isFinite(limitRaw) ? Math.min(200, Math.max(1, Math.floor(limitRaw))) : 50;
     const notifications = await prisma.notification.findMany({
       where: {
         userId: req.user!.userId,
         NOT: { type: { startsWith: SYSTEM_NOTIFICATION_PREFIX } },
       },
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take,
     });
     res.json(notifications);
   } catch (err) {
