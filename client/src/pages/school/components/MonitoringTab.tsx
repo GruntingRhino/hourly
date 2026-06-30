@@ -1,9 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../lib/api";
+import { useAuth } from "../../../hooks/useAuth";
 import type { LaunchWorkspace, ReminderSummary, MonitoringForm } from "./types";
 import { MetricCard, formatDate } from "./types";
 
+interface InternalInvoiceRequest {
+  id: string;
+  status: string;
+  legalName: string;
+  address: string;
+  billingContactName: string;
+  billingContactEmail: string;
+  purchaseOrderRequired: boolean;
+  taxExempt: boolean;
+  preferredPaymentMethod: string | null;
+  additionalNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  beneficiary: {
+    id: string;
+    name: string;
+    email: string | null;
+    planTier: "FREE" | "PRO" | null;
+  };
+}
+
 export default function MonitoringTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
+  const { user } = useAuth();
   const [monitoringForm, setMonitoringForm] = useState<MonitoringForm>({
     launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate ?? "",
     checkCadence: workspace.plan.firstUserMonitoring.checkCadence,
@@ -15,6 +38,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
   const [monitoringMessage, setMonitoringMessage] = useState("");
   const [runningReminders, setRunningReminders] = useState(false);
   const [latestReminderSummary, setLatestReminderSummary] = useState<ReminderSummary | null>(null);
+  const [invoiceRequests, setInvoiceRequests] = useState<InternalInvoiceRequest[]>([]);
+  const [loadingInvoiceRequests, setLoadingInvoiceRequests] = useState(false);
 
   const targetProgress = useMemo(() => {
     const target = Number(monitoringForm.activeStudentTarget) || workspace.plan.firstUserMonitoring.activeStudentTarget;
@@ -30,6 +55,15 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
       notes: workspace.plan.firstUserMonitoring.notes ?? "",
     });
   }, [workspace]);
+
+  useEffect(() => {
+    if (!user?.isInternalAdmin) return;
+    setLoadingInvoiceRequests(true);
+    api.get<{ requests: InternalInvoiceRequest[] }>("/billing/organizations/internal/invoice-requests?limit=10")
+      .then((data) => setInvoiceRequests(data.requests || []))
+      .catch(() => setInvoiceRequests([]))
+      .finally(() => setLoadingInvoiceRequests(false));
+  }, [user?.isInternalAdmin]);
 
   const handleSaveMonitoring = async () => {
     setSavingMonitoring(true);
@@ -245,6 +279,82 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         <MetricCard label="At-Risk Students" value={String(workspace.metrics.atRiskStudents)} subtext={`${workspace.metrics.completedStudents} completed`} />
         <MetricCard label="No-Shows" value={String(workspace.metrics.noShowCount)} subtext={`${workspace.metrics.pendingLegacyVerifications} legacy verifications pending`} />
       </div>
+
+      {user?.isInternalAdmin && (
+        <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface)] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[16px] font-semibold text-[var(--text)]">Organization Invoice Requests</h2>
+              <p className="mt-1 text-sm text-[var(--text-sec)]">
+                Internal queue for organizations that want invoice or purchase-order based billing.
+              </p>
+            </div>
+            <div className="text-sm text-[var(--text-sec)]">
+              {loadingInvoiceRequests ? "Loading..." : `${invoiceRequests.length} recent`}
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {loadingInvoiceRequests ? (
+              <div className="text-sm text-[var(--text-sec)]">Loading invoice requests...</div>
+            ) : invoiceRequests.length === 0 ? (
+              <div className="rounded-[3px] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--text-sec)]">
+                No invoice requests yet.
+              </div>
+            ) : (
+              invoiceRequests.map((request) => (
+                <div key={request.id} className="rounded-[3px] border border-[var(--border)] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--text)]">{request.legalName}</div>
+                      <div className="mt-1 text-xs text-[var(--text-sec)]">
+                        {request.beneficiary.name}
+                        {request.beneficiary.planTier ? ` · ${request.beneficiary.planTier}` : ""}
+                        {request.beneficiary.email ? ` · ${request.beneficiary.email}` : ""}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-sec)]">{request.status}</div>
+                      <div className="mt-1 text-xs text-[var(--text-faint)]">{new Date(request.createdAt).toLocaleString()}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 text-sm">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">Billing Contact</div>
+                      <div className="mt-1 text-[var(--text)]">{request.billingContactName}</div>
+                      <a href={`mailto:${request.billingContactEmail}`} className="text-[var(--action)] hover:underline">
+                        {request.billingContactEmail}
+                      </a>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">Preferences</div>
+                      <div className="mt-1 text-[var(--text)]">{request.preferredPaymentMethod || "No preferred method specified"}</div>
+                      <div className="mt-1 text-xs text-[var(--text-sec)]">
+                        {request.purchaseOrderRequired ? "Purchase order required" : "Purchase order not required"}
+                        {" · "}
+                        {request.taxExempt ? "Tax exempt" : "Not marked tax exempt"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-sm text-[var(--text-sec)]">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">Address</div>
+                    <div className="mt-1">{request.address}</div>
+                  </div>
+
+                  {request.additionalNotes && (
+                    <div className="mt-3 text-sm text-[var(--text-sec)]">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">Additional Notes</div>
+                      <div className="mt-1 whitespace-pre-wrap">{request.additionalNotes}</div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

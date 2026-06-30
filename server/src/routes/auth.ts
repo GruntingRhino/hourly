@@ -18,6 +18,7 @@ import {
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { isUniqueConstraintError } from "../lib/prismaErrors";
+import { isInternalAdminUser } from "../lib/internalAdmin";
 import {
   firstZodError,
   opaqueIdSchema,
@@ -313,6 +314,7 @@ function buildLoginUserPayload(user: {
     email: user.email,
     name: user.name,
     role: user.role,
+    isInternalAdmin: isInternalAdminUser(user),
     emailVerified: user.emailVerified,
     phone: enrichedUser?.phone ? decryptField(enrichedUser.phone) : undefined,
     grade: enrichedUser?.grade ?? undefined,
@@ -791,6 +793,7 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       grade: user.grade,
       house: user.house,
       status: user.status,
+      isInternalAdmin: isInternalAdminUser(user),
     });
 
   } catch (err) {

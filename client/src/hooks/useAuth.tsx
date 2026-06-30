@@ -18,6 +18,7 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  isInternalAdmin?: boolean;
   emailVerified?: boolean;
   grade?: string;
   house?: string;

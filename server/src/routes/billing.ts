@@ -4,6 +4,7 @@ import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { BILLING_CONFIG } from "../lib/billingConfig";
 import { getStripe } from "../lib/stripe";
+import { isInternalAdminUser } from "../lib/internalAdmin";
 
 const router = Router();
 
@@ -15,6 +16,16 @@ async function requireBeneficiaryAdmin(userId: string, beneficiaryId: string): P
     where: { id: userId, beneficiaryId, role: "BENEFICIARY_ADMIN" },
   });
   if (!member) throw Object.assign(new Error("Forbidden"), { status: 403 });
+}
+
+async function requireInternalAdmin(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, role: true },
+  });
+  if (!user || !isInternalAdminUser(user)) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
 }
 
 // ── GET /api/billing/organizations/:id/summary ──────────────────────────────
@@ -184,6 +195,53 @@ router.post("/:id/invoice-request", authenticate, async (req: Request, res: Resp
   } catch (err: any) {
     if (err.status === 403) return res.status(403).json({ error: "Forbidden" });
     console.error("[billing] invoice-request error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/billing/organizations/internal/invoice-requests ───────────────
+router.get("/internal/invoice-requests", authenticate, async (req: Request, res: Response) => {
+  try {
+    await requireInternalAdmin(req.user!.userId);
+
+    const query = z.object({
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+      status: z.string().trim().min(1).optional(),
+    }).parse(req.query);
+
+    const requests = await prisma.organizationInvoiceRequest.findMany({
+      where: query.status ? { status: query.status } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: query.limit ?? 25,
+      select: {
+        id: true,
+        status: true,
+        legalName: true,
+        address: true,
+        billingContactName: true,
+        billingContactEmail: true,
+        purchaseOrderRequired: true,
+        taxExempt: true,
+        preferredPaymentMethod: true,
+        additionalNotes: true,
+        createdAt: true,
+        updatedAt: true,
+        beneficiary: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            planTier: true,
+          },
+        },
+      },
+    });
+
+    res.json({ requests });
+  } catch (err: any) {
+    if (err.status === 403) return res.status(403).json({ error: "Forbidden" });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues[0]?.message || "Invalid query" });
+    console.error("[billing] internal invoice-requests error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
