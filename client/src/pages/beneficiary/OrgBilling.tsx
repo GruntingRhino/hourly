@@ -326,6 +326,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                 "Reminder performance analytics",
                 "5 GB file storage",
                 "Higher upload-rate limits",
+                "Small featured placement boost in student browse when opportunities are otherwise similarly relevant",
               ].map((f) => (
                 <li key={f} className="flex gap-2">
                   <span className="text-[var(--action)] flex-shrink-0 mt-0.5">✦</span>
@@ -350,6 +351,9 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                 </button>
                 <p className="mt-2 text-xs text-[var(--text-faint)] text-center">
                   Secure checkout powered by Stripe. Cancel anytime.
+                </p>
+                <p className="mt-2 text-xs text-[var(--text-faint)] text-center">
+                  Placement boost is intentionally small and only acts as a tie-break after student relevance and eligibility.
                 </p>
               </>
             )}

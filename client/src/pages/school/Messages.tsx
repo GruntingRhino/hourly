@@ -236,7 +236,7 @@ export default function SchoolMessages() {
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--er-t)]">Open Intervention Queue</div>
               <div className="text-sm text-red-900">Students still blocking completion or requiring staff follow-up.</div>
             </div>
-            <button onClick={() => navigate('/groups?triage=URGENT&view=MORNING_TRIAGE')} className="px-3 py-2 rounded-[2px] bg-[var(--er-t)] text-white text-sm font-medium hover:bg-[var(--er-t)]">
+            <button onClick={() => navigate('/groups?triage=URGENT&view=ADMIN_MORNING&filter=ALL')} className="px-3 py-2 rounded-[2px] bg-[var(--er-t)] text-white text-sm font-medium hover:bg-[var(--er-t)]">
               Open Triage Roster
             </button>
           </div>

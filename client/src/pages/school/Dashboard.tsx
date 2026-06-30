@@ -361,7 +361,7 @@ export default function SchoolDashboard() {
               <p className="text-sm text-[var(--text-sec)] mt-1">Prioritized for admins and teachers: overdue deadlines, approval bottlenecks, and attendance concerns.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="px-3 py-2 bg-[var(--er-t)] text-white rounded-[2px] text-sm font-medium hover:bg-red-700">
+              <Link to="/groups?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="px-3 py-2 bg-[var(--er-t)] text-white rounded-[2px] text-sm font-medium hover:bg-red-700">
                 Open Triage Queue
               </Link>
               {schoolId && (
@@ -379,7 +379,7 @@ export default function SchoolDashboard() {
             {topAtRisk.map((student) => (
               <Link
                 key={student.id}
-                to={`/students?view=ADMIN_MORNING&triage=URGENT&filter=AT_RISK&student=${student.id}`}
+                to={`/groups?view=ADMIN_MORNING&triage=URGENT&filter=AT_RISK&student=${student.id}`}
                 className="rounded-[3px] border border-white/80 bg-[var(--surface)]/90 p-3 hover:border-[var(--er-b)] hover:bg-[var(--surface)]"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -406,13 +406,13 @@ export default function SchoolDashboard() {
             ))}
           </div>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            <Link to="/students?view=DEADLINE_ESCALATIONS&triage=OVERDUE&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--er-b)] text-[var(--er-t)] hover:bg-[var(--er-bg)]">
+            <Link to="/groups?view=DEADLINE_ESCALATIONS&triage=OVERDUE&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--er-b)] text-[var(--er-t)] hover:bg-[var(--er-bg)]">
               Deadline Escalations
             </Link>
-            <Link to="/students?view=APPROVAL_BOTTLENECKS&triage=PENDING_APPROVAL&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--wn-b)] text-[var(--wn-t)] hover:bg-[var(--wn-bg)]">
+            <Link to="/groups?view=APPROVAL_BOTTLENECKS&triage=PENDING_APPROVAL&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--wn-b)] text-[var(--wn-t)] hover:bg-[var(--wn-bg)]">
               Approval Bottlenecks
             </Link>
-            <Link to="/students?view=ATTENDANCE_WATCH&triage=NO_SHOWS&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text-sec)] hover:bg-[var(--bg)]">
+            <Link to="/groups?view=ATTENDANCE_WATCH&triage=NO_SHOWS&filter=ALL" className="px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text-sec)] hover:bg-[var(--bg)]">
               Attendance Watch
             </Link>
           </div>
@@ -426,7 +426,7 @@ export default function SchoolDashboard() {
               <div className="text-sm font-semibold text-[var(--text)]">Recent Outreach & Intervention History</div>
               <p className="text-sm text-[var(--text-faint)] mt-1">See who was contacted, from which queue, who sent it, and whether students showed follow-up activity after outreach.</p>
             </div>
-            <Link to="/students?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="text-sm font-medium text-[var(--action)] underline underline-offset-2 hover:text-[var(--navy)]">
+            <Link to="/groups?view=ADMIN_MORNING&triage=URGENT&filter=ALL" className="text-sm font-medium text-[var(--action)] underline underline-offset-2 hover:text-[var(--navy)]">
               Open roster workflow
             </Link>
           </div>

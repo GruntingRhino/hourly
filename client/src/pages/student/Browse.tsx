@@ -19,7 +19,7 @@ interface TimeSlot {
     location: string | null;
     category: string | null;
     requirementsNote: string | null;
-    beneficiary: { id: string; name: string; category: string | null };
+    beneficiary: { id: string; name: string; category: string | null; planTier?: "FREE" | "PRO" | null };
   };
 }
 
@@ -97,6 +97,12 @@ function getSlotSearchScore(slot: TimeSlot, rawQuery: string): number {
   }
 
   return total;
+}
+
+function getStudentBrowseRank(slot: TimeSlot, rawQuery: string): number {
+  const searchScore = getSlotSearchScore(slot, rawQuery);
+  const proBoost = slot.opportunity.beneficiary.planTier === "PRO" ? 8 : 0;
+  return searchScore * 100 + proBoost;
 }
 
 function getSlotDateKey(date: string): string {
@@ -290,7 +296,7 @@ export default function StudentBrowse() {
 
   const visibleSlots =
     view === "list" && search
-      ? [...filtered].sort((a, b) => getSlotSearchScore(b, search) - getSlotSearchScore(a, search))
+      ? [...filtered].sort((a, b) => getStudentBrowseRank(b, search) - getStudentBrowseRank(a, search))
       : filtered;
 
   return (
@@ -411,6 +417,21 @@ export default function StudentBrowse() {
                     <div className="text-[13px] mt-0.5" style={{ color: "var(--text-sec)" }}>
                       {slot.opportunity.beneficiary.name}
                     </div>
+                    {slot.opportunity.beneficiary.planTier === "PRO" && (
+                      <div className="mt-1">
+                        <span
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{
+                            background: "var(--wn-bg)",
+                            color: "var(--wn-t)",
+                            borderColor: "var(--wn-b)",
+                          }}
+                          title="Pro partners receive a small placement boost when opportunities are otherwise similarly relevant."
+                        >
+                          Pro Partner
+                        </span>
+                      </div>
+                    )}
                     {slot.opportunity.category && (
                       <div className="text-[12px] mt-0.5" style={{ color: "var(--action)" }}>
                         {slot.opportunity.category}

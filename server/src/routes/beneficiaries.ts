@@ -829,7 +829,7 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
       include: {
         opportunity: {
           include: {
-            beneficiary: { select: { id: true, name: true, category: true } },
+            beneficiary: { select: { id: true, name: true, category: true, planTier: true } },
           },
         },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },

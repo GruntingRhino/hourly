@@ -31,6 +31,7 @@ const StudentSettings = lazy(() => import("./pages/student/Settings"));
 const StudentSelfSubmit = lazy(() => import("./pages/student/SelfSubmit"));
 const SchoolDashboard = lazy(() => import("./pages/school/Dashboard"));
 const StudentList = lazy(() => import("./pages/school/StudentList"));
+const SchoolGroups = lazy(() => import("./pages/school/Groups"));
 const SchoolCohorts = lazy(() => import("./pages/school/Cohorts"));
 const CohortDetail = lazy(() => import("./pages/school/CohortDetail"));
 const SchoolBeneficiaries = lazy(() => import("./pages/school/Beneficiaries"));
@@ -121,6 +122,7 @@ function AppRoutes() {
               <Route path="/students" element={<StudentList />} />
               <Route path="/students/on-track" element={<StudentList />} />
               <Route path="/students/off-track" element={<StudentList />} />
+              <Route path="/groups" element={<SchoolGroups />} />
               <Route path="/cohorts" element={<SchoolCohorts />} />
               <Route path="/cohorts/:id" element={<CohortDetail />} />
               <Route path="/cohorts/:id/on-track" element={<StudentList />} />
