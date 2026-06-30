@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
@@ -6,57 +6,46 @@ import SessionPrefBanner from "./components/SessionPrefBanner";
 import { getSessionPref } from "./lib/authSession";
 import { ToastProvider } from "./components/Toast";
 
-// Public pages
-import Landing from "./pages/Landing";
-import FAQ from "./pages/FAQ";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import EmailVerificationRequired from "./pages/EmailVerificationRequired";
-import ParentProgress from "./pages/ParentProgress";
-
-// Invitation / onboarding flows (public, no auth required)
-import JoinCohort from "./pages/student/JoinCohort";
-import JoinBeneficiary from "./pages/beneficiary/JoinBeneficiary";
-import SchoolRegister from "./pages/school/Register";
-import SchoolVerifyRegistration from "./pages/school/VerifyRegistration";
-import SchoolConfirmTransfer from "./pages/school/ConfirmTransfer";
-
-// Student pages
-import StudentDashboard from "./pages/student/Dashboard";
-import StudentBrowse from "./pages/student/Browse";
-import OpportunityDetail from "./pages/student/OpportunityDetail";
-import SlotDetail from "./pages/student/SlotDetail";
-import StudentMessages from "./pages/student/Messages";
-import StudentSettings from "./pages/student/Settings";
-import StudentSelfSubmit from "./pages/student/SelfSubmit";
-
-// School pages
-import SchoolDashboard from "./pages/school/Dashboard";
-import StudentList from "./pages/school/StudentList";
-import SchoolCohorts from "./pages/school/Cohorts";
-import CohortDetail from "./pages/school/CohortDetail";
-import SchoolBeneficiaries from "./pages/school/Beneficiaries";
-import BeneficiaryDiscover from "./pages/school/Discover";
-import SchoolOpportunities from "./pages/school/SchoolOpportunities";
-import SchoolSelfSubmissions from "./pages/school/SelfSubmissions";
-import SchoolMessages from "./pages/school/Messages";
-import SchoolSettings from "./pages/school/Settings";
-import SchoolOnboarding from "./pages/school/Onboarding";
-import LaunchCenter from "./pages/school/LaunchCenter";
-
-// Admin pages
-import ImpersonatePage from "./pages/admin/Impersonate";
-
-// Beneficiary pages
-import BeneficiaryDashboard from "./pages/beneficiary/Dashboard";
-import BeneficiaryOpportunities from "./pages/beneficiary/Opportunities";
-import BeneficiarySettings from "./pages/beneficiary/Settings";
-import OrgMessages from "./pages/organization/Messages";
+const Landing = lazy(() => import("./pages/Landing"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const EmailVerificationRequired = lazy(() => import("./pages/EmailVerificationRequired"));
+const ParentProgress = lazy(() => import("./pages/ParentProgress"));
+const JoinCohort = lazy(() => import("./pages/student/JoinCohort"));
+const JoinBeneficiary = lazy(() => import("./pages/beneficiary/JoinBeneficiary"));
+const SchoolRegister = lazy(() => import("./pages/school/Register"));
+const SchoolVerifyRegistration = lazy(() => import("./pages/school/VerifyRegistration"));
+const SchoolConfirmTransfer = lazy(() => import("./pages/school/ConfirmTransfer"));
+const StudentDashboard = lazy(() => import("./pages/student/Dashboard"));
+const StudentBrowse = lazy(() => import("./pages/student/Browse"));
+const OpportunityDetail = lazy(() => import("./pages/student/OpportunityDetail"));
+const SlotDetail = lazy(() => import("./pages/student/SlotDetail"));
+const StudentMessages = lazy(() => import("./pages/student/Messages"));
+const StudentSettings = lazy(() => import("./pages/student/Settings"));
+const StudentSelfSubmit = lazy(() => import("./pages/student/SelfSubmit"));
+const SchoolDashboard = lazy(() => import("./pages/school/Dashboard"));
+const StudentList = lazy(() => import("./pages/school/StudentList"));
+const SchoolCohorts = lazy(() => import("./pages/school/Cohorts"));
+const CohortDetail = lazy(() => import("./pages/school/CohortDetail"));
+const SchoolBeneficiaries = lazy(() => import("./pages/school/Beneficiaries"));
+const BeneficiaryDiscover = lazy(() => import("./pages/school/Discover"));
+const SchoolOpportunities = lazy(() => import("./pages/school/SchoolOpportunities"));
+const SchoolSelfSubmissions = lazy(() => import("./pages/school/SelfSubmissions"));
+const SchoolMessages = lazy(() => import("./pages/school/Messages"));
+const SchoolSettings = lazy(() => import("./pages/school/Settings"));
+const SchoolOnboarding = lazy(() => import("./pages/school/Onboarding"));
+const LaunchCenter = lazy(() => import("./pages/school/LaunchCenter"));
+const ImpersonatePage = lazy(() => import("./pages/admin/Impersonate"));
+const BeneficiaryDashboard = lazy(() => import("./pages/beneficiary/Dashboard"));
+const BeneficiaryOpportunities = lazy(() => import("./pages/beneficiary/Opportunities"));
+const BeneficiarySettings = lazy(() => import("./pages/beneficiary/Settings"));
+const OrgMessages = lazy(() => import("./pages/organization/Messages"));
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 
@@ -79,6 +68,13 @@ function AppRoutes() {
 
   return (
     <div className={user && showPrefBanner && !suppressPrefBanner ? "pb-40 sm:pb-32" : undefined}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-[var(--text-sec)] text-lg">Loading...</div>
+        </div>
+      }
+    >
     <Routes>
       {/* Public routes — always accessible */}
       <Route path="/" element={<Landing />} />
@@ -175,6 +171,7 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       )}
     </Routes>
+    </Suspense>
     {user && showPrefBanner && !suppressPrefBanner && (
       <SessionPrefBanner onDismiss={() => setShowPrefBanner(false)} />
     )}
