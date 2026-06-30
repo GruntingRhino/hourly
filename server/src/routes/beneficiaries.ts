@@ -7,6 +7,7 @@ import { z } from "zod";
 import { parse } from "csv-parse/sync";
 import multer from "multer";
 import prisma from "../lib/prisma";
+import { isPrismaKnownRequestError } from "../lib/prismaErrors";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -2278,7 +2279,7 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
 
     res.status(201).json(result.signup);
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (isPrismaKnownRequestError(err)) {
       if (err.code === "P2002") {
         return res.status(409).json({ error: "Already signed up for this slot" });
       }

@@ -1,5 +1,5 @@
-import { Prisma } from "@prisma/client";
 import prisma from "./prisma";
+import { isPrismaKnownRequestError } from "./prismaErrors";
 
 type LeaseHandle = {
   release: (markRan?: boolean) => Promise<void>;
@@ -12,13 +12,14 @@ export async function acquireJobLease(
   const leaseUntil = new Date(Date.now() + leaseMs);
   const now = new Date();
 
-  const updated = await prisma.$executeRaw(
-    Prisma.sql`
-      UPDATE "ScheduledJobLease"
-      SET "leaseUntil" = ${leaseUntil}, "updatedAt" = NOW()
-      WHERE "jobName" = ${jobName}
-        AND "leaseUntil" <= ${now}
-    `
+  const updated = await prisma.$executeRawUnsafe(
+    `UPDATE "ScheduledJobLease"
+     SET "leaseUntil" = $1, "updatedAt" = NOW()
+     WHERE "jobName" = $2
+       AND "leaseUntil" <= $3`,
+    leaseUntil,
+    jobName,
+    now
   );
 
   if (updated === 0) {
@@ -30,17 +31,18 @@ export async function acquireJobLease(
         },
       });
     } catch (err) {
-      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+      if (!isPrismaKnownRequestError(err) || err.code !== "P2002") {
         throw err;
       }
 
-      const retry = await prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "ScheduledJobLease"
-          SET "leaseUntil" = ${leaseUntil}, "updatedAt" = NOW()
-          WHERE "jobName" = ${jobName}
-            AND "leaseUntil" <= ${now}
-        `
+      const retry = await prisma.$executeRawUnsafe(
+        `UPDATE "ScheduledJobLease"
+         SET "leaseUntil" = $1, "updatedAt" = NOW()
+         WHERE "jobName" = $2
+           AND "leaseUntil" <= $3`,
+        leaseUntil,
+        jobName,
+        now
       );
 
       if (retry === 0) {

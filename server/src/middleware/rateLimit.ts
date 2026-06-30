@@ -1,6 +1,5 @@
 import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
-import { Prisma } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 import type { AuthPayload } from "./auth";
@@ -126,24 +125,24 @@ async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimi
 
 async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
   const resetAt = new Date(Date.now() + windowMs);
-  const rows = await prisma.$queryRaw<Array<{ count: number; resetAt: Date }>>(
-    Prisma.sql`
-      INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
-      VALUES (${key}, 1, ${resetAt}, NOW(), NOW())
-      ON CONFLICT ("key") DO UPDATE
-      SET
-        "count" = CASE
-          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN 1
-          ELSE "RateLimitBucket"."count" + 1
-        END,
-        "resetAt" = CASE
-          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN ${resetAt}
-          ELSE "RateLimitBucket"."resetAt"
-        END,
-        "updatedAt" = NOW()
-      RETURNING "count", "resetAt"
-    `
-  );
+  const rows = await prisma.$queryRawUnsafe(
+    `INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
+     VALUES ($1, 1, $2, NOW(), NOW())
+     ON CONFLICT ("key") DO UPDATE
+     SET
+       "count" = CASE
+         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN 1
+         ELSE "RateLimitBucket"."count" + 1
+       END,
+       "resetAt" = CASE
+         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN $2
+         ELSE "RateLimitBucket"."resetAt"
+       END,
+       "updatedAt" = NOW()
+     RETURNING "count", "resetAt"`,
+    key,
+    resetAt
+  ) as Array<{ count: number; resetAt: Date }>;
 
   const row = rows[0];
   if (!row) {
