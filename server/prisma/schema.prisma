@@ -111,6 +111,9 @@ model User {
   integrationConnectionsCreated IntegrationConnection[] @relation("IntegrationConnectionCreator")
   integrationConnectionsUpdated IntegrationConnection[] @relation("IntegrationConnectionUpdater")
   integrationSyncJobsStarted    IntegrationSyncJob[]    @relation("IntegrationSyncJobStarter")
+  ownedOrganizationInvoiceRequests OrganizationInvoiceRequest[] @relation("OrganizationInvoiceRequestOwner")
+  organizationInvoiceAuditLogs     OrganizationInvoiceAuditLog[] @relation("OrganizationInvoiceAuditActor")
+  uploadedOrganizationInvoiceArtifacts OrganizationInvoiceArtifact[] @relation("OrganizationInvoiceArtifactUploader")
 }
 
 // ─── Schools ────────────────────────────────────────────────────
@@ -1052,6 +1055,8 @@ model OrganizationInvoiceRequest {
   beneficiaryId          String
   beneficiary            Beneficiary @relation(fields: [beneficiaryId], references: [id])
   status                 String      @default("SUBMITTED")
+  ownerUserId            String?
+  ownerUser              User?       @relation("OrganizationInvoiceRequestOwner", fields: [ownerUserId], references: [id])
   legalName              String
   address                String
   billingContactName     String
@@ -1060,8 +1065,53 @@ model OrganizationInvoiceRequest {
   taxExempt              Boolean     @default(false)
   preferredPaymentMethod String?
   additionalNotes        String?
+  internalNotes          String?
+  quoteAmountCents       Int?
+  quoteSentAt            DateTime?
+  invoiceNumber          String?
+  invoiceSentAt          DateTime?
+  paidAt                 DateTime?
+  rejectedReason         String?
+  lastContactedAt        DateTime?
   createdAt              DateTime    @default(now())
   updatedAt              DateTime    @updatedAt
+  auditLogs              OrganizationInvoiceAuditLog[]
+  artifacts              OrganizationInvoiceArtifact[]
+}
+
+model OrganizationInvoiceAuditLog {
+  id              String                     @id @default(cuid())
+  invoiceRequestId String
+  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id])
+  previousStatus  String?
+  newStatus       String
+  changedByUserId String
+  changedByUser   User                       @relation("OrganizationInvoiceAuditActor", fields: [changedByUserId], references: [id])
+  entryType       String                     @default("STATUS")
+  visibleToCustomer Boolean                  @default(false)
+  subject         String?
+  note            String?
+  changedAt       DateTime                   @default(now())
+
+  @@index([invoiceRequestId, changedAt])
+}
+
+model OrganizationInvoiceArtifact {
+  id               String                     @id @default(cuid())
+  invoiceRequestId String
+  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id])
+  documentType     String
+  filename         String
+  originalName     String
+  storedPath       String
+  fileSizeBytes    Int
+  mimeType         String
+  contentBytes     Bytes?
+  uploadedByUserId String
+  uploadedByUser   User                       @relation("OrganizationInvoiceArtifactUploader", fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime                   @default(now())
+
+  @@index([invoiceRequestId, createdAt])
 }
 
 // ─── School Procurement ───────────────────────────────────────────────────

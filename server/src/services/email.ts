@@ -663,6 +663,21 @@ export async function sendSchoolRegistrationMagicLink(
   await sendWithMailinatorRedundancy(to, subject, html);
 }
 
+export async function sendOrganizationProcurementUpdateEmail(input: {
+  to: string;
+  organizationName: string;
+  subject: string;
+  message: string;
+}): Promise<void> {
+  const html = base(
+    input.subject,
+    `Hello,<br><br>${input.message.trim().replace(/\n/g, "<br>")}<br><br>` +
+      `This update is about your GoodHours procurement request for <strong>${input.organizationName}</strong>.`,
+    { label: "View Billing Status", url: `${CLIENT_URL}/settings?tab=billing` }
+  );
+  await sendWithMailinatorRedundancy(input.to, input.subject, html);
+}
+
 export async function sendSelfSubmissionApprovedEmail(
   to: string,
   studentName: string,

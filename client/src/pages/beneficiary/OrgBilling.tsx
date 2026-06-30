@@ -13,7 +13,54 @@ interface BillingSummary {
   hasStripeCustomer: boolean;
   proMonthlyPriceCents: number;
   proAnnualPriceCents: number;
-  invoiceRequests: Array<{ id: string; status: string; legalName: string; createdAt: string }>;
+  invoiceRequests: ProcurementRequest[];
+}
+
+type ProcurementRequestStatus =
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "INVOICE_SENT"
+  | "PAID"
+  | "REJECTED"
+  | "CANCELLED";
+
+interface ProcurementRequest {
+  id: string;
+  status: ProcurementRequestStatus | string;
+  legalName: string;
+  address: string;
+  billingContactName: string;
+  billingContactEmail: string;
+  purchaseOrderRequired: boolean;
+  taxExempt: boolean;
+  preferredPaymentMethod: string | null;
+  additionalNotes: string | null;
+  quoteAmountCents?: number | null;
+  quoteSentAt?: string | null;
+  invoiceNumber?: string | null;
+  invoiceSentAt?: string | null;
+  paidAt?: string | null;
+  rejectedReason?: string | null;
+  auditLogs?: Array<{
+    id: string;
+    previousStatus: string | null;
+    newStatus: string;
+    subject?: string | null;
+    entryType?: string;
+    note?: string | null;
+    changedAt: string;
+  }>;
+  artifacts?: Array<{
+    id: string;
+    documentType: string;
+    originalName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    createdAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -36,8 +83,47 @@ const INVOICE_REQUEST_STATUS_LABELS: Record<string, string> = {
   CANCELLED:      "Cancelled",
 };
 
+const PROCUREMENT_STEPS: Array<{ statuses: ProcurementRequestStatus[]; label: string }> = [
+  { statuses: ["SUBMITTED"], label: "Request submitted" },
+  { statuses: ["UNDER_REVIEW"], label: "GoodHours review" },
+  { statuses: ["APPROVED"], label: "Quote approved" },
+  { statuses: ["INVOICE_SENT"], label: "Invoice or PO sent" },
+  { statuses: ["PAID"], label: "Activation complete" },
+];
+
+const TERMINAL_PROCUREMENT_STATUSES: ProcurementRequestStatus[] = ["PAID", "REJECTED", "CANCELLED"];
+const OPEN_PROCUREMENT_STATUSES = new Set<ProcurementRequestStatus>(["SUBMITTED", "UNDER_REVIEW", "APPROVED", "INVOICE_SENT"]);
+
 function cents(n: number) {
   return `$${(n / 100).toFixed(0)}`;
+}
+
+function fmtDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
+  return `${bytes} B`;
+}
+
+function procurementStepState(
+  step: typeof PROCUREMENT_STEPS[number],
+  current: ProcurementRequestStatus,
+): "completed" | "current" | "upcoming" {
+  if (current === "REJECTED" || current === "CANCELLED") return "upcoming";
+
+  const allStatuses = PROCUREMENT_STEPS.flatMap((s) => s.statuses);
+  const currentIdx = allStatuses.indexOf(current);
+  const stepLastIdx = Math.max(...step.statuses.map((s) => allStatuses.indexOf(s)));
+
+  if (currentIdx < 0) return "upcoming";
+  if (current === "PAID" && step.statuses.includes("PAID")) return "completed";
+  if (stepLastIdx < currentIdx) return "completed";
+  if (step.statuses.includes(current)) return "current";
+  return "upcoming";
 }
 
 export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
@@ -125,6 +211,16 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
       setInvoiceMessage("Invoice request submitted. We'll be in touch within 2 business days.");
       setInvoiceIsError(false);
       setShowInvoiceForm(false);
+      setInvoiceForm({
+        legalName: "",
+        address: "",
+        billingContactName: "",
+        billingContactEmail: "",
+        purchaseOrderRequired: false,
+        taxExempt: false,
+        preferredPaymentMethod: "",
+        additionalNotes: "",
+      });
       // Refresh summary
       const fresh = await api.get<BillingSummary>(`/billing/organizations/${beneficiaryId}/summary`);
       setSummary(fresh);
@@ -136,6 +232,18 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
     }
   };
 
+  const handleArtifactDownload = async (requestId: string, artifactId: string, originalName: string) => {
+    const blob = await api.download(`/billing/organizations/invoice-requests/${requestId}/artifacts/${artifactId}`);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", originalName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) return <div className="text-[var(--text-sec)] text-sm">Loading billing information...</div>;
   if (error) return (
     <div className="p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded-[2px] text-sm text-[var(--er-t)]">{error}</div>
@@ -145,6 +253,10 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
   const isPro = import.meta.env.DEV || summary.planTier === "PRO";
   const statusInfo = STATUS_LABELS[summary.subscriptionStatus] ?? { label: summary.subscriptionStatus, color: "text-[var(--text-sec)]" };
   const periodEnd = summary.currentPeriodEnd ? new Date(summary.currentPeriodEnd) : null;
+  const activeProcurementRequest = summary.invoiceRequests.find((req) =>
+    OPEN_PROCUREMENT_STATUSES.has(req.status as ProcurementRequestStatus)
+  );
+  const procurementHistory = summary.invoiceRequests.filter((req) => req.id !== activeProcurementRequest?.id);
 
   const checkoutSuccess = new URLSearchParams(window.location.search).get("checkout") === "success";
 
@@ -361,19 +473,215 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
         </div>
       </div>
 
-      {/* ── Annual invoice / purchase order option ── */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6">
-        <h3 className="font-medium text-[var(--text)] mb-1">Need an invoice or purchase order?</h3>
-        <p className="text-sm text-[var(--text-sec)] mb-4">
-          Organizations that require formal procurement — including nonprofits, school districts, and
-          government agencies — may request annual invoicing. We support ACH, check, bank transfer,
-          purchase orders, and card.
-        </p>
+      {/* ── Procurement / quote flow ── */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-6 space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-medium text-[var(--text)] mb-1">Procurement, quote, or invoicing</h3>
+            <p className="text-sm text-[var(--text-sec)] max-w-2xl">
+              If your organization needs an annual quote, invoice, purchase order, or tax-exempt billing flow,
+              request procurement here. Stripe checkout is still the fastest path for instant activation.
+            </p>
+          </div>
+          {!activeProcurementRequest && !showInvoiceForm && (
+            <button
+              onClick={() => setShowInvoiceForm(true)}
+              className="px-4 py-2 border border-[var(--border-s)] text-[var(--text)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
+            >
+              Request Annual Quote
+            </button>
+          )}
+        </div>
 
-        {/* Past invoice requests */}
-        {summary.invoiceRequests.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {summary.invoiceRequests.map((req) => (
+        <div className="grid sm:grid-cols-3 gap-4 p-4 bg-[var(--surface-alt)] border border-[var(--border)] rounded-[2px]">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)] mb-1">Monthly Pro</div>
+            <div className="text-[20px] font-bold text-[var(--text)]">{cents(summary.proMonthlyPriceCents)}</div>
+            <div className="text-xs text-[var(--text-sec)] mt-0.5">Card checkout, immediate activation</div>
+          </div>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)] mb-1">Annual Pro</div>
+            <div className="text-[20px] font-bold text-[var(--text)]">{cents(summary.proAnnualPriceCents)}</div>
+            <div className="text-xs text-[var(--text-sec)] mt-0.5">Best fit for invoice and PO workflows</div>
+          </div>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)] mb-1">Supported payment methods</div>
+            <div className="text-sm text-[var(--text)] leading-6">ACH, check, purchase order, bank transfer, or card</div>
+          </div>
+        </div>
+
+        {invoiceMessage && (
+          <div className={`p-3 rounded-[2px] text-sm ${invoiceIsError ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]" : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"}`}>
+            {invoiceMessage}
+          </div>
+        )}
+
+        {activeProcurementRequest && (
+          <div className="space-y-5 border border-[var(--border)] rounded-[3px] p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h4 className="font-medium text-[var(--text)]">Current procurement request</h4>
+                <p className="text-sm text-[var(--text-sec)] mt-1">
+                  Submitted {new Date(activeProcurementRequest.createdAt).toLocaleDateString()} for {activeProcurementRequest.legalName}
+                </p>
+              </div>
+              <span className="text-xs font-medium text-[var(--text-sec)] bg-[var(--surface-alt)] border border-[var(--border)] px-2 py-1 rounded-full w-fit">
+                {INVOICE_REQUEST_STATUS_LABELS[activeProcurementRequest.status] ?? activeProcurementRequest.status}
+              </span>
+            </div>
+
+            {!TERMINAL_PROCUREMENT_STATUSES.includes(activeProcurementRequest.status as ProcurementRequestStatus) && (
+              <div className="space-y-0">
+                {PROCUREMENT_STEPS.map((step, i) => {
+                  const state = procurementStepState(step, activeProcurementRequest.status as ProcurementRequestStatus);
+                  return (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          state === "completed" ? "bg-[var(--ok-t)] border-[var(--ok-t)]" :
+                          state === "current" ? "bg-[var(--action)] border-[var(--action)]" :
+                          "bg-white border-[var(--border-s)]"
+                        }`}>
+                          {state === "completed" && <span className="text-white text-[10px]">✓</span>}
+                          {state === "current" && <span className="w-2 h-2 rounded-full bg-white block" />}
+                        </div>
+                        {i < PROCUREMENT_STEPS.length - 1 && (
+                          <div className={`w-0.5 h-7 mt-0.5 ${state === "completed" ? "bg-[var(--ok-t)]" : "bg-[var(--border)]"}`} />
+                        )}
+                      </div>
+                      <div className="pb-6">
+                        <p className={`text-sm font-medium ${
+                          state === "current" ? "text-[var(--action)]" :
+                          state === "completed" ? "text-[var(--ok-t)]" :
+                          "text-[var(--text-faint)]"
+                        }`}>
+                          {step.label}
+                          {state === "current" && (
+                            <span className="ml-2 text-[10px] font-semibold bg-[var(--action-lt)] text-[var(--action)] px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                              Current
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Legal name</span>
+                <span className="text-[var(--text)] font-medium">{activeProcurementRequest.legalName}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Billing contact</span>
+                <span className="text-[var(--text)] font-medium">
+                  {activeProcurementRequest.billingContactName} · {activeProcurementRequest.billingContactEmail}
+                </span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Preferred payment method</span>
+                <span className="text-[var(--text)] font-medium">{activeProcurementRequest.preferredPaymentMethod || "Not specified"}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Requirements</span>
+                <span className="text-[var(--text)] font-medium">
+                  {[
+                    activeProcurementRequest.purchaseOrderRequired ? "Purchase order required" : null,
+                    activeProcurementRequest.taxExempt ? "Tax-exempt" : null,
+                  ].filter(Boolean).join(" · ") || "No special requirements noted"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Quoted amount</span>
+                <span className="text-[var(--text)] font-medium">
+                  {activeProcurementRequest.quoteAmountCents != null ? cents(activeProcurementRequest.quoteAmountCents) : "Pending"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Invoice number</span>
+                <span className="text-[var(--text)] font-medium">{activeProcurementRequest.invoiceNumber || "Pending"}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Quote sent</span>
+                <span className="text-[var(--text)] font-medium">{fmtDate(activeProcurementRequest.quoteSentAt)}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Invoice sent</span>
+                <span className="text-[var(--text)] font-medium">{fmtDate(activeProcurementRequest.invoiceSentAt)}</span>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Organization address</span>
+                <span className="text-[var(--text)] font-medium">{activeProcurementRequest.address}</span>
+              </div>
+              {activeProcurementRequest.additionalNotes && (
+                <div className="sm:col-span-2">
+                  <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Additional notes</span>
+                  <span className="text-[var(--text)] font-medium whitespace-pre-wrap">{activeProcurementRequest.additionalNotes}</span>
+                </div>
+              )}
+              {activeProcurementRequest.rejectedReason && (
+                <div className="sm:col-span-2">
+                  <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Decision note</span>
+                  <span className="text-[var(--text)] font-medium whitespace-pre-wrap">{activeProcurementRequest.rejectedReason}</span>
+                </div>
+              )}
+            </div>
+
+            {activeProcurementRequest.auditLogs && activeProcurementRequest.auditLogs.length > 0 && (
+              <div className="space-y-3">
+                <h5 className="text-sm font-medium text-[var(--text)]">Status History</h5>
+                <div className="space-y-2">
+                  {activeProcurementRequest.auditLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between rounded-[2px] border border-[var(--border)] px-3 py-2 text-sm">
+                      <div className="text-[var(--text)]">
+                        {log.entryType === "CONTACT"
+                          ? (log.subject || "Update from GoodHours")
+                          : (INVOICE_REQUEST_STATUS_LABELS[log.newStatus] ?? log.newStatus)}
+                        {log.note ? ` · ${log.note}` : ""}
+                      </div>
+                      <div className="text-[var(--text-faint)]">{fmtDate(log.changedAt)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeProcurementRequest.artifacts && activeProcurementRequest.artifacts.length > 0 && (
+              <div className="space-y-3">
+                <h5 className="text-sm font-medium text-[var(--text)]">Shared Documents</h5>
+                <div className="space-y-2">
+                  {activeProcurementRequest.artifacts.map((artifact) => (
+                    <div key={artifact.id} className="flex items-center justify-between rounded-[2px] border border-[var(--border)] px-3 py-2 text-sm">
+                      <div>
+                        <div className="font-medium text-[var(--text)]">{artifact.originalName}</div>
+                        <div className="text-xs text-[var(--text-faint)]">
+                          {artifact.documentType} · {formatBytes(artifact.fileSizeBytes)} · {fmtDate(artifact.createdAt)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => void handleArtifactDownload(activeProcurementRequest.id, artifact.id, artifact.originalName)}
+                        className="text-[var(--action)] hover:underline"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-[var(--in-bg)] border border-[var(--in-b)] rounded-[2px] text-sm text-[var(--in-t)]">
+              GoodHours will contact the billing contact listed above with quote details, invoice instructions, or any follow-up procurement questions.
+            </div>
+          </div>
+        )}
+
+        {procurementHistory.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="font-medium text-[var(--text)]">Request history</h4>
+            {procurementHistory.map((req) => (
               <div key={req.id} className="flex items-center justify-between p-3 bg-[var(--surface-alt)] border border-[var(--border)] rounded-[2px] text-sm">
                 <div>
                   <span className="font-medium text-[var(--text)]">{req.legalName}</span>
@@ -388,24 +696,10 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
           </div>
         )}
 
-        {invoiceMessage && (
-          <div className={`mb-4 p-3 rounded-[2px] text-sm ${invoiceIsError ? "bg-[var(--er-bg)] border border-[var(--er-b)] text-[var(--er-t)]" : "bg-[var(--ok-bg)] border border-[var(--ok-b)] text-[var(--ok-t)]"}`}>
-            {invoiceMessage}
-          </div>
-        )}
-
-        {!showInvoiceForm ? (
-          <button
-            onClick={() => setShowInvoiceForm(true)}
-            className="px-4 py-2 border border-[var(--border-s)] text-[var(--text)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
-          >
-            Request Annual Invoice
-          </button>
-        ) : (
-          <form onSubmit={handleInvoiceSubmit} className="space-y-4 border-t border-[var(--border)] pt-4 mt-2">
+        {!activeProcurementRequest && showInvoiceForm && (
+          <form onSubmit={handleInvoiceSubmit} className="space-y-4 border-t border-[var(--border)] pt-4">
             <p className="text-xs text-[var(--text-faint)]">
-              Submitting this form will not automatically activate Pro. Our team will reach out with a
-              quote and invoicing options.
+              This creates a tracked procurement request. It does not automatically activate Pro.
             </p>
 
             <div className="grid sm:grid-cols-2 gap-4">
@@ -490,7 +784,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                 rows={3}
                 value={invoiceForm.additionalNotes}
                 onChange={(e) => setInvoiceForm((p) => ({ ...p, additionalNotes: e.target.value }))}
-                placeholder="Vendor registration requirements, billing system details, etc."
+                placeholder="Vendor registration requirements, billing system details, quote questions, or PO instructions."
                 className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]"
               />
             </div>
@@ -501,7 +795,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                 disabled={submittingInvoice}
                 className="px-5 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85 disabled:opacity-50"
               >
-                {submittingInvoice ? "Submitting..." : "Submit Request"}
+                {submittingInvoice ? "Submitting..." : "Submit Procurement Request"}
               </button>
               <button
                 type="button"
