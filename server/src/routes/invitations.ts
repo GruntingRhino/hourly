@@ -296,8 +296,8 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
       });
       await prisma.schoolBeneficiaryApproval.upsert({
         where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
-        update: {},
-        create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
+        update: { status: "APPROVED", approvedAt: new Date() },
+        create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
       });
       const jwtToken = signToken({ userId: existing.id, email: existing.email, role: existing.role });
       return res.json({ token: jwtToken, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, beneficiaryId: inv.beneficiaryId } });
@@ -332,8 +332,8 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
 
     await prisma.schoolBeneficiaryApproval.upsert({
       where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
-      update: {},
-      create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "PENDING" },
+      update: { status: "APPROVED", approvedAt: new Date() },
+      create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
     });
 
     const jwtToken = signToken({ userId: user.id, email: user.email, role: user.role });

@@ -1,5 +1,5 @@
 // Adapted from the NCCS/IRS NTEE major-group taxonomy for volunteer-opportunity use.
-export const OPPORTUNITY_CATEGORY_OPTIONS = [
+const BASE_OPPORTUNITY_CATEGORY_OPTIONS = [
   "Arts & Culture",
   "Community Improvement",
   "Education",
@@ -31,8 +31,11 @@ export const OPPORTUNITY_CATEGORY_OPTIONS = [
   "Science & Research",
 ] as const;
 
+export const OPPORTUNITY_CATEGORY_OPTIONS = [...BASE_OPPORTUNITY_CATEGORY_OPTIONS].sort((a, b) => a.localeCompare(b));
+const PREDEFINED_OPPORTUNITY_CATEGORY_SET = new Set<string>(BASE_OPPORTUNITY_CATEGORY_OPTIONS);
+
 export function isPredefinedOpportunityCategory(value: string): boolean {
-  return OPPORTUNITY_CATEGORY_OPTIONS.includes(value as (typeof OPPORTUNITY_CATEGORY_OPTIONS)[number]);
+  return PREDEFINED_OPPORTUNITY_CATEGORY_SET.has(value);
 }
 
 export function splitOpportunityCategory(category: string | null | undefined): {

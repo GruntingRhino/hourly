@@ -2502,6 +2502,19 @@ router.post("/invitations/:invId/respond", authenticate, requireRole("BENEFICIAR
       },
     });
 
+    await prisma.schoolBeneficiaryApproval.upsert({
+      where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
+      update: action === "ACCEPTED"
+        ? { status: "APPROVED", approvedAt: new Date() }
+        : { status: "REJECTED", approvedAt: null },
+      create: {
+        schoolId: inv.schoolId,
+        beneficiaryId: inv.beneficiaryId,
+        status: action === "ACCEPTED" ? "APPROVED" : "REJECTED",
+        ...(action === "ACCEPTED" ? { approvedAt: new Date() } : {}),
+      },
+    });
+
     res.json(updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });

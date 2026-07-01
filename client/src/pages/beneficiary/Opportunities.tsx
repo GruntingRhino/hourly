@@ -824,9 +824,9 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
 
       {/* Opportunities tab — two-panel layout */}
       {tab === "opportunities" && (
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
           {/* Left panel: Create / Edit form */}
-          <div className="w-[55%] flex-shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-5">
+          <div className="w-full min-w-0 bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4 sm:p-5 xl:w-[55%] xl:flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">{editOppId ? "Edit Opportunity" : "Create New Opportunity"}</h2>
               {editOppId && (
@@ -925,14 +925,14 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                       </div>
                       <div className="space-y-2">
                         {form.slots.map((slot, i) => (
-                          <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                          <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5 lg:items-center">
                             <input type="date" value={slot.date} onChange={(e) => updateSlot(i, "date", e.target.value)}
-                              required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm col-span-2" />
+                              required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm sm:col-span-2 lg:col-span-2" />
                             <input type="time" value={slot.startTime} onChange={(e) => updateSlot(i, "startTime", e.target.value)}
                               required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                             <input type="time" value={slot.endTime} onChange={(e) => updateSlot(i, "endTime", e.target.value)}
                               required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
-                            <div className="flex gap-1 items-center">
+                            <div className="flex gap-1 items-center sm:col-span-2 lg:col-span-1">
                               <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
                                 placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
                                 title="Maximum # Volunteers" />
@@ -1028,7 +1028,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                       )}
 
                       {/* Time & capacity */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                         <div>
                           <div className="text-xs text-[var(--text-sec)] mb-1">Start time</div>
                           <input type="time" value={form.recurrenceStartTime}
@@ -1050,7 +1050,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                       </div>
 
                       {/* Start date + months ahead */}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                         <div>
                           <div className="text-xs text-[var(--text-sec)] mb-1">Starting from</div>
                           <input type="date" value={form.recurrenceStartDate}
@@ -1119,7 +1119,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
 
           {/* Right panel: Opportunities list */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h2 className="font-semibold text-[var(--text)]">Created Opportunities</h2>
               <div className="relative">
                 <button onClick={() => setFilterOpen((p) => !p)}
@@ -1497,7 +1497,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                   onChange={(e) => setSlotForm((p) => ({ ...p, date: e.target.value }))}
                   className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs text-[var(--text-sec)] mb-1">Start time</label>
                   <input type="time" value={slotForm.startTime}

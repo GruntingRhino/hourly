@@ -1,7 +1,7 @@
 export const CUSTOM_OPPORTUNITY_CATEGORY = "Custom";
 
 // Adapted from the NCCS/IRS NTEE major-group taxonomy for volunteer-opportunity use.
-export const OPPORTUNITY_CATEGORY_OPTIONS = [
+const BASE_OPPORTUNITY_CATEGORY_OPTIONS = [
   "Arts & Culture",
   "Community Improvement",
   "Education",
@@ -32,6 +32,8 @@ export const OPPORTUNITY_CATEGORY_OPTIONS = [
   "Philanthropy & Volunteerism",
   "Science & Research",
 ] as const;
+
+export const OPPORTUNITY_CATEGORY_OPTIONS = [...BASE_OPPORTUNITY_CATEGORY_OPTIONS].sort((a, b) => a.localeCompare(b));
 
 const CATEGORY_SET = new Set<string>(OPPORTUNITY_CATEGORY_OPTIONS);
 

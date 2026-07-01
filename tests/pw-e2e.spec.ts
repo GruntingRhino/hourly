@@ -16,11 +16,22 @@
  * Pre-requisite: run `cd server && npx tsx prisma/seed-playwright.ts` once.
  */
 
+import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { PrismaClient } from '@prisma/client';
 import { test, expect, Browser, BrowserContext, Page } from '@playwright/test';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const BASE = process.env.PW_BASE_URL || 'http://localhost:5173';
+if (!process.env.DATABASE_URL) {
+  const envFile = fs.readFileSync('server/.env', 'utf8');
+  const databaseUrlMatch = envFile.match(/^DATABASE_URL="?([^"\n]+)"?/m);
+  if (databaseUrlMatch?.[1]) {
+    process.env.DATABASE_URL = databaseUrlMatch[1];
+  }
+}
+const prisma = new PrismaClient();
 
 const PW = 'Playwright1!';
 const ACCOUNTS = {
@@ -922,6 +933,8 @@ const ctx2 = {
   schoolAUserId: '',
   // Bulk import result count
   bulkImportCount: 0,
+  schoolBOrgAPartnerOpportunityId: '',
+  schoolBOrgAPartnerOpportunityTitle: `PW School B Org A ${Date.now()}`,
 };
 
 // ─── Extra helpers ───────────────────────────────────────────────────────────
@@ -2882,5 +2895,189 @@ test.describe.serial('38 — Cohort: Remove Student', () => {
     // Actually, there's no endpoint to re-assign an existing student to a cohort.
     // This means the test is safe to run — student2 just loses their cohort for subsequent tests.
     // Since block 13 and block 19 (which use student2) run before this block, this is OK.
+  });
+});
+
+// ─── 39. Beneficiary opportunities mobile layout ────────────────────────────
+
+test.describe.serial('39 — Beneficiary Opportunities: Mobile Layout', () => {
+  let ctx_: BrowserContext;
+  let page: Page;
+
+  test.beforeAll(async ({ browser }) => {
+    ctx_ = await browser.newContext({
+      acceptDownloads: true,
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+    });
+    page = await ctx_.newPage();
+    await loginFast(page, ACCOUNTS.orgA.email, ACCOUNTS.orgA.password);
+    if (!ctx.orgAId) {
+      const me = await apiGet<any>(page, '/auth/me');
+      ctx.orgAId = me.beneficiaryId;
+    }
+  });
+  test.afterAll(() => ctx_.close());
+
+  test('opportunity form fits the phone viewport in manual and recurring modes', async () => {
+    await page.goto(`${BASE}/opportunities`, { waitUntil: 'networkidle' });
+
+    const hasNoHorizontalOverflow = async () => page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    );
+    const inputsFitViewport = async () => page.locator('form').first().evaluate((form) => {
+      const nodes = Array.from(form.querySelectorAll('input, select, textarea, button'));
+      return nodes.every((node) => {
+        const rect = (node as HTMLElement).getBoundingClientRect();
+        return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+      });
+    });
+
+    await expect(page.getByRole('heading', { name: /create new opportunity/i })).toBeVisible();
+    expect(await hasNoHorizontalOverflow()).toBe(true);
+    expect(await inputsFitViewport()).toBe(true);
+
+    await page.getByRole('button', { name: /\+ add slot/i }).click();
+    expect(await hasNoHorizontalOverflow()).toBe(true);
+    expect(await inputsFitViewport()).toBe(true);
+
+    await page.getByRole('button', { name: /^Recurring$/i }).click();
+    expect(await hasNoHorizontalOverflow()).toBe(true);
+    expect(await inputsFitViewport()).toBe(true);
+  });
+});
+
+// ─── 40. Existing org partner acceptance lifecycle ──────────────────────────
+
+test.describe.serial('40 — School B + Org A: Partner Invitation Acceptance', () => {
+  let schoolCtx: BrowserContext;
+  let schoolPage: Page;
+  let orgCtx: BrowserContext;
+  let orgPage: Page;
+
+  test.beforeAll(async ({ browser }) => {
+    schoolCtx = await newContext(browser);
+    schoolPage = await schoolCtx.newPage();
+    await loginFast(schoolPage, ACCOUNTS.schoolB.email, ACCOUNTS.schoolB.password);
+    if (!ctx.schoolBId) {
+      const me = await apiGet<any>(schoolPage, '/auth/me');
+      ctx.schoolBId = me.schoolId;
+    }
+
+    orgCtx = await newContext(browser);
+    orgPage = await orgCtx.newPage();
+    await loginFast(orgPage, ACCOUNTS.orgA.email, ACCOUNTS.orgA.password);
+    if (!ctx.orgAId) {
+      const me = await apiGet<any>(orgPage, '/auth/me');
+      ctx.orgAId = me.beneficiaryId;
+    }
+
+    await prisma.beneficiaryOpportunity.updateMany({
+      where: { beneficiaryId: ctx.orgAId, title: ctx2.schoolBOrgAPartnerOpportunityTitle },
+      data: { status: 'CANCELLED' },
+    });
+    await prisma.beneficiaryInvitation.deleteMany({
+      where: { schoolId: ctx.schoolBId, beneficiaryId: ctx.orgAId, sentTo: ACCOUNTS.orgA.email },
+    });
+    await prisma.schoolBeneficiaryApproval.upsert({
+      where: { schoolId_beneficiaryId: { schoolId: ctx.schoolBId, beneficiaryId: ctx.orgAId } },
+      update: { status: 'PENDING', approvedAt: null },
+      create: {
+        schoolId: ctx.schoolBId,
+        beneficiaryId: ctx.orgAId,
+        status: 'PENDING',
+      },
+    });
+    await prisma.beneficiaryInvitation.create({
+      data: {
+        schoolId: ctx.schoolBId,
+        beneficiaryId: ctx.orgAId,
+        token: randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, ''),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        sentTo: ACCOUNTS.orgA.email,
+        status: 'PENDING',
+      },
+    });
+  });
+
+  test.afterAll(async () => {
+    if (ctx2.schoolBOrgAPartnerOpportunityId && ctx.orgAId) {
+      await apiDelete(orgPage, `/beneficiaries/${ctx.orgAId}/opportunities/${ctx2.schoolBOrgAPartnerOpportunityId}`);
+    }
+    await prisma.beneficiaryInvitation.deleteMany({
+      where: { schoolId: ctx.schoolBId, beneficiaryId: ctx.orgAId, sentTo: ACCOUNTS.orgA.email },
+    });
+    await prisma.schoolBeneficiaryApproval.deleteMany({
+      where: { schoolId: ctx.schoolBId, beneficiaryId: ctx.orgAId },
+    });
+    await schoolCtx.close();
+    await orgCtx.close();
+    await prisma.$disconnect();
+  });
+
+  test('school B shows Org A in pending partners before acceptance', async () => {
+    await schoolPage.goto(`${BASE}/partners?tab=pending`, { waitUntil: 'networkidle' });
+    await expect(schoolPage.getByRole('button', { name: /pending partners/i }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(schoolPage.locator('text=/Playwright Org A/i').first()).toBeVisible({ timeout: 10_000 });
+    await expect(schoolPage.locator('text=/Invitation pending/i').first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('existing org admin can accept the school invitation from the dashboard UI', async () => {
+    await orgPage.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' });
+    await expect(orgPage.getByRole('heading', { name: /pending school invitations/i })).toBeVisible({ timeout: 10_000 });
+
+    const invitationRow = orgPage.locator('div').filter({ hasText: 'Playwright School B' }).filter({ has: orgPage.getByRole('button', { name: 'Accept' }) }).first();
+    const [res] = await Promise.all([
+      orgPage.waitForResponse(
+        (r) => r.url().includes('/api/beneficiaries/invitations/') && r.request().method() === 'POST',
+        { timeout: 20_000 },
+      ),
+      invitationRow.getByRole('button', { name: 'Accept' }).click(),
+    ]);
+    expect(res.status()).toBe(200);
+
+    await expect(orgPage.locator('text=/Pending School Invitations/i')).toHaveCount(0);
+    await expect(orgPage.locator('text=/Past School Invitations/i').first()).toBeVisible({ timeout: 10_000 });
+    await expect(orgPage.locator('text=/accepted/i').first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('school B moves Org A to approved after acceptance', async () => {
+    await schoolPage.goto(`${BASE}/partners?tab=approved`, { waitUntil: 'networkidle' });
+    await expect(schoolPage.locator('text=/Playwright Org A/i').first()).toBeVisible({ timeout: 10_000 });
+
+    const approvedPartners = await apiGet<any[]>(schoolPage, '/beneficiaries?status=APPROVED');
+    const orgAApproval = approvedPartners.find((partner) => partner.id === ctx.orgAId);
+    expect(orgAApproval).toBeTruthy();
+    expect(orgAApproval.approvalStatus).toBe('APPROVED');
+  });
+
+  test('approved Org A opportunities appear for School B after acceptance', async () => {
+    const res = await apiRawPost(orgPage, `/beneficiaries/${ctx.orgAId}/opportunities`, {
+      title: ctx2.schoolBOrgAPartnerOpportunityTitle,
+      category: 'Education',
+      description: 'Partner acceptance regression coverage',
+      startDate: tomorrow(),
+      timeSlots: [
+        {
+          date: tomorrow(),
+          startTime: '10:00',
+          endTime: '12:00',
+          durationHours: 2,
+          capacity: 8,
+        },
+      ],
+    });
+    expect(res.status()).toBe(201);
+    const body = await res.json();
+    ctx2.schoolBOrgAPartnerOpportunityId = body.id;
+
+    await schoolPage.goto(`${BASE}/partners?tab=opportunities`, { waitUntil: 'networkidle' });
+    await expect(schoolPage.locator(`text=${ctx2.schoolBOrgAPartnerOpportunityTitle}`).first()).toBeVisible({ timeout: 10_000 });
+    await expect(schoolPage.locator('text=/Playwright Org A/i').first()).toBeVisible({ timeout: 10_000 });
+
+    const partnerOpportunities = await apiGet<any[]>(schoolPage, `/schools/${ctx.schoolBId}/partner-opportunities`);
+    const createdOpportunity = partnerOpportunities.find((opportunity) => opportunity.id === ctx2.schoolBOrgAPartnerOpportunityId);
+    expect(createdOpportunity).toBeTruthy();
+    expect(createdOpportunity.beneficiary.name).toBe('Playwright Org A');
   });
 });
