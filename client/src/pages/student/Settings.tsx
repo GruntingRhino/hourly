@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
+import { setAuthSession } from "../../lib/authSession";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -231,7 +232,9 @@ export default function StudentSettings() {
     }
     setChangingPassword(true);
     try {
-      await api.put("/auth/password", { currentPassword, newPassword });
+      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens — adopt the fresh one
+      if (result?.token) setAuthSession(result.token);
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");

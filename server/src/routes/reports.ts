@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { buildCsv } from "../lib/csv";
 import { authenticate } from "../middleware/auth";
 import {
   buildRequestAuditMetadata,
@@ -466,7 +467,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     }
 
     const csv = rows.length > 0
-      ? rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
+      ? buildCsv(rows)
       : '"Date","Opportunity","Organization","Hours","Status"';
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

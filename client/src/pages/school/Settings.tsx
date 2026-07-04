@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
+import { setAuthSession } from "../../lib/authSession";
 import { CollapsibleList } from "../../components/CollapsibleList";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
 import { SchoolBilling } from "./SchoolBilling";
@@ -823,7 +824,9 @@ export default function SchoolSettings() {
     }
     setChangingPassword(true);
     try {
-      await api.put("/auth/password", { currentPassword, newPassword });
+      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens — adopt the fresh one
+      if (result?.token) setAuthSession(result.token);
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");

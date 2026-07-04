@@ -2,7 +2,8 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { signToken } from "../middleware/auth";
+import { signToken, signUserToken, verifyToken } from "../middleware/auth";
+import { generateToken, hashToken } from "../lib/tokenHash";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
@@ -65,6 +66,37 @@ function isApprovedDomain(email: string): boolean {
   return APPROVED_DOMAINS.some((allowed) =>
     domain === allowed || domain.endsWith(`.${allowed}`)
   );
+}
+
+// ─── OAuth CSRF protection ───────────────────────────────────────────────────
+// The `state` sent to Google is `<flow>.<nonce>`; the nonce is also stored in a
+// short-lived cookie. At token exchange the two must match, so an attacker
+// cannot complete an OAuth flow they initiated in someone else's browser
+// (login CSRF). The flow prefix ("login" / "") selects UX only.
+const OAUTH_STATE_COOKIE = "gh_oauth_state";
+const OAUTH_STATE_COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: IS_PRODUCTION,
+  path: "/api/auth/google",
+};
+
+function parseCookies(req: Request): Record<string, string> {
+  const header = req.headers.cookie;
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return out;
+}
+
+function splitOauthState(state: string): { flow: string; nonce: string } {
+  const idx = state.lastIndexOf(".");
+  if (idx === -1) return { flow: state, nonce: "" };
+  return { flow: state.slice(0, idx), nonce: state.slice(idx + 1) };
 }
 
 const classifyDomainQuerySchema = strictObject({
@@ -195,7 +227,7 @@ async function handleGoogleIdentity(params: {
     }
 
     const existingUser = user!;
-    const token = signToken({ userId: existingUser.id, email: existingUser.email, role: existingUser.role });
+    const token = signUserToken(existingUser);
     return {
       status: 200 as const,
       body: {
@@ -268,10 +300,14 @@ router.get("/url", publicGoogleAuthLimiter, (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: firstZodError(parsed.error) });
   }
-  const { state = "" } = parsed.data;
+  const { state: flow = "" } = parsed.data;
+  // Bind this OAuth attempt to the requesting browser (see OAUTH_STATE_COOKIE)
+  const nonce = crypto.randomBytes(16).toString("hex");
+  res.cookie(OAUTH_STATE_COOKIE, nonce, { ...OAUTH_STATE_COOKIE_OPTS, maxAge: 10 * 60 * 1000 });
+  const state = `${flow}.${nonce}`;
   const scope = encodeURIComponent("openid email profile");
   const redirectUri = encodeURIComponent(GOOGLE_CALLBACK_URL);
-  const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";
+  const stateParam = `&state=${encodeURIComponent(state)}`;
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account${stateParam}`;
   res.json({ url });
 });
@@ -290,7 +326,7 @@ router.get("/callback", publicGoogleAuthLimiter, (req: Request, res: Response) =
   }
   const { code = "", state = "", error = "" } = parsed.data;
 
-  const target = new URL(state === "login" ? "/login" : "/school/register", CLIENT_URL);
+  const target = new URL(splitOauthState(state).flow === "login" ? "/login" : "/school/register", CLIENT_URL);
   if (code) target.searchParams.set("code", code);
   if (state) target.searchParams.set("state", state);
   if (error) target.searchParams.set("error", error);
@@ -336,6 +372,19 @@ router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Resp
       return res.status(503).json({ error: "Google OAuth is not configured on server" });
     }
 
+    // CSRF check: the state nonce returned by Google must match the cookie set
+    // when this browser requested the auth URL. Without this, an attacker could
+    // complete their own OAuth flow inside a victim's browser (login CSRF).
+    const rawState = typeof req.query.state === "string" ? req.query.state : "";
+    const { flow, nonce } = splitOauthState(rawState);
+    const cookieNonce = parseCookies(req)[OAUTH_STATE_COOKIE] || "";
+    res.clearCookie(OAUTH_STATE_COOKIE, OAUTH_STATE_COOKIE_OPTS);
+    const nonceBuf = Buffer.from(nonce, "utf8");
+    const cookieBuf = Buffer.from(cookieNonce, "utf8");
+    if (!nonce || nonceBuf.length !== cookieBuf.length || !crypto.timingSafeEqual(nonceBuf, cookieBuf)) {
+      return res.status(403).json({ error: "Sign-in session expired or invalid. Please try signing in again." });
+    }
+
     // Exchange code for token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -372,6 +421,12 @@ router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Resp
 
     if (!email) return res.status(400).json({ error: "Google account must have an email address" });
 
+    // Only link Google identities whose email Google has verified — otherwise an
+    // attacker could claim an unverified address and take over the matching account.
+    if (googleUser.verified_email !== true) {
+      return res.status(403).json({ error: "Your Google account email address is unverified. Please verify it with Google first." });
+    }
+
     // In production, enforce approved domain whitelist
     if (!isApprovedDomain(email)) {
       return res.status(403).json({
@@ -384,7 +439,7 @@ router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Resp
       googleId,
       email,
       name: name || email,
-      state: typeof req.query.state === "string" ? req.query.state : undefined,
+      state: flow || undefined,
       persistGoogleId: true,
     });
 
@@ -486,8 +541,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     // Verify the registration token (contains Google profile)
     let googleProfile: any;
     try {
-      const jwt = await import("jsonwebtoken");
-      googleProfile = jwt.default.verify(data.registrationToken, process.env.JWT_SECRET!);
+      googleProfile = verifyToken<any>(data.registrationToken);
     } catch {
       return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
     }
@@ -548,7 +602,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     }
 
     // Generate magic link token
-    const magicToken = crypto.randomBytes(32).toString("hex");
+    const magicToken = generateToken();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Create a placeholder school record to store the magic link
@@ -580,7 +634,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
 
       // If onboarding is already complete, just return the existing session — no email needed
       if (school?.onboardingComplete) {
-        const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+        const token = signUserToken(adminUser);
         return res.json({
           alreadyRegistered: true,
           token,
@@ -591,7 +645,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
 
       // School exists but onboarding is incomplete — regenerate the magic link and resend.
       // This handles the case where the previous send failed or the token expired.
-      const magicToken = crypto.randomBytes(32).toString("hex");
+      const magicToken = generateToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const contactEmail = data.contactEmail || school?.registrationEmail;
 
@@ -601,7 +655,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
 
       await prisma.school.update({
         where: { id: school!.id },
-        data: { registrationToken: magicToken, registrationTokenExpires: expiresAt, registrationEmail: contactEmail },
+        data: { registrationToken: hashToken(magicToken), registrationTokenExpires: expiresAt, registrationEmail: contactEmail },
       });
 
       const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
@@ -634,7 +688,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         data: {
           name: dirEntry?.name || data.schoolName,
           verified: false,
-          registrationToken: magicToken,
+          registrationToken: hashToken(magicToken),
           registrationTokenExpires: expiresAt,
         },
         select: { id: true, name: true },
@@ -768,8 +822,7 @@ router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Reque
 
     let googleProfile: any;
     try {
-      const jwt = await import("jsonwebtoken");
-      googleProfile = jwt.default.verify(data.registrationToken, process.env.JWT_SECRET!);
+      googleProfile = verifyToken<any>(data.registrationToken);
     } catch {
       return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
     }
@@ -806,7 +859,7 @@ router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Reque
           beneficiary: true,
         },
       });
-      const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+      const token = signUserToken(adminUser);
       return res.json({ token, user: buildUserPayload(fullUser) });
     }
 
@@ -900,7 +953,7 @@ router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Reque
       },
     });
 
-    const token = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+    const token = signUserToken(adminUser);
     res.json({ token, user: buildUserPayload(fullUser) });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
@@ -918,7 +971,7 @@ router.get("/verify-school", publicGoogleAuthLimiter, async (req: Request, res: 
 
     const school = await prisma.school.findFirst({
       where: {
-        registrationToken: token,
+        registrationToken: hashToken(token),
         registrationTokenExpires: { gt: new Date() },
       },
       include: { createdBy: true },
@@ -944,7 +997,7 @@ router.get("/verify-school", publicGoogleAuthLimiter, async (req: Request, res: 
 
     // Return auth token for the admin
     const adminUser = school.createdBy;
-    const jwtToken = signToken({ userId: adminUser.id, email: adminUser.email, role: adminUser.role });
+    const jwtToken = signUserToken(adminUser);
 
     res.json({
       token: jwtToken,

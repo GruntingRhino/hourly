@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { signToken } from "../middleware/auth";
+import { signUserToken } from "../middleware/auth";
+import { hashToken } from "../lib/tokenHash";
 import { ensureStudentCohortMembership } from "../lib/studentCohorts";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { firstZodError, strictObject, tokenSchema, trimmedString } from "../lib/validation";
@@ -52,7 +53,7 @@ router.get("/student", publicInvitationLimiter, async (req: Request, res: Respon
     });
 
     const inv = await prisma.studentInvitation.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { cohort: { include: { school: { select: { id: true, name: true } } } } },
     });
 
@@ -86,7 +87,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
     const data = acceptStudentInvitationSchema.parse(req.body);
 
     const inv = await prisma.studentInvitation.findUnique({
-      where: { token: data.token },
+      where: { token: hashToken(data.token) },
       include: { cohort: { include: { school: true } } },
     });
 
@@ -136,7 +137,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
             },
           });
         }
-        const token = signToken({ userId: existing.id, email: existing.email, role: existing.role });
+        const token = signUserToken(existing);
         return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, cohortId: existing.cohortId ?? inv.cohortId, schoolId: inv.cohort.schoolId } });
       }
       return res.status(409).json({ error: "An account with this email already exists with a different role." });
@@ -186,7 +187,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
       });
     }
 
-    const jwtToken = signToken({ userId: user.id, email: user.email, role: user.role });
+    const jwtToken = signUserToken(user);
 
     res.status(201).json({
       token: jwtToken,
@@ -214,7 +215,7 @@ router.get("/beneficiary", publicInvitationLimiter, async (req: Request, res: Re
     });
 
     const inv = await prisma.beneficiaryInvitation.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { beneficiary: true },
     });
 
@@ -246,7 +247,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
     const data = acceptBeneficiaryInvitationSchema.parse(req.body);
 
     const inv = await prisma.beneficiaryInvitation.findUnique({
-      where: { token: data.token },
+      where: { token: hashToken(data.token) },
       include: { beneficiary: true },
     });
 
@@ -254,11 +255,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
     if (inv.status === "ACCEPTED") {
       const existingAcceptedUser = await prisma.user.findUnique({ where: { email: inv.sentTo } });
       if (existingAcceptedUser?.role === "BENEFICIARY_ADMIN") {
-        const jwtToken = signToken({
-          userId: existingAcceptedUser.id,
-          email: existingAcceptedUser.email,
-          role: existingAcceptedUser.role,
-        });
+        const jwtToken = signUserToken(existingAcceptedUser);
         return res.json({
           token: jwtToken,
           user: {
@@ -299,7 +296,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
         update: { status: "APPROVED", approvedAt: new Date() },
         create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
       });
-      const jwtToken = signToken({ userId: existing.id, email: existing.email, role: existing.role });
+      const jwtToken = signUserToken(existing);
       return res.json({ token: jwtToken, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, beneficiaryId: inv.beneficiaryId } });
     }
     if (existing) {
@@ -336,7 +333,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
       create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
     });
 
-    const jwtToken = signToken({ userId: user.id, email: user.email, role: user.role });
+    const jwtToken = signUserToken(user);
 
     res.status(201).json({
       token: jwtToken,

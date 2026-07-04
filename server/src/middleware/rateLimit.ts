@@ -1,8 +1,7 @@
 import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
-import type { AuthPayload } from "./auth";
+import { verifyToken } from "./auth";
 
 type Bucket = {
   count: number;
@@ -190,11 +189,8 @@ function getAuthenticatedUserId(req: Request): string | null {
   const token = authHeader.slice("Bearer ".length).trim();
   if (!token) return null;
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return null;
-
   try {
-    const payload = jwt.verify(token, secret) as AuthPayload;
+    const payload = verifyToken(token);
     return typeof payload.userId === "string" && payload.userId.trim()
       ? payload.userId.trim()
       : null;

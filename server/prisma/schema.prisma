@@ -61,6 +61,7 @@ model User {
   emailVerificationExpires DateTime?
   passwordResetToken String?
   passwordResetExpires DateTime?
+  tokenVersion  Int       @default(0) // bumped on password change/reset to revoke outstanding JWTs
   googleId      String?   @unique
   isTestAccount Boolean   @default(false) // true = Playwright/QA account, hidden from all lists
   notificationPreferences String?  // JSON blob for notification prefs

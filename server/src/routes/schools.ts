@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
+import { buildCsv } from "../lib/csv";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import {
@@ -2133,7 +2134,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     }
 
     const label = (cohortLabel ?? school.name).replace(/[^a-z0-9]/gi, "_");
-    const csv = rows.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+    const csv = buildCsv(rows);
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="${label}-students.csv"`);
     res.send(csv);
@@ -2432,7 +2433,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
           s.deadline ? s.deadline.split("T")[0] : "",
         ]);
       }
-      const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+      const csv = buildCsv(rows);
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="at-risk-students.csv"`);
       return res.send(csv);

@@ -5,7 +5,8 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import prisma from "../lib/prisma";
-import { authenticate, signToken } from "../middleware/auth";
+import { authenticate, signToken, signUserToken, verifyToken } from "../middleware/auth";
+import { generateToken, hashToken } from "../lib/tokenHash";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
 import {
@@ -143,7 +144,7 @@ const signupLimiter = rateLimit({
     if (!/^Bearer\s+/i.test(authHeader)) return false;
     try {
       const token = authHeader.slice(7);
-      const payload = jwt.verify(token, process.env.JWT_SECRET as string) as { userId?: string };
+      const payload = verifyToken<{ userId?: string }>(token);
       return !!payload.userId;
     } catch {
       return false;
@@ -426,7 +427,9 @@ const profileSchema = strictObject({
 });
 
 // POST /api/auth/signup
-router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLimiter, async (req: Request, res: Response) => {
+// Rate limiters run before the duplicate-email precheck so the 409 response
+// cannot be used for unthrottled account enumeration.
+router.post("/signup", publicAuthLimiter, signupLimiter, precheckDuplicateSignupEmail, async (req: Request, res: Response) => {
   let signupStage = "parse";
   try {
     const data = signupSchema.parse(req.body);
@@ -475,8 +478,8 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
 
     let schoolId: string | undefined;
 
-    // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+    // Generate email verification token — only the hash is stored
+    const emailVerificationToken = generateToken();
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const directorySchool = data.directorySchoolId
@@ -529,7 +532,7 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
           name: data.name,
           role: data.role,
           emailVerified: false,
-          emailVerificationToken,
+          emailVerificationToken: hashToken(emailVerificationToken),
           emailVerificationExpires,
         },
       });
@@ -666,7 +669,7 @@ router.post("/signup", publicAuthLimiter, precheckDuplicateSignupEmail, signupLi
       });
     }
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const token = signUserToken(user);
 
     const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
 
@@ -723,6 +726,7 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
         classroomId: true,
         cohortId: true,
         beneficiaryId: true,
+        tokenVersion: true,
       },
     });
     if (!user) {
@@ -733,7 +737,9 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
     }
 
     if (!user.passwordHash) {
-      return res.status(401).json({ error: "This account uses Google Sign-In. Please use that method." });
+      // Generic message — a distinct response would confirm the account exists
+      // and reveal its sign-in method to unauthenticated callers.
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const valid = await safeBcryptCompare(data.password, user.passwordHash);
@@ -741,7 +747,7 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const token = signUserToken(user);
 
     const profile = await loadLoginProfile(user.id);
     const payload = buildLoginUserPayload(user, profile);
@@ -821,12 +827,14 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
+    // Bump tokenVersion so every outstanding JWT is revoked, then issue a
+    // fresh token so the current session stays signed in.
+    const updated = await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { passwordHash },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
     });
 
-    res.json({ message: "Password changed successfully" });
+    res.json({ message: "Password changed successfully", token: signUserToken(updated) });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: firstZodError(err) });
@@ -880,7 +888,7 @@ router.get("/verify-email", publicAuthLimiter, async (req: Request, res: Respons
 
     const user = await prisma.user.findFirst({
       where: {
-        emailVerificationToken: token,
+        emailVerificationToken: hashToken(token),
         emailVerificationExpires: { gt: new Date() },
       },
     });
@@ -915,12 +923,12 @@ router.post("/resend-verification", authenticate, resendVerificationLimiter, asy
     if (!user) return res.status(404).json({ error: "User not found" });
     if (user.emailVerified) return res.status(400).json({ error: "Email already verified" });
 
-    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+    const emailVerificationToken = generateToken();
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { emailVerificationToken, emailVerificationExpires },
+      data: { emailVerificationToken: hashToken(emailVerificationToken), emailVerificationExpires },
     });
 
     const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
@@ -947,12 +955,12 @@ router.post("/forgot-password", publicAuthLimiter, forgotPasswordLimiter, async 
 
     // Always respond with success to prevent user enumeration
     if (user) {
-      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetToken = generateToken();
       const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { passwordResetToken: resetToken, passwordResetExpires: resetExpires },
+        data: { passwordResetToken: hashToken(resetToken), passwordResetExpires: resetExpires },
       });
 
       const resetLink = `${CLIENT_URL}/reset-password?token=${resetToken}`;
@@ -980,7 +988,7 @@ router.post("/reset-password", publicAuthLimiter, async (req: Request, res: Resp
 
     const user = await prisma.user.findFirst({
       where: {
-        passwordResetToken: token,
+        passwordResetToken: hashToken(token),
         passwordResetExpires: { gt: new Date() },
       },
     });
@@ -990,9 +998,16 @@ router.post("/reset-password", publicAuthLimiter, async (req: Request, res: Resp
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    // tokenVersion bump revokes every JWT issued before the reset —
+    // a stolen session cannot outlive a password reset.
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash, passwordResetToken: null, passwordResetExpires: null },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        tokenVersion: { increment: 1 },
+      },
     });
 
     res.json({ message: "Password reset successfully" });
@@ -1264,7 +1279,7 @@ if (!IS_PROD_LIKE && ENABLE_IMPERSONATION) {
         console.error("[FERPA] Failed to log impersonation access:", logErr);
       }
 
-      const token = signToken({ userId: target.id, email: target.email, role: target.role });
+      const token = signUserToken(target);
 
       const studentSchool = resolveSchoolFromUserAssociations(target);
       const schoolId = resolveSchoolIdFromUserAssociations(target);

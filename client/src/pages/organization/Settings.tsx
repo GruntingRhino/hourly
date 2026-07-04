@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
+import { setAuthSession } from "../../lib/authSession";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -293,7 +294,9 @@ export default function OrgSettings() {
     }
     setChangingPassword(true);
     try {
-      await api.put("/auth/password", { currentPassword, newPassword });
+      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens — adopt the fresh one
+      if (result?.token) setAuthSession(result.token);
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");

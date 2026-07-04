@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
+import { generateToken, hashToken } from "../lib/tokenHash";
+import { csvCell } from "../lib/csv";
 import { z } from "zod";
 import { parse } from "csv-parse/sync";
 import prisma from "../lib/prisma";
@@ -156,7 +158,7 @@ async function findOrCreateTeacherForCohort(params: {
   const configuredRounds = Number(process.env.TEMP_PASSWORD_BCRYPT_ROUNDS ?? 8);
   const rounds = Number.isFinite(configuredRounds) ? Math.min(14, Math.max(4, Math.floor(configuredRounds))) : 8;
   const passwordHash = await bcrypt.hash(tempPassword, rounds);
-  const passwordResetToken = crypto.randomBytes(32).toString("hex");
+  const passwordResetToken = generateToken();
   const passwordResetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const created = await prisma.user.create({
@@ -167,7 +169,7 @@ async function findOrCreateTeacherForCohort(params: {
       role: "TEACHER",
       schoolId: params.schoolId,
       emailVerified: true,
-      passwordResetToken,
+      passwordResetToken: hashToken(passwordResetToken),
       passwordResetExpires,
     },
   });
@@ -275,10 +277,6 @@ async function sendCohortInvitation(
   }
 }
 
-function csvCell(value: string | number | null | undefined): string {
-  const text = value == null ? "" : String(value);
-  return `"${text.replace(/"/g, "\"\"")}"`;
-}
 
 async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof getStaffAccessScope>>>): Promise<CohortSummary[]> {
   const school = await prisma.school.findUnique({
@@ -1133,7 +1131,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
         results.skipped++;
         continue;
       }
-      const token = crypto.randomBytes(32).toString("hex");
+      const token = generateToken();
       const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72h
       await prisma.studentInvitation.create({
         data: {
@@ -1143,7 +1141,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
           grade: grade || null,
           house: usesHouseField ? house || null : null,
           startingHours: validHours,
-          token,
+          token: hashToken(token),
           expiresAt,
           status: "PENDING",
         },
@@ -1220,7 +1218,14 @@ router.post("/:id/publish", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
         failed += blockedByRateLimit;
         break;
       }
-      const ok = await sendCohortInvitation(cohort, inv);
+      // Tokens are stored hashed, so the original link can't be rebuilt from
+      // the DB — rotate to a fresh token for each resend.
+      const freshToken = generateToken();
+      await prisma.studentInvitation.update({
+        where: { id: inv.id },
+        data: { token: hashToken(freshToken), expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000) },
+      });
+      const ok = await sendCohortInvitation(cohort, { ...inv, token: freshToken });
       if (ok) {
         sent++;
       } else {
@@ -1292,7 +1297,7 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       });
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    const token = generateToken();
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     const inv = await prisma.studentInvitation.create({
@@ -1302,13 +1307,14 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
         name: name || null,
         grade: grade || null,
         house: cohort.usesHouseField ? house || null : null,
-        token,
+        token: hashToken(token),
         expiresAt,
         status: "PENDING",
       },
     });
 
-    const emailSent = await sendCohortInvitation(cohort, inv);
+    // inv.token holds the hash — email and return the raw token instead
+    const emailSent = await sendCohortInvitation(cohort, { ...inv, token });
     await prisma.cohort.update({
       where: { id: cohort.id },
       data: { status: "PUBLISHED", publishedAt: cohort.publishedAt ?? new Date() },
@@ -1316,6 +1322,7 @@ router.post("/:id/add-student", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     res.status(201).json({
       ...inv,
+      token,
       emailSent,
       inviteLimit: {
         perHour: COHORT_INVITE_LIMIT_PER_HOUR,

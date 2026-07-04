@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { decryptField, encryptField } from "../lib/fieldEncryption";
@@ -287,7 +289,7 @@ function buildGoogleClassroomStateToken(payload: GoogleClassroomStatePayload): s
 }
 
 function verifyGoogleClassroomStateToken(token: string): GoogleClassroomStatePayload {
-  const payload = jwt.verify(token, JWT_SECRET) as GoogleClassroomStatePayload;
+  const payload = verifyToken<GoogleClassroomStatePayload>(token);
   if (payload.purpose !== "googleClassroom-oauth") {
     throw new Error("Invalid Google Classroom OAuth state.");
   }
@@ -1233,7 +1235,7 @@ async function runGoogleClassroomSync(params: {
             cohortId: targetCohortId,
             email: student.email,
             name: student.name,
-            token: crypto.randomBytes(32).toString("hex"),
+            token: hashToken(generateToken()), // never emailed here — publish rotates to a fresh token
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             status: "PENDING",
           },

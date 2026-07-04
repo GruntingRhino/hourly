@@ -9,6 +9,7 @@ const REQUIRED = [
 ] as const;
 
 const OPTIONAL = [
+  "JWT_SECRET_PREVIOUS",    // previous signing secret — kept during rotation so old sessions stay valid
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "GOOGLE_CLIENT_ID",

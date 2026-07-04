@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";
+import { generateToken, hashToken } from "../lib/tokenHash";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
@@ -1132,13 +1133,13 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
       : beneficiary.email;
 
     if (inviteEmail && approval.status === "PENDING") {
-      const token = crypto.randomBytes(32).toString("hex");
+      const token = generateToken();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await prisma.beneficiaryInvitation.create({
         data: {
           schoolId: user.schoolId,
           beneficiaryId: beneficiary.id,
-          token,
+          token: hashToken(token),
           expiresAt,
           sentTo: inviteEmail,
           status: "PENDING",
@@ -1181,14 +1182,14 @@ router.post("/:id/invite", authenticate, requireRole("SCHOOL_ADMIN"), beneficiar
       message: z.string().max(4000).optional(),
     }).parse(req.body);
 
-    const token = crypto.randomBytes(32).toString("hex");
+    const token = generateToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await prisma.beneficiaryInvitation.create({
       data: {
         schoolId: user.schoolId,
         beneficiaryId: ben.id,
-        token,
+        token: hashToken(token),
         expiresAt,
         sentTo: email,
         status: "PENDING",

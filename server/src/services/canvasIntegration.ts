@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { decryptField, encryptField } from "../lib/fieldEncryption";
@@ -272,7 +274,7 @@ function buildCanvasStateToken(payload: CanvasStatePayload): string {
 }
 
 function verifyCanvasStateToken(token: string): CanvasStatePayload {
-  const payload = jwt.verify(token, JWT_SECRET) as CanvasStatePayload;
+  const payload = verifyToken<CanvasStatePayload>(token);
   if (payload.purpose !== "canvas-oauth") {
     throw new Error("Invalid Canvas OAuth state.");
   }
@@ -1222,7 +1224,7 @@ async function runCanvasSync(params: {
             cohortId: targetCohortId,
             email: student.email,
             name: student.name,
-            token: crypto.randomBytes(32).toString("hex"),
+            token: hashToken(generateToken()), // never emailed here — publish rotates to a fresh token
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             status: "PENDING",
           },

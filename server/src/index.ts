@@ -119,7 +119,10 @@ app.use(cors({
 // Stripe webhook needs raw body for signature verification
 app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRoutes);
 
-app.use(express.json({ limit: "10mb" }));
+// Cohort roster imports post CSV data as JSON and can legitimately be large;
+// everything else gets a tight limit so oversized payloads are rejected early.
+app.use("/api/cohorts", express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use("/uploads", authenticate, express.static(path.join(__dirname, "../uploads")));
 
 app.use("/api", (req: Request, _res: Response, next: NextFunction) => {

@@ -159,7 +159,8 @@ export default function SchoolRegister() {
   };
 
   const handleOAuthCallback = async (code: string) => {
-    const isLoginFlow = searchParams.get("state") === "login";
+    // state is "<flow>.<nonce>" — the nonce is the server's OAuth CSRF token
+    const isLoginFlow = (searchParams.get("state") ?? "").split(".")[0] === "login";
     try {
       const stateSuffix = searchParams.get("state")
         ? `?state=${encodeURIComponent(searchParams.get("state")!)}`
