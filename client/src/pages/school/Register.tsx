@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import { classifyEmailDomain, type EmailDomainStatus } from "../../lib/emailDomainPolicy";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -24,42 +25,12 @@ interface SchoolEntry {
 }
 
 type Step = "google" | "email-collect" | "search" | "contact" | "sent";
-type DomainStatus = "personal" | "edu" | "custom" | null;
+type DomainStatus = EmailDomainStatus;
 
-
-// ─── Layer 1: personal email provider blocklist (mirrors server) ─────────────
-const PERSONAL_EMAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com",
-  "yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.co.in", "yahoo.com.au",
-  "yahoo.fr", "yahoo.de", "yahoo.es", "yahoo.it", "yahoo.ca",
-  "hotmail.com", "outlook.com", "live.com", "msn.com",
-  "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es",
-  "live.co.uk", "live.fr",
-  "icloud.com", "me.com", "mac.com",
-  "aol.com", "aim.com", "verizon.net",
-  "protonmail.com", "pm.me", "proton.me",
-  "tutanota.com", "tuta.com",
-  "gmx.com", "gmx.net", "mail.com",
-  "zoho.com", "zohomail.com",
-  "yandex.com", "yandex.ru",
-  "qq.com", "163.com", "126.com",
-  "mail.ru", "inbox.com", "rediffmail.com",
-  "comcast.net", "att.net", "sbcglobal.net", "cox.net",
-]);
-
-function classifyEmailDomain(email: string): DomainStatus {
-  const atIdx = email.indexOf("@");
-  if (atIdx < 0) return null;
-  const domain = email.slice(atIdx + 1).toLowerCase().trim();
-  if (!domain || !domain.includes(".")) return null;
-  // Personal emails are only blocked in production (not in dev deployment or local dev)
-  const isProduction = import.meta.env.PROD && import.meta.env.VITE_APP_ENV !== "development";
-  if (isProduction && PERSONAL_EMAIL_DOMAINS.has(domain)) {
-    return "personal";
-  }
-  if (domain.endsWith(".edu")) return "edu";
-  return "custom";
-}
+// This must stay in sync with the server's ALLOW_PERSONAL_EMAIL_DOMAINS flag.
+// Vite exposes only VITE_-prefixed values to the browser at build time.
+const ALLOW_PERSONAL_EMAIL_DOMAINS = import.meta.env.VITE_ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
+const IS_PRODUCTION = import.meta.env.PROD && import.meta.env.VITE_APP_ENV !== "development";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -477,7 +448,7 @@ export default function SchoolRegister() {
       setError("");
       // Pre-fill contact email and fetch domain suggestions
       setContactEmail(emailCollectEmail);
-      setDomainStatus(classifyEmailDomain(emailCollectEmail));
+      setDomainStatus(classifyEmailDomain(emailCollectEmail, IS_PRODUCTION, ALLOW_PERSONAL_EMAIL_DOMAINS));
       const domain = emailCollectEmail.split("@")[1]?.toLowerCase().trim();
       if (domain) {
         try {
@@ -829,7 +800,7 @@ export default function SchoolRegister() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setContactEmail(val);
-                    const status = classifyEmailDomain(val);
+                    const status = classifyEmailDomain(val, IS_PRODUCTION, ALLOW_PERSONAL_EMAIL_DOMAINS);
                     setDomainStatus(status);
                     if (error) setError("");
                   }}
