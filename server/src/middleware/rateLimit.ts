@@ -13,7 +13,10 @@ type HybridRateLimitOptions = {
   windowMs: number;
   maxPerIp: number;
   maxPerUser?: number;
+  maxPerKey?: number;
   keySuffix?: (req: Request) => string;
+  keyGenerator?: (req: Request) => string | null | undefined;
+  message?: string;
   skip?: (req: Request) => boolean;
 };
 
@@ -231,6 +234,8 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
 
       let userRemaining: number | null = null;
       let userResetAt: number | null = null;
+      let keyRemaining: number | null = null;
+      let keyResetAt: number | null = null;
       let blockedRetryAfterMs: number | null = null;
 
       if (ipBucket.count > options.maxPerIp) {
@@ -253,22 +258,40 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
         }
       }
 
-      const resetAt = Math.max(ipBucket.resetAt, userResetAt ?? 0);
+      const rateLimitKey = options.keyGenerator?.(req)?.trim();
+      if (rateLimitKey && options.maxPerKey) {
+        const keyBucket = await takeRateLimitBucket(
+          `${options.namespace}:key:${hashKey(rateLimitKey)}`,
+          options.windowMs
+        );
+        keyRemaining = Math.max(0, options.maxPerKey - keyBucket.count);
+        keyResetAt = keyBucket.resetAt;
+
+        if (keyBucket.count > options.maxPerKey) {
+          blockedRetryAfterMs = Math.max(blockedRetryAfterMs ?? 0, keyBucket.resetAt - now);
+        }
+      }
+
+      const resetAt = Math.max(ipBucket.resetAt, userResetAt ?? 0, keyResetAt ?? 0);
+      const configuredLimits = [options.maxPerIp, options.maxPerUser, options.maxPerKey]
+        .filter((limit): limit is number => typeof limit === "number");
+      const remainingLimits = [ipRemaining, userRemaining, keyRemaining]
+        .filter((remaining): remaining is number => remaining !== null);
       res.setHeader("RateLimit-Policy", `${options.maxPerIp};w=${Math.ceil(options.windowMs / 1000)}`);
       res.setHeader(
         "RateLimit-Limit",
-        String(userId && options.maxPerUser ? Math.min(options.maxPerIp, options.maxPerUser) : options.maxPerIp)
+        String(Math.min(...configuredLimits))
       );
       res.setHeader(
         "RateLimit-Remaining",
-        String(userRemaining === null ? ipRemaining : Math.min(ipRemaining, userRemaining))
+        String(Math.min(...remainingLimits))
       );
       res.setHeader("RateLimit-Reset", String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
 
       if (blockedRetryAfterMs !== null && blockedRetryAfterMs > 0) {
         buildRateLimitResponse(
           res,
-          "Too many requests. Please wait before trying again.",
+          options.message ?? "Too many requests. Please wait before trying again.",
           blockedRetryAfterMs
         );
         return;
@@ -279,5 +302,37 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
       console.error("[RateLimit] Falling back to open on store error:", err);
       next();
     }
+  };
+}
+
+type EmailSendRateLimitOptions = {
+  namespace: string;
+  recipientKey: (req: Request) => string | null | undefined;
+  suspiciousIpNamespace?: string;
+};
+
+// Sensitive email links are limited per recipient, regardless of source IP.
+// A second bucket detects a single IP cycling through recipients (inbox bombing).
+export function createEmailSendRateLimit(options: EmailSendRateLimitOptions) {
+  const recipientLimiter = createHybridRateLimit({
+    namespace: `${options.namespace}:recipient`,
+    windowMs: 60 * 1000,
+    maxPerIp: Number.MAX_SAFE_INTEGER,
+    maxPerKey: 1,
+    keyGenerator: options.recipientKey,
+    message: "Please wait 60 seconds before requesting another email.",
+  });
+  const suspiciousIpLimiter = createHybridRateLimit({
+    namespace: options.suspiciousIpNamespace ?? "email-send:ip",
+    windowMs: 15 * 60 * 1000,
+    maxPerIp: 10,
+    message: "Too many email requests from this IP. Please try again later.",
+  });
+
+  return async (req: Request, res: Response, next: NextFunction) => {
+    let recipientAllowed = false;
+    await recipientLimiter(req, res, (() => { recipientAllowed = true; }) as NextFunction);
+    if (!recipientAllowed) return;
+    await suspiciousIpLimiter(req, res, next);
   };
 }

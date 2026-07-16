@@ -27,6 +27,7 @@ import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
+import { toLegacyAvailableSlot } from "../lib/legacyOpportunityAvailability";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
 import { createHybridRateLimit } from "../middleware/rateLimit";
@@ -481,10 +482,37 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     // If no geocoded results, check if we need to kick off background geocoding
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      include: { school: { select: { id: true, state: true } } },
+      include: { school: { select: { id: true, state: true, directoryId: true } } },
     });
     const schoolId = user?.schoolId;
     const schoolState = (user as any)?.school?.state as string | null;
+
+    // A registered school is also linked to a BeneficiaryDirectory row so it can
+    // appear as a partner to other schools. Do not show that row back to its
+    // owner: the school's private beneficiary and approval are created by
+    // default during registration.
+    const ownSchoolBeneficiary = schoolId
+      ? await prisma.beneficiary.findFirst({
+          where: { createdBySchoolId: schoolId, visibility: "PRIVATE" },
+          select: { directoryId: true },
+        })
+      : null;
+    let ownSchoolDirectoryId = ownSchoolBeneficiary?.directoryId ?? null;
+    if (!ownSchoolDirectoryId && user?.school?.directoryId) {
+      const schoolDirectory = await prisma.schoolDirectory.findUnique({
+        where: { id: user.school.directoryId },
+        select: { ncessId: true },
+      });
+      if (schoolDirectory?.ncessId) {
+        ownSchoolDirectoryId = (await prisma.beneficiaryDirectory.findUnique({
+          where: { ncessId: schoolDirectory.ncessId },
+          select: { id: true },
+        }))?.id ?? null;
+      }
+    }
+    const visibleResults = ownSchoolDirectoryId
+      ? results.filter((result: any) => result.id !== ownSchoolDirectoryId)
+      : results;
 
     let geocodingInProgress = false;
     if (results.length === 0 && schoolState && !geocodingStates.has(schoolState)) {
@@ -502,7 +530,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     let approvalMap = new Map<string, string>(); // directoryId -> approval status
     if (schoolId) {
-      const dirIds = results.map((r: any) => r.id);
+      const dirIds = visibleResults.map((r: any) => r.id);
       // Find beneficiaries linked to these directory entries that have school approval
       const beneficiaries = await prisma.beneficiary.findMany({
         where: { directoryId: { in: dirIds } },
@@ -520,7 +548,7 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
       }
     }
 
-    const annotated = results.map((r: any) => ({
+    const annotated = visibleResults.map((r: any) => ({
       id: r.id,
       name: r.name,
       ein: r.ein,
@@ -591,7 +619,10 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
 
     const allItems = [...annotated, ...annotatedSchools].sort((a, b) => a.distanceMiles - b.distanceMiles);
 
-    res.json({ items: allItems, total: total + nearbySchools.length, geocodingInProgress });
+    const ownSchoolWasInResults = ownSchoolDirectoryId !== null
+      && results.some((result: any) => result.id === ownSchoolDirectoryId);
+    const visibleDirectoryTotal = Math.max(0, total - (ownSchoolWasInResults ? 1 : 0));
+    res.json({ items: allItems, total: visibleDirectoryTotal + nearbySchools.length, geocodingInProgress });
   } catch (err) {
     console.error("Nearby beneficiary directory error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -808,17 +839,24 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
     }
     if (!schoolId) return res.json([]);
 
-    const approvals = await prisma.schoolBeneficiaryApproval.findMany({
-      where: { schoolId, status: "APPROVED" },
-      select: { beneficiaryId: true },
-    });
+    const [approvals, legacyApprovals] = await Promise.all([
+      prisma.schoolBeneficiaryApproval.findMany({
+        where: { schoolId, status: "APPROVED" },
+        select: { beneficiaryId: true },
+      }),
+      prisma.schoolOrganization.findMany({
+        where: { schoolId, status: "APPROVED" },
+        select: { organizationId: true },
+      }),
+    ]);
     const beneficiaryIds = approvals.map((a) => a.beneficiaryId);
-    if (!beneficiaryIds.length) return res.json([]);
+    const legacyOrganizationIds = legacyApprovals.map((a) => a.organizationId);
+    if (!beneficiaryIds.length && !legacyOrganizationIds.length) return res.json([]);
 
     const now = new Date();
     const startOfTodayUtc = new Date(now);
     startOfTodayUtc.setUTCHours(0, 0, 0, 0);
-    const [slots, blockedCategoryKeys] = await Promise.all([
+    const [slots, blockedCategoryKeys, legacyOpportunities] = await Promise.all([
       prisma.beneficiaryTimeSlot.findMany({
       where: {
         date: { gte: startOfTodayUtc },
@@ -838,12 +876,36 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
       }),
       getBlockedCategoryKeysForStudent(req.user!.userId),
+      legacyOrganizationIds.length
+        ? prisma.opportunity.findMany({
+            where: {
+              organizationId: { in: legacyOrganizationIds },
+              status: "ACTIVE",
+              date: { gte: startOfTodayUtc },
+            },
+            include: {
+              organization: { select: { id: true, name: true } },
+              _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
+            },
+            orderBy: [{ date: "asc" }, { startTime: "asc" }],
+          })
+        : Promise.resolve([]),
     ]);
+    const beneficiarySlots = slots.filter((slot) => {
+      if (getSlotStartAt(slot.date, slot.startTime) < now) return false;
+      const categoryKey = normalizeCategoryKey(slot.opportunity.category);
+      return !blockedCategoryKeys.has(categoryKey);
+    });
+    const legacySlots = legacyOpportunities
+      .filter((opportunity) => getSlotStartAt(opportunity.date, opportunity.startTime) >= now)
+      .map((opportunity) => toLegacyAvailableSlot({
+        ...opportunity,
+        confirmedSignupCount: opportunity._count.signups,
+      }));
     res.json(
-      slots.filter((slot) => {
-        if (getSlotStartAt(slot.date, slot.startTime) < now) return false;
-        const categoryKey = normalizeCategoryKey(slot.opportunity.category);
-        return !blockedCategoryKeys.has(categoryKey);
+      [...beneficiarySlots, ...legacySlots].sort((a, b) => {
+        const dateDifference = new Date(a.date).getTime() - new Date(b.date).getTime();
+        return dateDifference || a.startTime.localeCompare(b.startTime);
       }),
     );
   } catch (err) {
@@ -1081,13 +1143,39 @@ router.post("/approve-from-directory", authenticate, requireRole("SCHOOL_ADMIN")
   try {
     const { directoryId } = z.object({ directoryId: z.string().min(1) }).parse(req.body);
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { school: { select: { directoryId: true } } },
+    });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+
+    const schoolDirectory = user.school?.directoryId
+      ? await prisma.schoolDirectory.findUnique({
+          where: { id: user.school.directoryId },
+          select: { ncessId: true },
+        })
+      : null;
+    const ownSchoolDirectory = schoolDirectory?.ncessId
+      ? await prisma.beneficiaryDirectory.findUnique({
+          where: { ncessId: schoolDirectory.ncessId },
+          select: { id: true },
+        })
+      : null;
+    if (ownSchoolDirectory?.id === directoryId) {
+      return res.status(400).json({ error: "Your school is already approved by default" });
+    }
 
     const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
 
     // Check if a Beneficiary already exists for this directory entry
     let beneficiary = await prisma.beneficiary.findFirst({ where: { directoryId } });
+    const ownSchoolBeneficiary = await prisma.beneficiary.findFirst({
+      where: { createdBySchoolId: user.schoolId, visibility: "PRIVATE", directoryId },
+      select: { id: true },
+    });
+    if (ownSchoolBeneficiary) {
+      return res.status(400).json({ error: "Your school is already approved by default" });
+    }
     if (!beneficiary) {
       const dirEntry = await prisma.beneficiaryDirectory.findUnique({ where: { id: directoryId } });
       if (!dirEntry) return res.status(404).json({ error: "Directory entry not found" });

@@ -209,7 +209,7 @@ function resolveInitialTab(searchParams: URLSearchParams, isAdmin: boolean): Tab
   const requestedTab = searchParams.get("tab");
   const allowedTabs: Tab[] = isAdmin
     ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
-    : ["profile", "security", "notifications", "privacy", "billing"];
+    : ["profile", "security", "notifications", "privacy"];
   return requestedTab && allowedTabs.includes(requestedTab as Tab) ? (requestedTab as Tab) : "profile";
 }
 
@@ -429,7 +429,7 @@ export default function SchoolSettings() {
     const requestedTab = searchParams.get("tab");
     const allowedTabs: Tab[] = isAdmin
       ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
-      : ["profile", "security", "notifications", "privacy", "billing"];
+      : ["profile", "security", "notifications", "privacy"];
     if (requestedTab && allowedTabs.includes(requestedTab as Tab)) {
       setTab(requestedTab as Tab);
     }
@@ -956,7 +956,7 @@ export default function SchoolSettings() {
 
   const visibleTabs: Tab[] = isAdmin
     ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
-    : ["profile", "security", "notifications", "privacy", "billing"];
+    : ["profile", "security", "notifications", "privacy"];
 
   return (
     <div>

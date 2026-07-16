@@ -17,7 +17,7 @@ import {
   normalizeEmail,
 } from "../lib/signupEmailPolicy";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
-import { createHybridRateLimit } from "../middleware/rateLimit";
+import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import { isUniqueConstraintError } from "../lib/prismaErrors";
 import { isInternalAdminUser } from "../lib/internalAdmin";
 import {
@@ -52,6 +52,11 @@ function normalizeRateLimitEmail(email: unknown): string {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) return "unknown";
   return normalizeEmail(trimmed);
+}
+
+function emailRecipientRateLimitKey(email: unknown): string | null {
+  const normalized = normalizeRateLimitEmail(email);
+  return normalized === "unknown" ? null : normalized;
 }
 
 function getRequestUserAgent(req: Request): string {
@@ -155,26 +160,19 @@ const signupLimiter = rateLimit({
   message: { error: "Too many signup attempts from this IP. Please try again later." },
 });
 
-// Forgot-password: 5 requests per IP/email pair per 15 minutes
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  keyGenerator: (req) =>
-    `forgot-password:${ipKeyGenerator(req.ip || "")}:${normalizeRateLimitEmail(req.body?.email)}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many password reset requests for this email. Please try again later." },
+const signupEmailLimiter = createEmailSendRateLimit({
+  namespace: "signup-verification",
+  recipientKey: (req) => emailRecipientRateLimitKey(req.body?.email),
 });
 
-// Resend-verification: 3 requests per account per hour
-const resendVerificationLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  keyGenerator: (req) =>
-    `resend-verification:${(req as any).user?.userId ?? ipKeyGenerator(req.ip || "")}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many verification email resend attempts. Please try again later." },
+const forgotPasswordLimiter = createEmailSendRateLimit({
+  namespace: "forgot-password",
+  recipientKey: (req) => emailRecipientRateLimitKey(req.body?.email),
+});
+
+const resendVerificationLimiter = createEmailSendRateLimit({
+  namespace: "resend-verification",
+  recipientKey: (req) => req.user?.userId,
 });
 
 // Login global IP window: 50 failed attempts per IP/UA per 15 minutes.
@@ -429,7 +427,7 @@ const profileSchema = strictObject({
 // POST /api/auth/signup
 // Rate limiters run before the duplicate-email precheck so the 409 response
 // cannot be used for unthrottled account enumeration.
-router.post("/signup", publicAuthLimiter, signupLimiter, precheckDuplicateSignupEmail, async (req: Request, res: Response) => {
+router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, precheckDuplicateSignupEmail, async (req: Request, res: Response) => {
   let signupStage = "parse";
   try {
     const data = signupSchema.parse(req.body);

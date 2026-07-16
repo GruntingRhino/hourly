@@ -67,7 +67,7 @@ export default function OpportunityDetail() {
       if (requestId !== loadRequestIdRef.current) return;
       setOpp(oppData);
       const mine = user?.id
-        ? oppData.signups.find((signup) => signup.user.id === user.id)
+        ? oppData.signups?.find((signup) => signup.user.id === user.id)
         : null;
       setMySignup(mine ? { id: mine.id, status: mine.status } : null);
       setLoading(false);

@@ -1,5 +1,9 @@
 # GoodHours QA Results
 
+Generated: 2026-07-12T17:34:00.331Z
+
+# GoodHours QA Results
+
 Generated: 2026-06-29T13:52:42.427Z
 
 # GoodHours QA Results
@@ -149,7 +153,9 @@ Generated: 2026-02-24T01:50:05.795Z
 
 > One-time flows. Use a fresh mailinator address (e.g. `qa-test-01@mailinator.com`).
 
-- [ ] **Signup — Student** · Select "I would like to volunteer" → fill form → "Create Account" — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Signup — Student** · Select "I would like to volunteer" → fill form → "Create Account" — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Student self-registration via /signup has been removed. Students now join GoodHours exclusively through school invitation links.
+  - Manual Step: Ask a school admin to invite a student email. The student receives a link, sets a password, and is immediately added to the school cohort. Verify the invite email arrives, the link works, and the student is shown on the school admin roster.
   - Reason: Student self-registration via /signup has been removed. Students now join GoodHours exclusively through school invitation links.
   - Manual Step: Ask a school admin to invite a student email. The student receives a link, sets a password, and is immediately added to the school cohort. Verify the invite email arrives, the link works, and the student is shown on the school admin roster.
   - Reason: Student self-registration via /signup has been removed. Students now join GoodHours exclusively through school invitation links.
@@ -221,7 +227,9 @@ Generated: 2026-02-24T01:50:05.795Z
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-001-2026-05-18T13-40-28-589Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: redirected to `/dashboard` showing "Verify your email" screen with the correct address_
-- [ ] **Verification email delivered** · Check `mailinator.com/v4/public/inboxes.jsp?to=qa-test-01` — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Verification email delivered** · Check `mailinator.com/v4/public/inboxes.jsp?to=qa-test-01` — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Verification email step is only triggered by student invitation flow (not self-signup). Requires a valid invitation to have been sent first.
+  - Manual Step: After school admin sends an invitation, check the student mailbox for "Verify your GoodHours account" email, confirm sender is noreply@notifications.goodhours.app, click the verify link.
   - Reason: Verification email step is only triggered by student invitation flow (not self-signup). Requires a valid invitation to have been sent first.
   - Manual Step: After school admin sends an invitation, check the student mailbox for "Verify your GoodHours account" email, confirm sender is noreply@notifications.goodhours.app, click the verify link.
   - Reason: Verification email step is only triggered by student invitation flow (not self-signup). Requires a valid invitation to have been sent first.
@@ -293,7 +301,9 @@ Generated: 2026-02-24T01:50:05.795Z
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-002-2026-05-18T13-43-30-353Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: email from `noreply@notifications.goodhours.app`, subject "Verify your GoodHours account"_
-- [ ] **Email link works** · Click "Verify Email" button in email — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Email link works** · Click "Verify Email" button in email — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Email verification link works only after an invitation is created (self-signup removed).
+  - Manual Step: Use the verification link from the invitation email. Confirm it redirects to a "Email verified" or "Join a Classroom" screen.
   - Reason: Email verification link works only after an invitation is created (self-signup removed).
   - Manual Step: Use the verification link from the invitation email. Confirm it redirects to a "Email verified" or "Join a Classroom" screen.
   - Reason: Email verification link works only after an invitation is created (self-signup removed).
@@ -365,7 +375,7 @@ Generated: 2026-02-24T01:50:05.795Z
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-003-2026-05-18T13-43-30-405Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: app shows ✅ "Email verified!" then redirects to "Join a Classroom"_
-- [ ] **Login with wrong password** · Try logging in with bad credentials — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Login with wrong password** · Try logging in with bad credentials — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/login
 Call log:
 [2m  - navigating to "http://localhost:5173/login", waiting until "domcontentloaded"[22m
@@ -439,7 +449,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-004-2026-05-18T13-43-30-602Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: "Invalid email or password" error, no token issued_
-- [ ] **Forgot password** · `/login` → "Forgot password?" → enter email → check mailinator — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Forgot password** · `/login` → "Forgot password?" → enter email → check mailinator — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Forgot-password email delivery still depends on a reachable mailbox and outbound email transport. The automated self-signup mailinator path no longer exists in this suite.
+  - Manual Step: Open /forgot-password, submit a real mailbox for an existing account, confirm the "Check your email" state, then verify the reset email arrives and the link lands on /reset-password.
   - Reason: Forgot-password email delivery still depends on a reachable mailbox and outbound email transport. The automated self-signup mailinator path no longer exists in this suite.
   - Manual Step: Open /forgot-password, submit a real mailbox for an existing account, confirm the "Check your email" state, then verify the reset email arrives and the link lands on /reset-password.
   - Reason: Forgot-password email delivery still depends on a reachable mailbox and outbound email transport. The automated self-signup mailinator path no longer exists in this suite.
@@ -511,7 +523,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-005-2026-05-18T13-44-31-215Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: reset email arrives; clicking link lands on `/reset-password` form_
-- [ ] **Reset password** · Enter new password matching all rules → submit — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Reset password** · Enter new password matching all rules → submit — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Reset-password completion depends on the manual email-delivery step immediately before it.
+  - Manual Step: Use the reset link from the email, submit a compliant new password, confirm the success state, then log in with the new password.
   - Reason: Reset-password completion depends on the manual email-delivery step immediately before it.
   - Manual Step: Use the reset link from the email, submit a compliant new password, confirm the success state, then log in with the new password.
   - Reason: Reset-password completion depends on the manual email-delivery step immediately before it.
@@ -583,7 +597,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-006-2026-05-18T13-44-31-268Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/auth-flow-2026-05-18T13-40-27-710Z.zip
   _Expect: success message; can log in with new password_
-- [ ] **Duplicate signup** · Try signing up with an already-registered email — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+- [ ] **Duplicate signup** · Try signing up with an already-registered email — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Duplicate student self-signup is obsolete because students no longer self-register from /signup.
+  - Manual Step: Validate duplicate-invitation protection instead: have a school admin invite an already-enrolled student email and confirm the UI/API reject the duplicate cleanly.
   - Reason: Duplicate student self-signup is obsolete because students no longer self-register from /signup.
   - Manual Step: Validate duplicate-invitation protection instead: have a school admin invite an already-enrolled student email and confirm the UI/API reject the duplicate cleanly.
   - Reason: Duplicate student self-signup is obsolete because students no longer self-register from /signup.
@@ -663,7 +679,7 @@ Call log:
 > **Log in as:** john@student.edu
 
 ### 2a · Dashboard
-- [ ] Hour summary cards show (Committed, Verified, Activities Done) — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Hour summary cards show (Committed, Verified, Activities Done) — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -679,7 +695,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-008-2026-05-18T13-44-34-357Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] Progress bar reflects verified hours vs school goal — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Progress bar reflects verified hours vs school goal — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -687,7 +703,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] "Upcoming Opportunities" lists future events — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] "Upcoming Opportunities" lists future events — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -703,7 +719,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-010-2026-05-18T13-44-34-412Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] "Recent Activity" shows past sessions with statuses — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] "Recent Activity" shows past sessions with statuses — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -713,7 +729,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
 
 ### 2b · Browse
-- [ ] Opportunities load on arrival — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Opportunities load on arrival — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -737,7 +753,7 @@ Call log:
 [2026-05-18T13:44:34.541Z] response: 404 GET http://127.0.0.1:5174/api/schools/my-rules
 [2026-05-18T13:44:34.541Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
-- [ ] **Search** · Type a partial title → list filters in real time — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Search** · Type a partial title → list filters in real time — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — PASS
   - Reason: The current student account has no visible browse opportunities because no partner organizations are approved for this school in the present seed state.
   - Manual Step: Approve at least one partner organization or seed one visible slot for the student, then re-run browse search coverage.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -787,7 +803,7 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-013-2026-05-18T13-44-35-150Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Tag filter** · Select a tag → only matching opps shown; clear → all return — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Tag filter** · Select a tag → only matching opps shown; clear → all return — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -807,7 +823,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-014-2026-05-18T13-44-35-208Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Sort: Date** · Events appear in chronological order — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Sort: Date** · Events appear in chronological order — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The dedicated browse sort control is no longer exposed in the current student browse UI.
+  - Manual Step: If sort controls are reintroduced, verify Date ordering with at least two visible slots. Until then, this case should be covered by backend ordering tests or a restored UI control.
   - Reason: The dedicated browse sort control is no longer exposed in the current student browse UI.
   - Manual Step: If sort controls are reintroduced, verify Date ordering with at least two visible slots. Until then, this case should be covered by backend ordering tests or a restored UI control.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -875,7 +893,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-015-2026-05-18T13-45-05-264Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Sort: Most Popular** · Higher-signup events appear first — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Sort: Most Popular** · Higher-signup events appear first — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The dedicated popularity sort control is no longer exposed in the current student browse UI.
+  - Manual Step: If sort controls are reintroduced, verify higher-signup slots rank first. Until then, keep this covered elsewhere or restore the UI control.
   - Reason: The dedicated popularity sort control is no longer exposed in the current student browse UI.
   - Manual Step: If sort controls are reintroduced, verify higher-signup slots rank first. Until then, keep this covered elsewhere or restore the UI control.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -943,7 +963,7 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-016-2026-05-18T13-45-35-330Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Approved Orgs Only** toggle · List narrows to school-approved orgs — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Approved Orgs Only** toggle · List narrows to school-approved orgs — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -959,7 +979,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-017-2026-05-18T13-45-35-392Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Save** · Click Save on an opp → appears in "Saved" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Save** · Click Save on an opp → appears in "Saved" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Saved/Skipped/Discarded browse buckets are not surfaced in the current student UI, even though backend saved routes still exist.
+  - Manual Step: If this behavior is still a product requirement, restore the UI surface or add dedicated automated API coverage for save-state transitions.
   - Reason: Saved/Skipped/Discarded browse buckets are not surfaced in the current student UI, even though backend saved routes still exist.
   - Manual Step: If this behavior is still a product requirement, restore the UI surface or add dedicated automated API coverage for save-state transitions.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1027,7 +1049,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-018-2026-05-18T13-45-50-440Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Skip** · Click Skip on another opp → appears in "Skipped" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Skip** · Click Skip on another opp → appears in "Skipped" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Skip-state UX is not exposed in the current student browse UI.
+  - Manual Step: Restore the skip/discard surface or cover the saved-state API transitions separately, then re-enable this automated case.
   - Reason: Skip-state UX is not exposed in the current student browse UI.
   - Manual Step: Restore the skip/discard surface or cover the saved-state API transitions separately, then re-enable this automated case.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1095,7 +1119,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-019-2026-05-18T13-46-05-488Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Discard** · Click Discard → appears in "Discarded" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Discard** · Click Discard → appears in "Discarded" tab — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Discard-state UX is not exposed in the current student browse UI.
+  - Manual Step: Restore the skip/discard surface or cover the saved-state API transitions separately, then re-enable this automated case.
   - Reason: Discard-state UX is not exposed in the current student browse UI.
   - Manual Step: Restore the skip/discard surface or cover the saved-state API transitions separately, then re-enable this automated case.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1163,7 +1189,9 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-020-2026-05-18T13-46-20-540Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Recover** · From Skipped/Discarded tab, recover → moves back to main list — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Recover** · From Skipped/Discarded tab, recover → moves back to main list — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Recovering skipped/discarded opportunities is blocked by the same missing saved-state browse surface.
+  - Manual Step: After that UI returns, verify recovery moves the item back into the visible browse list.
   - Reason: Recovering skipped/discarded opportunities is blocked by the same missing saved-state browse surface.
   - Manual Step: After that UI returns, verify recovery moves the item back into the visible browse list.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1233,7 +1261,7 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
 
 ### 2c · Opportunity Detail & Signup
-- [ ] Click an opportunity → detail view shows org name, date, time, location, capacity, tags, custom fields — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Click an opportunity → detail view shows org name, date, time, location, capacity, tags, custom fields — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — PASS
   - Reason: The current student account has no visible browse opportunities, so there is no detail page to inspect from the live student flow.
   - Manual Step: Approve at least one partner organization or seed one visible slot for the student, then re-run the detail-view audit.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1293,7 +1321,7 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-022-2026-05-18T13-46-50-681Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Sign up** · Click "Sign Up" → button changes; confirm appears in student's signups — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Sign up** · Click "Sign Up" → button changes; confirm appears in student's signups — PASS — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — PASS
   - Reason: No sign-up eligible slot is currently visible to the student in this seed state, so automated signup coverage cannot proceed.
   - Manual Step: Seed or approve at least one open slot that the student can join, then re-run the signup and cancellation checks.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1351,7 +1379,11 @@ Call log:
 [2026-05-18T13:46:50.859Z] response: 404 GET http://127.0.0.1:5174/api/schools/my-rules
 [2026-05-18T13:46:50.859Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
-- [ ] **Capacity full → Waitlist** · If opp is at capacity, button reads "Join Waitlist"; status shows WAITLISTED — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Capacity full → Waitlist** · If opp is at capacity, button reads "Join Waitlist"; status shows WAITLISTED — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — FAIL
+  - Error: Waitlisted status not shown after joining waitlist
+  - URL: http://localhost:5173/slot/cmqzat3uw000cmu0qde1utnvx
+  - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-024-2026-07-12T17-32-58-358Z.png
+  - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-jane-2026-07-12T17-32-45-571Z.zip
   - Reason: Current seed data does not include a full slot that exposes the waitlist path.
   - Manual Step: Seed one capacity-full opportunity with at least one confirmed signup, then verify a second student can join the waitlist and sees WAITLISTED state.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1415,7 +1447,11 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-024-2026-05-18T13-46-54-393Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-jane-2026-05-18T13-46-51-459Z.zip
-- [ ] **Cancel signup** · Cancel a CONFIRMED signup → slot freed, confirmation shown — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Cancel signup** · Cancel a CONFIRMED signup → slot freed, confirmation shown — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — FAIL
+  - Error: Cancel signup button not found on confirmed signup
+  - URL: http://localhost:5173/dashboard
+  - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-025-2026-07-12T17-32-59-214Z.png
+  - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-07-12T17-32-36-325Z.zip
   - Reason: Cancellation coverage depends on item 23 creating a fresh confirmed signup, which did not happen in the current seed state.
   - Manual Step: First seed a sign-up eligible slot and confirm item 23 succeeds, then rerun cancellation coverage.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1493,7 +1529,11 @@ Call log:
   - URL: http://127.0.0.1:5174/browse
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-025-2026-05-18T13-46-54-473Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Waitlist promotion** · If another student cancels and a waitlisted student exists, waitlisted student becomes CONFIRMED (check DB or re-browse) — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Waitlist promotion** · If another student cancels and a waitlisted student exists, waitlisted student becomes CONFIRMED (check DB or re-browse) — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — FAIL
+  - Error: Waitlisted student was not promoted to CONFIRMED after cancellation
+  - URL: http://localhost:5173/slot/cmqzat3uw000cmu0qde1utnvx
+  - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-026-2026-07-12T17-33-00-509Z.png
+  - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-jane-2026-07-12T17-32-45-571Z.zip
   - Reason: Waitlist-promotion coverage depends on item 24 locating a full slot with a waitlist path, which is not present in the current seed state.
   - Manual Step: Seed a capacity-full slot, join it with the second student, then re-run cancellation and promotion verification together.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1571,7 +1611,9 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-jane-2026-05-18T13-46-51-459Z.zip
 
 ### 2d · Check-In / Check-Out
-- [ ] **Check in** · From dashboard or activity, click "Check In" on a confirmed session — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Check in** · From dashboard or activity, click "Check In" on a confirmed session — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Current seed state does not expose a check-in-ready confirmed session on the dashboard.
+  - Manual Step: Seed or locate a confirmed session within its check-in window, then verify Check In transitions the session state correctly.
   - Reason: Current seed state does not expose a check-in-ready confirmed session on the dashboard.
   - Manual Step: Seed or locate a confirmed session within its check-in window, then verify Check In transitions the session state correctly.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1636,7 +1678,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-027-2026-05-18T13-46-55-214Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
   _Expect: session status → CHECKED_IN; check-in time recorded_
-- [ ] **Check out** · Click "Check Out" — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Check out** · Click "Check Out" — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Current seed state does not expose a checked-in session ready for checkout.
+  - Manual Step: Use a session that has already been checked in, then confirm Check Out appears, completes, and exposes verification next steps.
   - Reason: Current seed state does not expose a checked-in session ready for checkout.
   - Manual Step: Use a session that has already been checked in, then confirm Check Out appears, completes, and exposes verification next steps.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1703,7 +1747,9 @@ Call log:
   _Expect: status → CHECKED_OUT; `totalHours` auto-calculated from elapsed time_
 
 ### 2e · Submit Verification
-- [ ] **Drawn signature** · On a CHECKED_OUT session, open "Submit Verification" → draw signature → submit — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Drawn signature** · On a CHECKED_OUT session, open "Submit Verification" → draw signature → submit — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Current seed state does not expose a checked-out session ready for verification submission.
+  - Manual Step: Use a student session that has already been checked out, open Submit Verification, draw a signature, and confirm the submission enters pending review.
   - Reason: Current seed state does not expose a checked-out session ready for verification submission.
   - Manual Step: Use a student session that has already been checked out, open Submit Verification, draw a signature, and confirm the submission enters pending review.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1780,7 +1826,9 @@ Call log:
 [2026-05-18T13:46:56.021Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
   _Expect: status → PENDING_VERIFICATION; org & school notified_
-- [ ] **File upload** · Submit verification with a PDF/PNG/JPG upload — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **File upload** · Submit verification with a PDF/PNG/JPG upload — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Current seed state does not expose a verification-ready session for file-upload coverage.
+  - Manual Step: Use a checked-out session, open Submit Verification, confirm `.exe` is rejected and PDF/PNG/JPG are accepted.
   - Reason: Current seed state does not expose a verification-ready session for file-upload coverage.
   - Manual Step: Use a checked-out session, open Submit Verification, confirm `.exe` is rejected and PDF/PNG/JPG are accepted.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1857,7 +1905,9 @@ Call log:
 [2026-05-18T13:46:57.253Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
   _Expect: accepted; unsupported types (e.g. `.exe`) rejected_
-- [ ] **Before event date** · Try submitting verification before event date — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Before event date** · Try submitting verification before event date — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The current seed state does not reliably guarantee a future checked-out session with verification blocked by date.
+  - Manual Step: Create or identify a future confirmed slot, check in/out if allowed, open verification, and confirm the UI blocks submission until the event date when that rule applies.
   - Reason: The current seed state does not reliably guarantee a future checked-out session with verification blocked by date.
   - Manual Step: Create or identify a future confirmed slot, check in/out if allowed, open verification, and confirm the UI blocks submission until the event date when that rule applies.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1930,7 +1980,7 @@ Call log:
   _Expect: blocked with appropriate error_
 
 ### 2f · Hour History & Reports
-- [ ] Settings → Profile → "Export Hours (CSV)" downloads a `.csv` with correct columns (Date, Opportunity, Organization, Hours, Status) — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Settings → Profile → "Export Hours (CSV)" downloads a `.csv` with correct columns (Date, Opportunity, Organization, Hours, Status) — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1938,7 +1988,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] Settings → Profile → "Export as PDF" generates a PDF report — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Settings → Profile → "Export as PDF" generates a PDF report — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1948,7 +1998,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
 
 ### 2g · Messages
-- [ ] Navigate to Messages → inbox loads — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Navigate to Messages → inbox loads — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1956,7 +2006,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] **Compose** · Send message to `volunteer@greenearth.org` — appears in Sent folder — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Compose** · Send message to `volunteer@greenearth.org` — appears in Sent folder — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -1978,7 +2028,9 @@ Call log:
 [2026-05-18T13:46:59.919Z] response: 404 POST http://127.0.0.1:5174/api/messages
 [2026-05-18T13:46:59.919Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
-- [ ] **Mark as read** · Unread message → click it → badge clears — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Mark as read** · Unread message → click it → badge clears — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: No unread messages exist to mark as read in this environment state.
+  - Manual Step: Create or receive an unread message, open it, and confirm unread badge clears.
   - Reason: No unread messages exist to mark as read in this environment state.
   - Manual Step: Create or receive an unread message, open it, and confirm unread badge clears.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2040,7 +2092,7 @@ Call log:
   - Manual Step: Create or receive an unread message, open it, and confirm unread badge clears.
   - Reason: No unread messages exist to mark as read in this environment state.
   - Manual Step: Create or receive an unread message, open it, and confirm unread badge clears.
-- [ ] **Notifications tab** · System notifications listed; clicking one marks it read — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Notifications tab** · System notifications listed; clicking one marks it read — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2054,7 +2106,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
 
 ### 2h · Settings
-- [ ] **Profile** · Edit name, phone, bio (check 300-char limit) → Save → refresh → changes persist — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Profile** · Edit name, phone, bio (check 300-char limit) → Save → refresh → changes persist — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2116,7 +2168,7 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-038-2026-05-18T13-47-18-817Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Avatar upload** · Upload a profile image → avatar updates — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Avatar upload** · Upload a profile image → avatar updates — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2128,7 +2180,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-039-2026-06-28T19-08-28-650Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-06-28T19-08-09-007Z.zip
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] **Social links** · Enter Instagram handle → Save → persists — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Social links** · Enter Instagram handle → Save → persists — PASS — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Student social-link fields are not exposed in the current Settings UI.
+  - Manual Step: If social links remain a product requirement, restore the field and re-enable a persistence check here.
   - Reason: Student social-link fields are not exposed in the current Settings UI.
   - Manual Step: If social links remain a product requirement, restore the field and re-enable a persistence check here.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2190,7 +2244,7 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-040-2026-05-18T13-47-21-893Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Notifications** · Toggle off "Hour Approvals" email → save → setting persists on refresh — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Notifications** · Toggle off "Hour Approvals" email → save → setting persists on refresh — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2222,7 +2276,7 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-041-2026-05-18T13-47-24-862Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Privacy** · Set "Who can message me" to "Orgs Only" → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Privacy** · Set "Who can message me" to "Orgs Only" → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2278,9 +2332,29 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-042-2026-05-18T13-47-26-928Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Change password** · Enter current + valid new password → success — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Change password** · Enter current + valid new password → success — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
+  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
@@ -2297,24 +2371,6 @@ Call log:
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-  - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
-  - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
@@ -2338,7 +2394,7 @@ Call log:
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
   - Reason: Changing john@student.edu password inside this run can break later required seed-account logins and downstream checklist continuity.
   - Manual Step: In Student Settings > Security, change password with current+valid new password, confirm success, and restore original credential for seed-account stability.
-- [ ] **Classroom tab** · Displays current classroom and invite code; "Leave Classroom" button present — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Classroom tab** · Displays current classroom and invite code; "Leave Classroom" button present — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2354,7 +2410,9 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-044-2026-05-18T13-47-27-597Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
-- [ ] **Delete account** · Type DELETE in confirmation → account removed → redirected to landing — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Delete account** · Type DELETE in confirmation → account removed → redirected to landing — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Deleting john@student.edu would invalidate remaining checklist steps that require this seeded account.
+  - Manual Step: Run this step separately: Student Settings > Security > Delete account, type DELETE, confirm redirect to landing and account removal.
   - Reason: Deleting john@student.edu would invalidate remaining checklist steps that require this seeded account.
   - Manual Step: Run this step separately: Student Settings > Security > Delete account, type DELETE, confirm redirect to landing and account removal.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2422,7 +2480,9 @@ Call log:
 > **Log in as:** volunteer@greenearth.org
 
 ### 3a · Dashboard
-- [ ] Stats cards show (Total Opportunities, Signups, Approved Hours, Unique Volunteers) — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Stats cards show (Total Opportunities, Signups, Approved Hours, Unique Volunteers) — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN with no linked organizationId, so the org dashboard stat-card surface is not reachable from this environment state.
+  - Manual Step: Use a true ORG_ADMIN seed with a non-null organizationId, then verify Dashboard shows Total Opportunities, Total Signups, Approved Hours, and Unique Volunteers.
   - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN with no linked organizationId, so the org dashboard stat-card surface is not reachable from this environment state.
   - Manual Step: Use a true ORG_ADMIN seed with a non-null organizationId, then verify Dashboard shows Total Opportunities, Total Signups, Approved Hours, and Unique Volunteers.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2495,7 +2555,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-046-2026-05-18T13-47-29-977Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] "Pending Verifications" section lists sessions awaiting action — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] "Pending Verifications" section lists sessions awaiting action — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2516,7 +2576,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-047-2026-05-18T13-47-30-021Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] Recent activity feed shows last notifications — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Recent activity feed shows last notifications — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The legacy beneficiary recent-activity dashboard feed is no longer present in the current UI.
+  - Manual Step: If activity-feed visibility is still required, add the surface back or move this coverage to the opportunities/signups history screens.
   - Reason: The legacy beneficiary recent-activity dashboard feed is no longer present in the current UI.
   - Manual Step: If activity-feed visibility is still required, add the surface back or move this coverage to the opportunities/signups history screens.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2581,7 +2643,9 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
 
 ### 3b · Create & Manage Opportunities
-- [ ] **Create** · Click "Create Opportunity" → fill all fields including address → Save — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Create** · Click "Create Opportunity" → fill all fields including address → Save — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Beneficiary opportunity creation is now handled by the rebuilt `/opportunities` composer; this audit case still targets the removed `/opportunities/new` form contract.
+  - Manual Step: Rebuild this case against the current beneficiary opportunity composer, then verify create/edit/cancel from that surface end-to-end.
   - Reason: Beneficiary opportunity creation is now handled by the rebuilt `/opportunities` composer; this audit case still targets the removed `/opportunities/new` form contract.
   - Manual Step: Rebuild this case against the current beneficiary opportunity composer, then verify create/edit/cancel from that surface end-to-end.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2654,7 +2718,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-049-2026-05-18T13-47-45-727Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
   _Expect: opp appears in Opportunities list with ACTIVE status_
-- [ ] **Auto-geocode** · Created opp with address → lat/lng populated (visible to students as distance sort) — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Auto-geocode** · Created opp with address → lat/lng populated (visible to students as distance sort) — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Auto-geocode validation depends on the updated beneficiary opportunity-creation case completing successfully first.
+  - Manual Step: After the current opportunity composer is automated, verify the saved opportunity retains valid location/address data and any downstream distance features still work.
   - Reason: Auto-geocode validation depends on the updated beneficiary opportunity-creation case completing successfully first.
   - Manual Step: After the current opportunity composer is automated, verify the saved opportunity retains valid location/address data and any downstream distance features still work.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2717,7 +2783,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-050-2026-05-18T13-47-45-788Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Edit** · Edit title/description/capacity → Save → changes reflected immediately — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Edit** · Edit title/description/capacity → Save → changes reflected immediately — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Beneficiary opportunity edit coverage depends on rebuilding the create/edit/cancel flow against the current opportunity composer.
+  - Manual Step: After the new create case is automated, verify editing title/description/capacity updates the list immediately.
   - Reason: Beneficiary opportunity edit coverage depends on rebuilding the create/edit/cancel flow against the current opportunity composer.
   - Manual Step: After the new create case is automated, verify editing title/description/capacity updates the list immediately.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2780,7 +2848,9 @@ Call log:
   - URL: http://127.0.0.1:5174/opportunities
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-051-2026-05-18T13-47-46-456Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Cancel** · Cancel the opp → status → CANCELLED; signed-up students receive notification — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Cancel** · Cancel the opp → status → CANCELLED; signed-up students receive notification — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Beneficiary opportunity cancel coverage depends on rebuilding the current opportunity composer/list flow.
+  - Manual Step: After the new create/edit automation exists, verify cancellation moves the opportunity into the cancelled state and notifies affected students.
   - Reason: Beneficiary opportunity cancel coverage depends on rebuilding the current opportunity composer/list flow.
   - Manual Step: After the new create/edit automation exists, verify cancellation moves the opportunity into the cancelled state and notifies affected students.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2843,7 +2913,9 @@ Call log:
   - URL: http://127.0.0.1:5174/opportunities
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-052-2026-05-18T13-47-46-520Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Recurring pattern field** · Enable "Recurring" toggle → recurring pattern field appears; saved correctly — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Recurring pattern field** · Enable "Recurring" toggle → recurring pattern field appears; saved correctly — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Recurring-opportunity coverage also depends on the rebuilt beneficiary opportunity composer automation.
+  - Manual Step: Use the current composer on `/opportunities`, enable recurring mode, and verify recurring schedule controls appear and save correctly.
   - Reason: Recurring-opportunity coverage also depends on the rebuilt beneficiary opportunity composer automation.
   - Manual Step: Use the current composer on `/opportunities`, enable recurring mode, and verify recurring schedule controls appear and save correctly.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2908,7 +2980,9 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
 
 ### 3c · Verify Hours
-- [ ] **Approve** · From Dashboard pending list or verification queue, click Approve on a PENDING_VERIFICATION session — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Approve** · From Dashboard pending list or verification queue, click Approve on a PENDING_VERIFICATION session — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The current seed state does not guarantee a pending beneficiary verification at run time.
+  - Manual Step: Seed a completed student session awaiting beneficiary review, then verify Approve removes it from the pending queue.
   - Reason: The current seed state does not guarantee a pending beneficiary verification at run time.
   - Manual Step: Seed a completed student session awaiting beneficiary review, then verify Approve removes it from the pending queue.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -2972,7 +3046,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-054-2026-05-18T13-47-47-821Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
   _Expect: status → VERIFIED; student receives email notification_
-- [ ] **Approve with override** · Approve with a custom hours value (different from totalHours) — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Approve with override** · Approve with a custom hours value (different from totalHours) — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Override approval depends on a pending verification record being present in the seed state.
+  - Manual Step: Seed a pending verification, approve it with a non-default hours override, and verify the approved total matches the override.
   - Reason: Override approval depends on a pending verification record being present in the seed state.
   - Manual Step: Seed a pending verification, approve it with a non-default hours override, and verify the approved total matches the override.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3036,7 +3112,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-055-2026-05-18T13-47-47-875Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
   _Expect: `verifiedHours` reflects overridden value_
-- [ ] **Reject** · Click Reject → enter reason (required) → submit — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Reject** · Click Reject → enter reason (required) → submit — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Reject-path coverage depends on a pending verification record being present in the seed state.
+  - Manual Step: Seed a pending verification, verify rejection requires a reason, then submit and confirm the request leaves the pending queue.
   - Reason: Reject-path coverage depends on a pending verification record being present in the seed state.
   - Manual Step: Seed a pending verification, verify rejection requires a reason, then submit and confirm the request leaves the pending queue.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3100,7 +3178,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-056-2026-05-18T13-47-47-921Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
   _Expect: status → REJECTED; reason stored; student notified_
-- [ ] **Self-verification blocked** · Org admin who is also verifier cannot verify their own session — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Self-verification blocked** · Org admin who is also verifier cannot verify their own session — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Seed data does not include a user who is both org verifier and session owner; self-verification cannot be produced from available UI states.
+  - Manual Step: Create an org-admin account that can log volunteer sessions for itself, then attempt to verify that own session and confirm "Cannot verify your own session".
   - Reason: Seed data does not include a user who is both org verifier and session owner; self-verification cannot be produced from available UI states.
   - Manual Step: Create an org-admin account that can log volunteer sessions for itself, then attempt to verify that own session and confirm "Cannot verify your own session".
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3162,7 +3242,9 @@ Call log:
   _Expect: error "Cannot verify your own session"_
 
 ### 3d · Announcements
-- [ ] Click "Make Announcement" → select opp → type message → send — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Click "Make Announcement" → select opp → type message → send — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The legacy dashboard announcement composer is not exposed in the current beneficiary admin surface.
+  - Manual Step: If announcements remain required, restore the composer or move this coverage to the current messaging/bulk-communication entry point.
   - Reason: The legacy dashboard announcement composer is not exposed in the current beneficiary admin surface.
   - Manual Step: If announcements remain required, restore the composer or move this coverage to the current messaging/bulk-communication entry point.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3237,7 +3319,9 @@ Call log:
   _Expect: all confirmed signups for that opp receive a notification/message_
 
 ### 3e · Messages & Notifications
-- [ ] Compose message to john@student.edu → appears in Sent — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Compose message to john@student.edu → appears in Sent — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN without organization ownership, so the legacy org-admin message flow is not a valid automated target in this environment.
+  - Manual Step: Use a true ORG_ADMIN seed, compose a message to john@student.edu, send it, and confirm it appears in Sent.
   - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN without organization ownership, so the legacy org-admin message flow is not a valid automated target in this environment.
   - Manual Step: Use a true ORG_ADMIN seed, compose a message to john@student.edu, send it, and confirm it appears in Sent.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3358,7 +3442,7 @@ Call log:
 [2026-05-18T13:48:04.368Z] response: 404 POST http://127.0.0.1:5174/api/messages
 [2026-05-18T13:48:04.368Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
-- [ ] Student's message from 2g appears in Inbox → mark read — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Student's message from 2g appears in Inbox → mark read — PASS — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3380,7 +3464,7 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
 
 ### 3f · Settings
-- [ ] **Profile** · Edit description (500-char limit), website, phone → Save → persists — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Profile** · Edit description (500-char limit), website, phone → Save → persists — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3404,7 +3488,9 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-061-2026-05-18T13-48-21-750Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **ZIP codes** · Add a ZIP code → appears in list; remove it → gone — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **ZIP codes** · Add a ZIP code → appears in list; remove it → gone — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN without a linked organization profile, so ZIP-code profile editing is not reachable in the intended org-admin surface.
+  - Manual Step: Use a true ORG_ADMIN seed, add a ZIP code in Organization Settings, save, refresh, confirm it persists, then remove it and confirm it clears.
   - Reason: The seeded org test account is currently a BENEFICIARY_ADMIN without a linked organization profile, so ZIP-code profile editing is not reachable in the intended org-admin surface.
   - Manual Step: Use a true ORG_ADMIN seed, add a ZIP code in Organization Settings, save, refresh, confirm it persists, then remove it and confirm it clears.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3477,7 +3563,9 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-062-2026-05-18T13-48-21-829Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Schools tab** · Search for "Lincoln" → request approval — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Schools tab** · Search for "Lincoln" → request approval — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: A dedicated beneficiary "Schools" tab is not present in the current settings UI.
+  - Manual Step: Validate school participation restrictions from the opportunity composer instead, where approved schools are now selected per opportunity.
   - Reason: A dedicated beneficiary "Schools" tab is not present in the current settings UI.
   - Manual Step: Validate school participation restrictions from the opportunity composer instead, where approved schools are now selected per opportunity.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3550,7 +3638,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-063-2026-05-18T13-48-36-873Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
   _Expect: "Pending" status shown; school admin sees request_
-- [ ] **Analytics** · Volunteer count and total hours display correctly — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Analytics** · Volunteer count and total hours display correctly — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Attendance analytics are gated behind the current Pro workflow and not exposed as the old standalone analytics tab.
+  - Manual Step: Validate analytics through the current Pro workflow once that surface is active for the seeded org.
   - Reason: Attendance analytics are gated behind the current Pro workflow and not exposed as the old standalone analytics tab.
   - Manual Step: Validate analytics through the current Pro workflow once that surface is active for the seeded org.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3622,7 +3712,9 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-064-2026-05-18T13-48-51-939Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Export CSV** · Downloads volunteer data file — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Export CSV** · Downloads volunteer data file — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The old beneficiary data-export tab is not present in the current settings surface.
+  - Manual Step: If volunteer-data export remains required, wire it into the current UI and restore automated download coverage.
   - Reason: The old beneficiary data-export tab is not present in the current settings surface.
   - Manual Step: If volunteer-data export remains required, wire it into the current UI and restore automated download coverage.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3694,46 +3786,13 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-065-2026-05-18T13-49-07-013Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/org-volunteer-2026-05-18T13-47-27-661Z.zip
-- [ ] **Change password** · Works correctly — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+- [ ] **Change password** · Works correctly — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
-  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
@@ -3749,11 +3808,48 @@ Call log:
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
   - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
   - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
-- [ ] **Notifications** · Toggle off "New Signup" → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+  - Reason: Changing volunteer@greenearth.org password in-suite risks invalidating later required quick-smoke credentials.
+  - Manual Step: In Organization Settings > Security, change password and confirm login, then restore seed password for shared test-account continuity.
+- [ ] **Notifications** · Toggle off "New Signup" → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Beneficiary notification toggles are not exposed in the current settings surface.
+  - Manual Step: If org-level notification preferences remain required, add the current UI and restore automated persistence checks here.
   - Reason: Beneficiary notification toggles are not exposed in the current settings surface.
   - Manual Step: If org-level notification preferences remain required, add the current UI and restore automated persistence checks here.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3830,7 +3926,9 @@ Call log:
 > **Log in as:** admin@lincoln.edu
 
 ### 4a · Onboarding (first-time)
-- [ ] On first login (clear `school_onboarding_*` from localStorage), graduation hours goal screen appears — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] On first login (clear `school_onboarding_*` from localStorage), graduation hours goal screen appears — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: School onboarding is now server-backed (`school.onboardingComplete`), not controlled by `school_onboarding_*` localStorage keys.
+  - Manual Step: Use a school account whose onboarding has not been completed yet, then verify the 3-step welcome/setup card appears on Dashboard.
   - Reason: School onboarding is now server-backed (`school.onboardingComplete`), not controlled by `school_onboarding_*` localStorage keys.
   - Manual Step: Use a school account whose onboarding has not been completed yet, then verify the 3-step welcome/setup card appears on Dashboard.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -3975,7 +4073,9 @@ Call log:
 [2026-05-18T13:49:24.082Z] console.error: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. /cohorts
 [2026-05-18T13:49:24.090Z] console.error: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. /cohorts
 ```
-- [ ] Enter hours (e.g. 40) → Save → lands on Dashboard — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Enter hours (e.g. 40) → Save → lands on Dashboard — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: This step depends on the onboarding card being active for the current school account.
+  - Manual Step: Use a not-yet-onboarded school admin, advance the onboarding steps, and confirm the final action dismisses the card while keeping the user on Dashboard.
   - Reason: This step depends on the onboarding card being active for the current school account.
   - Manual Step: Use a not-yet-onboarded school admin, advance the onboarding steps, and confirm the final action dismisses the card while keeping the user on Dashboard.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4043,7 +4143,7 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
 
 ### 4b · Dashboard
-- [ ] School stats: Total Students, Total Hours, Goal Completion %, At Risk count — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] School stats: Total Students, Total Hours, Goal Completion %, At Risk count — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4085,7 +4185,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-070-2026-05-18T13-49-24-231Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] Classroom grid shows each classroom with: student count, completion count, at-risk count, invite code — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Classroom grid shows each classroom with: student count, completion count, at-risk count, invite code — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4115,7 +4215,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-071-2026-05-18T13-49-24-330Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Copy invite code** · Click copy button → clipboard contains the code — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Copy invite code** · Click copy button → clipboard contains the code — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Invite-code copy is no longer exposed as a dashboard-level control in the current cohort-centric school UI.
+  - Manual Step: Open a cohort management surface that exposes invite codes, click copy there, and confirm the clipboard contains the cohort/classroom code.
   - Reason: Invite-code copy is no longer exposed as a dashboard-level control in the current cohort-centric school UI.
   - Manual Step: Open a cohort management surface that exposes invite codes, click copy there, and confirm the clipboard contains the cohort/classroom code.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4198,7 +4300,9 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
   - Reason: Clipboard API read is unavailable in this run environment.
   - Manual Step: Click copy invite code and manually paste to verify copied code is correct.
-- [ ] **Org requests** · Org request from 3f appears in "Pending Requests" → Approve it — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Org requests** · Org request from 3f appears in "Pending Requests" → Approve it — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The old inline dashboard "Pending Requests" queue is not present in the current school dashboard.
+  - Manual Step: Validate partner approval through the current beneficiary/partner workflow using a school account that has a pending request.
   - Reason: The old inline dashboard "Pending Requests" queue is not present in the current school dashboard.
   - Manual Step: Validate partner approval through the current beneficiary/partner workflow using a school account that has a pending request.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4265,7 +4369,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-073-2026-05-18T13-49-39-532Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
   _Expect: org status → APPROVED; org receives notification_
-- [ ] **Reject org** · Reject a different pending org → status → REJECTED — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Reject org** · Reject a different pending org → status → REJECTED — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Inline dashboard rejection of partner requests is no longer exposed on the current school dashboard.
+  - Manual Step: Use the current partner-management flow to reject a pending request and confirm the status becomes REJECTED.
   - Reason: Inline dashboard rejection of partner requests is no longer exposed on the current school dashboard.
   - Manual Step: Use the current partner-management flow to reject a pending request and confirm the status becomes REJECTED.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4331,7 +4437,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-074-2026-05-18T13-49-39-632Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Block org** · Block an approved org → confirmation modal → blocked; org disappears from approved list — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Block org** · Block an approved org → confirmation modal → blocked; org disappears from approved list — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Blocking an approved partner is no longer handled from the old dashboard list the audit expected.
+  - Manual Step: Use the current partner-management flow to block an approved partner and confirm it no longer appears as approved for the school.
   - Reason: Blocking an approved partner is no longer handled from the old dashboard list the audit expected.
   - Manual Step: Use the current partner-management flow to block an approved partner and confirm it no longer appears as approved for the school.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4399,7 +4507,7 @@ Call log:
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
 
 ### 4c · Groups (Student Management)
-- [ ] Left sidebar shows "All Students" + individual classrooms — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Left sidebar shows "All Students" + individual classrooms — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4435,7 +4543,9 @@ Call log:
 [2026-05-18T13:49:39.995Z] console.error: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. /cohorts
 [2026-05-18T13:49:40.001Z] console.error: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. /cohorts
 ```
-- [ ] **Search** · Type student name → list filters — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Search** · Type student name → list filters — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Dashboard-level student search has moved into the dedicated `/students` workflow.
+  - Manual Step: Open `/students`, search for a student by name, and confirm the roster filters to matching rows.
   - Reason: Dashboard-level student search has moved into the dedicated `/students` workflow.
   - Manual Step: Open `/students`, search for a student by name, and confirm the roster filters to matching rows.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4501,7 +4611,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-077-2026-05-18T13-49-40-619Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Filter: Completed** · Shows only students at/above goal — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Filter: Completed** · Shows only students at/above goal — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Completion-status filtering now lives in the dedicated `/students` triage/roster workflow instead of dashboard buttons.
+  - Manual Step: Open `/students`, apply the Completed view/filter, and confirm only completed students remain visible.
   - Reason: Completion-status filtering now lives in the dedicated `/students` triage/roster workflow instead of dashboard buttons.
   - Manual Step: Open `/students`, apply the Completed view/filter, and confirm only completed students remain visible.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4582,7 +4694,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-078-2026-05-18T13-49-55-718Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Filter: At Risk** · Shows students with < 50% of goal — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Filter: At Risk** · Shows students with < 50% of goal — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: At-risk filtering now lives in the dedicated `/students` triage workflow instead of dashboard buttons.
+  - Manual Step: Open `/students` or the intervention queue, apply the At Risk filter, and confirm only at-risk students remain visible.
   - Reason: At-risk filtering now lives in the dedicated `/students` triage workflow instead of dashboard buttons.
   - Manual Step: Open `/students` or the intervention queue, apply the At Risk filter, and confirm only at-risk students remain visible.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4663,7 +4777,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-079-2026-05-18T13-50-10-838Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Filter: Not Started** · Shows 0-hour students — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Filter: Not Started** · Shows 0-hour students — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Not-started filtering now lives in the dedicated `/students` workflow instead of dashboard buttons.
+  - Manual Step: Open `/students`, apply the Not Started or zero-hours filter, and confirm only zero-hour students remain visible.
   - Reason: Not-started filtering now lives in the dedicated `/students` workflow instead of dashboard buttons.
   - Manual Step: Open `/students`, apply the Not Started or zero-hours filter, and confirm only zero-hour students remain visible.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4744,7 +4860,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-080-2026-05-18T13-50-25-957Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Select student** · Click a student → right panel shows name, email, hours progress bar, status badge — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Select student** · Click a student → right panel shows name, email, hours progress bar, status badge — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4793,7 +4909,7 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-081-2026-05-18T13-50-56-079Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Send Reminder** · Opens compose window pre-filled with student as recipient — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Send Reminder** · Opens compose window pre-filled with student as recipient — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4823,7 +4939,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-082-2026-05-18T13-50-56-205Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **View Hour History** · Shows up to 5 sessions; each has date, opp, hours, status — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **View Hour History** · Shows up to 5 sessions; each has date, opp, hours, status — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Inline dashboard hour-history panels were replaced by dedicated roster/student workflows.
+  - Manual Step: Open a student from the current `/students` workflow and verify recent sessions/hour history render there.
   - Reason: Inline dashboard hour-history panels were replaced by dedicated roster/student workflows.
   - Manual Step: Open a student from the current `/students` workflow and verify recent sessions/hour history render there.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4889,7 +5007,9 @@ Call log:
   - URL: http://127.0.0.1:5174/dashboard
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-083-2026-05-18T13-50-56-300Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Remove Hours** · On a VERIFIED session, click Remove → optionally enter reason → confirm — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Remove Hours** · On a VERIFIED session, click Remove → optionally enter reason → confirm — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Remove-hours actions are no longer exposed from the old inline dashboard panel this audit targeted.
+  - Manual Step: Use the current student/session review workflow to remove approved hours and confirm totals and audit history update correctly.
   - Reason: Remove-hours actions are no longer exposed from the old inline dashboard panel this audit targeted.
   - Manual Step: Use the current student/session review workflow to remove approved hours and confirm totals and audit history update correctly.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -4958,7 +5078,9 @@ Call log:
   _Expect: session status → REJECTED; student receives email notification; school hours total decreases_
 
 ### 4d · Add Staff
-- [ ] Click "Add Staff Member" → fill name, email, optional classroom → Submit — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Click "Add Staff Member" → fill name, email, optional classroom → Submit — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The old `/groups` staff-management surface targeted by this audit is no longer routed in the current school app, so this automation cannot reach the Add Staff modal through the live UI.
+  - Manual Step: Expose the current staff-management route in navigation/router, then automate Add Staff Member creation against that mounted surface.
   - Reason: The old `/groups` staff-management surface targeted by this audit is no longer routed in the current school app, so this automation cannot reach the Add Staff modal through the live UI.
   - Manual Step: Expose the current staff-management route in navigation/router, then automate Add Staff Member creation against that mounted surface.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5059,7 +5181,7 @@ Call log:
   _Expect: success message with temporary password displayed; new teacher can log in_
 
 ### 4e · Settings
-- [ ] **Profile** · Edit school name, domain, required hours, ZIP codes → Save → persists — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Profile** · Edit school name, domain, required hours, ZIP codes → Save → persists — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5069,7 +5191,9 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] **Classrooms** · "Create Classroom" → enter name → created; appears in list with invite code — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Classrooms** · "Create Classroom" → enter name → created; appears in list with invite code — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The school settings "Classrooms" tab no longer exists; cohort management replaced this flow.
+  - Manual Step: Use the current cohort-management surface to create a cohort/classroom-equivalent group and verify the invite/join workflow there.
   - Reason: The school settings "Classrooms" tab no longer exists; cohort management replaced this flow.
   - Manual Step: Use the current cohort-management surface to create a cohort/classroom-equivalent group and verify the invite/join workflow there.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5150,7 +5274,7 @@ Call log:
   - URL: http://127.0.0.1:5174/settings
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-087-2026-05-18T13-51-29-576Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-05-18T13-49-22-197Z.zip
-- [ ] **Data Export** · Export activity log CSV → downloads file with Student, Opportunity, Date, Hours, Status columns — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Data Export** · Export activity log CSV → downloads file with Student, Opportunity, Date, Hours, Status columns — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5160,42 +5284,13 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] **Change password** · Works correctly — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+- [ ] **Change password** · Works correctly — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
-  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
@@ -5211,6 +5306,17 @@ Call log:
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5218,7 +5324,27 @@ Call log:
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
   - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
   - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
-- [ ] **Notifications** · Toggle off an option → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+  - Reason: Changing admin@lincoln.edu password in-suite can break subsequent seeded login checks and shared test credentials.
+  - Manual Step: In School Settings > Security, change password and verify login, then restore seed password before shared quick-smoke runs.
+- [ ] **Notifications** · Toggle off an option → save → persists — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5290,7 +5416,7 @@ Call log:
 
 > These require switching accounts. Do them last.
 
-- [ ] **Message preference enforcement** · Set student privacy to "Admins Only" → log in as org → attempt to message that student — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] **Message preference enforcement** · Set student privacy to "Admins Only" → log in as org → attempt to message that student — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5347,7 +5473,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-091-2026-05-18T13-51-34-570Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/student-john-2026-05-18T13-44-31-972Z.zip
   _Expect: blocked with "Message preferences do not allow this"_
-- [ ] **Audit trail** · School admin views audit log for a session that was approved then had hours removed — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Audit trail** · School admin views audit log for a session that was approved then had hours removed — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The old audit-trail check points at the removed `/groups` surface, and no current automated path in this suite both removes approved hours and lands on the replacement audit-history UI.
+  - Manual Step: Use the current student/session review workflow that supports remove-hours, then verify the resulting audit history from the mounted replacement surface before restoring automation.
   - Reason: The old audit-trail check points at the removed `/groups` surface, and no current automated path in this suite both removes approved hours and lands on the replacement audit-history UI.
   - Manual Step: Use the current student/session review workflow that supports remove-hours, then verify the resulting audit history from the mounted replacement surface before restoring automation.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5425,7 +5553,9 @@ Call log:
 [2026-05-18T13:51:34.695Z] console.error: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. /cohorts
 ```
   _Expect: two entries — APPROVE (by org/school) then OVERRIDE (by school)_
-- [ ] **Rate limit** · Attempt 6+ signups from same IP within 1 hour — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Rate limit** · Attempt 6+ signups from same IP within 1 hour — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: This rate-limit case still targets the removed student self-signup contract on `/api/auth/signup`, so it now only exercises validation failures instead of the intended limiter path.
+  - Manual Step: Retarget the limiter check to the current school-registration or invitation-based auth entrypoint that is actually rate-limited, then verify repeated attempts return HTTP 429 with the expected message.
   - Reason: This rate-limit case still targets the removed student self-signup contract on `/api/auth/signup`, so it now only exercises validation failures instead of the intended limiter path.
   - Manual Step: Retarget the limiter check to the current school-registration or invitation-based auth entrypoint that is actually rate-limited, then verify repeated attempts return HTTP 429 with the expected message.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5496,7 +5626,9 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-093-2026-05-18T13-51-35-379Z.png
   - Trace: n/a
   _Expect: 429 "Too many signup attempts"_
-- [ ] **Expired verification token** · Use a verify-email link older than 24h — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Expired verification token** · Use a verify-email link older than 24h — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: Token-expiry >24h cannot be time-traveled from UI and no exposed admin control was found to mint an already-expired verification token.
+  - Manual Step: Generate a verification token, wait past 24 hours (or use backend/admin tooling to mint expired token), then open link and confirm "Invalid or expired verification token".
   - Reason: Token-expiry >24h cannot be time-traveled from UI and no exposed admin control was found to mint an already-expired verification token.
   - Manual Step: Generate a verification token, wait past 24 hours (or use backend/admin tooling to mint expired token), then open link and confirm "Invalid or expired verification token".
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5555,7 +5687,9 @@ Call log:
   - Reason: Token-expiry >24h cannot be time-traveled from UI and no exposed admin control was found to mint an already-expired verification token.
   - Manual Step: Generate a verification token, wait past 24 hours (or use backend/admin tooling to mint expired token), then open link and confirm "Invalid or expired verification token".
   _Expect: "Invalid or expired verification token" error_
-- [ ] **Resend verification** · On email verification screen, click "Resend" → new email arrives — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] **Resend verification** · On email verification screen, click "Resend" → new email arrives — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: This check still targets the removed self-signup/email-verification flow on `/signup`.
+  - Manual Step: Use the current invitation-based registration flow, reach the email-verification screen from an actual invite, click Resend, and confirm a fresh verification email arrives.
   - Reason: This check still targets the removed self-signup/email-verification flow on `/signup`.
   - Manual Step: Use the current invitation-based registration flow, reach the email-verification screen from an actual invite, click Resend, and confirm a fresh verification email arrives.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5631,7 +5765,7 @@ Call log:
 
 > Run after every deploy. Should take < 5 min.
 
-- [ ] `GET /api/health` returns `{"status":"ok"}` — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] `GET /api/health` returns `{"status":"ok"}` — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5641,7 +5775,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] Login as john@student.edu → Dashboard loads with no errors — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Login as john@student.edu → Dashboard loads with no errors — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5651,7 +5785,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] Browse page loads opportunities — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Browse page loads opportunities — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — FAIL — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5697,7 +5831,9 @@ Call log:
 [2026-05-18T13:51:38.471Z] response: 404 GET http://127.0.0.1:5174/api/schools/my-rules
 [2026-05-18T13:51:38.471Z] console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
 ```
-- [ ] Login as volunteer@greenearth.org → Opportunities list loads — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] Login as volunteer@greenearth.org → Opportunities list loads — PASS — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: The seeded org quick-smoke account is currently a BENEFICIARY_ADMIN with no organizationId, so the old "My Opportunities" org-admin expectation is invalid for this environment.
+  - Manual Step: Use a true ORG_ADMIN seed account and confirm `/opportunities` loads the organization opportunity list without console errors.
   - Reason: The seeded org quick-smoke account is currently a BENEFICIARY_ADMIN with no organizationId, so the old "My Opportunities" org-admin expectation is invalid for this environment.
   - Manual Step: Use a true ORG_ADMIN seed account and confirm `/opportunities` loads the organization opportunity list without console errors.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5770,7 +5906,7 @@ Call log:
   - URL: http://127.0.0.1:5174/opportunities
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-099-2026-05-18T13-51-41-480Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/quick-org-2026-05-18T13-51-39-103Z.zip
-- [ ] Login as admin@lincoln.edu → Dashboard stats load — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Login as admin@lincoln.edu → Dashboard stats load — PASS — PASS — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5780,7 +5916,7 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] No console errors on any of the above pages — PASS — FAIL — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — FAIL — FAIL — PASS
+- [ ] No console errors on any of the above pages — PASS — FAIL — FAIL — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Console errors found on smoke pages:
@@ -5802,7 +5938,7 @@ Encountered two children with the same key, `%s`. Keys should be unique so that 
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/quick-admin-2026-05-18T13-51-41-589Z.zip
 
 ## New Feature Tests (102–108)
-- [ ] School Settings tab bar — all tabs fully visible and "Plans & Billing" tab not clipped — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] School Settings tab bar — all tabs fully visible and "Plans & Billing" tab not clipped — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5811,7 +5947,7 @@ Encountered two children with the same key, `%s`. Keys should be unique so that 
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] School Settings tab bar — clicking billing tab sets ?tab=billing in URL; URL-direct navigation shows billing content — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — FAIL — FAIL — PASS — FAIL — FAIL — FAIL — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] School Settings tab bar — clicking billing tab sets ?tab=billing in URL; URL-direct navigation shows billing content — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — FAIL — PASS — FAIL — FAIL — PASS — FAIL — FAIL — FAIL — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5879,7 +6015,7 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-103-2026-06-27T01-05-08-589Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-06-27T01-02-45-287Z.zip
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] Dev Pro unlock — org settings shows Pro tier (not "Free") in dev mode; Reminders tab has no "Upgrade" overlay — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] Dev Pro unlock — org settings shows Pro tier (not "Free") in dev mode; Reminders tab has no "Upgrade" overlay — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5888,39 +6024,12 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] ProGate redirect — "Upgrade to Pro" button navigates to /settings?tab=billing (not mail app), works on repeat clicks — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+- [ ] ProGate redirect — "Upgrade to Pro" button navigates to /settings?tab=billing (not mail app), works on repeat clicks — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
   - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Error: Item was not executed due to unexpected suite interruption.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
-  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
-  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Error: Item was not executed due to unexpected suite interruption.
   - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
@@ -5936,10 +6045,39 @@ Call log:
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Error: Item was not executed due to unexpected suite interruption.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
   - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] School as hosting org — GET /api/schools/my-beneficiary returns a beneficiary with id and name — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Reason: No "Upgrade to Pro" ProGate button visible in dev mode (dev Pro unlock hides it). Cannot test redirect flow without a genuine Free-tier env.
+  - Manual Step: In a non-dev environment log in as a Free org, navigate to a Pro-gated tab (Reminders or Branding), click "Upgrade to Pro", and confirm it navigates to /settings?tab=billing — not to the mail app.
+  - Error: Item was not executed due to unexpected suite interruption.
+- [ ] School as hosting org — GET /api/schools/my-beneficiary returns a beneficiary with id and name — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -5948,7 +6086,9 @@ Call log:
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] School-to-school partnership — nearby directory includes school entries with "School" badge; partner request API returns 201 or 409 — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED
+- [ ] School-to-school partnership — nearby directory includes school entries with "School" badge; partner request API returns 201 or 409 — FAIL — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — MANUAL REQUIRED — FAIL — FAIL — MANUAL REQUIRED — MANUAL REQUIRED
+  - Reason: No second school found in the nearby directory (seed only has one school). Cannot test school-to-school partner request without two schools.
+  - Manual Step: Seed a second school with non-null lat/lng, log in as the first school admin, open Discover, locate the second school on the map, click "+ Partner", confirm the partner request is sent, then log in as the second school admin, approve the request from the School Partners tab, and verify mutual access.
   - Reason: No second school found in the nearby directory (seed only has one school). Cannot test school-to-school partner request without two schools.
   - Manual Step: Seed a second school with non-null lat/lng, log in as the first school admin, open Discover, locate the second school on the map, click "+ Partner", confirm the partner request is sent, then log in as the second school admin, approve the request from the School Partners tab, and verify mutual access.
   - Error: Item was not executed due to unexpected suite interruption.
@@ -6007,7 +6147,7 @@ Call log:
   - Screenshot: /Users/abhay/RTB/GoodHours/tests/artifacts/screenshots/item-107-2026-06-27T01-05-31-894Z.png
   - Trace: /Users/abhay/RTB/GoodHours/tests/artifacts/traces/school-admin-2026-06-27T01-02-45-287Z.zip
   - Error: Item was not executed due to unexpected suite interruption.
-- [ ] School-to-school partnership — Partners page loads; "School Partners" tab exists and renders request content — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS
+- [ ] School-to-school partnership — Partners page loads; "School Partners" tab exists and renders request content — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — FAIL — FAIL — PASS — PASS — PASS — PASS — PASS — PASS — PASS — FAIL — FAIL — PASS — PASS
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.
   - Error: Item was not executed due to unexpected suite interruption.

@@ -4,6 +4,7 @@ import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -13,6 +14,10 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
     const { opportunityId } = req.body;
     if (!opportunityId) {
       return res.status(400).json({ error: "opportunityId is required" });
+    }
+    const schoolId = await resolveStudentSchoolId(req.user!.userId);
+    if (!schoolId) {
+      return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }
 
     const result = await runSerializableTransaction(async (tx) => {
@@ -24,6 +29,13 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       });
       if (!opp) return { kind: "error" as const, status: 404, body: { error: "Opportunity not found" } };
       if (opp.status !== "ACTIVE") return { kind: "error" as const, status: 400, body: { error: "Opportunity is not active" } };
+      const approval = await tx.schoolOrganization.findFirst({
+        where: { schoolId, organizationId: opp.organizationId, status: "APPROVED" },
+        select: { id: true },
+      });
+      if (!approval) {
+        return { kind: "error" as const, status: 403, body: { error: "This opportunity is not available at your school." } };
+      }
 
       const existing = await tx.signup.findUnique({
         where: { userId_opportunityId: { userId: req.user!.userId, opportunityId } },

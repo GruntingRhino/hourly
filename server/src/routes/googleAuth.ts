@@ -12,7 +12,7 @@ import {
   extractDomainFromWebsite,
   isPersonalEmailDomain,
 } from "../lib/signupEmailPolicy";
-import { createHybridRateLimit } from "../middleware/rateLimit";
+import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import {
   firstZodError,
   opaqueIdSchema,
@@ -42,6 +42,14 @@ const registerSchoolLimiter = createHybridRateLimit({
   windowMs: 60 * 60 * 1000,
   maxPerIp: 10,
   keySuffix: (req) => normalizeContactEmail(req.body?.contactEmail),
+});
+
+const registerSchoolEmailLimiter = createEmailSendRateLimit({
+  namespace: "register-school-email",
+  recipientKey: (req) => {
+    const email = normalizeContactEmail(req.body?.contactEmail);
+    return email === "unknown" ? null : email;
+  },
 });
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -534,7 +542,7 @@ router.get("/schools", publicGoogleAuthLimiter, async (req: Request, res: Respon
 });
 
 // POST /api/auth/google/register-school — initiate school registration via magic link
-router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, async (req: Request, res: Response) => {
+router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, registerSchoolEmailLimiter, async (req: Request, res: Response) => {
   try {
     const data = registerSchoolSchema.parse(req.body);
 

@@ -6,6 +6,7 @@ import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories
 
 interface TimeSlot {
   id: string;
+  legacyOpportunityId?: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -403,7 +404,7 @@ export default function StudentBrowse() {
             return (
               <Link
                 key={slot.id}
-                to={`/slot/${slot.id}`}
+                to={slot.legacyOpportunityId ? `/opportunity/${slot.legacyOpportunityId}` : `/slot/${slot.id}`}
                 state={{ slot }}
                 className="block border border-[var(--border)] rounded-[3px] p-4 transition-colors hover:border-[var(--action)]"
                 style={{ background: "var(--surface)" }}
