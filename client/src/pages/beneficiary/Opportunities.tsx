@@ -934,8 +934,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                               required className="px-2 py-1.5 border border-[var(--border-s)] rounded text-sm" />
                             <div className="flex gap-1 items-center sm:col-span-2 lg:col-span-1">
                               <input type="number" value={slot.capacity} onChange={(e) => updateSlot(i, "capacity", e.target.value)}
-                                placeholder="Max #" min={1} className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
-                                title="Maximum # Volunteers" />
+                                placeholder="Max volunteers" min={1} className="w-full px-2 py-1.5 border border-[var(--border-s)] rounded text-sm"
+                                title="Maximum volunteers" />
                               {form.slots.length > 1 && (
                                 <button type="button" onClick={() => removeSlot(i)} className="text-red-400 hover:text-[var(--er-t)] text-xs">✕</button>
                               )}
