@@ -162,18 +162,24 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/opportunities/:id
-router.get("/:id", async (req: Request, res: Response) => {
+// GET /api/opportunities/:id — student detail with the requesting student's signup state
+router.get("/:id", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
-    const opp = await prisma.opportunity.findUnique({
-      where: { id: req.params.id },
-      include: {
-        organization: { select: { id: true, name: true, description: true } },
-        _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
-      },
-    });
+    const [opp, mySignup] = await Promise.all([
+      prisma.opportunity.findUnique({
+        where: { id: req.params.id },
+        include: {
+          organization: { select: { id: true, name: true, description: true } },
+          _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
+        },
+      }),
+      prisma.signup.findUnique({
+        where: { userId_opportunityId: { userId: req.user!.userId, opportunityId: req.params.id } },
+        select: { id: true, status: true },
+      }),
+    ]);
     if (!opp) return res.status(404).json({ error: "Opportunity not found" });
-    res.json(opp);
+    res.json({ ...opp, mySignup });
   } catch (err) {
     console.error("Get opportunity error:", err);
     res.status(500).json({ error: "Internal server error" });

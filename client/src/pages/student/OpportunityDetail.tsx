@@ -23,7 +23,7 @@ interface Opportunity {
   status: string;
   organization: { id: string; name: string; description?: string };
   _count: { signups: number };
-  signups: { id: string; status: string; user: { id: string; name: string } }[];
+  mySignup: SignupRecord | null;
 }
 
 interface Session {
@@ -66,10 +66,7 @@ export default function OpportunityDetail() {
       const oppData = await api.get<Opportunity>(`/opportunities/${id}`);
       if (requestId !== loadRequestIdRef.current) return;
       setOpp(oppData);
-      const mine = user?.id
-        ? oppData.signups?.find((signup) => signup.user.id === user.id)
-        : null;
-      setMySignup(mine ? { id: mine.id, status: mine.status } : null);
+      setMySignup(oppData.mySignup);
       setLoading(false);
 
       // Session fetch runs separately so detail actions render without waiting
