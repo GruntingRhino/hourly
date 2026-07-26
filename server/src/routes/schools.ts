@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { buildCsv } from "../lib/csv";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import {
@@ -836,9 +837,7 @@ router.get("/my-beneficiary", authenticate, requireRole("SCHOOL_ADMIN"), async (
           name: user.school.name,
           visibility: "PRIVATE",
           createdBySchoolId: user.schoolId,
-          // Private school workspaces use the normal organization tier.
-          // Pro access is provisioned only after verified billing succeeds.
-          planTier: "FREE",
+          ...SCHOOL_CREATED_BENEFICIARY_PLAN,
           status: "ACTIVE",
         },
         select: { id: true, name: true },

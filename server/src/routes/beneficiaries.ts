@@ -11,6 +11,7 @@ import prisma from "../lib/prisma";
 import { isPrismaKnownRequestError } from "../lib/prismaErrors";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { canRemoveBeneficiaryAdmin } from "../lib/beneficiaryAdminPolicy";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, CLIENT_URL } from "../services/email";
@@ -720,6 +721,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
         visibility: data.visibility,
         status: "ACTIVE",
         createdBySchoolId: user.schoolId,
+        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       },
     });
 
@@ -956,6 +958,7 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
             visibility: ((row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE"),
             status: "ACTIVE",
             createdBySchoolId: user.schoolId,
+            ...SCHOOL_CREATED_BENEFICIARY_PLAN,
           },
         });
         const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";

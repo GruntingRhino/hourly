@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 
@@ -30,7 +31,7 @@ async function getOrCreateSchoolBeneficiary(schoolId: string): Promise<{ id: str
       name: school?.name ?? "School",
       visibility: "PRIVATE",
       createdBySchoolId: schoolId,
-      planTier: "PRO",
+      ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       status: "ACTIVE",
     },
     select: { id: true },

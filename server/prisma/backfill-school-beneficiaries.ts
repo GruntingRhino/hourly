@@ -8,6 +8,7 @@
  */
 
 import prisma from "../src/lib/prisma";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../src/lib/schoolBeneficiaryPolicy";
 
 async function main() {
   const schools = await prisma.school.findMany({ select: { id: true, name: true } });
@@ -45,6 +46,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: school.id,
+        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       },
     });
 

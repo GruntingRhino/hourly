@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { getStripe } from "../lib/stripe";
 import { processStripeEventAtomically } from "../lib/stripeWebhookProcessor";
+import { projectSubscriptionEntitlement } from "../lib/stripeSubscriptionPolicy";
 
 const router = Router();
 
@@ -68,25 +69,17 @@ router.post("/", async (req: Request, res: Response) => {
         const beneficiaryId = sub.metadata?.beneficiaryId;
         if (!beneficiaryId) break;
 
-        const statusMap: Record<string, string> = {
-          active: "ACTIVE",
-          trialing: "TRIALING",
-          past_due: "PAST_DUE",
-          canceled: "CANCELLED",
-          unpaid: "PAST_DUE",
-          incomplete: "INCOMPLETE",
-          incomplete_expired: "CANCELLED",
-          paused: "PAST_DUE",
-        };
-        const newStatus = statusMap[sub.status] ?? "ACTIVE";
-        const isActive = ["ACTIVE", "TRIALING"].includes(newStatus);
+        const entitlement = projectSubscriptionEntitlement({
+          event: "updated",
+          stripeStatus: sub.status,
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+        });
 
         applyUpdate = async (tx) => {
           await tx.beneficiary.update({
             where: { id: beneficiaryId },
             data: {
-              planTier: isActive || sub.cancel_at_period_end ? "PRO" : "FREE",
-              subscriptionStatus: sub.cancel_at_period_end ? "CANCEL_AT_PERIOD_END" : newStatus,
+              ...entitlement,
               stripeSubscriptionId: sub.id,
               stripePriceId: sub.items.data[0]?.price.id ?? null,
               billingInterval: sub.items.data[0]?.price.recurring?.interval === "year" ? "annual" : "monthly",
@@ -102,13 +95,13 @@ router.post("/", async (req: Request, res: Response) => {
         const sub = event.data.object as import("stripe").Stripe.Subscription;
         const beneficiaryId = sub.metadata?.beneficiaryId;
         if (!beneficiaryId) break;
+        const entitlement = projectSubscriptionEntitlement({ event: "deleted" });
 
         applyUpdate = async (tx) => {
           await tx.beneficiary.update({
             where: { id: beneficiaryId },
             data: {
-              planTier: "FREE",
-              subscriptionStatus: "CANCELLED",
+              ...entitlement,
               stripeSubscriptionId: null,
               stripePriceId: null,
               currentPeriodEnd: null,

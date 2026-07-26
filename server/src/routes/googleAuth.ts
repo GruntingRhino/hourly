@@ -7,6 +7,7 @@ import { generateToken, hashToken } from "../lib/tokenHash";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
 import {
   emailDomainMatchesWebsite,
   extractDomainFromWebsite,
@@ -764,6 +765,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
             visibility: "PRIVATE",
             status: "ACTIVE",
             createdBySchoolId: school.id,
+            ...SCHOOL_CREATED_BENEFICIARY_PLAN,
           },
         }));
 
@@ -931,7 +933,13 @@ router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Reque
       const schoolBeneficiary =
         (await prisma.beneficiary.findFirst({ where: { createdBySchoolId: school.id, visibility: "PRIVATE" } })) ??
         (await prisma.beneficiary.create({
-          data: { name: school.name, visibility: "PRIVATE", status: "ACTIVE", createdBySchoolId: school.id },
+          data: {
+            name: school.name,
+            visibility: "PRIVATE",
+            status: "ACTIVE",
+            createdBySchoolId: school.id,
+            ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+          },
         }));
       const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
         where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },

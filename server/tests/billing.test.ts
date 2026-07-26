@@ -87,19 +87,3 @@ test("formatCents formats 30000 as $300", () => {
 test("formatCents formats 50000 as $500", () => {
   assert.equal(formatCents(50000), "$500");
 });
-
-// ── Subscription status safety (no-Stripe logic) ────────────────────────────
-
-test("FREE status means no active subscription", () => {
-  const freeStatuses = ["FREE", "CANCELLED", "INCOMPLETE"];
-  const proStatuses = ["ACTIVE", "TRIALING", "CANCEL_AT_PERIOD_END"];
-  for (const s of freeStatuses) {
-    assert.ok(!proStatuses.includes(s), `${s} should not be treated as active Pro`);
-  }
-});
-
-test("PAST_DUE does not remove Pro until subscription.deleted fires", () => {
-  // PAST_DUE keeps planTier=PRO to allow grace period; only subscription.deleted fires removal
-  const pastDueKeepsPro = ["PAST_DUE", "CANCEL_AT_PERIOD_END"].includes("PAST_DUE");
-  assert.ok(pastDueKeepsPro, "PAST_DUE should preserve Pro access during grace period");
-});

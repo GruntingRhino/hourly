@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../src/lib/schoolBeneficiaryPolicy";
 
 const prisma = new PrismaClient();
 
@@ -63,7 +64,7 @@ async function main() {
       email: "admin@lincoln.edu",
       visibility: "PRIVATE",
       createdBySchoolId: school.id,
-      planTier: "PRO",
+      ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       status: "ACTIVE",
     },
   });

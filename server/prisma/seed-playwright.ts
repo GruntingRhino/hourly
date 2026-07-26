@@ -22,6 +22,7 @@
 
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../src/lib/schoolBeneficiaryPolicy";
 
 const prisma = new PrismaClient();
 
@@ -76,6 +77,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: schoolA.id,
+        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       },
     });
     await prisma.schoolBeneficiaryApproval.create({
@@ -129,6 +131,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: schoolB.id,
+        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
       },
     });
     await prisma.schoolBeneficiaryApproval.create({
