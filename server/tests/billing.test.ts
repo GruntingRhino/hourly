@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateSchoolEstimate, BILLING_CONFIG, formatCents, getSchoolPricePerStudentCents } from "../src/lib/billingConfig";
+import {
+  calculateSchoolEstimate,
+  BILLING_CONFIG,
+  DEFAULT_ORGANIZATION_QUOTE_INTERVAL,
+  formatCents,
+  getSchoolPricePerStudentCents,
+} from "../src/lib/billingConfig";
 
 // ── BILLING_CONFIG ──────────────────────────────────────────────────────────
 
@@ -16,6 +22,10 @@ test("annual price is less than 12 months of monthly (10% savings)", () => {
   const monthly12 = BILLING_CONFIG.organization.proMonthlyPriceCents * 12;
   const annual = BILLING_CONFIG.organization.proAnnualPriceCents;
   assert.ok(annual < monthly12, "annual plan should cost less than 12 monthly payments");
+});
+
+test("legacy organization quote requests default to annual billing", () => {
+  assert.equal(DEFAULT_ORGANIZATION_QUOTE_INTERVAL, "annual");
 });
 
 test("school price per student is $0.50 (50 cents) by default", () => {

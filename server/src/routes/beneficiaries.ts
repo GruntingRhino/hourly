@@ -3509,14 +3509,33 @@ router.post("/admin-invitations/:token/accept", authenticate, async (req, res) =
 });
 
 router.delete("/:id/admins/:adminId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
-  const [actor, target] = await Promise.all([prisma.user.findUnique({ where: { id: req.user!.userId } }), prisma.user.findUnique({ where: { id: req.params.adminId } })]);
-  if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER" || target?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Owner access required" });
-  const owners = await prisma.user.count({ where: { beneficiaryId: req.params.id, role: "BENEFICIARY_ADMIN", beneficiaryAdminRole: "OWNER" } });
-  if (!canRemoveBeneficiaryAdmin({ targetRole: target.beneficiaryAdminRole as "OWNER" | "ADMIN" | null, ownerCount: owners, targetUserId: target.id, actorUserId: actor.id })) {
-    return res.status(400).json({ error: "An organization must retain an owner" });
+  try {
+    const result = await runSerializableTransaction(async (tx) => {
+      const [actor, target] = await Promise.all([
+        tx.user.findUnique({ where: { id: req.user!.userId } }),
+        tx.user.findUnique({ where: { id: req.params.adminId } }),
+      ]);
+      if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER" || target?.beneficiaryId !== req.params.id) {
+        return "FORBIDDEN" as const;
+      }
+      const owners = await tx.user.count({
+        where: { beneficiaryId: req.params.id, role: "BENEFICIARY_ADMIN", beneficiaryAdminRole: "OWNER" },
+      });
+      if (!canRemoveBeneficiaryAdmin({ targetRole: target.beneficiaryAdminRole as "OWNER" | "ADMIN" | null, ownerCount: owners, targetUserId: target.id, actorUserId: actor.id })) {
+        return "FINAL_OWNER" as const;
+      }
+      await tx.user.update({ where: { id: target.id }, data: { beneficiaryId: null, beneficiaryAdminRole: null } });
+      return "REMOVED" as const;
+    });
+    if (result === "FORBIDDEN") return res.status(403).json({ error: "Owner access required" });
+    if (result === "FINAL_OWNER") {
+      return res.status(400).json({ error: "An organization must retain an owner" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Remove beneficiary administrator error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-  await prisma.user.update({ where: { id: target.id }, data: { beneficiaryId: null, beneficiaryAdminRole: null } });
-  res.json({ ok: true });
 });
 
 router.delete("/:id/admin-invitations/:invitationId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {

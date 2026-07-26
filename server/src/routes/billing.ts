@@ -5,7 +5,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
-import { BILLING_CONFIG } from "../lib/billingConfig";
+import { BILLING_CONFIG, DEFAULT_ORGANIZATION_QUOTE_INTERVAL } from "../lib/billingConfig";
 import { getStripe } from "../lib/stripe";
 import { isInternalAdminUser } from "../lib/internalAdmin";
 import { detectMimeType } from "../lib/detectMimeType";
@@ -364,7 +364,7 @@ const invoiceRequestSchema = z.object({
   billingContactEmail: z.string().email(),
   purchaseOrderRequired: z.boolean().default(false),
   taxExempt: z.boolean().default(false),
-  requestedBillingInterval: z.enum(["monthly", "annual"]),
+  requestedBillingInterval: z.enum(["monthly", "annual"]).default(DEFAULT_ORGANIZATION_QUOTE_INTERVAL),
   preferredPaymentMethod: z.string().optional(),
   additionalNotes: z.string().optional(),
 });

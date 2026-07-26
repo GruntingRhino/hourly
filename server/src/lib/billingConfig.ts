@@ -1,6 +1,8 @@
 // Centralized billing configuration. Never import from client code.
 // Prices are in cents to avoid floating-point issues.
 
+export const DEFAULT_ORGANIZATION_QUOTE_INTERVAL = "annual" as const;
+
 export const BILLING_CONFIG = {
   organization: {
     proMonthlyPriceCents: 3000,  // $30/month

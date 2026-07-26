@@ -8,6 +8,8 @@ import { hashToken } from "../lib/tokenHash";
 import { ensureStudentCohortMembership } from "../lib/studentCohorts";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { firstZodError, strictObject, tokenSchema, trimmedString } from "../lib/validation";
+import { roleForBeneficiaryClaim } from "../lib/beneficiaryAdminPolicy";
+import { runSerializableTransaction } from "../lib/serializableTransaction";
 
 const router = Router();
 const publicInvitationLimiter = createHybridRateLimit({
@@ -281,67 +283,61 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
       return res.status(400).json({ error: "Invitation has expired" });
     }
 
-    // Check if account already exists for this email
+    // Check if account already exists for this email.
     const existing = await prisma.user.findUnique({ where: { email: inv.sentTo } });
-    if (existing && existing.role === "BENEFICIARY_ADMIN") {
-      // Link to beneficiary if not already
-      await prisma.user.update({
-        where: { id: existing.id },
-        data: { beneficiaryId: inv.beneficiaryId },
-      });
-      await prisma.beneficiaryInvitation.update({
-        where: { id: inv.id },
+    if (existing && existing.role !== "BENEFICIARY_ADMIN") {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+    if (existing?.beneficiaryId && existing.beneficiaryId !== inv.beneficiaryId) {
+      return res.status(409).json({ error: "This administrator already belongs to another organization." });
+    }
+
+    const passwordHash = existing ? null : await bcrypt.hash(data.password, 12);
+    const user = await runSerializableTransaction(async (tx) => {
+      const accepted = await tx.beneficiaryInvitation.updateMany({
+        where: { id: inv.id, status: "PENDING", expiresAt: { gt: new Date() } },
         data: { status: "ACCEPTED", acceptedAt: new Date(), respondedAt: new Date() },
       });
-      await prisma.beneficiary.update({
+      if (accepted.count !== 1) throw Object.assign(new Error("Invitation is no longer available"), { status: 409 });
+
+      const ownerCount = await tx.user.count({
+        where: { beneficiaryId: inv.beneficiaryId, role: "BENEFICIARY_ADMIN", beneficiaryAdminRole: "OWNER" },
+      });
+      const beneficiaryAdminRole = existing?.beneficiaryId === inv.beneficiaryId && existing.beneficiaryAdminRole === "OWNER"
+        ? "OWNER"
+        : roleForBeneficiaryClaim(ownerCount > 0);
+      const acceptedUser = existing
+        ? await tx.user.update({
+            where: { id: existing.id },
+            data: { beneficiaryId: inv.beneficiaryId, beneficiaryAdminRole },
+          })
+        : await tx.user.create({
+            data: {
+              email: inv.sentTo,
+              passwordHash: passwordHash!,
+              name: data.name,
+              role: "BENEFICIARY_ADMIN",
+              beneficiaryId: inv.beneficiaryId,
+              beneficiaryAdminRole,
+              emailVerified: true,
+              status: "ACTIVE",
+            },
+          });
+      await tx.beneficiary.update({
         where: { id: inv.beneficiaryId },
         data: { claimed: true, status: "ACTIVE" },
       });
-      await prisma.schoolBeneficiaryApproval.upsert({
+      await tx.schoolBeneficiaryApproval.upsert({
         where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
         update: { status: "APPROVED", approvedAt: new Date() },
         create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
       });
-      const jwtToken = signUserToken(existing);
-      return res.json({ token: jwtToken, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, beneficiaryId: inv.beneficiaryId } });
-    }
-    if (existing) {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 12);
-
-    const user = await prisma.user.create({
-      data: {
-        email: inv.sentTo,
-        passwordHash,
-        name: data.name,
-        role: "BENEFICIARY_ADMIN",
-        beneficiaryId: inv.beneficiaryId,
-        emailVerified: true,
-        status: "ACTIVE",
-      },
-    });
-
-    await prisma.beneficiaryInvitation.update({
-      where: { id: inv.id },
-      data: { status: "ACCEPTED", acceptedAt: new Date(), respondedAt: new Date() },
-    });
-
-    await prisma.beneficiary.update({
-      where: { id: inv.beneficiaryId },
-      data: { claimed: true, status: "ACTIVE" },
-    });
-
-    await prisma.schoolBeneficiaryApproval.upsert({
-      where: { schoolId_beneficiaryId: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId } },
-      update: { status: "APPROVED", approvedAt: new Date() },
-      create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
+      return acceptedUser;
     });
 
     const jwtToken = signUserToken(user);
 
-    res.status(201).json({
+    res.status(existing ? 200 : 201).json({
       token: jwtToken,
       user: {
         id: user.id,
@@ -351,8 +347,9 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
         beneficiaryId: user.beneficiaryId,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    if (err?.status === 409) return res.status(409).json({ error: err.message });
     console.error("Accept beneficiary invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
