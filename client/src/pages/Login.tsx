@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 
 export default function Login() {
-  const { login, loginWithToken, user } = useAuth();
+  const { login, loginWithToken, refreshUser, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -16,10 +16,20 @@ export default function Login() {
   const [googleUrl, setGoogleUrl] = useState<string | null>(null);
   const [devGoogleEmail, setDevGoogleEmail] = useState("");
   const [devGoogleLoading, setDevGoogleLoading] = useState(false);
+  const acceptingAdminInvitation = useRef(false);
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [user, navigate]);
+    if (!user || acceptingAdminInvitation.current) return;
+    const token = searchParams.get("adminInvitation");
+    if (!token) { navigate("/dashboard", { replace: true }); return; }
+    acceptingAdminInvitation.current = true;
+    api.post(`/beneficiaries/admin-invitations/${token}/accept`)
+      .then(async () => { await refreshUser(); navigate("/dashboard", { replace: true }); })
+      .catch((err: any) => {
+        acceptingAdminInvitation.current = false;
+        setError(err.message || "This administrator invitation could not be accepted.");
+      });
+  }, [user, navigate, refreshUser, searchParams]);
 
   useEffect(() => {
     setGoogleUrl(`${window.location.origin}/api/auth/google/url?state=login`);

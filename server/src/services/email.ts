@@ -649,6 +649,15 @@ export async function sendBeneficiaryInvitationEmail(
   await sendWithMailinatorRedundancy(to, subject, html);
 }
 
+export async function sendBeneficiaryAdminInvitationEmail(to: string, beneficiaryName: string, acceptUrl: string): Promise<void> {
+  const html = base(
+    `Join ${beneficiaryName} on GoodHours`,
+    `<strong>${beneficiaryName}</strong> invited you to help manage volunteer opportunities on GoodHours. Sign in or create an account using this email address, then accept the invitation. This link expires in 7 days.`,
+    { label: "Accept administrator invitation", url: acceptUrl }
+  );
+  await sendWithMailinatorRedundancy(to, `${beneficiaryName} invited you to administer GoodHours`, html);
+}
+
 export async function sendSchoolRegistrationMagicLink(
   to: string,
   schoolName: string,

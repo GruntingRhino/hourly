@@ -10,9 +10,10 @@ import multer from "multer";
 import prisma from "../lib/prisma";
 import { isPrismaKnownRequestError } from "../lib/prismaErrors";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
+import { canRemoveBeneficiaryAdmin } from "../lib/beneficiaryAdminPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { sendBeneficiaryInvitationEmail, CLIENT_URL } from "../services/email";
+import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, CLIENT_URL } from "../services/email";
 import {
   getOrgTier,
   getOrgTierLimits,
@@ -2396,7 +2397,7 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
       include: {
         slot: {
           include: {
-            opportunity: { select: { title: true } },
+            opportunity: { select: { id: true, title: true } },
           },
         },
       },
@@ -3409,6 +3410,120 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
     console.error("No-show error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ── Beneficiary administrator management ──────────────────────────────────
+// Returns the minimum data required for a front-desk attendance checklist.
+router.get("/:id/opportunities/:oppId/attendance-checklist", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (actor?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Forbidden" });
+  const slotId = typeof req.query.slotId === "string" ? req.query.slotId : "";
+  if (!slotId) return res.status(400).json({ error: "slotId is required" });
+  const slot = await prisma.beneficiaryTimeSlot.findFirst({
+    where: { id: slotId, opportunityId: req.params.oppId, opportunity: { beneficiaryId: req.params.id } },
+    select: { id: true, date: true, startTime: true, endTime: true, opportunity: { select: { id: true, title: true } } },
+  });
+  if (!slot) return res.status(404).json({ error: "Time slot not found" });
+  const records = await prisma.beneficiarySignup.findMany({
+    where: { slotId, status: { in: ["CONFIRMED", "NO_SHOW"] } },
+    select: { id: true, attendance: true, studentId: true },
+  });
+  const students = await prisma.user.findMany({ where: { id: { in: records.map((record) => record.studentId) } }, select: { id: true, name: true } });
+  const namesByStudentId = new Map(students.map((student) => [student.id, student.name]));
+  res.json({
+    opportunity: slot.opportunity,
+    slot: { id: slot.id, date: slot.date, startTime: slot.startTime, endTime: slot.endTime },
+    records: records.map(({ id, attendance, studentId }) => ({ signupId: id, name: namesByStudentId.get(studentId) ?? "Volunteer", attendance })).sort((a, b) => a.name.localeCompare(b.name)),
+  });
+});
+
+router.get("/:id/admins", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (actor?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Forbidden" });
+  const admins = await prisma.user.findMany({
+    where: { beneficiaryId: req.params.id, role: "BENEFICIARY_ADMIN" },
+    select: { id: true, name: true, email: true, beneficiaryAdminRole: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+  res.json(admins);
+});
+
+router.get("/:id/admin-invitations", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") {
+    return res.status(403).json({ error: "Owner access required" });
+  }
+  const invitations = await prisma.beneficiaryAdminInvitation.findMany({
+    where: { beneficiaryId: req.params.id, status: "PENDING" },
+    select: { id: true, email: true, expiresAt: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(invitations);
+});
+
+router.post("/:id/admin-invitations", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") return res.status(403).json({ error: "Owner access required" });
+  const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "A valid email is required" });
+  const email = parsed.data.email.trim().toLowerCase();
+  const [existingAdmin, existingInvitation] = await Promise.all([
+    prisma.user.findFirst({ where: { email, beneficiaryId: req.params.id, role: "BENEFICIARY_ADMIN" }, select: { id: true } }),
+    prisma.beneficiaryAdminInvitation.findFirst({
+      where: { beneficiaryId: req.params.id, email, status: "PENDING", expiresAt: { gt: new Date() } },
+      select: { id: true },
+    }),
+  ]);
+  if (existingAdmin) return res.status(409).json({ error: "That person is already an administrator" });
+  if (existingInvitation) return res.status(409).json({ error: "A pending invitation already exists for that email" });
+  const token = crypto.randomBytes(32).toString("hex");
+  const invitation = await prisma.beneficiaryAdminInvitation.create({ data: {
+    beneficiaryId: req.params.id, email, token: hashToken(token), invitedById: actor.id,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }});
+  const beneficiary = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { name: true } });
+  sendBeneficiaryAdminInvitationEmail(email, beneficiary?.name ?? "an organization", `${CLIENT_URL}/join/admin?token=${token}`).catch(() => {});
+  res.status(201).json({ id: invitation.id, email, expiresAt: invitation.expiresAt });
+});
+
+router.post("/admin-invitations/:token/accept", authenticate, async (req, res) => {
+  const invitation = await prisma.beneficiaryAdminInvitation.findUnique({ where: { token: hashToken(req.params.token) } });
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!invitation || !user || invitation.status !== "PENDING" || invitation.expiresAt <= new Date() || user.email.toLowerCase() !== invitation.email) return res.status(404).json({ error: "Invitation not available" });
+  // An admin invitation must never silently convert a student or school user.
+  if (user.role !== "BENEFICIARY_ADMIN" && user.role !== "ORG_ADMIN") {
+    return res.status(409).json({ error: "Sign in with an existing organization administrator account to accept this invitation" });
+  }
+  if (user.beneficiaryId && user.beneficiaryId !== invitation.beneficiaryId) {
+    return res.status(409).json({ error: "Leave your current organization before accepting an invitation to another organization" });
+  }
+  await prisma.$transaction(async (tx) => {
+    const accepted = await tx.beneficiaryAdminInvitation.updateMany({
+      where: { id: invitation.id, status: "PENDING", expiresAt: { gt: new Date() } },
+      data: { status: "ACCEPTED", acceptedAt: new Date() },
+    });
+    if (accepted.count !== 1) throw Object.assign(new Error("Invitation is no longer available"), { status: 409 });
+    await tx.user.update({ where: { id: user.id }, data: { role: "BENEFICIARY_ADMIN", beneficiaryId: invitation.beneficiaryId, beneficiaryAdminRole: "ADMIN" } });
+  });
+  res.json({ ok: true, beneficiaryId: invitation.beneficiaryId });
+});
+
+router.delete("/:id/admins/:adminId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const [actor, target] = await Promise.all([prisma.user.findUnique({ where: { id: req.user!.userId } }), prisma.user.findUnique({ where: { id: req.params.adminId } })]);
+  if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER" || target?.beneficiaryId !== req.params.id) return res.status(403).json({ error: "Owner access required" });
+  const owners = await prisma.user.count({ where: { beneficiaryId: req.params.id, role: "BENEFICIARY_ADMIN", beneficiaryAdminRole: "OWNER" } });
+  if (!canRemoveBeneficiaryAdmin({ targetRole: target.beneficiaryAdminRole as "OWNER" | "ADMIN" | null, ownerCount: owners, targetUserId: target.id, actorUserId: actor.id })) {
+    return res.status(400).json({ error: "An organization must retain an owner" });
+  }
+  await prisma.user.update({ where: { id: target.id }, data: { beneficiaryId: null, beneficiaryAdminRole: null } });
+  res.json({ ok: true });
+});
+
+router.delete("/:id/admin-invitations/:invitationId", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
+  const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") return res.status(403).json({ error: "Owner access required" });
+  await prisma.beneficiaryAdminInvitation.updateMany({ where: { id: req.params.invitationId, beneficiaryId: req.params.id, status: "PENDING" }, data: { status: "REVOKED" } });
+  res.json({ ok: true });
 });
 
 export default router;

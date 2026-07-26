@@ -33,6 +33,19 @@ tests/.auth/
 tests/qa-results.md
 test-results/
 uploads/
+server/dev.db
+server/prisma/dev.db
+*.sqlite
+*.sqlite3
+
+# Generated QA/browser evidence and test payloads — keep only deliberately
+# curated documentation under docs/.
+.playwright-cli/
+security-report/
+screens/
+tests/artifacts/
+tests-upload-test.exe
+tests-upload-test.pdf
 
 # Large data files (kept locally, not in git)
 server/data/*.zip

@@ -62,9 +62,6 @@ const FEATURE_MESSAGES: Record<OrgFeature, string> = {
 // ─── Helpers ────────────────────────────────────────────────────
 
 export async function getOrgTier(beneficiaryId: string): Promise<OrgTier> {
-  const { isDevMode } = await import("./env");
-  if (isDevMode()) return "PRO";
-
   const { default: prisma } = await import("./prisma");
   const ben = await prisma.beneficiary.findUnique({
     where: { id: beneficiaryId },

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateSchoolEstimate, BILLING_CONFIG, formatCents } from "../src/lib/billingConfig";
+import { calculateSchoolEstimate, BILLING_CONFIG, formatCents, getSchoolPricePerStudentCents } from "../src/lib/billingConfig";
 
 // ── BILLING_CONFIG ──────────────────────────────────────────────────────────
 
@@ -19,36 +19,36 @@ test("annual price is less than 12 months of monthly (10% savings)", () => {
 });
 
 test("school price per student is $0.50 (50 cents) by default", () => {
-  assert.equal(BILLING_CONFIG.school.pricePerStudentCents, 50);
-});
-
-test("school annual minimum is $500 (50000 cents) by default", () => {
-  assert.equal(BILLING_CONFIG.school.annualMinimumCents, 50000);
+  assert.equal(BILLING_CONFIG.school.introductoryPricePerStudentCents, 50);
 });
 
 // ── calculateSchoolEstimate ─────────────────────────────────────────────────
 
-test("school estimate: small school below minimum gets the minimum", () => {
-  // 100 students × $0.50 = $50, below $500 minimum → should be $500
+test("school estimate has no annual minimum", () => {
+  // 100 students × $0.50 = $50, with no $500 floor.
   const estimate = calculateSchoolEstimate(100);
-  assert.equal(estimate, 50000, "should use $500 minimum for small school");
+  assert.equal(estimate, 5000);
 });
 
-test("school estimate: 1000 students × $0.50 = $500 equals minimum", () => {
+test("school estimate uses the introductory per-student price", () => {
   const estimate = calculateSchoolEstimate(1000);
   assert.equal(estimate, 50000);
 });
 
-test("school estimate: 2000 students × $0.50 = $1000 exceeds minimum", () => {
+test("school estimate: 2000 students × $0.50 = $1000", () => {
   const estimate = calculateSchoolEstimate(2000);
   assert.equal(estimate, 100000);
 });
 
-test("school estimate: uses Math.max(enrollment × price, minimum)", () => {
-  const estimate10 = calculateSchoolEstimate(10);
-  const estimate5000 = calculateSchoolEstimate(5000);
-  assert.ok(estimate10 >= BILLING_CONFIG.school.annualMinimumCents, "minimum applies");
-  assert.ok(estimate5000 > BILLING_CONFIG.school.annualMinimumCents, "large schools exceed minimum");
+test("school pricing progresses from $0.50 to $1 after the configured effective date", () => {
+  const pricing = {
+    introductoryPricePerStudentCents: 50,
+    standardPricePerStudentCents: 100,
+    priceIncreaseEffectiveAt: new Date("2026-10-24T00:00:00.000Z"),
+  };
+  assert.equal(getSchoolPricePerStudentCents(new Date("2026-10-23T23:59:59.000Z"), pricing), 50);
+  assert.equal(getSchoolPricePerStudentCents(new Date("2026-10-24T00:00:00.000Z"), pricing), 100);
+  assert.equal(calculateSchoolEstimate(100, new Date("2026-10-24T00:00:00.000Z"), pricing), 10000);
 });
 
 test("server recalculates school estimate (not trusting client value)", () => {
@@ -61,7 +61,7 @@ test("server recalculates school estimate (not trusting client value)", () => {
 });
 
 test("school estimate rounds enrollment correctly", () => {
-  assert.equal(calculateSchoolEstimate(1001), Math.max(1001 * 50, 50000));
+  assert.equal(calculateSchoolEstimate(1001), 1001 * BILLING_CONFIG.school.introductoryPricePerStudentCents);
 });
 
 // ── formatCents ─────────────────────────────────────────────────────────────

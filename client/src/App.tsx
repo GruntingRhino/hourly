@@ -19,6 +19,7 @@ const EmailVerificationRequired = lazy(() => import("./pages/EmailVerificationRe
 const ParentProgress = lazy(() => import("./pages/ParentProgress"));
 const JoinCohort = lazy(() => import("./pages/student/JoinCohort"));
 const JoinBeneficiary = lazy(() => import("./pages/beneficiary/JoinBeneficiary"));
+const JoinBeneficiaryAdmin = lazy(() => import("./pages/beneficiary/JoinBeneficiaryAdmin"));
 const SchoolRegister = lazy(() => import("./pages/school/Register"));
 const SchoolVerifyRegistration = lazy(() => import("./pages/school/VerifyRegistration"));
 const SchoolConfirmTransfer = lazy(() => import("./pages/school/ConfirmTransfer"));
@@ -89,6 +90,7 @@ function AppRoutes() {
       <Route path="/school/confirm-transfer" element={<SchoolConfirmTransfer />} />
       <Route path="/join/student" element={<JoinCohort />} />
       <Route path="/join/beneficiary" element={<JoinBeneficiary />} />
+      <Route path="/join/admin" element={<JoinBeneficiaryAdmin />} />
       <Route path="/parent-progress" element={<ParentProgress />} />
       <Route path="/faq" element={<FAQ />} />
       <Route path="/terms" element={<Terms />} />

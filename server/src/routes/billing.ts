@@ -90,6 +90,7 @@ const organizationInvoiceRequestSelect = {
   billingContactEmail: true,
   purchaseOrderRequired: true,
   taxExempt: true,
+  requestedBillingInterval: true,
   preferredPaymentMethod: true,
   additionalNotes: true,
   internalNotes: true,
@@ -363,6 +364,7 @@ const invoiceRequestSchema = z.object({
   billingContactEmail: z.string().email(),
   purchaseOrderRequired: z.boolean().default(false),
   taxExempt: z.boolean().default(false),
+  requestedBillingInterval: z.enum(["monthly", "annual"]),
   preferredPaymentMethod: z.string().optional(),
   additionalNotes: z.string().optional(),
 });
@@ -403,6 +405,7 @@ router.post("/:id/invoice-request", authenticate, async (req: Request, res: Resp
           billingContactEmail: parse.data.billingContactEmail,
           purchaseOrderRequired: parse.data.purchaseOrderRequired,
           taxExempt: parse.data.taxExempt,
+          requestedBillingInterval: parse.data.requestedBillingInterval,
           preferredPaymentMethod: parse.data.preferredPaymentMethod,
           additionalNotes: parse.data.additionalNotes,
         },

@@ -34,6 +34,7 @@ interface ProcurementRequest {
   billingContactEmail: string;
   purchaseOrderRequired: boolean;
   taxExempt: boolean;
+  requestedBillingInterval: "monthly" | "annual" | null;
   preferredPaymentMethod: string | null;
   additionalNotes: string | null;
   quoteAmountCents?: number | null;
@@ -150,6 +151,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
     billingContactEmail: "",
     purchaseOrderRequired: false,
     taxExempt: false,
+    requestedBillingInterval: "monthly" as "monthly" | "annual",
     preferredPaymentMethod: "",
     additionalNotes: "",
   });
@@ -218,6 +220,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
         billingContactEmail: "",
         purchaseOrderRequired: false,
         taxExempt: false,
+        requestedBillingInterval: "monthly",
         preferredPaymentMethod: "",
         additionalNotes: "",
       });
@@ -250,7 +253,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
   );
   if (!summary) return null;
 
-  const isPro = import.meta.env.DEV || summary.planTier === "PRO";
+  const isPro = summary.planTier === "PRO";
   const statusInfo = STATUS_LABELS[summary.subscriptionStatus] ?? { label: summary.subscriptionStatus, color: "text-[var(--text-sec)]" };
   const periodEnd = summary.currentPeriodEnd ? new Date(summary.currentPeriodEnd) : null;
   const activeProcurementRequest = summary.invoiceRequests.find((req) =>
@@ -479,7 +482,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
           <div>
             <h3 className="font-medium text-[var(--text)] mb-1">Procurement, quote, or invoicing</h3>
             <p className="text-sm text-[var(--text-sec)] max-w-2xl">
-              If your organization needs an annual quote, invoice, purchase order, or tax-exempt billing flow,
+              If your organization needs a monthly or annual quote, invoice, purchase order, or tax-exempt billing flow,
               request procurement here. Stripe checkout is still the fastest path for instant activation.
             </p>
           </div>
@@ -488,7 +491,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
               onClick={() => setShowInvoiceForm(true)}
               className="px-4 py-2 border border-[var(--border-s)] text-[var(--text)] rounded-[2px] text-sm hover:bg-[var(--surface-alt)]"
             >
-              Request Annual Quote
+              Request a Quote
             </button>
           )}
         </div>
@@ -583,6 +586,16 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
               <div>
                 <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Preferred payment method</span>
                 <span className="text-[var(--text)] font-medium">{activeProcurementRequest.preferredPaymentMethod || "Not specified"}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Requested billing interval</span>
+                <span className="text-[var(--text)] font-medium">
+                  {activeProcurementRequest.requestedBillingInterval === "annual"
+                    ? "Annual"
+                    : activeProcurementRequest.requestedBillingInterval === "monthly"
+                      ? "Monthly"
+                      : "Not specified"}
+                </span>
               </div>
               <div>
                 <span className="text-[var(--text-faint)] uppercase tracking-wide text-[11px] font-semibold block mb-0.5">Requirements</span>
@@ -740,6 +753,19 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                   className="w-full px-3 py-[7px] border border-[var(--border-s)] rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--text)] mb-1">Requested billing interval <span className="text-[var(--er-t)]">*</span></label>
+              <select
+                required
+                value={invoiceForm.requestedBillingInterval}
+                onChange={(e) => setInvoiceForm((p) => ({ ...p, requestedBillingInterval: e.target.value as "monthly" | "annual" }))}
+                className="w-full px-3 py-[7px] border border-[var(--border-s)] rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--action)]"
+              >
+                <option value="monthly">Monthly Pro</option>
+                <option value="annual">Annual Pro</option>
+              </select>
             </div>
 
             <div>

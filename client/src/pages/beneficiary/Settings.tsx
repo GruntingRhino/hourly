@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { ProGate, ProBadge } from "../../components/ProGate";
 import { OrgBilling } from "./OrgBilling";
+import { AdminTeam } from "./AdminTeam";
 
 interface BeneficiaryProfile {
   id: string;
@@ -52,7 +53,7 @@ interface Branding {
   emailSignature: string;
 }
 
-type Tab = "profile" | "reminders" | "branding" | "account" | "billing";
+type Tab = "profile" | "reminders" | "branding" | "account" | "billing" | "team";
 
 const MINUTES_OPTIONS = [
   { value: 60,   label: "1 hour before" },
@@ -71,12 +72,12 @@ export default function BeneficiarySettings() {
 
   const [tab, setTab] = useState<Tab>(() => {
     const t = searchParams.get("tab");
-    return (["profile","reminders","branding","account","billing"].includes(t ?? "") ? t as Tab : "profile");
+    return (["profile","reminders","branding","account","billing","team"].includes(t ?? "") ? t as Tab : "profile");
   });
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (["profile","reminders","branding","account","billing"].includes(t ?? "")) {
+    if (["profile","reminders","branding","account","billing","team"].includes(t ?? "")) {
       setTab(t as Tab);
     }
   }, [searchParams]);
@@ -220,13 +221,14 @@ export default function BeneficiarySettings() {
 
   if (loading) return <div className="text-[var(--text-sec)] py-8 text-center">Loading...</div>;
 
-  const isPro = (import.meta.env.DEV && !import.meta.env.VITE_FORCE_FREE_TIER) || tierInfo?.tier === "PRO";
+  const isPro = tierInfo?.tier === "PRO";
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "profile", label: "Profile" },
     { id: "reminders", label: "Reminders" },
     { id: "branding", label: "Branding" },
     { id: "account", label: "Account" },
+    { id: "team", label: "Team" },
     { id: "billing", label: "Plans & Billing" },
   ];
 
@@ -261,6 +263,8 @@ export default function BeneficiarySettings() {
 
       {error && <div className="mb-4 p-3 bg-[var(--er-bg)] border border-[var(--er-b)] rounded text-[var(--er-t)] text-sm">{error}</div>}
       {success && <div className="mb-4 p-3 bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded text-[var(--ok-t)] text-sm">{success}</div>}
+
+      {tab === "team" && benId && <AdminTeam beneficiaryId={benId} />}
 
       {/* ── Profile tab ── */}
       {tab === "profile" && (

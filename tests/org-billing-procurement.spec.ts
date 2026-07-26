@@ -106,6 +106,7 @@ test("organization billing shows tracked procurement state", async ({ page }) =>
             billingContactEmail: "billing@greenearth.org",
             purchaseOrderRequired: true,
             taxExempt: true,
+            requestedBillingInterval: "annual",
             preferredPaymentMethod: "ACH",
             additionalNotes: "Vendor setup pending.",
             quoteAmountCents: 30000,
@@ -156,6 +157,7 @@ test("organization billing shows tracked procurement state", async ({ page }) =>
             billingContactEmail: "billing@greenearth.org",
             purchaseOrderRequired: false,
             taxExempt: false,
+            requestedBillingInterval: "monthly",
             preferredPaymentMethod: "card",
             additionalNotes: null,
             createdAt: "2026-05-01T12:00:00.000Z",
@@ -181,6 +183,7 @@ test("organization billing shows tracked procurement state", async ({ page }) =>
   await expect(page.getByText("Current procurement request")).toBeVisible();
   await expect(page.getByText("GoodHours review")).toBeVisible();
   await expect(page.getByText("Avery Admin · billing@greenearth.org")).toBeVisible();
+  await expect(page.getByText("Annual", { exact: true })).toBeVisible();
   await expect(page.getByText("$300", { exact: true }).last()).toBeVisible();
   await expect(page.getByText("INV-204", { exact: true })).toBeVisible();
   await expect(page.getByText("Status History")).toBeVisible();

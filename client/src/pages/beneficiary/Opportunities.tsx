@@ -59,7 +59,7 @@ interface SignupRecord {
     startTime: string;
     endTime: string;
     durationHours: number;
-    opportunity: { title: string };
+    opportunity: { id: string; title: string };
   };
   student: { label: string };
 }
@@ -279,6 +279,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const [noShowId, setNoShowId] = useState<string | null>(null);
   const [historySignup, setHistorySignup] = useState<SignupHistoryResponse | null>(null);
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<{ opportunity: { id: string; title: string }; slot: { date: string; startTime: string; endTime: string }; records: Array<{ signupId: string; name: string; attendance: string | null }> } | null>(null);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [approvedSchools, setApprovedSchools] = useState<ApprovedSchool[]>([]);
   const [selectedSchools, setSelectedSchools] = useState<string[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -302,6 +304,30 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false);
 
   const benId = overrideBenId ?? user?.beneficiaryId;
+
+  const openChecklist = async (signup: SignupRecord) => {
+    if (!benId) return;
+    try { setChecklist(await api.get(`/beneficiaries/${benId}/opportunities/${signup.slot.opportunity.id}/attendance-checklist?slotId=${signup.slot.id}`)); }
+    catch (err: any) { setError(err.message || "Unable to load attendance checklist."); }
+  };
+
+  const saveChecklist = async () => {
+    if (!benId || !checklist) return;
+    setAttendanceSaving(true);
+    try {
+      await api.post(`/beneficiaries/${benId}/opportunities/${checklist.opportunity.id}/attendance`, {
+        records: checklist.records
+          .filter((record) => record.attendance === "ATTENDED" || record.attendance === "NO_SHOW")
+          .map(({ signupId, attendance }) => ({ signupId, attendance })),
+      });
+      setChecklist(null);
+      await loadSignups();
+    } catch (err: any) {
+      setError(err.message || "Unable to save attendance.");
+    } finally {
+      setAttendanceSaving(false);
+    }
+  };
 
   const clearError = () => {
     setError("");
@@ -1358,6 +1384,10 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                               className="px-2 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-[var(--surface-alt)] disabled:opacity-50">
                               {historyLoadingId === s.id ? "..." : "History"}
                             </button>
+                            <button onClick={() => openChecklist(s)}
+                              className="px-2 py-1 text-[var(--text-sec)] border border-[var(--border)] rounded text-xs hover:bg-[var(--surface-alt)]">
+                              Attendance list
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1573,6 +1603,38 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
           </div>
         );
       })()}
+
+      {checklist && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[var(--surface)] rounded-[3px] border border-[var(--border)] max-h-[85vh] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-[var(--text)]">Attendance checklist</h3>
+                <p className="mt-1 text-xs text-[var(--text-sec)]">{checklist.opportunity.title} · {new Date(checklist.slot.date).toLocaleDateString(undefined, { timeZone: "UTC" })} · {checklist.slot.startTime}–{checklist.slot.endTime}</p>
+              </div>
+              <button onClick={() => setChecklist(null)} className="text-[var(--text-faint)] hover:text-[var(--text-sec)] text-sm">Close</button>
+            </div>
+            <div className="p-5 max-h-[52vh] overflow-y-auto space-y-2">
+              <p className="text-xs text-[var(--text-faint)]">This front-desk list intentionally contains names only.</p>
+              {checklist.records.map((record) => (
+                <label key={record.signupId} className="flex items-center justify-between gap-3 rounded border border-[var(--border)] px-3 py-2 text-sm">
+                  <span className="font-medium text-[var(--text)]">{record.name}</span>
+                  <select value={record.attendance ?? ""} onChange={(event) => setChecklist((current) => current && ({ ...current, records: current.records.map((item) => item.signupId === record.signupId ? { ...item, attendance: event.target.value || null } : item) }))} className="border border-[var(--border-s)] rounded px-2 py-1 text-xs">
+                    <option value="">Not recorded</option>
+                    <option value="ATTENDED">Attended</option>
+                    <option value="NO_SHOW">No-show</option>
+                  </select>
+                </label>
+              ))}
+              {checklist.records.length === 0 && <p className="text-sm text-[var(--text-sec)]">No confirmed volunteers are on this list.</p>}
+            </div>
+            <div className="flex gap-3 border-t border-[var(--border)] px-5 py-4">
+              <button onClick={saveChecklist} disabled={attendanceSaving} className="flex-1 px-4 py-2 bg-[var(--action)] text-white rounded text-sm disabled:opacity-50">{attendanceSaving ? "Saving..." : "Save attendance"}</button>
+              <button onClick={() => setChecklist(null)} className="px-4 py-2 border border-[var(--border-s)] rounded text-sm text-[var(--text-sec)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Verification history modal */}
       {historySignup && (

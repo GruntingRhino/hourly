@@ -94,8 +94,8 @@ router.get("/:id/summary", authenticate, requireRole("SCHOOL_ADMIN"), async (req
       ...school,
       ...devOverrides,
       pricingConfig: {
-        pricePerStudentCents: config.pricePerStudentCents,
-        annualMinimumCents: config.annualMinimumCents,
+        pricePerStudentCents: calculateSchoolEstimate(1),
+        priceIncreaseEffectiveAt: config.priceIncreaseEffectiveAt?.toISOString() ?? null,
       },
     });
   } catch (err: any) {

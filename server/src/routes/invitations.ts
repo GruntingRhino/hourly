@@ -45,6 +45,12 @@ const declineBeneficiaryInvitationSchema = strictObject({
   token: tokenSchema,
 });
 
+const acceptBeneficiaryAdminInvitationSchema = strictObject({
+  token: tokenSchema,
+  name: trimmedString(255, 1),
+  password: passwordSchema,
+});
+
 // GET /api/invitations/student?token=xxx — look up a student invitation
 router.get("/student", publicInvitationLimiter, async (req: Request, res: Response) => {
   try {
@@ -375,6 +381,82 @@ router.post("/beneficiary/decline", publicInvitationLimiter, async (req: Request
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Decline invitation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/invitations/beneficiary-admin?token=xxx — inspect an additional-admin invitation
+router.get("/beneficiary-admin", publicInvitationLimiter, async (req: Request, res: Response) => {
+  try {
+    const { token } = invitationTokenQuerySchema.parse({
+      token: typeof req.query.token === "string" ? req.query.token : undefined,
+    });
+    const invitation = await prisma.beneficiaryAdminInvitation.findUnique({
+      where: { token: hashToken(token) },
+      include: { beneficiary: { select: { name: true } } },
+    });
+    if (!invitation || invitation.status !== "PENDING") return res.status(404).json({ error: "Invitation not available" });
+    if (invitation.expiresAt <= new Date()) {
+      await prisma.beneficiaryAdminInvitation.update({ where: { id: invitation.id }, data: { status: "EXPIRED" } });
+      return res.status(400).json({ error: "Invitation has expired" });
+    }
+    const existingAccount = await prisma.user.findUnique({ where: { email: invitation.email }, select: { id: true } });
+    res.json({
+      beneficiaryName: invitation.beneficiary.name,
+      email: invitation.email,
+      hasExistingAccount: !!existingAccount,
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    console.error("Get beneficiary admin invitation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/invitations/beneficiary-admin/accept — create a new additional-admin account
+router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Request, res: Response) => {
+  try {
+    const data = acceptBeneficiaryAdminInvitationSchema.parse(req.body);
+    const invitation = await prisma.beneficiaryAdminInvitation.findUnique({
+      where: { token: hashToken(data.token) },
+    });
+    if (!invitation || invitation.status !== "PENDING") return res.status(404).json({ error: "Invitation not available" });
+    if (invitation.expiresAt <= new Date()) {
+      await prisma.beneficiaryAdminInvitation.update({ where: { id: invitation.id }, data: { status: "EXPIRED" } });
+      return res.status(400).json({ error: "Invitation has expired" });
+    }
+    const existing = await prisma.user.findUnique({ where: { email: invitation.email }, select: { id: true } });
+    if (existing) return res.status(409).json({ error: "An account already exists for this email. Sign in to accept the invitation." });
+
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const user = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.beneficiaryAdminInvitation.updateMany({
+        where: { id: invitation.id, status: "PENDING", expiresAt: { gt: new Date() } },
+        data: { status: "ACCEPTED", acceptedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw Object.assign(new Error("Invitation is no longer available"), { status: 409 });
+      return tx.user.create({
+        data: {
+          email: invitation.email,
+          passwordHash,
+          name: data.name,
+          role: "BENEFICIARY_ADMIN",
+          beneficiaryId: invitation.beneficiaryId,
+          beneficiaryAdminRole: "ADMIN",
+          emailVerified: true,
+          status: "ACTIVE",
+        },
+      });
+    });
+    const jwtToken = signUserToken(user);
+    res.status(201).json({
+      token: jwtToken,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, beneficiaryId: user.beneficiaryId },
+    });
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    if (err?.status === 409 || err?.code === "P2002") return res.status(409).json({ error: "Invitation is no longer available or that account already exists" });
+    console.error("Accept beneficiary admin invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -5,8 +5,8 @@ import {
   sendBehindScheduleEmail,
   sendServiceDeadlineReminderEmail,
 } from "../services/email";
+import { DAY_MS, getInAppNotificationCooldownMs } from "./reminderPolicy";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const QUARTER_MS = 90 * DAY_MS;
 const SYSTEM_AT_RISK_EMAIL_SENT = "_SYSTEM_AT_RISK_EMAIL_SENT";
 
@@ -34,7 +34,7 @@ async function hasRecentNotification(userId: string, type: string, withinMs: num
 }
 
 async function createNotificationIfFresh(userId: string, type: string, title: string, body: string): Promise<boolean> {
-  const fresh = !(await hasRecentNotification(userId, type, DAY_MS));
+  const fresh = !(await hasRecentNotification(userId, type, getInAppNotificationCooldownMs(type)));
   if (!fresh) return false;
 
   await prisma.notification.create({

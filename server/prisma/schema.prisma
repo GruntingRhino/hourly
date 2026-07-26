@@ -8,14 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  STUDENT
-  TEACHER
-  SCHOOL_ADMIN
-  BENEFICIARY_ADMIN
-  ORG_ADMIN
-}
-
 enum IntegrationProvider {
   CANVAS
   GOOGLE_CLASSROOM
@@ -86,6 +78,7 @@ model User {
   // Beneficiary association (BENEFICIARY_ADMIN)
   beneficiaryId String?
   beneficiary   Beneficiary? @relation("BeneficiaryMembers", fields: [beneficiaryId], references: [id])
+  beneficiaryAdminRole String? // OWNER | ADMIN; only applies to BENEFICIARY_ADMIN
 
   // Legacy org (kept for backward compat during migration)
   organizationId String?
@@ -461,6 +454,7 @@ model Beneficiary {
   opportunities BeneficiaryOpportunity[]
   schoolApprovals SchoolBeneficiaryApproval[]
   invitations BeneficiaryInvitation[]
+  adminInvitations BeneficiaryAdminInvitation[]
   attachments BeneficiaryOpportunityAttachment[]
   reminderConfig  OrgReminderConfig?
   invoiceRequests OrganizationInvoiceRequest[]
@@ -522,6 +516,22 @@ model BeneficiaryInvitation {
   acceptedAt     DateTime?
   respondedAt    DateTime?
   createdAt      DateTime    @default(now())
+}
+
+model BeneficiaryAdminInvitation {
+  id            String      @id @default(cuid())
+  beneficiaryId String
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  email         String
+  token         String      @unique
+  expiresAt     DateTime
+  status        String      @default("PENDING") // PENDING, ACCEPTED, REVOKED, EXPIRED
+  invitedById   String
+  acceptedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([beneficiaryId, status])
+  @@index([email, status])
 }
 
 // ─── Self-Submitted Volunteering Requests ───────────────────────
@@ -1064,6 +1074,7 @@ model OrganizationInvoiceRequest {
   billingContactEmail    String
   purchaseOrderRequired  Boolean     @default(false)
   taxExempt              Boolean     @default(false)
+  requestedBillingInterval String?   // "monthly" or "annual" for procurement quotes
   preferredPaymentMethod String?
   additionalNotes        String?
   internalNotes          String?
@@ -1078,12 +1089,14 @@ model OrganizationInvoiceRequest {
   updatedAt              DateTime    @updatedAt
   auditLogs              OrganizationInvoiceAuditLog[]
   artifacts              OrganizationInvoiceArtifact[]
+
+  @@index([ownerUserId])
 }
 
 model OrganizationInvoiceAuditLog {
   id              String                     @id @default(cuid())
   invoiceRequestId String
-  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id])
+  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id], onDelete: Cascade)
   previousStatus  String?
   newStatus       String
   changedByUserId String
@@ -1100,7 +1113,7 @@ model OrganizationInvoiceAuditLog {
 model OrganizationInvoiceArtifact {
   id               String                     @id @default(cuid())
   invoiceRequestId String
-  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id])
+  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id], onDelete: Cascade)
   documentType     String
   filename         String
   originalName     String

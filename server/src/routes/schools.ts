@@ -836,7 +836,9 @@ router.get("/my-beneficiary", authenticate, requireRole("SCHOOL_ADMIN"), async (
           name: user.school.name,
           visibility: "PRIVATE",
           createdBySchoolId: user.schoolId,
-          planTier: "PRO",
+          // Private school workspaces use the normal organization tier.
+          // Pro access is provisioned only after verified billing succeeds.
+          planTier: "FREE",
           status: "ACTIVE",
         },
         select: { id: true, name: true },

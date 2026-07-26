@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { getStripe } from "../lib/stripe";
+import { processStripeEventAtomically } from "../lib/stripeWebhookProcessor";
 
 const router = Router();
 
@@ -21,19 +22,20 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Webhook signature invalid" });
   }
 
-  // Idempotency: skip events we've already processed (handles Stripe retries and duplicates)
+  // Fast-path already completed deliveries. The transactional helper below remains
+  // the concurrency-safe deduplication boundary.
   try {
     const existing = await prisma.stripeProcessedEvent.findUnique({ where: { id: event.id } });
     if (existing) {
       return res.json({ received: true, skipped: true });
     }
-    await prisma.stripeProcessedEvent.create({ data: { id: event.id } });
   } catch (err) {
     console.error("[stripeWebhook] idempotency check failed:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 
   try {
+    let applyUpdate: (tx: any) => Promise<void> = async () => {};
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as import("stripe").Stripe.Checkout.Session;
@@ -41,19 +43,21 @@ router.post("/", async (req: Request, res: Response) => {
         if (beneficiaryId && session.subscription) {
           const stripe = getStripe();
           const sub = await stripe.subscriptions.retrieve(session.subscription as string);
-          await prisma.beneficiary.update({
-            where: { id: beneficiaryId },
-            data: {
-              planTier: "PRO",
-              proActivatedAt: new Date(),
-              subscriptionStatus: "ACTIVE",
-              stripeSubscriptionId: sub.id,
-              stripePriceId: sub.items.data[0]?.price.id ?? null,
-              billingInterval: sub.items.data[0]?.price.recurring?.interval === "year" ? "annual" : "monthly",
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
-              cancelAtPeriodEnd: sub.cancel_at_period_end,
-            },
-          });
+          applyUpdate = async (tx) => {
+            await tx.beneficiary.update({
+              where: { id: beneficiaryId },
+              data: {
+                planTier: "PRO",
+                proActivatedAt: new Date(),
+                subscriptionStatus: "ACTIVE",
+                stripeSubscriptionId: sub.id,
+                stripePriceId: sub.items.data[0]?.price.id ?? null,
+                billingInterval: sub.items.data[0]?.price.recurring?.interval === "year" ? "annual" : "monthly",
+                currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                cancelAtPeriodEnd: sub.cancel_at_period_end,
+              },
+            });
+          };
         }
         break;
       }
@@ -77,18 +81,20 @@ router.post("/", async (req: Request, res: Response) => {
         const newStatus = statusMap[sub.status] ?? "ACTIVE";
         const isActive = ["ACTIVE", "TRIALING"].includes(newStatus);
 
-        await prisma.beneficiary.update({
-          where: { id: beneficiaryId },
-          data: {
-            planTier: isActive || sub.cancel_at_period_end ? "PRO" : "FREE",
-            subscriptionStatus: sub.cancel_at_period_end ? "CANCEL_AT_PERIOD_END" : newStatus,
-            stripeSubscriptionId: sub.id,
-            stripePriceId: sub.items.data[0]?.price.id ?? null,
-            billingInterval: sub.items.data[0]?.price.recurring?.interval === "year" ? "annual" : "monthly",
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
-          },
-        });
+        applyUpdate = async (tx) => {
+          await tx.beneficiary.update({
+            where: { id: beneficiaryId },
+            data: {
+              planTier: isActive || sub.cancel_at_period_end ? "PRO" : "FREE",
+              subscriptionStatus: sub.cancel_at_period_end ? "CANCEL_AT_PERIOD_END" : newStatus,
+              stripeSubscriptionId: sub.id,
+              stripePriceId: sub.items.data[0]?.price.id ?? null,
+              billingInterval: sub.items.data[0]?.price.recurring?.interval === "year" ? "annual" : "monthly",
+              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+            },
+          });
+        };
         break;
       }
 
@@ -97,17 +103,19 @@ router.post("/", async (req: Request, res: Response) => {
         const beneficiaryId = sub.metadata?.beneficiaryId;
         if (!beneficiaryId) break;
 
-        await prisma.beneficiary.update({
-          where: { id: beneficiaryId },
-          data: {
-            planTier: "FREE",
-            subscriptionStatus: "CANCELLED",
-            stripeSubscriptionId: null,
-            stripePriceId: null,
-            currentPeriodEnd: null,
-            cancelAtPeriodEnd: false,
-          },
-        });
+        applyUpdate = async (tx) => {
+          await tx.beneficiary.update({
+            where: { id: beneficiaryId },
+            data: {
+              planTier: "FREE",
+              subscriptionStatus: "CANCELLED",
+              stripeSubscriptionId: null,
+              stripePriceId: null,
+              currentPeriodEnd: null,
+              cancelAtPeriodEnd: false,
+            },
+          });
+        };
         break;
       }
 
@@ -118,13 +126,15 @@ router.post("/", async (req: Request, res: Response) => {
           const sub = await stripe.subscriptions.retrieve(invoice.subscription as string);
           const beneficiaryId = sub.metadata?.beneficiaryId;
           if (beneficiaryId) {
-            await prisma.beneficiary.update({
-              where: { id: beneficiaryId },
-              data: {
-                subscriptionStatus: "ACTIVE",
-                currentPeriodEnd: new Date(sub.current_period_end * 1000),
-              },
-            });
+            applyUpdate = async (tx) => {
+              await tx.beneficiary.update({
+                where: { id: beneficiaryId },
+                data: {
+                  subscriptionStatus: "ACTIVE",
+                  currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                },
+              });
+            };
           }
         }
         break;
@@ -137,25 +147,27 @@ router.post("/", async (req: Request, res: Response) => {
           const sub = await stripe.subscriptions.retrieve(invoice.subscription as string);
           const beneficiaryId = sub.metadata?.beneficiaryId;
           if (beneficiaryId) {
-            await prisma.beneficiary.update({
-              where: { id: beneficiaryId },
-              data: { subscriptionStatus: "PAST_DUE" },
-            });
+            applyUpdate = async (tx) => {
+              await tx.beneficiary.update({
+                where: { id: beneficiaryId },
+                data: { subscriptionStatus: "PAST_DUE" },
+              });
+            };
           }
         }
         break;
       }
 
       default:
-        // Unhandled event — acknowledge receipt so Stripe does not retry
         break;
     }
+
+    const result = await processStripeEventAtomically(prisma, event.id, applyUpdate);
+    return res.json({ received: true, ...(result.processed ? {} : { skipped: true }) });
   } catch (err) {
     console.error("[stripeWebhook] handler error for", event.type, err);
-    // Return 200 to prevent Stripe retries for handler bugs; log for investigation
+    return res.status(500).json({ error: "Webhook processing failed" });
   }
-
-  res.json({ received: true });
 });
 
 export default router;

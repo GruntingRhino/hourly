@@ -78,7 +78,7 @@ interface SchoolBillingSummary {
   pilotExpiresAt: string | null;
   billingRecord: BillingRecord | null;
   quoteRequests: Array<{ id: string; enrollment: number; estimatedAnnualCents: number | null; createdAt: string }>;
-  pricingConfig: { pricePerStudentCents: number; annualMinimumCents: number };
+  pricingConfig: { pricePerStudentCents: number; priceIncreaseEffectiveAt: string | null };
 }
 
 // ── Timeline steps ──────────────────────────────────────────────────────────
@@ -261,10 +261,10 @@ function QuoteRequestState({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  const { pricePerStudentCents, annualMinimumCents } = summary.pricingConfig;
+  const { pricePerStudentCents } = summary.pricingConfig;
   const enrollNum = parseInt(form.enrollment, 10);
   const estimatedCents = !isNaN(enrollNum) && enrollNum > 0
-    ? Math.max(enrollNum * pricePerStudentCents, annualMinimumCents)
+    ? enrollNum * pricePerStudentCents
     : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -321,19 +321,16 @@ function QuoteRequestState({
         <h3 className="font-semibold text-[var(--text)] text-[16px] mb-2">Bring GoodHours to Your School</h3>
         <div className="space-y-2 text-sm text-[var(--text-sec)] mb-5">
           <p>GoodHours is purchased through an annual school or district agreement, not a consumer subscription.</p>
-          <p>Pricing is based on enrolled students. The current founding rate is <strong className="text-[var(--text)]">{cents(pricePerStudentCents)} per student annually</strong>, with a <strong className="text-[var(--text)]">{cents(annualMinimumCents)} annual minimum</strong>.</p>
+          <p>Pricing is based on enrolled students. The current rate is <strong className="text-[var(--text)]">{cents(pricePerStudentCents)} per student annually</strong>. There is no annual minimum.</p>
           <p>A final written quote is provided before any commitment. No card is required to request a quote.</p>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-4 mb-5 p-4 bg-[var(--surface-alt)] border border-[var(--border)] rounded-[2px]">
+        <div className="grid sm:grid-cols-2 gap-4 mb-5 p-4 bg-[var(--surface-alt)] border border-[var(--border)] rounded-[2px]">
           <div className="text-center">
             <div className="text-[20px] font-bold text-[var(--text)]">{cents(pricePerStudentCents)}</div>
             <div className="text-xs text-[var(--text-sec)] mt-0.5">per student / year</div>
           </div>
-          <div className="text-center">
-            <div className="text-[20px] font-bold text-[var(--text)]">{cents(annualMinimumCents)}</div>
-            <div className="text-xs text-[var(--text-sec)] mt-0.5">annual minimum</div>
-          </div>
+
           <div className="text-center">
             <div className="text-[20px] font-bold text-[var(--text)]">Annual</div>
             <div className="text-xs text-[var(--text-sec)] mt-0.5">contract term</div>
@@ -401,8 +398,7 @@ function QuoteRequestState({
                     <span className="text-[18px] font-bold text-[var(--in-t)]">{cents(estimatedCents)}</span>
                   </div>
                   <p className="text-xs text-[var(--in-t)] opacity-80 mt-1">
-                    Final pricing is confirmed in your written quote. This estimate uses {cents(pricePerStudentCents)}/student
-                    with a {cents(annualMinimumCents)} minimum.
+                    Final pricing is confirmed in your written quote. This estimate uses {cents(pricePerStudentCents)}/student with no annual minimum.
                   </p>
                 </div>
               )}
