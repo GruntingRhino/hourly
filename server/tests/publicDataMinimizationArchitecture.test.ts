@@ -14,10 +14,10 @@ test("student status queries are forced to APPROVED and use an explicit safe pro
   const selectEnd = beneficiariesRoute.indexOf("} as const;", selectStart) + "} as const;".length;
   const select = beneficiariesRoute.slice(selectStart, selectEnd);
   assert.match(route, /const isStudent = user\.role === "STUDENT"/);
-  assert.match(route, /status: isStudent \? "APPROVED" :/);
+  assert.match(route, /status: usesPublicBeneficiaryDto \? "APPROVED" :/);
   assert.match(route, /beneficiary: \{ select: approvalBeneficiarySelect \}/);
   assert.doesNotMatch(route, /beneficiary:\s*true/);
-  assert.match(route, /\.\.\.\(isStudent \? \{\} : \{/);
+  assert.match(route, /\.\.\.\(isSchoolAdmin \? \{/);
   for (const field of [
     "approvalId", "latestInvitationStatus", "latestInvitationSentTo", "latestInvitationCreatedAt", "email", "phone", "address",
     "stripeCustomerId", "stripeSubscriptionId", "stripePriceId", "subscriptionStatus", "planTier",
@@ -33,7 +33,8 @@ test("school-admin invitation metadata is limited to status and createdAt", () =
   const route = beneficiariesRoute.slice(start, end);
   assert.match(route, /select: \{ beneficiaryId: true, status: true, createdAt: true \}/);
   assert.doesNotMatch(route, /sentTo:\s*true/);
-  assert.match(route, /latestInvitations = !isStudent/);
+  assert.match(route, /latestInvitations = isSchoolAdmin/);
+  assert.match(route, /\.\.\.\(isSchoolAdmin \? \{/);
 });
 
 test("organization directory uses public-safe projections", () => {

@@ -371,7 +371,11 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     }
 
     const isStudent = user.role === "STUDENT";
-    const approvalBeneficiarySelect = isStudent
+    const isSchoolAdmin = user.role === "SCHOOL_ADMIN";
+    // Teachers can view approved partners, but do not manage partner records.
+    // Keep every non-school-admin role on the public directory contract.
+    const usesPublicBeneficiaryDto = !isSchoolAdmin;
+    const approvalBeneficiarySelect = usesPublicBeneficiaryDto
       ? studentBeneficiaryListSelect
       : schoolAdminBeneficiaryListSelect;
     const schoolId = isStudent
@@ -386,7 +390,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
       where: {
         schoolId,
-        status: isStudent ? "APPROVED" : (status && status !== "ALL" ? status : undefined),
+        status: usesPublicBeneficiaryDto ? "APPROVED" : (status && status !== "ALL" ? status : undefined),
       },
       select: {
         id: true,
@@ -398,7 +402,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     });
 
     const beneficiaryIds = approvals.map((a) => a.beneficiaryId);
-    const latestInvitations = !isStudent && beneficiaryIds.length > 0
+    const latestInvitations = isSchoolAdmin && beneficiaryIds.length > 0
       ? await prisma.beneficiaryInvitation.findMany({
           where: { schoolId, beneficiaryId: { in: beneficiaryIds } },
           select: { beneficiaryId: true, status: true, createdAt: true },
@@ -416,11 +420,11 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     let beneficiaries = approvals.map((a) => ({
       ...a.beneficiary,
       approvalStatus: a.status,
-      ...(isStudent ? {} : {
+      ...(isSchoolAdmin ? {
         approvalId: a.id,
         latestInvitationStatus: latestInvitationByBeneficiary.get(a.beneficiaryId)?.status ?? null,
         latestInvitationCreatedAt: latestInvitationByBeneficiary.get(a.beneficiaryId)?.createdAt ?? null,
-      }),
+      } : {}),
     }));
 
     if (search) {

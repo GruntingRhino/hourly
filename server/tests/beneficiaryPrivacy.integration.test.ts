@@ -10,6 +10,7 @@ const prismaClient = prisma as any;
 
 const student = { id: "student-1", email: "student@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0 };
 const schoolAdmin = { id: "admin-1", email: "admin@example.test", role: "SCHOOL_ADMIN", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a" };
+const teacher = { id: "teacher-1", email: "teacher@example.test", role: "TEACHER", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a" };
 const unrelatedStudent = { id: "student-2", email: "other@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0 };
 
 const privateBeneficiary = {
@@ -40,7 +41,7 @@ function pick(source: Record<string, unknown>, select: Record<string, boolean>) 
   return Object.fromEntries(Object.entries(select).filter(([, enabled]) => enabled).map(([key]) => [key, source[key]]));
 }
 
-async function requestAs(app: express.Express, user: typeof student | typeof schoolAdmin | typeof unrelatedStudent) {
+async function requestAs(app: express.Express, user: typeof student | typeof schoolAdmin | typeof teacher | typeof unrelatedStudent) {
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
@@ -61,7 +62,7 @@ test("beneficiary list enforces student privacy through the authenticated HTTP A
     approvalFindMany: prismaClient.schoolBeneficiaryApproval.findMany,
     invitationFindMany: prismaClient.beneficiaryInvitation.findMany,
   };
-  const users = new Map([[student.id, student], [schoolAdmin.id, schoolAdmin], [unrelatedStudent.id, unrelatedStudent]]);
+  const users = new Map([[student.id, student], [schoolAdmin.id, schoolAdmin], [teacher.id, teacher], [unrelatedStudent.id, unrelatedStudent]]);
   const observedApprovalWheres: Array<Record<string, unknown>> = [];
 
   prismaClient.user.findUnique = async ({ where, select }: any) => {
@@ -103,6 +104,15 @@ test("beneficiary list enforces student privacy through the authenticated HTTP A
       "email", "phone", "address", "stripeCustomerId", "stripeSubscriptionId", "stripePriceId",
       "subscriptionStatus", "planTier", "uploadAbuseStrikes", "uploadSuspendedUntil",
     ]) assert.equal(field in studentJson[0], false, `student response exposed ${field}`);
+
+    const teacherResponse = await requestAs(app, teacher);
+    assert.equal(teacherResponse.status, 200);
+    assert.deepEqual(observedApprovalWheres[1], { schoolId: "school-a", status: "APPROVED" });
+    const teacherJson = await teacherResponse.json() as Array<Record<string, unknown>>;
+    assert.equal(teacherJson.length, 1);
+    for (const field of ["email", "phone", "address", "approvalId", "latestInvitationStatus", "latestInvitationSentTo", "latestInvitationCreatedAt"]) {
+      assert.equal(field in teacherJson[0], false, `teacher response exposed ${field}`);
+    }
 
     const adminResponse = await requestAs(app, schoolAdmin);
     assert.equal(adminResponse.status, 200);
