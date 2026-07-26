@@ -37,20 +37,31 @@ import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
-const beneficiaryListSelect = {
+/**
+ * Student directory policy: show an approved organization's public profile and
+ * general service area only. Direct contact details (email, phone, street
+ * address) are not exposed because no student contact workflow requires them.
+ */
+const studentBeneficiaryListSelect = {
   id: true,
   name: true,
-  email: true,
-  phone: true,
   description: true,
   website: true,
   category: true,
-  address: true,
   city: true,
   state: true,
   zip: true,
   visibility: true,
   claimed: true,
+} as const;
+
+// School administrators need organization contact details to manage partners
+// and invitations; they do not receive billing or subscription fields.
+const schoolAdminBeneficiaryListSelect = {
+  ...studentBeneficiaryListSelect,
+  email: true,
+  phone: true,
+  address: true,
   createdBySchoolId: true,
 } as const;
 
@@ -354,12 +365,15 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
       if (!user.beneficiaryId) return res.json([]);
       const ben = await prisma.beneficiary.findUnique({
         where: { id: user.beneficiaryId },
-        select: beneficiaryListSelect,
+        select: schoolAdminBeneficiaryListSelect,
       });
       return res.json(ben ? [ben] : []);
     }
 
     const isStudent = user.role === "STUDENT";
+    const approvalBeneficiarySelect = isStudent
+      ? studentBeneficiaryListSelect
+      : schoolAdminBeneficiaryListSelect;
     const schoolId = isStudent
       ? await resolveStudentSchoolId(user.id)
       : user.schoolId;
@@ -378,7 +392,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
         id: true,
         beneficiaryId: true,
         status: true,
-        beneficiary: { select: beneficiaryListSelect },
+        beneficiary: { select: approvalBeneficiarySelect },
       },
       orderBy: { createdAt: "desc" },
     });

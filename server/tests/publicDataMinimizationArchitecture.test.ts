@@ -10,16 +10,16 @@ test("student status queries are forced to APPROVED and use an explicit safe pro
   const start = beneficiariesRoute.indexOf('// GET /api/beneficiaries — list beneficiaries');
   const end = beneficiariesRoute.indexOf('// GET /api/beneficiaries/directory/nearby', start);
   const route = beneficiariesRoute.slice(start, end);
-  const selectStart = beneficiariesRoute.indexOf("const beneficiaryListSelect = {");
+  const selectStart = beneficiariesRoute.indexOf("const studentBeneficiaryListSelect = {");
   const selectEnd = beneficiariesRoute.indexOf("} as const;", selectStart) + "} as const;".length;
   const select = beneficiariesRoute.slice(selectStart, selectEnd);
   assert.match(route, /const isStudent = user\.role === "STUDENT"/);
   assert.match(route, /status: isStudent \? "APPROVED" :/);
-  assert.match(route, /beneficiary: \{ select: beneficiaryListSelect \}/);
+  assert.match(route, /beneficiary: \{ select: approvalBeneficiarySelect \}/);
   assert.doesNotMatch(route, /beneficiary:\s*true/);
   assert.match(route, /\.\.\.\(isStudent \? \{\} : \{/);
   for (const field of [
-    "approvalId", "latestInvitationStatus", "latestInvitationSentTo", "latestInvitationCreatedAt",
+    "approvalId", "latestInvitationStatus", "latestInvitationSentTo", "latestInvitationCreatedAt", "email", "phone", "address",
     "stripeCustomerId", "stripeSubscriptionId", "stripePriceId", "subscriptionStatus", "planTier",
     "uploadAbuseStrikes", "uploadSuspendedUntil",
   ]) {
