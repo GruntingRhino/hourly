@@ -37,6 +37,23 @@ import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
+const beneficiaryListSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  description: true,
+  website: true,
+  category: true,
+  address: true,
+  city: true,
+  state: true,
+  zip: true,
+  visibility: true,
+  claimed: true,
+  createdBySchoolId: true,
+} as const;
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;        // 10 MB per file
 const MAX_FILES_PER_UPLOAD = 5;
 const MAX_TOTAL_PER_UPLOAD = 25 * 1024 * 1024; // 25 MB per request
@@ -335,11 +352,15 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 
     if (user.role === "BENEFICIARY_ADMIN") {
       if (!user.beneficiaryId) return res.json([]);
-      const ben = await prisma.beneficiary.findUnique({ where: { id: user.beneficiaryId } });
+      const ben = await prisma.beneficiary.findUnique({
+        where: { id: user.beneficiaryId },
+        select: beneficiaryListSelect,
+      });
       return res.json(ben ? [ben] : []);
     }
 
-    const schoolId = user.role === "STUDENT"
+    const isStudent = user.role === "STUDENT";
+    const schoolId = isStudent
       ? await resolveStudentSchoolId(user.id)
       : user.schoolId;
 
@@ -351,18 +372,22 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
       where: {
         schoolId,
-        ...(status && status !== "ALL" ? { status } : {}),
+        status: isStudent ? "APPROVED" : (status && status !== "ALL" ? status : undefined),
       },
-      include: {
-        beneficiary: true,
+      select: {
+        id: true,
+        beneficiaryId: true,
+        status: true,
+        beneficiary: { select: beneficiaryListSelect },
       },
       orderBy: { createdAt: "desc" },
     });
 
     const beneficiaryIds = approvals.map((a) => a.beneficiaryId);
-    const latestInvitations = beneficiaryIds.length > 0
+    const latestInvitations = !isStudent && beneficiaryIds.length > 0
       ? await prisma.beneficiaryInvitation.findMany({
           where: { schoolId, beneficiaryId: { in: beneficiaryIds } },
+          select: { beneficiaryId: true, status: true, createdAt: true },
           orderBy: [{ createdAt: "desc" }],
         })
       : [];
@@ -377,10 +402,11 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     let beneficiaries = approvals.map((a) => ({
       ...a.beneficiary,
       approvalStatus: a.status,
-      approvalId: a.id,
-      latestInvitationStatus: latestInvitationByBeneficiary.get(a.beneficiaryId)?.status ?? null,
-      latestInvitationSentTo: latestInvitationByBeneficiary.get(a.beneficiaryId)?.sentTo ?? null,
-      latestInvitationCreatedAt: latestInvitationByBeneficiary.get(a.beneficiaryId)?.createdAt ?? null,
+      ...(isStudent ? {} : {
+        approvalId: a.id,
+        latestInvitationStatus: latestInvitationByBeneficiary.get(a.beneficiaryId)?.status ?? null,
+        latestInvitationCreatedAt: latestInvitationByBeneficiary.get(a.beneficiaryId)?.createdAt ?? null,
+      }),
     }));
 
     if (search) {
