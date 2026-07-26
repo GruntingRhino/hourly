@@ -283,17 +283,19 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
       return res.status(400).json({ error: "Invitation has expired" });
     }
 
-    // Check if account already exists for this email.
-    const existing = await prisma.user.findUnique({ where: { email: inv.sentTo } });
-    if (existing && existing.role !== "BENEFICIARY_ADMIN") {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
-    if (existing?.beneficiaryId && existing.beneficiaryId !== inv.beneficiaryId) {
-      return res.status(409).json({ error: "This administrator already belongs to another organization." });
-    }
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const acceptance = await runSerializableTransaction(async (tx) => {
+      // This lookup must happen inside every serializable retry. Reusing a
+      // pre-transaction snapshot could move one administrator between two
+      // organizations when separate invitations are accepted concurrently.
+      const existing = await tx.user.findUnique({ where: { email: inv.sentTo } });
+      if (existing && existing.role !== "BENEFICIARY_ADMIN") {
+        throw Object.assign(new Error("An account with this email already exists."), { status: 409 });
+      }
+      if (existing?.beneficiaryId && existing.beneficiaryId !== inv.beneficiaryId) {
+        throw Object.assign(new Error("This administrator already belongs to another organization."), { status: 409 });
+      }
 
-    const passwordHash = existing ? null : await bcrypt.hash(data.password, 12);
-    const user = await runSerializableTransaction(async (tx) => {
       const accepted = await tx.beneficiaryInvitation.updateMany({
         where: { id: inv.id, status: "PENDING", expiresAt: { gt: new Date() } },
         data: { status: "ACCEPTED", acceptedAt: new Date(), respondedAt: new Date() },
@@ -314,7 +316,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
         : await tx.user.create({
             data: {
               email: inv.sentTo,
-              passwordHash: passwordHash!,
+              passwordHash,
               name: data.name,
               role: "BENEFICIARY_ADMIN",
               beneficiaryId: inv.beneficiaryId,
@@ -332,12 +334,13 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
         update: { status: "APPROVED", approvedAt: new Date() },
         create: { schoolId: inv.schoolId, beneficiaryId: inv.beneficiaryId, status: "APPROVED", approvedAt: new Date() },
       });
-      return acceptedUser;
+      return { user: acceptedUser, created: !existing };
     });
 
+    const { user } = acceptance;
     const jwtToken = signUserToken(user);
 
-    res.status(existing ? 200 : 201).json({
+    res.status(acceptance.created ? 201 : 200).json({
       token: jwtToken,
       user: {
         id: user.id,
