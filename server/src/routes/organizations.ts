@@ -9,13 +9,45 @@ import { strictObject, optionalTrimmedString } from "../lib/validation";
 
 const router = Router();
 
+const organizationPublicSelect = {
+  id: true,
+  name: true,
+  description: true,
+  website: true,
+  avatarUrl: true,
+  opportunities: {
+    where: { status: "ACTIVE" },
+    orderBy: { date: "asc" },
+    take: 10,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+      location: true,
+      status: true,
+    },
+  },
+  _count: { select: { opportunities: true } },
+} as const;
+
+// Owner-only profile data. Never use this for a directory or an unrelated
+// authenticated requester.
+const organizationOwnerSelect = {
+  ...organizationPublicSelect,
+  email: true,
+  phone: true,
+  status: true,
+  zipCodes: true,
+} as const;
+
 // GET /api/organizations — list all
 router.get("/", authenticate, async (_req: Request, res: Response) => {
   try {
     const orgs = await prisma.organization.findMany({
-      include: {
-        _count: { select: { opportunities: true, members: true } },
-      },
+      select: organizationPublicSelect,
       orderBy: { name: "asc" },
     });
     res.json(orgs);
@@ -28,16 +60,14 @@ router.get("/", authenticate, async (_req: Request, res: Response) => {
 // GET /api/organizations/:id
 router.get("/:id", authenticate, async (req: Request, res: Response) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { organizationId: true },
+    });
+    const isOwner = req.user!.role === "ORG_ADMIN" && user?.organizationId === req.params.id;
     const org = await prisma.organization.findUnique({
       where: { id: req.params.id },
-      include: {
-        opportunities: {
-          where: { status: "ACTIVE" },
-          orderBy: { date: "asc" },
-          take: 10,
-        },
-        _count: { select: { opportunities: true, members: true } },
-      },
+      select: isOwner ? organizationOwnerSelect : organizationPublicSelect,
     });
     if (!org) return res.status(404).json({ error: "Organization not found" });
     res.json(org);
