@@ -30,7 +30,6 @@ const organizationPublicSelect = {
       status: true,
     },
   },
-  _count: { select: { opportunities: true } },
 } as const;
 
 // Owner-only profile data. Never use this for a directory or an unrelated

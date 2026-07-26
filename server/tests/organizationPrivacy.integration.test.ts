@@ -21,14 +21,32 @@ const organization = {
   zipCodes: '["62701"]',
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-02"),
-  opportunities: [],
-  _count: { opportunities: 0, members: 3 },
+  opportunities: [{
+    id: "inactive-opportunity",
+    title: "Inactive opportunity",
+    description: "Not publicly listed",
+    date: new Date("2026-01-01"),
+    startTime: "09:00",
+    endTime: "10:00",
+    location: "Private location",
+    status: "INACTIVE",
+  }],
+  _count: { opportunities: 1, members: 3 },
 };
 
-function pick(source: Record<string, unknown>, select: Record<string, unknown>) {
+function pick(source: Record<string, unknown>, select: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(select)
     .filter(([, value]) => value === true || typeof value === "object")
-    .map(([key]) => [key, source[key]]));
+    .map(([key, value]) => {
+      if (key === "opportunities" && typeof value === "object" && value) {
+        const relation = value as { where?: { status?: string }; select?: Record<string, unknown> };
+        const opportunities = source.opportunities as Array<Record<string, unknown>>;
+        return [key, opportunities
+          .filter((opportunity) => !relation.where?.status || opportunity.status === relation.where.status)
+          .map((opportunity) => pick(opportunity, relation.select ?? {}))];
+      }
+      return [key, source[key]];
+    }));
 }
 
 async function requestAs(app: express.Express, path: string, user: typeof owner | typeof outsider) {
@@ -59,6 +77,8 @@ test("organization directory keeps private rows out of unrelated authenticated r
     assert.equal(listResponse.status, 200);
     const list = await listResponse.json() as Array<Record<string, unknown>>;
     assert.equal(list.length, 1);
+    assert.deepEqual(list[0].opportunities, []);
+    assert.equal("_count" in list[0], false, "directory response revealed inactive opportunity existence");
     for (const field of ["email", "phone", "status", "zipCodes", "createdAt", "updatedAt", "members"]) {
       assert.equal(field in list[0], false, `directory response exposed ${field}`);
     }
