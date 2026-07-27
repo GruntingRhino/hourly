@@ -10,6 +10,8 @@ export const ORGANIZATION_TIER_LIMITS = {
     advancedReminderContent: false,
     advancedWaitlistControls: false,
     attendanceAnalytics: false,
+    priorityListing: false,
+    multiAdminManagement: false,
   },
   PRO: {
     storageLimitBytes: 5 * 1024 * 1024 * 1024, // 5 GB
@@ -20,6 +22,8 @@ export const ORGANIZATION_TIER_LIMITS = {
     advancedReminderContent: true,
     advancedWaitlistControls: true,
     attendanceAnalytics: true,
+    priorityListing: true,
+    multiAdminManagement: true,
   },
 } as const;
 
@@ -55,6 +59,8 @@ const FEATURE_MESSAGES: Record<OrgFeature, string> = {
   advancedReminderContent: "Upgrade to GoodHours Pro to include directions, prep notes, and contact info in reminders.",
   advancedWaitlistControls: "Upgrade to GoodHours Pro for configurable waitlist promotion controls.",
   attendanceAnalytics: "Upgrade to GoodHours Pro to access attendance and reminder analytics.",
+  priorityListing: "Upgrade to GoodHours Pro for featured opportunity placement.",
+  multiAdminManagement: "Upgrade to GoodHours Pro to invite additional organization administrators.",
   storageLimitBytes: "Storage limit is set by your plan tier.",
   uploadAttemptsPerHour: "Upload rate is set by your plan tier.",
 };
@@ -63,12 +69,14 @@ const FEATURE_MESSAGES: Record<OrgFeature, string> = {
 
 export async function getOrgTier(beneficiaryId: string): Promise<OrgTier> {
   const { default: prisma } = await import("./prisma");
+  const { resolveBeneficiaryPlanTier } = await import("./schoolBeneficiaryPolicy");
   const ben = await prisma.beneficiary.findUnique({
     where: { id: beneficiaryId },
-    select: { planTier: true },
+    select: { planTier: true, createdBySchoolId: true, visibility: true, hasSchoolComplimentaryPro: true },
   });
-  const tier = ben?.planTier;
-  return tier === "PRO" ? "PRO" : "FREE";
+  if (!ben) return "FREE";
+  const persistedTier = ben.planTier === "PRO" ? "PRO" : "FREE";
+  return resolveBeneficiaryPlanTier(ben, persistedTier);
 }
 
 export function getOrgTierLimits(tier: OrgTier) {

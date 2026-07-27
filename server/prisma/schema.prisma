@@ -430,8 +430,9 @@ model Beneficiary {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  planTier             String    @default("FREE") // FREE, PRO
-  proActivatedAt       DateTime?
+  planTier                  String    @default("FREE") // FREE, PRO
+  hasSchoolComplimentaryPro Boolean   @default(false)
+  proActivatedAt            DateTime?
   timezone             String    @default("America/New_York") // IANA timezone for event times
   uploadAbuseStrikes   Int       @default(0)
   uploadSuspendedUntil DateTime?
@@ -442,10 +443,11 @@ model Beneficiary {
   emailSignature  String?
 
   // Stripe subscription fields
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
   stripePriceId        String?
-  subscriptionStatus   String   @default("FREE")
+  stripeEventCreatedAt DateTime?
+  subscriptionStatus   String  @default("FREE")
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean  @default(false)
   billingInterval      String?  // "monthly" | "annual"
@@ -458,6 +460,21 @@ model Beneficiary {
   attachments BeneficiaryOpportunityAttachment[]
   reminderConfig  OrgReminderConfig?
   invoiceRequests OrganizationInvoiceRequest[]
+  stripeCheckoutAttempt StripeCheckoutAttempt?
+}
+
+model StripeCheckoutAttempt {
+  id              String   @id @default(cuid())
+  beneficiaryId   String   @unique
+  interval        String
+  idempotencyKey  String   @unique
+  stripeSessionId String?  @unique
+  checkoutUrl     String?
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
 }
 
 // ─── Beneficiary Directory (IRS 501c3 + public institutions) ────
@@ -905,6 +922,8 @@ model ServiceSession {
   signatureType     String?   // "DRAWN" or "FILE"
   signatureData     String?   // Base64 eSignature data (for DRAWN type)
   signatureFileName String?   // Original filename
+  signatureFileBytes Bytes?   // Durable file-signature evidence; never a temporary filesystem path
+  signatureFileMimeType String?
   submittedAt       DateTime? // When verification was submitted
 
   createdAt       DateTime    @default(now())

@@ -28,6 +28,8 @@ test("FREE tier has all Pro features disabled", () => {
   assert.equal(free.advancedReminderContent, false);
   assert.equal(free.advancedWaitlistControls, false);
   assert.equal(free.attendanceAnalytics, false);
+  assert.equal(free.priorityListing, false);
+  assert.equal(free.multiAdminManagement, false);
 });
 
 test("PRO tier has all features enabled", () => {
@@ -38,6 +40,8 @@ test("PRO tier has all features enabled", () => {
   assert.equal(pro.advancedReminderContent, true);
   assert.equal(pro.advancedWaitlistControls, true);
   assert.equal(pro.attendanceAnalytics, true);
+  assert.equal(pro.priorityListing, true);
+  assert.equal(pro.multiAdminManagement, true);
 });
 
 test("getOrgTierLimits returns FREE limits for FREE tier", () => {

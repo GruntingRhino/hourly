@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import crypto from "crypto";
 
 let resendClient: Resend | null | undefined;
 
@@ -21,6 +22,24 @@ function isDevEnv(): boolean {
       process.env.NODE_ENV !== "production" &&
       process.env.VERCEL_ENV !== "production")
   );
+}
+
+export function redactEmailLogContext({
+  recipient,
+  subject,
+  environment = isDevEnv() ? "development" : "production",
+}: {
+  recipient: string;
+  subject?: string;
+  environment?: "development" | "production";
+}): Record<string, string> {
+  if (environment === "development") {
+    return { recipient, ...(subject !== undefined ? { subject } : {}), deliveryEnvironment: environment };
+  }
+  return {
+    recipientHash: crypto.createHash("sha256").update(recipient.trim().toLowerCase()).digest("hex").slice(0, 16),
+    deliveryEnvironment: environment,
+  };
 }
 
 type EmailDeliveryMode = "auto" | "send" | "log";
@@ -278,9 +297,9 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 
           const data = (res as any)?.data;
           if (!data) {
-            console.warn(`[email] No data returned when sending "${subject}" to ${to}`);
+            console.warn("[email] No data returned when sending", redactEmailLogContext({ recipient: to, subject }));
           } else {
-            console.info(`[email] Sent "${subject}" to ${to}`, { id: (data as any).id, from });
+            console.info("[email] Sent", { id: (data as any).id, from, ...redactEmailLogContext({ recipient: to, subject }) });
           }
           sent = true;
           break;
@@ -311,8 +330,9 @@ async function send(to: string, subject: string, html: string): Promise<void> {
       }
       const willRetry = attempt < retryDelaysMs.length - 1 && isRetryableEmailError(err);
       console.error(
-        `[email] Send attempt ${attempt + 1}/${retryDelaysMs.length} failed for "${subject}" to ${to}`,
+        `[email] Send attempt ${attempt + 1}/${retryDelaysMs.length} failed`,
         {
+          ...redactEmailLogContext({ recipient: to, subject }),
           name: err?.name,
           message: err?.message,
           statusCode: err?.statusCode ?? err?.status,
@@ -327,8 +347,9 @@ async function send(to: string, subject: string, html: string): Promise<void> {
   if (canUseLocalMailinatorFallback(to)) {
     captureMailinatorEmail(to, subject, html, fromCandidates[0] || defaultFrom);
     console.warn(
-      `[email] Captured "${subject}" locally for ${to} after provider send failures`,
+      "[email] Captured locally after provider send failures",
       {
+        ...redactEmailLogContext({ recipient: to, subject }),
         message: (lastError as any)?.message,
         statusCode: (lastError as any)?.statusCode,
       }
@@ -600,10 +621,14 @@ export async function sendEventReminderEmail(params: EventReminderParams): Promi
             content: Buffer.from(icsContent, "utf8").toString("base64"),
           }],
         });
-        console.info(`[email] Sent reminder with ICS for "${eventName}" to ${to}`);
+        console.info("[email] Sent reminder with ICS", redactEmailLogContext({ recipient: to, subject }));
         return;
-      } catch (err) {
-        console.error("[email] ICS attachment send failed, falling back to plain send:", (err as any)?.message);
+      } catch (err: any) {
+        console.error("[email] ICS attachment send failed; falling back to plain send", {
+          ...redactEmailLogContext({ recipient: to, subject }),
+          errorClass: err?.name ?? "Error",
+          errorCode: err?.code,
+        });
       }
     }
   }

@@ -22,7 +22,7 @@
 
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../src/lib/schoolBeneficiaryPolicy";
+import { schoolCreatedBeneficiaryPlan } from "../src/lib/schoolBeneficiaryPolicy";
 
 const prisma = new PrismaClient();
 
@@ -77,7 +77,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: schoolA.id,
-        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+        ...schoolCreatedBeneficiaryPlan("PRIVATE"),
       },
     });
     await prisma.schoolBeneficiaryApproval.create({
@@ -94,6 +94,10 @@ async function main() {
       data: { onboardingComplete: true, verified: true },
     });
   }
+  await prisma.beneficiary.updateMany({
+    where: { createdBySchoolId: schoolA.id, visibility: "PRIVATE" },
+    data: schoolCreatedBeneficiaryPlan("PRIVATE"),
+  });
   await prisma.user.update({
     where: { id: adminA.id },
     data: { schoolId: schoolA.id },
@@ -131,7 +135,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: schoolB.id,
-        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+        ...schoolCreatedBeneficiaryPlan("PRIVATE"),
       },
     });
     await prisma.schoolBeneficiaryApproval.create({
@@ -148,6 +152,10 @@ async function main() {
       data: { onboardingComplete: true, verified: true },
     });
   }
+  await prisma.beneficiary.updateMany({
+    where: { createdBySchoolId: schoolB.id, visibility: "PRIVATE" },
+    data: schoolCreatedBeneficiaryPlan("PRIVATE"),
+  });
   await prisma.user.update({
     where: { id: adminB.id },
     data: { schoolId: schoolB.id },

@@ -438,7 +438,6 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
                 "Advanced reminder content (directions, prep notes)",
                 "Advanced waitlist controls",
                 "Attendance and no-show analytics",
-                "Reminder performance analytics",
                 "5 GB file storage",
                 "Higher upload-rate limits",
                 "Small featured placement boost in student browse when opportunities are otherwise similarly relevant",

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
+import { schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 
@@ -25,13 +25,19 @@ async function getOrCreateSchoolBeneficiary(schoolId: string): Promise<{ id: str
     where: { createdBySchoolId: schoolId, visibility: "PRIVATE" },
     select: { id: true },
   });
-  if (existing) return existing;
+  if (existing) {
+    await prisma.beneficiary.update({
+      where: { id: existing.id },
+      data: schoolCreatedBeneficiaryPlan("PRIVATE"),
+    });
+    return existing;
+  }
   return prisma.beneficiary.create({
     data: {
       name: school?.name ?? "School",
       visibility: "PRIVATE",
       createdBySchoolId: schoolId,
-      ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+      ...schoolCreatedBeneficiaryPlan("PRIVATE"),
       status: "ACTIVE",
     },
     select: { id: true },

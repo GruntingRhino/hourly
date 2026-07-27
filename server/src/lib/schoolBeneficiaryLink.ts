@@ -7,6 +7,7 @@
  * and their opportunities appear as verified partner opportunities.
  */
 import prisma from "./prisma";
+import { schoolCreatedBeneficiaryPlan } from "./schoolBeneficiaryPolicy";
 
 export async function linkSchoolToBeneficiaryDirectory(
   schoolId: string,
@@ -38,6 +39,7 @@ export async function linkSchoolToBeneficiaryDirectory(
   await prisma.beneficiary.update({
     where: { id: privateBen.id },
     data: {
+      ...schoolCreatedBeneficiaryPlan("PRIVATE"),
       directoryId: benDir.id,
       ...(benDir.latitude != null && benDir.longitude != null
         ? { latitude: benDir.latitude, longitude: benDir.longitude }

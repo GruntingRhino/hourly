@@ -10,6 +10,7 @@ import { createHybridRateLimit } from "../middleware/rateLimit";
 import { firstZodError, strictObject, tokenSchema, trimmedString } from "../lib/validation";
 import { roleForBeneficiaryClaim } from "../lib/beneficiaryAdminPolicy";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
+import { ForbiddenFeatureError, requireOrgFeature, sendForbiddenFeature } from "../lib/orgTierGates";
 
 const router = Router();
 const publicInvitationLimiter = createHybridRateLimit({
@@ -425,6 +426,7 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
       await prisma.beneficiaryAdminInvitation.update({ where: { id: invitation.id }, data: { status: "EXPIRED" } });
       return res.status(400).json({ error: "Invitation has expired" });
     }
+    await requireOrgFeature(invitation.beneficiaryId, "multiAdminManagement");
     const existing = await prisma.user.findUnique({ where: { email: invitation.email }, select: { id: true } });
     if (existing) return res.status(409).json({ error: "An account already exists for this email. Sign in to accept the invitation." });
 
@@ -455,6 +457,7 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
     });
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res, err);
     if (err?.status === 409 || err?.code === "P2002") return res.status(409).json({ error: "Invitation is no longer available or that account already exists" });
     console.error("Accept beneficiary admin invitation error:", err);
     res.status(500).json({ error: "Internal server error" });

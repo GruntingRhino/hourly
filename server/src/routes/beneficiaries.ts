@@ -11,7 +11,7 @@ import prisma from "../lib/prisma";
 import { isPrismaKnownRequestError } from "../lib/prismaErrors";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { canRemoveBeneficiaryAdmin } from "../lib/beneficiaryAdminPolicy";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
+import { resolveBeneficiaryPlanTier, schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, CLIENT_URL } from "../services/email";
@@ -29,11 +29,15 @@ import { geocodeAddress } from "../lib/geocode";
 import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
+import { compareAvailableSlots } from "../lib/opportunityListingPolicy";
 import { toLegacyAvailableSlot } from "../lib/legacyOpportunityAvailability";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
+import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
+import { slotDateTime } from "../lib/icsGenerator";
+import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
 
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
@@ -71,6 +75,12 @@ const MAX_TOTAL_PER_UPLOAD = 25 * 1024 * 1024; // 25 MB per request
 
 const ABUSE_STRIKE_THRESHOLD = 5;
 const SUSPENSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+class UploadQuotaError extends Error {
+  constructor(readonly status: 413 | 429, message: string) {
+    super(message);
+  }
+}
 
 // Derived from centralized tier gates — single source of truth
 const TIER_LIMITS = {
@@ -231,6 +241,71 @@ async function canManageBeneficiary(userId: string, beneficiaryId: string): Prom
     return ben !== null;
   }
   return user.beneficiaryId === beneficiaryId;
+}
+
+async function promoteNextWaitlisted(
+  tx: any,
+  slotId: string,
+  actorId: string,
+  source: string,
+): Promise<{ studentId: string; message: string | null } | null> {
+  const slot = await tx.beneficiaryTimeSlot.findUnique({
+    where: { id: slotId },
+    select: {
+      date: true,
+      startTime: true,
+      opportunity: {
+        select: {
+          beneficiary: {
+            select: {
+              planTier: true,
+              createdBySchoolId: true,
+              visibility: true,
+              hasSchoolComplimentaryPro: true,
+              timezone: true,
+              reminderConfig: {
+                select: {
+                  waitlistCutoffHours: true,
+                  requireApprovalForPromotion: true,
+                  disableAutoPromotion: true,
+                  promoMessageTemplate: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!slot) return null;
+  const beneficiary = slot.opportunity.beneficiary;
+  const tier = resolveBeneficiaryPlanTier(beneficiary, beneficiary.planTier === "PRO" ? "PRO" : "FREE");
+  const eventStartsAt = slotDateTime(slot.date, slot.startTime, beneficiary.timezone);
+  const config = beneficiary.reminderConfig;
+  if (!shouldAutoPromoteWaitlist({
+    tier,
+    disableAutoPromotion: config?.disableAutoPromotion ?? false,
+    requireApprovalForPromotion: config?.requireApprovalForPromotion ?? false,
+    waitlistCutoffHours: config?.waitlistCutoffHours ?? null,
+    eventStartsAt,
+    now: new Date(),
+  })) return null;
+
+  const next = await tx.beneficiarySignup.findFirst({
+    where: { slotId, status: "WAITLISTED" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!next) return null;
+  await tx.beneficiarySignup.update({ where: { id: next.id }, data: { status: "CONFIRMED" } });
+  await tx.beneficiaryAuditLog.create({
+    data: {
+      action: "WAITLIST_PROMOTED",
+      actorId,
+      signupId: next.id,
+      details: JSON.stringify({ source, previousStatus: "WAITLISTED", nextStatus: "CONFIRMED" }),
+    },
+  });
+  return { studentId: next.studentId, message: tier === "PRO" ? config?.promoMessageTemplate ?? null : null };
 }
 
 async function cancelBeneficiarySlot(
@@ -765,7 +840,7 @@ router.post("/", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request,
         visibility: data.visibility,
         status: "ACTIVE",
         createdBySchoolId: user.schoolId,
-        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+        ...schoolCreatedBeneficiaryPlan(data.visibility),
       },
     });
 
@@ -836,6 +911,7 @@ router.put("/:id", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Reques
         website: data.website || null,
         description: data.description || null,
         visibility: data.visibility,
+        ...(data.visibility === "PRIVATE" ? schoolCreatedBeneficiaryPlan("PRIVATE") : {}),
       },
     });
 
@@ -915,7 +991,7 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
       include: {
         opportunity: {
           include: {
-            beneficiary: { select: { id: true, name: true, category: true, planTier: true } },
+            beneficiary: { select: { id: true, name: true, category: true, planTier: true, createdBySchoolId: true, visibility: true, hasSchoolComplimentaryPro: true } },
           },
         },
         _count: { select: { signups: { where: { status: "CONFIRMED" } } } },
@@ -949,12 +1025,30 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
         ...opportunity,
         confirmedSignupCount: opportunity._count.signups,
       }));
-    res.json(
-      [...beneficiarySlots, ...legacySlots].sort((a, b) => {
-        const dateDifference = new Date(a.date).getTime() - new Date(b.date).getTime();
-        return dateDifference || a.startTime.localeCompare(b.startTime);
-      }),
-    );
+    const rankedSlots = [...beneficiarySlots, ...legacySlots].sort(compareAvailableSlots);
+    res.json(rankedSlots.map((slot: any) => {
+      const beneficiary = slot.opportunity?.beneficiary;
+      if (!beneficiary || !("hasSchoolComplimentaryPro" in beneficiary)) return slot;
+      const {
+        createdBySchoolId,
+        visibility,
+        hasSchoolComplimentaryPro,
+        ...publicBeneficiary
+      } = beneficiary;
+      return {
+        ...slot,
+        opportunity: {
+          ...slot.opportunity,
+          beneficiary: {
+            ...publicBeneficiary,
+            planTier: resolveBeneficiaryPlanTier(
+              { createdBySchoolId, visibility, hasSchoolComplimentaryPro },
+              beneficiary.planTier === "PRO" ? "PRO" : "FREE",
+            ),
+          },
+        },
+      };
+    }));
   } catch (err) {
     console.error("Available slots error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -987,6 +1081,7 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
         continue;
       }
       try {
+        const visibility = (row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE";
         const ben = await prisma.beneficiary.create({
           data: {
             name,
@@ -999,10 +1094,10 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
             state: row.state?.trim() || null,
             zip: (row.zip || row.zip_code)?.trim() || null,
             description: row.description?.trim() || null,
-            visibility: ((row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE"),
+            visibility,
             status: "ACTIVE",
             createdBySchoolId: user.schoolId,
-            ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+            ...schoolCreatedBeneficiaryPlan(visibility),
           },
         });
         const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
@@ -1604,6 +1699,12 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       startDate: z.string(),
       endDate: z.string().optional(),
       requirementsNote: z.string().max(1000).optional(),
+      preparationNotes: z.string().max(2000).optional(),
+      arrivalInstructions: z.string().max(2000).optional(),
+      contactInfo: z.string().max(500).optional(),
+      requiredFormUrl: z.string().url().max(2048).optional(),
+      requiredFormName: z.string().max(255).optional(),
+      requiredFormIsRequired: z.boolean().optional().default(false),
       schoolRestrictions: z.array(z.string()).optional(),
       recurrenceRule: recurrenceRuleSchema.optional(),
       timeSlots: z.array(opportunityTimeSlotSchema).optional().default([]),
@@ -1618,6 +1719,12 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       addCategoryValidation(d, ctx, true);
     });
     const data = schema.parse(req.body);
+    if (data.preparationNotes || data.arrivalInstructions || data.contactInfo) {
+      await requireOrgFeature(req.params.id, "advancedReminderContent");
+    }
+    if (data.requiredFormUrl || data.requiredFormName || data.requiredFormIsRequired) {
+      await requireOrgFeature(req.params.id, "automatedFormReminders");
+    }
     const resolvedCategory = resolveOpportunityCategory(data.category, data.customCategory);
     if (!resolvedCategory) {
       return res.status(400).json({ error: "Category is required" });
@@ -1655,6 +1762,12 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
         startDate: new Date(data.startDate),
         endDate: data.endDate ? new Date(data.endDate) : null,
         requirementsNote: data.requirementsNote || null,
+        preparationNotes: data.preparationNotes || null,
+        arrivalInstructions: data.arrivalInstructions || null,
+        contactInfo: data.contactInfo || null,
+        requiredFormUrl: data.requiredFormUrl || null,
+        requiredFormName: data.requiredFormName || null,
+        requiredFormIsRequired: data.requiredFormIsRequired,
         schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
         recurrenceRule: data.recurrenceRule ? JSON.stringify(data.recurrenceRule) : null,
         status: "ACTIVE",
@@ -1675,6 +1788,7 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       });
       return res.status(400).json({ error: "Validation failed", details: err.errors });
     }
+    if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res, err);
     console.error("Create opportunity error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1696,6 +1810,12 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
       customCategory: z.string().max(100).nullable().optional(),
       location: z.string().max(255).nullable().optional(),
       requirementsNote: z.string().max(1000).nullable().optional(),
+      preparationNotes: z.string().max(2000).nullable().optional(),
+      arrivalInstructions: z.string().max(2000).nullable().optional(),
+      contactInfo: z.string().max(500).nullable().optional(),
+      requiredFormUrl: z.string().url().max(2048).nullable().optional(),
+      requiredFormName: z.string().max(255).nullable().optional(),
+      requiredFormIsRequired: z.boolean().optional(),
       schoolRestrictions: z.array(z.string()).nullable().optional(),
       recurrenceRule: recurrenceRuleSchema.optional(),
       timeSlots: z.array(opportunityTimeSlotSchema).optional(),
@@ -1709,6 +1829,12 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
       }
     });
     const data = schema.parse(req.body);
+    if (data.preparationNotes || data.arrivalInstructions || data.contactInfo) {
+      await requireOrgFeature(req.params.id, "advancedReminderContent");
+    }
+    if (data.requiredFormUrl || data.requiredFormName || data.requiredFormIsRequired) {
+      await requireOrgFeature(req.params.id, "automatedFormReminders");
+    }
     const resolvedCategory =
       data.category !== undefined || data.customCategory !== undefined
         ? resolveOpportunityCategory(data.category, data.customCategory ?? undefined)
@@ -1722,6 +1848,12 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
         ...(resolvedCategory !== undefined && { category: resolvedCategory }),
         ...(data.location !== undefined && { location: data.location }),
         ...(data.requirementsNote !== undefined && { requirementsNote: data.requirementsNote }),
+        ...(data.preparationNotes !== undefined && { preparationNotes: data.preparationNotes }),
+        ...(data.arrivalInstructions !== undefined && { arrivalInstructions: data.arrivalInstructions }),
+        ...(data.contactInfo !== undefined && { contactInfo: data.contactInfo }),
+        ...(data.requiredFormUrl !== undefined && { requiredFormUrl: data.requiredFormUrl }),
+        ...(data.requiredFormName !== undefined && { requiredFormName: data.requiredFormName }),
+        ...(data.requiredFormIsRequired !== undefined && { requiredFormIsRequired: data.requiredFormIsRequired }),
         ...(data.schoolRestrictions !== undefined && {
           schoolRestrictions: data.schoolRestrictions ? JSON.stringify(data.schoolRestrictions) : null,
         }),
@@ -1782,6 +1914,7 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
     res.json(final ?? updated);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
+    if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res, err);
     console.error("Update opportunity error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1856,6 +1989,16 @@ router.post(
   "/:id/opportunities/:oppId/attachments",
   authenticate,
   requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"),
+  async (req: Request, res: Response, next) => {
+    try {
+      if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+        return res.status(403).json({ error: "Not your beneficiary" });
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  },
   (req, res, next) => {
     attachmentUpload.array("files", MAX_FILES_PER_UPLOAD)(req, res, (err) => {
       if (err instanceof multer.MulterError) {
@@ -1894,14 +2037,18 @@ router.post(
       // --- Suspension check ---
       const benRecord = await prisma.beneficiary.findUnique({
         where: { id: req.params.id },
-        select: { planTier: true, uploadSuspendedUntil: true },
+        select: { planTier: true, createdBySchoolId: true, visibility: true, hasSchoolComplimentaryPro: true, uploadSuspendedUntil: true },
       });
       if (benRecord?.uploadSuspendedUntil && benRecord.uploadSuspendedUntil > new Date()) {
         cleanupFiles(allPaths);
         return res.status(429).json({ error: "Upload access temporarily suspended due to repeated policy violations." });
       }
 
-      const tier = (isDevMode() ? "PRO" : (benRecord?.planTier ?? "FREE")) as keyof typeof TIER_LIMITS;
+      const tier = isDevMode()
+        ? "PRO"
+        : benRecord
+          ? resolveBeneficiaryPlanTier(benRecord, benRecord.planTier === "PRO" ? "PRO" : "FREE")
+          : "FREE";
       const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.FREE;
 
       // --- Opportunity ownership ---
@@ -2006,20 +2153,42 @@ router.post(
         try { fs.unlinkSync(file.path); } catch {}
       }
 
-      for (const attachment of newAttachments) {
-        await prisma.beneficiaryOpportunityAttachment.create({
-          data: {
-            opportunity: { connect: { id: attachment.opportunityId } },
-            beneficiary: { connect: { id: attachment.beneficiaryId } },
-            filename: attachment.filename,
-            originalName: attachment.originalName,
-            mimeType: attachment.mimeType,
-            size: attachment.size,
-            sha256: attachment.sha256,
-            contentBytes: attachment.contentBytes as any,
-          },
+      await runSerializableTransaction(async (tx) => {
+        // Serialize quota reservation per beneficiary. The earlier checks give
+        // fast feedback; these checks are the authoritative concurrency boundary.
+        await tx.$executeRaw`SELECT 1 FROM "Beneficiary" WHERE id = ${req.params.id} FOR UPDATE`;
+        const authoritativeRecentUploads = await tx.beneficiaryOpportunityAttachment.count({
+          where: { beneficiaryId: req.params.id, createdAt: { gte: oneHourAgo } },
         });
-      }
+        if (authoritativeRecentUploads + newAttachments.length > limits.uploadsPerHour) {
+          throw new UploadQuotaError(429, `Upload rate limit reached. Your plan allows ${limits.uploadsPerHour} files per hour.`);
+        }
+        const authoritativeUsage = await tx.beneficiaryOpportunityAttachment.aggregate({
+          where: { beneficiaryId: req.params.id },
+          _sum: { size: true },
+        });
+        const usedBytes = authoritativeUsage._sum.size ?? 0;
+        if (usedBytes + totalSize > limits.storageBytes) {
+          const usedMB = (usedBytes / 1024 / 1024).toFixed(1);
+          const limitMB = (limits.storageBytes / 1024 / 1024).toFixed(0);
+          throw new UploadQuotaError(413, `Storage quota exceeded. Used ${usedMB} MB of ${limitMB} MB.`);
+        }
+
+        for (const attachment of newAttachments) {
+          await tx.beneficiaryOpportunityAttachment.create({
+            data: {
+              opportunity: { connect: { id: attachment.opportunityId } },
+              beneficiary: { connect: { id: attachment.beneficiaryId } },
+              filename: attachment.filename,
+              originalName: attachment.originalName,
+              mimeType: attachment.mimeType,
+              size: attachment.size,
+              sha256: attachment.sha256,
+              contentBytes: attachment.contentBytes as any,
+            },
+          });
+        }
+      });
 
       const attachments = await prisma.beneficiaryOpportunityAttachment.findMany({
         where: { opportunityId: req.params.oppId },
@@ -2030,6 +2199,9 @@ router.post(
       res.status(201).json({ count: newAttachments.length, attachments });
     } catch (err) {
       cleanupFiles(allPaths);
+      if (err instanceof UploadQuotaError) {
+        return res.status(err.status).json({ error: err.message });
+      }
       console.error("Upload attachment error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -2916,6 +3088,78 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
   }
 });
 
+// POST /api/beneficiaries/:id/signups/:signupId/promote — Pro manual waitlist approval
+router.post("/:id/signups/:signupId/promote", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) {
+      return res.status(403).json({ error: "Not your beneficiary" });
+    }
+    try {
+      await requireOrgFeature(req.params.id, "advancedWaitlistControls");
+    } catch (err) {
+      if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res, err);
+      throw err;
+    }
+
+    const promotedStudentId = await runSerializableTransaction(async (tx) => {
+      const signup = await tx.beneficiarySignup.findUnique({
+        where: { id: req.params.signupId },
+        select: {
+          id: true,
+          studentId: true,
+          status: true,
+          slotId: true,
+          slot: {
+            select: {
+              capacity: true,
+              opportunity: { select: { beneficiaryId: true } },
+            },
+          },
+        },
+      });
+      if (!signup || signup.slot.opportunity.beneficiaryId !== req.params.id) {
+        throw new Error("WAITLIST_SIGNUP_NOT_FOUND");
+      }
+      await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${signup.slotId} FOR UPDATE`;
+      const liveSlot = await tx.beneficiaryTimeSlot.findUnique({ where: { id: signup.slotId }, select: { capacity: true } });
+      if (!liveSlot) throw new Error("WAITLIST_SIGNUP_NOT_FOUND");
+      const liveSignup = await tx.beneficiarySignup.findUnique({ where: { id: signup.id }, select: { status: true } });
+      if (liveSignup?.status !== "WAITLISTED") throw new Error("WAITLIST_SIGNUP_NOT_PENDING");
+      const confirmedCount = await tx.beneficiarySignup.count({
+        where: { slotId: signup.slotId, status: "CONFIRMED" },
+      });
+      if (confirmedCount >= liveSlot.capacity) throw new Error("WAITLIST_SLOT_FULL");
+      await tx.beneficiarySignup.update({ where: { id: signup.id }, data: { status: "CONFIRMED" } });
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: "WAITLIST_PROMOTED",
+          actorId: req.user!.userId,
+          signupId: signup.id,
+          details: JSON.stringify({ source: "manual_pro_approval", previousStatus: "WAITLISTED", nextStatus: "CONFIRMED" }),
+        },
+      });
+      return signup.studentId;
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: promotedStudentId,
+        type: "SIGNUP_CONFIRMED",
+        title: "You're off the waitlist!",
+        body: "The organization approved your waitlist promotion. You're now confirmed.",
+        data: JSON.stringify({ href: "/dashboard" }),
+      },
+    });
+    res.json({ success: true });
+  } catch (err) {
+    if (err instanceof Error && err.message === "WAITLIST_SIGNUP_NOT_FOUND") return res.status(404).json({ error: "Waitlisted signup not found" });
+    if (err instanceof Error && err.message === "WAITLIST_SIGNUP_NOT_PENDING") return res.status(409).json({ error: "Signup is no longer waitlisted" });
+    if (err instanceof Error && err.message === "WAITLIST_SLOT_FULL") return res.status(409).json({ error: "No capacity is available" });
+    console.error("Manual waitlist promotion error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/beneficiaries/signups/:signupId/cancel — student cancels their signup (promotes next waitlisted)
 router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -2956,33 +3200,15 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
         },
       });
 
-      let promotedStudentId: string | null = null;
-      if (liveSignup.status === "CONFIRMED") {
-        const nextWaitlisted = await tx.beneficiarySignup.findFirst({
-          where: { slotId: signup.slotId, status: "WAITLISTED" },
-          orderBy: { createdAt: "asc" },
-        });
-        if (nextWaitlisted) {
-          await tx.beneficiarySignup.update({
-            where: { id: nextWaitlisted.id },
-            data: { status: "CONFIRMED" },
-          });
-          await tx.beneficiaryAuditLog.create({
-            data: {
-              action: "WAITLIST_PROMOTED",
-              actorId: req.user!.userId,
-              signupId: nextWaitlisted.id,
-              details: JSON.stringify({
-                previousStatus: "WAITLISTED",
-                nextStatus: "CONFIRMED",
-              }),
-            },
-          });
-          promotedStudentId = nextWaitlisted.studentId;
-        }
-      }
+      const promotion = liveSignup.status === "CONFIRMED"
+        ? await promoteNextWaitlisted(tx, signup.slotId, req.user!.userId, "student_cancel_promotion")
+        : null;
 
-      return { kind: "success" as const, promotedStudentId };
+      return {
+        kind: "success" as const,
+        promotedStudentId: promotion?.studentId ?? null,
+        promotionMessage: promotion?.message ?? null,
+      };
     });
 
     if (result.kind === "error") {
@@ -2995,7 +3221,8 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
           userId: result.promotedStudentId,
           type: "SIGNUP_CONFIRMED",
           title: "You're off the waitlist!",
-          body: `A spot opened up and you're now confirmed for "${signup.slot.startTime}–${signup.slot.endTime}" on ${new Date(signup.slot.date).toLocaleDateString()}.`,
+          body: result.promotionMessage
+            ?? `A spot opened up and you're now confirmed for "${signup.slot.startTime}–${signup.slot.endTime}" on ${new Date(signup.slot.date).toLocaleDateString()}.`,
         },
       });
     }
@@ -3057,30 +3284,15 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
         },
       });
 
-      let promotedStudentId: string | null = null;
-      if (signup.status === "CONFIRMED") {
-        const next = await tx.beneficiarySignup.findFirst({
-          where: { slotId: signup.slotId, status: "WAITLISTED" },
-          orderBy: { createdAt: "asc" },
-        });
-        if (next) {
-          await tx.beneficiarySignup.update({
-            where: { id: next.id },
-            data: { status: "CONFIRMED" },
-          });
-          await tx.beneficiaryAuditLog.create({
-            data: {
-              action: "WAITLIST_PROMOTED",
-              actorId: signup.studentId,
-              signupId: next.id,
-              details: JSON.stringify({ source: "one_click_cancel_promotion" }),
-            },
-          });
-          promotedStudentId = next.studentId;
-        }
-      }
+      const promotion = signup.status === "CONFIRMED"
+        ? await promoteNextWaitlisted(tx, signup.slotId, signup.studentId, "one_click_cancel_promotion")
+        : null;
 
-      return { kind: "cancelled" as const, promotedStudentId };
+      return {
+        kind: "cancelled" as const,
+        promotedStudentId: promotion?.studentId ?? null,
+        promotionMessage: promotion?.message ?? null,
+      };
     });
 
     if (result.kind === "already_cancelled") {
@@ -3096,7 +3308,8 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
           userId: result.promotedStudentId,
           type: "SIGNUP_CONFIRMED",
           title: "You're off the waitlist!",
-          body: `A spot opened up for "${signup.slot.opportunity.title}" — you're now confirmed!`,
+          body: result.promotionMessage
+            ?? `A spot opened up for "${signup.slot.opportunity.title}" — you're now confirmed!`,
           data: JSON.stringify({ href: "/dashboard" }),
         },
       });
@@ -3332,9 +3545,10 @@ router.get("/:id/reminder-config", authenticate, requireRole("BENEFICIARY_ADMIN"
       });
     }
 
+    const defaults = tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS;
     res.json({
       ...config,
-      reminders: JSON.parse(config.reminders),
+      reminders: parseStoredReminders(config.reminders, defaults),
       tier,
     });
   } catch (err) {
@@ -3351,17 +3565,15 @@ router.put("/:id/reminder-config", authenticate, requireRole("BENEFICIARY_ADMIN"
     }
 
     const tier = await getOrgTier(req.params.id);
-    const body = req.body as {
-      reminders?: Array<{ minutesBefore: number; enabled: boolean; label: string }>;
-      waitlistCutoffHours?: number | null;
-      requireApprovalForPromotion?: boolean;
-      disableAutoPromotion?: boolean;
-      promoMessageTemplate?: string | null;
-    };
+    const body = parseReminderConfigInput(req.body);
 
     // Free orgs can only have the one standardized 24h reminder
     if (tier === "FREE") {
-      if (body.reminders && (body.reminders.length > 1 || body.reminders.some((r) => r.minutesBefore !== 1440))) {
+      if (body.reminders && (
+        body.reminders.length !== 1
+        || body.reminders[0].minutesBefore !== 1440
+        || body.reminders[0].enabled !== true
+      )) {
         try { await requireOrgFeature(req.params.id, "configurableReminders"); } catch (err) {
           if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
           throw err;
@@ -3396,8 +3608,15 @@ router.put("/:id/reminder-config", authenticate, requireRole("BENEFICIARY_ADMIN"
       },
     });
 
-    res.json({ ...config, reminders: JSON.parse(config.reminders), tier });
+    res.json({
+      ...config,
+      reminders: parseStoredReminders(config.reminders, tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS),
+      tier,
+    });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.issues });
+    }
     console.error("Reminder config update error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -3511,6 +3730,12 @@ router.get("/:id/admin-invitations", authenticate, requireRole("BENEFICIARY_ADMI
 router.post("/:id/admin-invitations", authenticate, requireRole("BENEFICIARY_ADMIN"), async (req, res) => {
   const actor = await prisma.user.findUnique({ where: { id: req.user!.userId } });
   if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") return res.status(403).json({ error: "Owner access required" });
+  try {
+    await requireOrgFeature(req.params.id, "multiAdminManagement");
+  } catch (err) {
+    if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+    throw err;
+  }
   const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "A valid email is required" });
   const email = parsed.data.email.trim().toLowerCase();
@@ -3537,6 +3762,12 @@ router.post("/admin-invitations/:token/accept", authenticate, async (req, res) =
   const invitation = await prisma.beneficiaryAdminInvitation.findUnique({ where: { token: hashToken(req.params.token) } });
   const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
   if (!invitation || !user || invitation.status !== "PENDING" || invitation.expiresAt <= new Date() || user.email.toLowerCase() !== invitation.email) return res.status(404).json({ error: "Invitation not available" });
+  try {
+    await requireOrgFeature(invitation.beneficiaryId, "multiAdminManagement");
+  } catch (err) {
+    if (err instanceof ForbiddenFeatureError) return sendForbiddenFeature(res as any, err);
+    throw err;
+  }
   // An admin invitation must never silently convert a student or school user.
   if (user.role !== "BENEFICIARY_ADMIN" && user.role !== "ORG_ADMIN") {
     return res.status(409).json({ error: "Sign in with an existing organization administrator account to accept this invitation" });

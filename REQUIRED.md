@@ -78,16 +78,15 @@ What exists:
 -  Some emails are sent 
 -  Basic reactive messaging exists 
 
-What is missing: 
+What exists now:
 
--  No automatic reminders 
--  No “you are behind” alerts 
--  No admin alerts for pending reviews 
--  No deadline reminder system 
+-  Scheduled event reminders
+-  “You are behind” alerts
+-  Admin alerts for pending reviews
+-  Deadline reminders
 
-Simple note: 
-Notifications exist, but only for basic actions. 
-There is no real reminder system yet. 
+Simple note:
+Reminder delivery is implemented; production delivery and scheduler configuration must still be verified in the live environment.
 
  
  
@@ -126,15 +125,15 @@ What exists:
 -  Full slots can place students on a waitlist 
 -  Signup statuses exist 
 
-What is missing: 
+What exists:
 
--  No waitlist promotion 
--  No student cancellation flow 
--  No proper no-show flow 
--  No reliability tracking 
+-  Automatic and manual waitlist promotion
+-  Student cancellation
+-  No-show handling
+-  Attendance and no-show analytics
 
-Simple note: 
-The structure exists, but the actual behavior is unfinished. 
+Simple note:
+The core waitlist and attendance reliability flows are implemented.
 
 13) Messaging / communication tools 
 
@@ -297,14 +296,15 @@ What’s missing:
 Simple note: 
 This would be useful and expected. 
 
-24) Automated reminders 
+24) Automated reminders
 
-What’s missing: 
+What exists:
 
--  No scheduled reminder system exists 
+-  A scheduled event-reminder worker and authenticated internal trigger
+-  Tier-aware configurable reminder schedules
 
-Simple note: 
-This is a big school-facing value feature that is missing. 
+Simple note:
+Live scheduler and email-delivery configuration still require production verification.
 
  
  

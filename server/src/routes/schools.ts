@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { buildCsv } from "../lib/csv";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
+import { schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import {
@@ -837,10 +837,15 @@ router.get("/my-beneficiary", authenticate, requireRole("SCHOOL_ADMIN"), async (
           name: user.school.name,
           visibility: "PRIVATE",
           createdBySchoolId: user.schoolId,
-          ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+          ...schoolCreatedBeneficiaryPlan("PRIVATE"),
           status: "ACTIVE",
         },
         select: { id: true, name: true },
+      });
+    } else {
+      await prisma.beneficiary.update({
+        where: { id: ben.id },
+        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
       });
     }
 

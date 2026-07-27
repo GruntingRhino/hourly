@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
@@ -50,6 +50,16 @@ async function requireSchoolAdmin(userId: string, schoolId: string): Promise<voi
     where: { id: userId, schoolId, role: { in: ["SCHOOL_ADMIN"] } },
   });
   if (!user) throw Object.assign(new Error("Forbidden"), { status: 403 });
+}
+
+async function authorizeProcurementDocumentUpload(req: Request, res: Response, next: NextFunction) {
+  try {
+    await requireSchoolAdmin(req.user!.userId, req.params.id);
+    next();
+  } catch (err: any) {
+    if (err.status === 403) return res.status(403).json({ error: "Forbidden" });
+    return next(err);
+  }
 }
 
 // ── GET /api/school-procurement/:id/summary ─────────────────────────────────
@@ -210,11 +220,10 @@ router.post("/:id/quote-request", authenticate, requireRole("SCHOOL_ADMIN"), asy
 router.post("/:id/documents",
   authenticate,
   requireRole("SCHOOL_ADMIN"),
+  authorizeProcurementDocumentUpload,
   procUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      await requireSchoolAdmin(req.user!.userId, req.params.id);
-
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
       const documentType = req.body.documentType;

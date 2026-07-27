@@ -20,14 +20,14 @@ Do not launch until every item in sections 1–8 is marked `DONE`.
 ## Section 1: Infrastructure
 
 - [ ] **HTTPS enforced** — TLS certificate issued and auto-renewing (Let's Encrypt or CDN-managed). All HTTP traffic redirects to HTTPS. `Owner: DevOps`
-- [ ] **Custom domain configured** — Production domain (e.g., `app.goodhours.app`) resolves to the correct server/CDN. DNS propagation confirmed. `Owner: Founder`
+- [ ] **Custom domain configured** — `goodhours.app` resolves to the correct Vercel deployment. DNS propagation confirmed. `Owner: Founder`
 - [ ] **Database server provisioned** — PostgreSQL instance running on a managed provider (Neon, Railway, Supabase, RDS, etc.). Connection string uses `sslmode=require`. `Owner: DevOps`
 - [ ] **Database backups enabled** — Automated daily backups with at least 7-day retention. Point-in-time recovery available. Backup restore tested at least once. `Owner: DevOps`
 - [ ] **Uptime monitoring** — External health check (e.g., Better Uptime, UptimeRobot) pinging `/api/health` every 60 seconds. Alert goes to founder's phone. `Owner: Founder`
 - [ ] **Error tracking** — Sentry (or equivalent) configured for both server and client. Source maps uploaded. Alerts routed to engineering. `Owner: Engineering`
 - [ ] **Log aggregation** — Server logs shipped to a searchable store (Papertrail, Logtail, Datadog, etc.). Log retention ≥ 30 days. `Owner: DevOps`
 - [ ] **Deployment pipeline** — CI/CD pipeline runs `npx tsc --noEmit`, `npm audit`, and tests before any production deploy. No direct pushes to production without a passing pipeline. `Owner: Engineering`
-- [ ] **File uploads storage** — `uploads/` directory is NOT served from the application server in production. Uploads are stored in object storage (S3, Cloudflare R2, etc.) with appropriate ACLs. `Owner: Engineering`
+- [ ] **File uploads storage** — Temporary upload files are not publicly served, accepted content is persisted durably in PostgreSQL, and rejection/orphan cleanup is operational. `Owner: Engineering`
 - [ ] **CDN configured** — Static client assets served via CDN with appropriate cache headers. `Owner: DevOps`
 
 ---
@@ -41,8 +41,8 @@ All of the following must be set in the production environment. Do not use any p
 - [ ] `DATABASE_URL` — PostgreSQL connection string with `sslmode=require`. `Owner: DevOps`
 - [ ] `JWT_SECRET` — Generated with `openssl rand -hex 64`. Never reuse the dev value. `Owner: DevOps`
 - [ ] `FIELD_ENCRYPTION_KEY` — Generated with `openssl rand -hex 32`. Store in secrets manager, not in `.env` on disk. `Owner: DevOps`
-- [ ] `APP_URL` — Set to the production API origin (e.g., `https://api.goodhours.app`). Used for CORS. `Owner: Engineering`
-- [ ] `CLIENT_URL` — Set to the production frontend URL (e.g., `https://app.goodhours.app`). Used in email links. `Owner: Engineering`
+- [ ] `APP_URL` — Set to `https://goodhours.app`. Used for CORS. `Owner: Engineering`
+- [ ] `CLIENT_URL` — Set to `https://goodhours.app`. Used in email links. `Owner: Engineering`
 - [ ] `RESEND_API_KEY` — Real production Resend API key (not the placeholder `re_your_resend_api_key_here`). `Owner: Founder`
 - [ ] `EMAIL_FROM` — A verified sender address on the Resend-approved sending domain (e.g., `noreply@notifications.goodhours.app`). `Owner: Founder`
 - [ ] `EMAIL_DELIVERY_MODE` — Set to `send` in production. `Owner: Engineering`
@@ -52,7 +52,6 @@ All of the following must be set in the production environment. Do not use any p
 ### Required When Stripe Is Activated
 
 - [ ] `STRIPE_SECRET_KEY` — Live mode key (`sk_live_...`). Store in secrets manager. `Owner: Founder`
-- [ ] `STRIPE_PUBLISHABLE_KEY` — Live mode publishable key (`pk_live_...`). `Owner: Founder`
 - [ ] `STRIPE_WEBHOOK_SECRET` — Webhook signing secret from the Stripe dashboard (`whsec_...`). `Owner: Engineering`
 - [ ] All `STRIPE_PRICE_ID_*` variables — Live mode price IDs created in the Stripe dashboard. `Owner: Founder`
 

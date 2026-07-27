@@ -26,10 +26,8 @@
     "node-fetch": "^3.3.2",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "prisma": "^6.3.1",
     "resend": "^6.9.2",
     "stripe": "^14.25.0",
-    "vercel": "^50.22.0",
     "ws": "^8.18.0",
     "zipcodes": "^8.0.0",
     "zod": "^3.24.1"
@@ -47,6 +45,8 @@
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/ws": "^8.5.14",
     "@types/zipcodes": "^8.0.5",
-    "typescript": "^5.7.3"
+    "prisma": "^6.19.3",
+    "typescript": "^5.7.3",
+    "vercel": "^50.44.0"
   }
 }

@@ -6,6 +6,7 @@ import {
   sendServiceDeadlineReminderEmail,
 } from "../services/email";
 import { DAY_MS, getInAppNotificationCooldownMs } from "./reminderPolicy";
+import { expireInvoiceEntitlements } from "./invoiceEntitlementPolicy";
 
 const QUARTER_MS = 90 * DAY_MS;
 const SYSTEM_AT_RISK_EMAIL_SENT = "_SYSTEM_AT_RISK_EMAIL_SENT";
@@ -291,6 +292,9 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
 }
 
 export async function runReminderCycle(targetSchoolId?: string): Promise<ReminderSummary[]> {
+  if (!targetSchoolId) {
+    await expireInvoiceEntitlements(prisma);
+  }
   const schoolIds = targetSchoolId
     ? [targetSchoolId]
     : (

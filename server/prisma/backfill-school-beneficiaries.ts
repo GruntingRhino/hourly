@@ -8,7 +8,7 @@
  */
 
 import prisma from "../src/lib/prisma";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../src/lib/schoolBeneficiaryPolicy";
+import { schoolCreatedBeneficiaryPlan } from "../src/lib/schoolBeneficiaryPolicy";
 
 async function main() {
   const schools = await prisma.school.findMany({ select: { id: true, name: true } });
@@ -24,6 +24,10 @@ async function main() {
     });
 
     if (existing) {
+      await prisma.beneficiary.update({
+        where: { id: existing.id },
+        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
+      });
       // Ensure the approval record exists too
       await prisma.schoolBeneficiaryApproval.upsert({
         where: { schoolId_beneficiaryId: { schoolId: school.id, beneficiaryId: existing.id } },
@@ -46,7 +50,7 @@ async function main() {
         visibility: "PRIVATE",
         status: "ACTIVE",
         createdBySchoolId: school.id,
-        ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+        ...schoolCreatedBeneficiaryPlan("PRIVATE"),
       },
     });
 

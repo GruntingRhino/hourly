@@ -1,8 +1,10 @@
 import prisma from "./prisma";
-import { getOrgTier, ORGANIZATION_TIER_LIMITS, DEFAULT_FREE_REMINDERS, DEFAULT_PRO_REMINDERS } from "./orgTierGates";
+import { ORGANIZATION_TIER_LIMITS, DEFAULT_FREE_REMINDERS, DEFAULT_PRO_REMINDERS } from "./orgTierGates";
+import { resolveBeneficiaryPlanTier } from "./schoolBeneficiaryPolicy";
 import { sendEventReminderEmail } from "../services/email";
 import { generateICS, slotDateTime } from "./icsGenerator";
 import { acquireJobLease, shouldRunJob } from "./jobLease";
+import { parseStoredReminders, type ReminderDefinition } from "./reminderConfigPolicy";
 
 // Scheduler fires every 15 min. We look ahead LOOK_AHEAD_MS + guard buffer to
 // ensure no slot falls in a gap between runs.
@@ -11,20 +13,6 @@ const LOOK_AHEAD_BUFFER_MS = 2 * 60 * 1000; // 2 min buffer per side
 const EVENT_REMINDER_JOB = "event-reminders";
 const EVENT_REMINDER_LEASE_MS = 14 * 60 * 1000;
 
-interface ReminderDefinition {
-  minutesBefore: number;
-  enabled: boolean;
-  label: string;
-}
-
-function parseReminders(raw: string | null | undefined): ReminderDefinition[] {
-  if (!raw) return DEFAULT_FREE_REMINDERS;
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
-  } catch { /* fall through */ }
-  return DEFAULT_FREE_REMINDERS;
-}
 
 interface ReminderSignup {
   id: string;
@@ -49,6 +37,8 @@ interface ReminderSignup {
       requiredFormIsRequired: boolean;
       beneficiary: {
         planTier: string;
+        createdBySchoolId: string | null;
+        visibility: string;
         timezone: string;
         brandColor: string | null;
         logoUrl: string | null;
@@ -168,16 +158,26 @@ async function runEventReminderCycle(): Promise<void> {
 
   // Fetch all configs + Pro orgs
   const configs = await prisma.orgReminderConfig.findMany({
-    include: { beneficiary: { select: { id: true, planTier: true } } },
+    include: { beneficiary: { select: { id: true, planTier: true, createdBySchoolId: true, visibility: true, hasSchoolComplimentaryPro: true } } },
   });
 
   // Build a map of beneficiaryId → reminders to send
   const tierMap = new Map<string, { tier: "FREE" | "PRO"; reminders: ReminderDefinition[] }>();
 
   for (const config of configs) {
-    const tier: "FREE" | "PRO" = config.beneficiary.planTier === "PRO" ? "PRO" : "FREE";
-    const reminders = parseReminders(config.reminders);
-    tierMap.set(config.beneficiaryId, { tier, reminders });
+    try {
+      const tier = resolveBeneficiaryPlanTier(
+        config.beneficiary,
+        config.beneficiary.planTier === "PRO" ? "PRO" : "FREE",
+      );
+      const reminders = parseStoredReminders(
+        config.reminders,
+        tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS,
+      );
+      tierMap.set(config.beneficiaryId, { tier, reminders });
+    } catch (err) {
+      console.error(`[eventReminders] Ignoring invalid configuration for beneficiary ${config.beneficiaryId}:`, (err as Error).message);
+    }
   }
 
   // Also include orgs that have no config yet (they get the default 24h Free reminder)
@@ -222,6 +222,8 @@ async function runEventReminderCycle(): Promise<void> {
                 beneficiary: {
                   select: {
                     id: true, planTier: true, name: true, timezone: true,
+                    createdBySchoolId: true, visibility: true,
+                    hasSchoolComplimentaryPro: true,
                     brandColor: true, logoUrl: true, emailSignature: true,
                     reminderConfig: { select: { reminders: true } },
                   },
@@ -248,16 +250,16 @@ async function runEventReminderCycle(): Promise<void> {
       if (!student) continue;
 
       const ben = signup.slot.opportunity.beneficiary;
-      const tier: "FREE" | "PRO" = ben.planTier === "PRO" ? "PRO" : "FREE";
+      const tier = resolveBeneficiaryPlanTier(ben, ben.planTier === "PRO" ? "PRO" : "FREE");
 
       // Free orgs only get the 24h reminder
       if (tier === "FREE" && minutes !== 1440) continue;
 
       // Determine which reminders this org sends
       const configEntry = tierMap.get(ben.id);
-      const orgReminders: ReminderDefinition[] = configEntry
-        ? configEntry.reminders
-        : (tier === "PRO" ? DEFAULT_PRO_REMINDERS : DEFAULT_FREE_REMINDERS);
+      const orgReminders: ReminderDefinition[] = tier === "FREE"
+        ? DEFAULT_FREE_REMINDERS
+        : (configEntry ? configEntry.reminders : DEFAULT_PRO_REMINDERS);
 
       const match = orgReminders.find((r) => r.enabled && r.minutesBefore === minutes);
       if (!match) continue;

@@ -123,7 +123,7 @@ app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), strip
 // everything else gets a tight limit so oversized payloads are rejected early.
 app.use("/api/cohorts", express.json({ limit: "10mb" }));
 app.use(express.json({ limit: "1mb" }));
-app.use("/uploads", authenticate, express.static(path.join(__dirname, "../uploads")));
+// Uploaded evidence is served only through resource-specific, ownership-scoped routes.
 
 app.use("/api", (req: Request, _res: Response, next: NextFunction) => {
   if (req.path !== "/health") {

@@ -9,7 +9,7 @@ import { authenticate, signToken, signUserToken, verifyToken } from "../middlewa
 import { generateToken, hashToken } from "../lib/tokenHash";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
-import { SCHOOL_CREATED_BENEFICIARY_PLAN } from "../lib/schoolBeneficiaryPolicy";
+import { schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import {
   emailDomainMatchesWebsite,
   extractDomainFromWebsite,
@@ -630,8 +630,12 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
           visibility: "PRIVATE",
           status: "ACTIVE",
           createdBySchoolId: school.id,
-          ...SCHOOL_CREATED_BENEFICIARY_PLAN,
+          ...schoolCreatedBeneficiaryPlan("PRIVATE"),
         },
+      });
+      await prisma.beneficiary.update({
+        where: { id: schoolBeneficiary.id },
+        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
       });
       const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
         where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },

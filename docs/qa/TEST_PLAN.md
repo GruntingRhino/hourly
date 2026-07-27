@@ -185,10 +185,9 @@ cd client && npx tsc --noEmit
 
 # Lint (if configured)
 cd client && npm run lint
-cd server && npm run lint
 ```
 
-Both must produce zero type errors before a build is considered clean.
+Both type-checks must produce zero errors before a build is considered clean. The client lint command must also pass; the server currently has no separate lint script.
 
 ### 4.4 Dependency Security Scan
 

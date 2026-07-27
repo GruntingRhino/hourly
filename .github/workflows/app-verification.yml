@@ -12,6 +12,20 @@ jobs:
     name: Build app and parse pilot-critical specs
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: goodhours
+          POSTGRES_PASSWORD: goodhours
+          POSTGRES_DB: goodhours_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U goodhours -d goodhours_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -37,6 +51,29 @@ jobs:
       - name: Install server dependencies
         working-directory: server
         run: npm ci
+
+      - name: Run server tests
+        working-directory: server
+        env:
+          APP_ENV: test
+          NODE_ENV: test
+          VERCEL_ENV: development
+        run: npm test
+
+      - name: Validate Prisma schema and migration history
+        working-directory: server
+        env:
+          DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
+        run: |
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          (cd server && npm audit --omit=dev --audit-level=high)
+          (cd client && npm audit --omit=dev --audit-level=high)
 
       - name: Build server
         working-directory: server

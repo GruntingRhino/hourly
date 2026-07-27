@@ -1,7 +1,7 @@
 import fs from "fs";
 import crypto from "crypto";
 import multer from "multer";
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
@@ -11,6 +11,8 @@ import { isInternalAdminUser } from "../lib/internalAdmin";
 import { detectMimeType } from "../lib/detectMimeType";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 import { sendOrganizationProcurementUpdateEmail } from "../services/email";
+import { resolveBeneficiaryPlanTier } from "../lib/schoolBeneficiaryPolicy";
+import { getInvoiceEntitlementPeriodEnd } from "../lib/invoiceEntitlementPolicy";
 
 const router = Router();
 
@@ -176,6 +178,55 @@ async function requireInternalAdmin(userId: string): Promise<void> {
   }
 }
 
+async function authorizeInternalArtifactUpload(req: Request, res: Response, next: NextFunction) {
+  try {
+    await requireInternalAdmin(req.user!.userId);
+    next();
+  } catch (err: any) {
+    if (err.status === 403) return res.status(403).json({ error: "Forbidden" });
+    return next(err);
+  }
+}
+
+async function reserveCheckoutAttempt(beneficiaryId: string, interval: "monthly" | "annual") {
+  for (let retry = 0; retry < 3; retry += 1) {
+    const now = new Date();
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const existing = await tx.stripeCheckoutAttempt.findUnique({ where: { beneficiaryId } });
+        if (existing && existing.expiresAt > now) return existing;
+        const data = {
+          interval,
+          idempotencyKey: `goodhours_checkout_${beneficiaryId}_${crypto.randomUUID()}`,
+          checkoutUrl: null,
+          stripeSessionId: null,
+          expiresAt: new Date(now.getTime() + 30 * 60 * 1000),
+        };
+        return existing
+          ? tx.stripeCheckoutAttempt.update({ where: { id: existing.id }, data })
+          : tx.stripeCheckoutAttempt.create({ data: { beneficiaryId, ...data } });
+      }, { isolationLevel: "Serializable" });
+    } catch (err: any) {
+      if (err.code !== "P2034" || retry === 2) throw err;
+    }
+  }
+  throw new Error("Unable to reserve checkout attempt");
+}
+
+async function restartExpiredCheckoutAttempt(attemptId: string, interval: "monthly" | "annual") {
+  const now = new Date();
+  return prisma.stripeCheckoutAttempt.update({
+    where: { id: attemptId },
+    data: {
+      interval,
+      idempotencyKey: `goodhours_checkout_${crypto.randomUUID()}`,
+      checkoutUrl: null,
+      stripeSessionId: null,
+      expiresAt: new Date(now.getTime() + 30 * 60 * 1000),
+    },
+  });
+}
+
 async function listInternalAdminUsers() {
   const users = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
@@ -239,6 +290,9 @@ router.get("/:id/summary", authenticate, async (req: Request, res: Response) => 
         id: true,
         name: true,
         planTier: true,
+        createdBySchoolId: true,
+        visibility: true,
+        hasSchoolComplimentaryPro: true,
         proActivatedAt: true,
         subscriptionStatus: true,
         billingInterval: true,
@@ -256,8 +310,19 @@ router.get("/:id/summary", authenticate, async (req: Request, res: Response) => 
     if (!ben) return res.status(404).json({ error: "Organization not found" });
 
     const config = BILLING_CONFIG.organization;
+    const effectivePlanTier = resolveBeneficiaryPlanTier(
+      ben,
+      ben.planTier === "PRO" ? "PRO" : "FREE",
+    );
+    const {
+      createdBySchoolId: _createdBySchoolId,
+      visibility: _visibility,
+      hasSchoolComplimentaryPro: _hasSchoolComplimentaryPro,
+      ...billingSummary
+    } = ben;
     res.json({
-      ...ben,
+      ...billingSummary,
+      planTier: effectivePlanTier,
       invoiceRequests: ben.invoiceRequests.map(redactRequestForBeneficiary),
       proMonthlyPriceCents: config.proMonthlyPriceCents,
       proAnnualPriceCents: config.proAnnualPriceCents,
@@ -285,12 +350,26 @@ router.post("/:id/checkout", authenticate, async (req: Request, res: Response) =
 
     const ben = await prisma.beneficiary.findUnique({
       where: { id: req.params.id },
-      select: { id: true, name: true, planTier: true, stripeCustomerId: true },
+      select: { id: true, name: true, planTier: true, createdBySchoolId: true, visibility: true, hasSchoolComplimentaryPro: true, stripeCustomerId: true },
     });
     if (!ben) return res.status(404).json({ error: "Organization not found" });
-    if (ben.planTier === "PRO") return res.status(400).json({ error: "Already on Pro plan" });
+    const effectivePlanTier = resolveBeneficiaryPlanTier(ben, ben.planTier === "PRO" ? "PRO" : "FREE");
+    if (effectivePlanTier === "PRO") return res.status(400).json({ error: "Already on Pro plan" });
 
+    const now = new Date();
+    let checkoutAttempt = await reserveCheckoutAttempt(ben.id, interval);
     const stripe = getStripe();
+    if (checkoutAttempt.checkoutUrl && checkoutAttempt.stripeSessionId && checkoutAttempt.expiresAt > now) {
+      const stripeSession = await stripe.checkout.sessions.retrieve(checkoutAttempt.stripeSessionId);
+      if (stripeSession.status === "open") {
+        return res.json({ url: checkoutAttempt.checkoutUrl });
+      }
+      if (stripeSession.status === "complete") {
+        return res.status(409).json({ error: "Checkout is already complete. Refresh billing." });
+      }
+      checkoutAttempt = await restartExpiredCheckoutAttempt(checkoutAttempt.id, interval);
+    }
+
     const config = BILLING_CONFIG.organization;
     const priceId = interval === "annual" ? config.stripeAnnualPriceId : config.stripeMonthlyPriceId;
     if (!priceId) return res.status(503).json({ error: "Billing not configured" });
@@ -301,7 +380,7 @@ router.post("/:id/checkout", authenticate, async (req: Request, res: Response) =
       const customer = await stripe.customers.create({
         name: ben.name,
         metadata: { beneficiaryId: ben.id },
-      });
+      }, { idempotencyKey: `goodhours_customer_${ben.id}` });
       customerId = customer.id;
       await prisma.beneficiary.update({
         where: { id: ben.id },
@@ -318,8 +397,18 @@ router.post("/:id/checkout", authenticate, async (req: Request, res: Response) =
       subscription_data: {
         metadata: { beneficiaryId: ben.id },
       },
-      metadata: { beneficiaryId: ben.id },
+      metadata: { beneficiaryId: ben.id, checkoutAttemptId: checkoutAttempt.id },
       allow_promotion_codes: true,
+    }, { idempotencyKey: checkoutAttempt.idempotencyKey });
+
+    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    await prisma.stripeCheckoutAttempt.update({
+      where: { id: checkoutAttempt.id },
+      data: {
+        stripeSessionId: session.id,
+        checkoutUrl: session.url,
+        expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : checkoutAttempt.expiresAt,
+      },
     });
 
     res.json({ url: session.url });
@@ -446,6 +535,9 @@ router.patch("/internal/invoice-requests/:requestId", authenticate, async (req: 
         id: true,
         status: true,
         ownerUserId: true,
+        beneficiaryId: true,
+        requestedBillingInterval: true,
+        beneficiary: { select: { stripeSubscriptionId: true } },
       },
     });
     if (!existing) return res.status(404).json({ error: "Invoice request not found" });
@@ -453,6 +545,11 @@ router.patch("/internal/invoice-requests/:requestId", authenticate, async (req: 
     if (parse.data.status && existing.status !== parse.data.status && !isAllowedInternalStatusTransition(existing.status, parse.data.status)) {
       return res.status(400).json({
         error: `Cannot move request from ${existing.status} to ${parse.data.status}`,
+      });
+    }
+    if (parse.data.status === "PAID" && existing.beneficiary.stripeSubscriptionId) {
+      return res.status(409).json({
+        error: "This organization already has a Stripe subscription; do not activate overlapping invoice entitlement",
       });
     }
 
@@ -494,6 +591,21 @@ router.patch("/internal/invoice-requests/:requestId", authenticate, async (req: 
         where: { id: req.params.requestId },
         data,
       });
+
+      if (parse.data.status === "PAID" && existing.status !== "PAID") {
+        const billingInterval = existing.requestedBillingInterval === "monthly" ? "monthly" : "annual";
+        await tx.beneficiary.update({
+          where: { id: existing.beneficiaryId },
+          data: {
+            planTier: "PRO",
+            proActivatedAt: now,
+            subscriptionStatus: "INVOICE_ACTIVE",
+            billingInterval,
+            currentPeriodEnd: getInvoiceEntitlementPeriodEnd(now, billingInterval),
+            cancelAtPeriodEnd: false,
+          },
+        });
+      }
 
       const shouldCreateAuditLog =
         parse.data.status !== undefined && parse.data.status !== existing.status ||
@@ -541,10 +653,10 @@ router.patch("/internal/invoice-requests/:requestId", authenticate, async (req: 
 router.post(
   "/internal/invoice-requests/:requestId/artifacts",
   authenticate,
+  authorizeInternalArtifactUpload,
   artifactUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      await requireInternalAdmin(req.user!.userId);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
       const documentType = String(req.body.documentType || "");

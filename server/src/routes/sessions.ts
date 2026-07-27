@@ -1,42 +1,17 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import path from "path";
-import os from "os";
-import crypto from "crypto";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
+import { detectSignatureMime } from "../lib/signatureStorage";
 
 const router = Router();
 
-// Multer config for signature file uploads
-// Use os.tmpdir() on serverless (Vercel) where the local filesystem is read-only
-const uploadDir = process.env.VERCEL
-  ? os.tmpdir()
-  : path.join(__dirname, "../../uploads");
-
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (_req, file, cb) => {
-    const unique = crypto.randomBytes(8).toString("hex");
-    cb(null, `sig-${unique}${path.extname(file.originalname)}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (_req, file, cb) => {
-    const allowed = [".pdf", ".png", ".jpg", ".jpeg"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF, PNG, JPG files are allowed"));
-    }
-  },
 });
 
 function uploadSignatureFile(req: Request, res: Response, next: NextFunction) {
@@ -52,6 +27,26 @@ function uploadSignatureFile(req: Request, res: Response, next: NextFunction) {
       : "Invalid signature file upload";
     return res.status(400).json({ error: message });
   });
+}
+
+async function authorizeVerificationSubmission(req: Request, res: Response, next: NextFunction) {
+  try {
+    const session = await prisma.serviceSession.findUnique({
+      where: { id: req.params.id },
+      include: { opportunity: true },
+    });
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    if (session.userId !== req.user!.userId) return res.status(403).json({ error: "Not your session" });
+    if (!["COMMITTED", "CHECKED_OUT", "PENDING_VERIFICATION", "REJECTED"].includes(session.status)) {
+      return res.status(400).json({ error: "Session is not ready for verification" });
+    }
+    if (new Date() < new Date(session.opportunity.date)) {
+      return res.status(400).json({ error: "Cannot submit verification before the opportunity date" });
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
 }
 
 // POST /api/sessions/:id/checkin — student checks in
@@ -201,7 +196,7 @@ router.get("/organization", authenticate, requireRole("ORG_ADMIN"), async (req: 
 });
 
 // POST /api/sessions/:id/submit-verification — student submits verification with signature
-router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), uploadSignatureFile, async (req: Request, res: Response) => {
+router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), authorizeVerificationSubmission, uploadSignatureFile, async (req: Request, res: Response) => {
   try {
     const session = await prisma.serviceSession.findUnique({
       where: { id: req.params.id },
@@ -231,7 +226,10 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
         return res.status(400).json({ error: "Signature data is required for drawn signatures" });
       }
     } else if (file) {
-      // File upload path
+      const signatureMimeType = detectSignatureMime(file.buffer);
+      if (!signatureMimeType) {
+        return res.status(400).json({ error: "Signature file must contain a PDF, PNG, or JPEG document" });
+      }
     } else {
       return res.status(400).json({ error: "Either a drawn signature or file upload is required" });
     }
@@ -243,8 +241,9 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
         verificationStatus: "PENDING",
         signatureType: file ? "FILE" : "DRAWN",
         signatureData: signatureType === "DRAWN" ? signatureData : null,
-        // signatureFileUrl removed from schema
         signatureFileName: file ? file.originalname : null,
+        signatureFileBytes: file ? Uint8Array.from(file.buffer) : null,
+        signatureFileMimeType: file ? detectSignatureMime(file.buffer) : null,
         submittedAt: new Date(),
       },
     });
@@ -301,6 +300,44 @@ router.post("/:id/submit-verification", authenticate, requireRole("STUDENT"), up
     res.json(updated);
   } catch (err) {
     console.error("Submit verification error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/sessions/:id/signature-file — scoped access to durable file evidence
+router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_ADMIN", "TEACHER", "ORG_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const session = await prisma.serviceSession.findUnique({
+      where: { id: req.params.id },
+      select: {
+        userId: true,
+        signatureFileName: true,
+        signatureFileBytes: true,
+        signatureFileMimeType: true,
+        opportunity: { select: { organizationId: true } },
+      },
+    });
+    if (!session?.signatureFileBytes || !session.signatureFileMimeType) {
+      return res.status(404).json({ error: "Signature file not found" });
+    }
+
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { role: true, organizationId: true },
+    });
+    const allowed = actor?.role === "STUDENT"
+      ? session.userId === req.user!.userId
+      : actor?.role === "ORG_ADMIN"
+        ? actor.organizationId === session.opportunity.organizationId
+        : (await resolveStudentSchoolId(session.userId)) === (await resolveStudentSchoolId(req.user!.userId));
+    if (!allowed) return res.status(403).json({ error: "Forbidden" });
+
+    const safeName = (session.signatureFileName ?? "signature").replace(/[\r\n"]/g, "_");
+    res.setHeader("Content-Type", session.signatureFileMimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.send(Buffer.from(session.signatureFileBytes));
+  } catch (err) {
+    console.error("Signature download error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

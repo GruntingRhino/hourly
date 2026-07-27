@@ -4,6 +4,7 @@ client/.env
 .env
 .env.local
 .env.*.local
+.environmentalvariables
 
 # Dependencies
 node_modules/

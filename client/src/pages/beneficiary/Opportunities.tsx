@@ -38,6 +38,12 @@ interface Opportunity {
   category: string | null;
   location: string | null;
   requirementsNote: string | null;
+  preparationNotes: string | null;
+  arrivalInstructions: string | null;
+  contactInfo: string | null;
+  requiredFormUrl: string | null;
+  requiredFormName: string | null;
+  requiredFormIsRequired: boolean;
   schoolRestrictions: string | null;
   status: string;
   recurrenceRule: string | null;
@@ -161,6 +167,12 @@ const emptyForm = {
   description: "",
   location: "",
   requirementsNote: "",
+  preparationNotes: "",
+  arrivalInstructions: "",
+  contactInfo: "",
+  requiredFormUrl: "",
+  requiredFormName: "",
+  requiredFormIsRequired: false,
   slots: [{ date: "", startTime: "", endTime: "", capacity: "" }],
   recurring: false,
   recurrenceType: "monthly_day_of_week" as "monthly_day_of_week" | "monthly_dates",
@@ -455,6 +467,12 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
       description: opp.description ?? "",
       location: opp.location ?? "",
       requirementsNote: opp.requirementsNote ?? "",
+      preparationNotes: opp.preparationNotes ?? "",
+      arrivalInstructions: opp.arrivalInstructions ?? "",
+      contactInfo: opp.contactInfo ?? "",
+      requiredFormUrl: opp.requiredFormUrl ?? "",
+      requiredFormName: opp.requiredFormName ?? "",
+      requiredFormIsRequired: opp.requiredFormIsRequired,
       slots: [{ date: "", startTime: "", endTime: "", capacity: "" }],
       recurring: !!rule,
       recurrenceType: rule?.type ?? emptyForm.recurrenceType,
@@ -504,6 +522,12 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
           description: form.description,
           location: form.location || null,
           requirementsNote: form.requirementsNote || null,
+          preparationNotes: form.preparationNotes || null,
+          arrivalInstructions: form.arrivalInstructions || null,
+          contactInfo: form.contactInfo || null,
+          requiredFormUrl: form.requiredFormUrl || null,
+          requiredFormName: form.requiredFormName || null,
+          requiredFormIsRequired: form.requiredFormIsRequired,
           schoolRestrictions: selectedSchools.length > 0 ? selectedSchools : null,
         };
         if (form.recurring) {
@@ -555,6 +579,12 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
         description: form.description,
         location: form.location || undefined,
         requirementsNote: form.requirementsNote || undefined,
+        preparationNotes: form.preparationNotes || undefined,
+        arrivalInstructions: form.arrivalInstructions || undefined,
+        contactInfo: form.contactInfo || undefined,
+        requiredFormUrl: form.requiredFormUrl || undefined,
+        requiredFormName: form.requiredFormName || undefined,
+        requiredFormIsRequired: form.requiredFormIsRequired,
         startDate,
         schoolRestrictions: selectedSchools.length > 0 ? selectedSchools : undefined,
       };
@@ -895,6 +925,32 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
                   placeholder="e.g. Bring closed-toe shoes, minimum age 16"
                   className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
               </div>
+
+              <fieldset className="space-y-3 border border-[var(--border)] rounded-[3px] p-3">
+                <legend className="px-1 text-sm font-medium text-[var(--text)]">Pro reminder content</legend>
+                <p className="text-xs text-[var(--text-faint)]">These fields require GoodHours Pro and are included only in Pro reminder emails.</p>
+                <textarea value={form.preparationNotes} onChange={(e) => setForm((p) => ({ ...p, preparationNotes: e.target.value }))}
+                  rows={2} placeholder="Preparation notes" aria-label="Preparation notes"
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
+                <textarea value={form.arrivalInstructions} onChange={(e) => setForm((p) => ({ ...p, arrivalInstructions: e.target.value }))}
+                  rows={2} placeholder="Arrival and parking instructions" aria-label="Arrival instructions"
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
+                <input type="text" value={form.contactInfo} onChange={(e) => setForm((p) => ({ ...p, contactInfo: e.target.value }))}
+                  placeholder="On-site contact name and phone" aria-label="On-site contact"
+                  className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input type="url" value={form.requiredFormUrl} onChange={(e) => setForm((p) => ({ ...p, requiredFormUrl: e.target.value }))}
+                    placeholder="Required form URL" aria-label="Required form URL"
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
+                  <input type="text" value={form.requiredFormName} onChange={(e) => setForm((p) => ({ ...p, requiredFormName: e.target.value }))}
+                    placeholder="Form name" aria-label="Required form name"
+                    className="w-full px-3 py-2 border border-[var(--border-s)] rounded-[2px] text-sm" />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-[var(--text-sec)]">
+                  <input type="checkbox" checked={form.requiredFormIsRequired} onChange={(e) => setForm((p) => ({ ...p, requiredFormIsRequired: e.target.checked }))} />
+                  Remind volunteers that this form is required
+                </label>
+              </fieldset>
 
               {/* Attachments */}
               <div>
