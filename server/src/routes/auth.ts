@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+
 import prisma from "../lib/prisma";
 import { authenticate, signToken, signUserToken, verifyToken } from "../middleware/auth";
 import { generateToken, hashToken } from "../lib/tokenHash";
@@ -134,13 +134,11 @@ async function precheckDuplicateSignupEmail(req: Request, res: Response, next: N
 // Signup:
 // - API/direct (non-browser): 5 accounts per IP/channel per hour
 // - Interactive browser flow: higher threshold to avoid false positives
-const signupLimiter = rateLimit({
+const signupLimiter = createHybridRateLimit({
+  namespace: "signup",
   windowMs: 60 * 60 * 1000,
-  // Browser-driven signup flows use a separate, higher-capacity bucket to avoid
-  // colliding with API-level abuse checks from non-browser contexts.
-  max: (req) => (isInteractiveSignupRequest(req) ? 100 : 5),
-  keyGenerator: (req) =>
-    `${ipKeyGenerator(req.ip || "")}:${req.get("user-agent") || "unknown"}:${signupRateLimitChannel(req)}`,
+  maxPerIp: 5,
+  keySuffix: (req) => `${getRequestUserAgent(req)}:${signupRateLimitChannel(req)}`,
   skipFailedRequests: true,
   // Allow authenticated users to create additional accounts during guided
   // onboarding/testing flows without tripping anonymous IP abuse limits.
@@ -156,9 +154,8 @@ const signupLimiter = rateLimit({
       return false;
     }
   },
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many signup attempts from this IP. Please try again later." },
+  failClosed: true,
+  message: "Too many signup attempts from this IP. Please try again later.",
 });
 
 const signupEmailLimiter = createEmailSendRateLimit({
@@ -177,26 +174,25 @@ const resendVerificationLimiter = createEmailSendRateLimit({
 });
 
 // Login global IP window: 50 failed attempts per IP/UA per 15 minutes.
-const loginIpLimiter = rateLimit({
+const loginIpLimiter = createHybridRateLimit({
+  namespace: "login-ip",
   windowMs: 15 * 60 * 1000,
-  max: 50,
-  keyGenerator: (req) => `login-ip:${ipKeyGenerator(req.ip || "")}:${getRequestUserAgent(req)}`,
+  maxPerIp: 50,
+  keySuffix: getRequestUserAgent,
   skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  failClosed: true,
+  message: "Too many login attempts. Please try again in 15 minutes.",
 });
 
 // Login credential window: 8 failed attempts per IP/email pair per 15 minutes.
-const loginLimiter = rateLimit({
+const loginLimiter = createHybridRateLimit({
+  namespace: "login-credential",
   windowMs: 15 * 60 * 1000,
-  max: 8,
-  keyGenerator: (req) =>
-    `login-credential:${ipKeyGenerator(req.ip || "")}:${normalizeRateLimitEmail(req.body?.email)}`,
+  maxPerIp: 8,
+  keySuffix: (req) => normalizeRateLimitEmail(req.body?.email),
   skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  failClosed: true,
+  message: "Too many login attempts. Please try again in 15 minutes.",
 });
 
 const router = Router();

@@ -73,7 +73,7 @@ All of the following must be set in the production environment. Do not use any p
 ## Section 3: Security Hardening
 
 - [ ] **CORS restricted** — `ALLOWED_ORIGINS` set to only the production frontend origin. No wildcard `*`. `Owner: Engineering`
-- [ ] **Rate limiting active** — Login endpoint rate-limited to prevent brute force. Signup rate-limited to prevent account spam. `Owner: Engineering`
+- [ ] **Rate limiting durable** — Login, signup, uploads, and sensitive API routes use the shared Upstash store when configured, otherwise the production PostgreSQL `RateLimitBucket` store. Verify limits across two separate deployment instances and monitor store failures. `Owner: Engineering`
 - [ ] **Security headers** — HTTP response headers include: `Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Content-Security-Policy`. Verify with [securityheaders.com](https://securityheaders.com). `Owner: Engineering`
 - [ ] **Dev/debug endpoints disabled** — Any route prefixed `/dev`, `/debug`, `/seed`, or equivalent is disabled or removed in `APP_ENV=production`. `Owner: Engineering`
 - [ ] **Prisma Studio not running** — Prisma Studio is not accessible on any public port in production. `Owner: DevOps`

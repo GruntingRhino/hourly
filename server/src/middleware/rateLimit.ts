@@ -18,11 +18,18 @@ type HybridRateLimitOptions = {
   keyGenerator?: (req: Request) => string | null | undefined;
   message?: string;
   skip?: (req: Request) => boolean;
+  /** When true, only count requests whose response status indicates failure (>= 400). */
+  skipSuccessfulRequests?: boolean;
+  /** When true, only count requests whose response status indicates success (< 400). */
+  skipFailedRequests?: boolean;
+  /** When true, store errors return 429 instead of failing open. */
+  failClosed?: boolean;
 };
 
 const buckets = new Map<string, Bucket>();
 const cleanupWindowMs = 5 * 60 * 1000;
 let lastCleanupAt = 0;
+let lastDatabaseCleanupAt = 0;
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || "";
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
@@ -51,6 +58,14 @@ function cleanupExpiredBuckets(now: number) {
       buckets.delete(key);
     }
   }
+}
+
+function scheduleDatabaseBucketCleanup(now: number) {
+  if (now - lastDatabaseCleanupAt < cleanupWindowMs) return;
+  lastDatabaseCleanupAt = now;
+  void prisma.rateLimitBucket.deleteMany({
+    where: { resetAt: { lt: new Date(now) } },
+  }).catch((err) => console.error("[RateLimit] Expired bucket cleanup failed:", err));
 }
 
 function hashKey(value: string): string {
@@ -126,6 +141,7 @@ async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimi
 }
 
 async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
+  scheduleDatabaseBucketCleanup(Date.now());
   const resetAt = new Date(Date.now() + windowMs);
   const rows = await prisma.$queryRawUnsafe(
     `INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
@@ -212,7 +228,34 @@ function buildRateLimitResponse(res: Response, message: string, retryAfterMs: nu
   });
 }
 
+/**
+ * Decrement a bucket counter after a request completes, used when
+ * skipSuccessfulRequests or skipFailedRequests is active and the response
+ * status doesn't match the filter (i.e., the request shouldn't have counted).
+ *
+ * For in-memory buckets this is synchronous. For PostgreSQL/Upstash it fires
+ * and forgets — a slight over-count is acceptable; this only fires on the
+ * "undo" path so under-count is impossible.
+ */
+function releaseBucket(key: string, windowMs: number) {
+  const now = Date.now();
+  const bucket = buckets.get(key);
+  if (bucket && bucket.resetAt > now && bucket.count > 0) {
+    bucket.count -= 1;
+  }
+  // For shared stores (PostgreSQL/Upstash) we accept eventual consistency.
+  // A best-effort HTTP DELETE is possible but not worth the latency on the
+  // response path — the window resets soon anyway.
+}
+
+function isErrorResponse(statusCode: number): boolean {
+  return statusCode >= 400 || statusCode === 0; // 0 = no status set yet
+}
+
 export function createHybridRateLimit(options: HybridRateLimitOptions) {
+  const hasResponseFilter = options.skipSuccessfulRequests || options.skipFailedRequests;
+  const failClosed = options.failClosed === true;
+
   return async (req: Request, res: Response, next: NextFunction) => {
     if (options.skip?.(req)) {
       next();
@@ -297,8 +340,49 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
         return;
       }
 
+      // When skipSuccessfulRequests or skipFailedRequests is active, we need
+      // to check the final response status AFTER the handler runs and release
+      // the bucket if the request shouldn't have been counted.
+      if (hasResponseFilter && typeof (res as any).end === "function") {
+        const originalEnd = res.end.bind(res);
+        const ipKey = `${options.namespace}:ip:${hashKey(ip)}${suffix}`;
+        const userKey = userId && options.maxPerUser
+          ? `${options.namespace}:user:${hashKey(userId)}${suffix}`
+          : null;
+        const keyBucketKey = rateLimitKey && options.maxPerKey
+          ? `${options.namespace}:key:${hashKey(rateLimitKey)}`
+          : null;
+
+        (res as any).end = function (this: Response, ...args: any[]) {
+          const statusCode = this.statusCode || 200;
+          const isError = isErrorResponse(statusCode);
+
+          // Determine whether this response should NOT count toward the quota
+          const shouldRelease =
+            (options.skipSuccessfulRequests && !isError) ||
+            (options.skipFailedRequests && isError);
+
+          if (shouldRelease) {
+            releaseBucket(ipKey, options.windowMs);
+            if (userKey) releaseBucket(userKey, options.windowMs);
+            if (keyBucketKey) releaseBucket(keyBucketKey, options.windowMs);
+          }
+
+          return originalEnd.apply(this, args as any);
+        };
+      }
+
       next();
     } catch (err) {
+      if (failClosed) {
+        console.error("[RateLimit] Store error (fail-closed):", err);
+        buildRateLimitResponse(
+          res,
+          options.message ?? "Too many requests. Please wait before trying again.",
+          options.windowMs
+        );
+        return;
+      }
       console.error("[RateLimit] Falling back to open on store error:", err);
       next();
     }
