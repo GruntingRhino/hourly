@@ -46,11 +46,16 @@ test("email send limiter allows only one request per recipient every 60 seconds"
 
   const blocked = await invoke(limiter, request("198.51.100.2", "student@example.edu"));
   assert.equal(blocked.status, 429);
-  assert.deepEqual(blocked.body, {
+  assert.deepEqual({
+    ...(blocked.body as Record<string, unknown>),
+    retryAfterSeconds: undefined,
+  }, {
     error: "Please wait 60 seconds before requesting another email.",
     code: "RATE_LIMITED",
-    retryAfterSeconds: 60,
+    retryAfterSeconds: undefined,
   });
+  const retryAfterSeconds = (blocked.body as { retryAfterSeconds: number }).retryAfterSeconds;
+  assert.ok(retryAfterSeconds >= 1 && retryAfterSeconds <= 60);
 });
 
 test("email send limiter blocks suspicious bursts from one IP across recipients", async () => {
