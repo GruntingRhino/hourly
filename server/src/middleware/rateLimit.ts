@@ -63,9 +63,8 @@ function cleanupExpiredBuckets(now: number) {
 function scheduleDatabaseBucketCleanup(now: number) {
   if (now - lastDatabaseCleanupAt < cleanupWindowMs) return;
   lastDatabaseCleanupAt = now;
-  void prisma.rateLimitBucket.deleteMany({
-    where: { resetAt: { lt: new Date(now) } },
-  }).catch((err) => console.error("[RateLimit] Expired bucket cleanup failed:", err));
+  void prisma.$executeRawUnsafe('DELETE FROM "RateLimitBucket" WHERE "resetAt" < NOW()')
+    .catch((err) => console.error("[RateLimit] Expired bucket cleanup failed:", err));
 }
 
 function hashKey(value: string): string {
@@ -142,10 +141,9 @@ async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimi
 
 async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
   scheduleDatabaseBucketCleanup(Date.now());
-  const resetAt = new Date(Date.now() + windowMs);
   const rows = await prisma.$queryRawUnsafe(
     `INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
-     VALUES ($1, 1, $2, NOW(), NOW())
+     VALUES ($1, 1, NOW() + ($2 * INTERVAL '1 millisecond'), NOW(), NOW())
      ON CONFLICT ("key") DO UPDATE
      SET
        "count" = CASE
@@ -153,13 +151,13 @@ async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLi
          ELSE "RateLimitBucket"."count" + 1
        END,
        "resetAt" = CASE
-         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN $2
+         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN NOW() + ($2 * INTERVAL '1 millisecond')
          ELSE "RateLimitBucket"."resetAt"
        END,
        "updatedAt" = NOW()
      RETURNING "count", "resetAt"`,
     key,
-    resetAt
+    windowMs
   ) as Array<{ count: number; resetAt: Date }>;
 
   const row = rows[0];
@@ -169,7 +167,10 @@ async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLi
 
   return {
     count: Number(row.count),
-    resetAt: row.resetAt.getTime(),
+    // PostgreSQL's timestamp-without-time-zone values are session-local. Keep
+    // the response header based on this process clock rather than reserializing
+    // a database timestamp through the driver's timezone conversion.
+    resetAt: Date.now() + windowMs,
   };
 }
 

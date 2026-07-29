@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import type { NextFunction, Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
 import { createHybridRateLimit } from "../src/middleware/rateLimit";
 
 // ── Test helpers ──────────────────────────────────────────────────────────
@@ -105,6 +106,35 @@ test("two independent instances share enforcement through PostgreSQL store", asy
 
   // instance2 (independent instance) also blocks — same shared store
   assert.equal((await invoke(instance2, fakeReq({ ip: sharedIp }))).status, 429);
+});
+
+test("two separately booted processes enforce one PostgreSQL bucket", { skip: !process.env.RATE_LIMIT_TEST_DATABASE_URL }, async () => {
+  const databaseUrl = process.env.RATE_LIMIT_TEST_DATABASE_URL!;
+  const namespace = `pg-process-${Date.now()}-${Math.random()}`;
+  const ip = "198.51.100.42";
+  const helperPath = new URL("./_databaseRateLimitHelper.ts", import.meta.url).pathname;
+  const client = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  const runProcess = () => {
+    const output = execFileSync("node", ["--import", "tsx", helperPath, namespace, ip], {
+      cwd: __dirname,
+      env: { ...process.env, APP_ENV: "production", DATABASE_URL: databaseUrl, DEV_DATABASE_URL: "", UPSTASH_REDIS_REST_URL: "", UPSTASH_REDIS_REST_TOKEN: "" },
+      timeout: 10_000,
+      encoding: "utf-8",
+    });
+    const jsonLine = output.split("\n").find((line) => line.startsWith("{"));
+    assert.ok(jsonLine, "Expected JSON output from database helper");
+    const parsed = JSON.parse(jsonLine) as { status: number; nextCalled: boolean };
+    return { status: parsed.status, nextCalled: parsed.nextCalled };
+  };
+
+  try {
+    assert.deepEqual(runProcess(), { status: 200, nextCalled: true });
+    assert.deepEqual(runProcess(), { status: 200, nextCalled: true });
+    assert.deepEqual(runProcess(), { status: 429, nextCalled: false });
+  } finally {
+    await client.rateLimitBucket.deleteMany({ where: { key: { startsWith: `${namespace}:` } } });
+    await client.$disconnect();
+  }
 });
 
 // ── Test 3: failClosed rejects on store error ────────────────────────────
