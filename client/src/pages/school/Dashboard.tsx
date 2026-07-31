@@ -115,7 +115,7 @@ export default function SchoolDashboard() {
 
   const handleDismissOnboarding = async () => {
     setOnboardingDismissed(true);
-    try { await api.put("/schools/onboarding", {}); } catch {}
+    try { await api.put("/schools/onboarding", {}); } catch { /* Local dismissal remains valid if persistence fails. */ }
   };
 
   useEffect(() => {

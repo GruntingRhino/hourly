@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 export default function ClassroomJoin() {
@@ -15,8 +15,8 @@ export default function ClassroomJoin() {
     try {
       await api.post("/classrooms/join", { inviteCode: code.trim().toLowerCase() });
       await refreshUser();
-    } catch (err: any) {
-      setError(err.message || "Invalid code");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Invalid code"));
     } finally {
       setLoading(false);
     }

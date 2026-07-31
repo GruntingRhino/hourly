@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { setAuthSession } from "../../lib/authSession";
 import { CollapsibleList } from "../../components/CollapsibleList";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
@@ -72,6 +72,14 @@ interface DataAccessLogEntry {
     role: string;
     email: string;
   };
+}
+
+interface SchoolSessionExport {
+  user?: { name?: string | null } | null;
+  opportunity?: { title?: string | null; date?: string | null } | null;
+  totalHours?: number | null;
+  verificationStatus?: string | null;
+  status?: string | null;
 }
 
 type IntegrationProvider = "CANVAS" | "GOOGLE_CLASSROOM";
@@ -269,13 +277,17 @@ export default function SchoolSettings() {
     hourApproval: { email: true, inApp: true },
     orgRequest: { email: true, inApp: true },
   };
-  const mergeNotifPrefs = (raw: any) => ({
+  const mergeNotifPrefs = (raw: {
+    studentJoin?: { email?: boolean; inApp?: boolean };
+    hourApproval?: { email?: boolean; inApp?: boolean };
+    orgRequest?: { email?: boolean; inApp?: boolean };
+  } | null | undefined) => ({
     studentJoin: { ...defaultNotifPrefs.studentJoin, ...(raw?.studentJoin || {}) },
     hourApproval: { ...defaultNotifPrefs.hourApproval, ...(raw?.hourApproval || {}) },
     orgRequest: { ...defaultNotifPrefs.orgRequest, ...(raw?.orgRequest || {}) },
   });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    mergeNotifPrefs((user as any)?.notificationPreferences)
+    mergeNotifPrefs(user?.notificationPreferences)
   );
   const [savingNotif, setSavingNotif] = useState(false);
   const [notifMessage, setNotifMessage] = useState("");
@@ -284,7 +296,7 @@ export default function SchoolSettings() {
   // Privacy
   const defaultMsgPrefs = { allowFrom: "EVERYONE", profileVisibility: "EVERYONE" };
   const [msgPrefs, setMsgPrefs] = useState<typeof defaultMsgPrefs>(
-    (user as any)?.messagePreferences || defaultMsgPrefs
+    { ...defaultMsgPrefs, ...(user?.messagePreferences ?? {}) }
   );
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState("");
@@ -363,8 +375,8 @@ export default function SchoolSettings() {
   }, [user]);
 
   useEffect(() => {
-    setNotifPrefs(mergeNotifPrefs((user as any)?.notificationPreferences));
-  }, [(user as any)?.notificationPreferences]);
+    setNotifPrefs(mergeNotifPrefs(user?.notificationPreferences));
+  }, [user?.notificationPreferences]);
 
   useEffect(() => {
     if (!joinByCodeToast) return;
@@ -385,7 +397,7 @@ export default function SchoolSettings() {
     setLogsError("");
     api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
       .then(setDataAccessLogs)
-      .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
+      .catch((err: unknown) => setLogsError(getErrorMessage(err, "Failed to load data access logs")))
       .finally(() => setLogsLoading(false));
   }, [tab, isAdmin, user?.schoolId]);
 
@@ -417,10 +429,11 @@ export default function SchoolSettings() {
         setGoogleClassroomConnectMode(classroom.connection?.mode ?? (classroom.capabilities?.mockAllowed === false ? "OAUTH" : "MOCK"));
         setGoogleClassroomBaseUrl(classroom.connection?.baseUrl ?? "https://classroom.googleapis.com");
       })
-      .catch((err: any) => {
-        setCanvasMessage(err.message || "Failed to load integration status");
+      .catch((err: unknown) => {
+        const errorMessage = getErrorMessage(err, "Failed to load integration status");
+        setCanvasMessage(errorMessage);
         setCanvasIsError(true);
-        setGoogleClassroomMessage(err.message || "Failed to load integration status");
+        setGoogleClassroomMessage(errorMessage);
         setGoogleClassroomIsError(true);
       });
   }, [tab, isAdmin, user?.schoolId]);
@@ -522,8 +535,8 @@ export default function SchoolSettings() {
       });
       setCanvasMessage("Canvas mock connection created.");
       await reloadCanvasState();
-    } catch (err: any) {
-      setCanvasMessage(err.message || "Failed to connect Canvas");
+    } catch (err: unknown) {
+      setCanvasMessage(getErrorMessage(err, "Failed to connect Canvas"));
       setCanvasIsError(true);
     } finally {
       setCanvasBusyAction("");
@@ -539,8 +552,8 @@ export default function SchoolSettings() {
       setCanvasPreview(null);
       setCanvasMessage("Canvas disconnected.");
       await reloadCanvasState();
-    } catch (err: any) {
-      setCanvasMessage(err.message || "Failed to disconnect Canvas");
+    } catch (err: unknown) {
+      setCanvasMessage(getErrorMessage(err, "Failed to disconnect Canvas"));
       setCanvasIsError(true);
     } finally {
       setCanvasBusyAction("");
@@ -556,8 +569,8 @@ export default function SchoolSettings() {
       setCanvasPreview(result.summary);
       setCanvasMessage("Canvas preview complete.");
       await reloadCanvasState();
-    } catch (err: any) {
-      setCanvasMessage(err.message || "Failed to preview Canvas sync");
+    } catch (err: unknown) {
+      setCanvasMessage(getErrorMessage(err, "Failed to preview Canvas sync"));
       setCanvasIsError(true);
     } finally {
       setCanvasBusyAction("");
@@ -573,8 +586,8 @@ export default function SchoolSettings() {
       setCanvasPreview(result.summary);
       setCanvasMessage("Canvas sync applied.");
       await reloadCanvasState();
-    } catch (err: any) {
-      setCanvasMessage(err.message || "Failed to apply Canvas sync");
+    } catch (err: unknown) {
+      setCanvasMessage(getErrorMessage(err, "Failed to apply Canvas sync"));
       setCanvasIsError(true);
     } finally {
       setCanvasBusyAction("");
@@ -602,8 +615,8 @@ export default function SchoolSettings() {
       });
       setGoogleClassroomMessage("Google Classroom mock connection created.");
       await reloadGoogleClassroomState();
-    } catch (err: any) {
-      setGoogleClassroomMessage(err.message || "Failed to connect Google Classroom");
+    } catch (err: unknown) {
+      setGoogleClassroomMessage(getErrorMessage(err, "Failed to connect Google Classroom"));
       setGoogleClassroomIsError(true);
     } finally {
       setGoogleClassroomBusyAction("");
@@ -619,8 +632,8 @@ export default function SchoolSettings() {
       setGoogleClassroomPreview(null);
       setGoogleClassroomMessage("Google Classroom disconnected.");
       await reloadGoogleClassroomState();
-    } catch (err: any) {
-      setGoogleClassroomMessage(err.message || "Failed to disconnect Google Classroom");
+    } catch (err: unknown) {
+      setGoogleClassroomMessage(getErrorMessage(err, "Failed to disconnect Google Classroom"));
       setGoogleClassroomIsError(true);
     } finally {
       setGoogleClassroomBusyAction("");
@@ -636,8 +649,8 @@ export default function SchoolSettings() {
       setGoogleClassroomPreview(result.summary);
       setGoogleClassroomMessage("Google Classroom preview complete.");
       await reloadGoogleClassroomState();
-    } catch (err: any) {
-      setGoogleClassroomMessage(err.message || "Failed to preview Google Classroom sync");
+    } catch (err: unknown) {
+      setGoogleClassroomMessage(getErrorMessage(err, "Failed to preview Google Classroom sync"));
       setGoogleClassroomIsError(true);
     } finally {
       setGoogleClassroomBusyAction("");
@@ -653,8 +666,8 @@ export default function SchoolSettings() {
       setGoogleClassroomPreview(result.summary);
       setGoogleClassroomMessage("Google Classroom sync applied.");
       await reloadGoogleClassroomState();
-    } catch (err: any) {
-      setGoogleClassroomMessage(err.message || "Failed to apply Google Classroom sync");
+    } catch (err: unknown) {
+      setGoogleClassroomMessage(getErrorMessage(err, "Failed to apply Google Classroom sync"));
       setGoogleClassroomIsError(true);
     } finally {
       setGoogleClassroomBusyAction("");
@@ -693,8 +706,8 @@ export default function SchoolSettings() {
       );
       setMessage("Settings updated!");
       await refreshUser();
-    } catch (err: any) {
-      setMessage(err.message || "Failed to update settings");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to update settings"));
       setIsError(true);
     } finally {
       setSaving(false);
@@ -713,8 +726,8 @@ export default function SchoolSettings() {
       });
       setTransferMessage(result.message || "Transfer confirmation sent.");
       setTransferTargetEmail("");
-    } catch (err: any) {
-      setTransferMessage(err.message || "Failed to start ownership transfer.");
+    } catch (err: unknown) {
+      setTransferMessage(getErrorMessage(err, "Failed to start ownership transfer."));
       setTransferIsError(true);
     } finally {
       setTransferringOwnership(false);
@@ -740,13 +753,14 @@ export default function SchoolSettings() {
       setMessage("Join-by-code setting updated.");
       setIsError(false);
       setJoinByCodeToast({ type: "success", text: "Join-by-code setting saved." });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAllowJoinByCode(previousValue);
-      setMessage(err.message || "Failed to update join-by-code setting");
+      const errorMessage = getErrorMessage(err, "Failed to update join-by-code setting");
+      setMessage(errorMessage);
       setIsError(true);
       setJoinByCodeToast({
         type: "error",
-        text: err.message || "Failed to update join-by-code setting",
+        text: errorMessage,
       });
     } finally {
       setUpdatingJoinByCode(false);
@@ -800,8 +814,8 @@ export default function SchoolSettings() {
           ? "Service rules saved. Some students are already above one or more new category caps, so their current hours were kept and they are now blocked from adding more in those categories."
           : "Service rules saved!",
       );
-    } catch (err: any) {
-      setRulesMessage(err.message || "Failed to save rules");
+    } catch (err: unknown) {
+      setRulesMessage(getErrorMessage(err, "Failed to save rules"));
       setRulesIsError(true);
     } finally {
       setSavingRules(false);
@@ -831,8 +845,8 @@ export default function SchoolSettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordMessage(err.message || "Failed to change password");
+    } catch (err: unknown) {
+      setPasswordMessage(getErrorMessage(err, "Failed to change password"));
       setPasswordIsError(true);
     } finally {
       setChangingPassword(false);
@@ -844,8 +858,8 @@ export default function SchoolSettings() {
     try {
       await api.delete("/auth/account");
       logout();
-    } catch (err: any) {
-      setMessage(err.message || "Failed to delete account");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to delete account"));
       setIsError(true);
       setDeleting(false);
       setDeleteConfirm(false);
@@ -895,10 +909,10 @@ export default function SchoolSettings() {
   const handleExportActivityLog = async () => {
     if (!user?.schoolId) return;
     try {
-      const sessions = await api.get<any[]>(`/sessions/school`).catch(() => [] as any[]);
+      const sessions = await api.get<SchoolSessionExport[]>(`/sessions/school`).catch(() => []);
       const rows = [
         ["Student", "Opportunity", "Date", "Hours", "Status"],
-        ...sessions.map((s: any) => [
+        ...sessions.map((s) => [
           s.user?.name || "",
           s.opportunity?.title || "",
           s.opportunity?.date ? new Date(s.opportunity.date).toLocaleDateString() : "",
@@ -914,8 +928,8 @@ export default function SchoolSettings() {
       a.download = "activity-log.csv";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setMessage(err.message || "Failed to export");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to export"));
       setIsError(true);
     }
   };

@@ -2643,7 +2643,7 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
 
     const result = signups.map((s) => ({
       ...s,
-      student: { id: s.studentId, label: pseudonymousStudentLabel(s.studentId) },
+      student: { id: s.studentId, label: studentMap.get(s.studentId) ?? "Unknown student" },
     }));
 
     res.json(result);

@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 export default function SchoolConfirmTransfer() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [message, setMessage] = useState("Confirming transfer...");
+  const token = searchParams.get("token");
+  const [status, setStatus] = useState<"loading" | "success" | "error">(token ? "loading" : "error");
+  const [message, setMessage] = useState(token ? "Confirming transfer..." : "Missing transfer token.");
 
   useEffect(() => {
-    const token = searchParams.get("token");
     if (!token) {
-      setStatus("error");
-      setMessage("Missing transfer token.");
       return;
     }
 
@@ -20,11 +18,11 @@ export default function SchoolConfirmTransfer() {
         setStatus("success");
         setMessage(result.message || "Ownership transferred successfully.");
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         setStatus("error");
-        setMessage(err.message || "Transfer confirmation failed.");
+        setMessage(getErrorMessage(err, "Transfer confirmation failed."));
       });
-  }, [searchParams]);
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-[var(--surface-alt)] flex items-center justify-center px-4">

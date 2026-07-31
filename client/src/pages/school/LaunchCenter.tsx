@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import type { Tab, LaunchWorkspace } from "./components/types";
 import { summaryClasses, badgeClasses } from "./components/types";
 import MonitoringTab from "./components/MonitoringTab";
@@ -21,8 +21,8 @@ export default function LaunchCenter() {
     try {
       const data = await api.get<LaunchWorkspace>("/schools/launch");
       setWorkspace(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load launch center.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load launch center."));
     } finally {
       setLoading(false);
     }

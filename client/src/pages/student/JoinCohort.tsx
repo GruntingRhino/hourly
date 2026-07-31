@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import type { User } from "../../hooks/useAuth";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -19,6 +20,11 @@ interface InvitationInfo {
   cohortName: string;
   schoolName: string;
   schoolId: string;
+}
+
+interface AuthResult {
+  token: string;
+  user: User;
 }
 
 export default function JoinCohort() {
@@ -50,8 +56,8 @@ export default function JoinCohort() {
         if (info.name) setName(info.name);
         setLoading(false);
       })
-      .catch((err) => {
-        setLoadError(err.message || "Invalid or expired invitation link.");
+      .catch((err: unknown) => {
+        setLoadError(getErrorMessage(err, "Invalid or expired invitation link."));
         setLoading(false);
       });
   }, [token]);
@@ -62,15 +68,15 @@ export default function JoinCohort() {
     setError("");
     setSubmitting(true);
     try {
-      const result = await api.post<any>("/invitations/student/accept", {
+      const result = await api.post<AuthResult>("/invitations/student/accept", {
         token,
         name,
         password,
       });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Enrollment failed. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Enrollment failed. Please try again."));
     } finally {
       setSubmitting(false);
     }

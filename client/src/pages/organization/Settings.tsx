@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { setAuthSession } from "../../lib/authSession";
 
 const PASSWORD_RULES = [
@@ -50,6 +50,32 @@ function ZipCodeInput({ zipCodes, onChange }: { zipCodes: string[]; onChange: (z
 
 type Tab = "profile" | "schools" | "security" | "notifications" | "analytics" | "data";
 
+type NotificationChannelPreferences = { email?: boolean; inApp?: boolean };
+type NotificationPreferences = Partial<Record<"studentSignup" | "hourRequest" | "schoolApproval", NotificationChannelPreferences>>;
+
+const defaultNotifPrefs = {
+  studentSignup: { email: true, inApp: true },
+  hourRequest: { email: true, inApp: true },
+  schoolApproval: { email: true, inApp: true },
+};
+
+function mergeNotifPrefs(incoming?: NotificationPreferences) {
+  return {
+    studentSignup: {
+      email: incoming?.studentSignup?.email ?? defaultNotifPrefs.studentSignup.email,
+      inApp: incoming?.studentSignup?.inApp ?? defaultNotifPrefs.studentSignup.inApp,
+    },
+    hourRequest: {
+      email: incoming?.hourRequest?.email ?? defaultNotifPrefs.hourRequest.email,
+      inApp: incoming?.hourRequest?.inApp ?? defaultNotifPrefs.hourRequest.inApp,
+    },
+    schoolApproval: {
+      email: incoming?.schoolApproval?.email ?? defaultNotifPrefs.schoolApproval.email,
+      inApp: incoming?.schoolApproval?.inApp ?? defaultNotifPrefs.schoolApproval.inApp,
+    },
+  };
+}
+
 interface OrgData {
   id: string;
   name: string;
@@ -89,6 +115,7 @@ interface Volunteer {
 
 export default function OrgSettings() {
   const { user, logout, refreshUser } = useAuth();
+  const organizationId = user?.organizationId;
   const [tab, setTab] = useState<Tab>("profile");
   const [org, setOrg] = useState<OrgData | null>(null);
   const [name, setName] = useState("");
@@ -124,27 +151,8 @@ export default function OrgSettings() {
   const [deleting, setDeleting] = useState(false);
 
   // Notifications
-  const defaultNotifPrefs = {
-    studentSignup: { email: true, inApp: true },
-    hourRequest: { email: true, inApp: true },
-    schoolApproval: { email: true, inApp: true },
-  };
-  const mergeNotifPrefs = (incoming: any) => ({
-    studentSignup: {
-      email: incoming?.studentSignup?.email ?? defaultNotifPrefs.studentSignup.email,
-      inApp: incoming?.studentSignup?.inApp ?? defaultNotifPrefs.studentSignup.inApp,
-    },
-    hourRequest: {
-      email: incoming?.hourRequest?.email ?? defaultNotifPrefs.hourRequest.email,
-      inApp: incoming?.hourRequest?.inApp ?? defaultNotifPrefs.hourRequest.inApp,
-    },
-    schoolApproval: {
-      email: incoming?.schoolApproval?.email ?? defaultNotifPrefs.schoolApproval.email,
-      inApp: incoming?.schoolApproval?.inApp ?? defaultNotifPrefs.schoolApproval.inApp,
-    },
-  });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    mergeNotifPrefs((user as any)?.notificationPreferences)
+    () => mergeNotifPrefs(user?.notificationPreferences ?? undefined)
   );
   const notifPrefsRef = useRef(notifPrefs);
   const [savingNotif, setSavingNotif] = useState(false);
@@ -155,16 +163,38 @@ export default function OrgSettings() {
   const [topVolunteers, setTopVolunteers] = useState<Volunteer[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
+  const loadAnalytics = useCallback(async () => {
+    if (!organizationId) return;
+    setAnalyticsLoading(true);
+    try {
+      const [stats, volunteers] = await Promise.all([
+        api.get<OrgStats>(`/organizations/${organizationId}/stats`),
+        api.get<Volunteer[]>(`/organizations/${organizationId}/volunteers`).catch(() => [] as Volunteer[]),
+      ]);
+      setOrgStats(stats);
+      setTopVolunteers([...volunteers].sort((a, b) => b.totalHours - a.totalHours).slice(0, 5));
+    } catch { /* Analytics is optional; retain the existing dashboard state. */ } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [organizationId]);
+
+  const loadApprovals = useCallback(async () => {
+    if (!organizationId) return;
+    try {
+      setApprovals(await api.get<SchoolApproval[]>(`/organizations/${organizationId}/schools`));
+    } catch { /* Keep the current approval list if refresh fails. */ }
+  }, [organizationId]);
+
   useEffect(() => {
-    if (user?.organizationId) {
-      api.get<OrgData>(`/organizations/${user.organizationId}`).then((data) => {
+    if (organizationId) {
+      api.get<OrgData>(`/organizations/${organizationId}`).then((data) => {
         setOrg(data);
         setName(data.name);
         setPhone(data.phone || "");
         setDescription(data.description || "");
         setWebsite(data.website || "");
         if (data.zipCodes) {
-          try { setZipCodes(JSON.parse(data.zipCodes)); } catch {}
+          try { setZipCodes(JSON.parse(data.zipCodes)); } catch { /* Ignore malformed legacy preferences. */ }
         }
         if (data.socialLinks) {
           try {
@@ -173,52 +203,23 @@ export default function OrgSettings() {
             setTiktok(links.tiktok || "");
             setTwitter(links.twitter || "");
             setYoutube(links.youtube || "");
-          } catch {}
+          } catch { /* Ignore malformed legacy preferences. */ }
         }
       });
       loadApprovals();
     }
-  }, [user]);
+  }, [loadApprovals, organizationId]);
 
   useEffect(() => {
-    if (tab === "analytics" && user?.organizationId && !orgStats) {
+    if (tab === "analytics" && organizationId && !orgStats) {
       loadAnalytics();
     }
-  }, [tab]);
+  }, [loadAnalytics, orgStats, organizationId, tab]);
 
   useEffect(() => {
     notifPrefsRef.current = notifPrefs;
   }, [notifPrefs]);
 
-  useEffect(() => {
-    const merged = mergeNotifPrefs((user as any)?.notificationPreferences);
-    setNotifPrefs(merged);
-    notifPrefsRef.current = merged;
-  }, [(user as any)?.notificationPreferences]);
-
-  const loadAnalytics = async () => {
-    if (!user?.organizationId) return;
-    setAnalyticsLoading(true);
-    try {
-      const [stats, volunteers] = await Promise.all([
-        api.get<OrgStats>(`/organizations/${user.organizationId}/stats`),
-        api.get<Volunteer[]>(`/organizations/${user.organizationId}/volunteers`).catch(() => [] as Volunteer[]),
-      ]);
-      setOrgStats(stats);
-      const sorted = [...volunteers].sort((a, b) => b.totalHours - a.totalHours).slice(0, 5);
-      setTopVolunteers(sorted);
-    } catch {} finally {
-      setAnalyticsLoading(false);
-    }
-  };
-
-  const loadApprovals = async () => {
-    if (!user?.organizationId) return;
-    try {
-      const data = await api.get<SchoolApproval[]>(`/organizations/${user.organizationId}/schools`);
-      setApprovals(data);
-    } catch {}
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,8 +238,8 @@ export default function OrgSettings() {
       });
       setMessage("Profile updated!");
       await refreshUser();
-    } catch (err: any) {
-      setMessage(err.message || "Failed to update profile");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to update profile"));
       setIsError(true);
     } finally {
       setSaving(false);
@@ -270,8 +271,8 @@ export default function OrgSettings() {
       setSearchResults([]);
       setSchoolSearch("");
       await loadApprovals();
-    } catch (err: any) {
-      setSchoolMsg(err.message || "Failed to send request");
+    } catch (err: unknown) {
+      setSchoolMsg(getErrorMessage(err, "Failed to send request"));
     } finally {
       setRequesting(null);
     }
@@ -301,8 +302,8 @@ export default function OrgSettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordMessage(err.message || "Failed to change password");
+    } catch (err: unknown) {
+      setPasswordMessage(getErrorMessage(err, "Failed to change password"));
       setPasswordIsError(true);
     } finally {
       setChangingPassword(false);
@@ -314,8 +315,8 @@ export default function OrgSettings() {
     try {
       await api.delete("/auth/account");
       logout();
-    } catch (err: any) {
-      setMessage(err.message || "Failed to delete account");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to delete account"));
       setIsError(true);
       setDeleting(false);
       setDeleteConfirm(false);
@@ -351,7 +352,7 @@ export default function OrgSettings() {
   const handleExportCSV = async () => {
     if (!user?.organizationId) return;
     try {
-      const volunteers = await api.get<any[]>(`/organizations/${user.organizationId}/volunteers`);
+      const volunteers = await api.get<Volunteer[]>(`/organizations/${user.organizationId}/volunteers`);
       const rows = [
         ["Volunteer", "Total Hours", "Sessions"],
         ...volunteers.map((v) => [v.label || "Anonymous volunteer", v.totalHours?.toString() || "0", v.sessionCount?.toString() || "0"]),
@@ -364,8 +365,8 @@ export default function OrgSettings() {
       a.download = "volunteer-data.csv";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setMessage(err.message || "Failed to export");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to export"));
       setIsError(true);
     }
   };

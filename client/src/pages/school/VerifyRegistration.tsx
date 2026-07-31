@@ -1,33 +1,37 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import type { User } from "../../hooks/useAuth";
+
+interface AuthResult {
+  token: string;
+  user: User;
+}
 
 export default function SchoolVerifyRegistration() {
   const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
   const navigate = useNavigate();
   const { loginWithToken } = useAuth();
-  const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [status, setStatus] = useState<"verifying" | "success" | "error">(token ? "verifying" : "error");
+  const [errorMsg, setErrorMsg] = useState(token ? "" : "No verification token found in the link.");
 
   useEffect(() => {
-    const token = searchParams.get("token");
     if (!token) {
-      setStatus("error");
-      setErrorMsg("No verification token found in the link.");
       return;
     }
-    api.get<any>(`/auth/google/verify-school?token=${token}`)
+    api.get<AuthResult>(`/auth/google/verify-school?token=${token}`)
       .then((result) => {
         loginWithToken(result.token, result.user);
         setStatus("success");
         setTimeout(() => navigate("/dashboard"), 2000);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         setStatus("error");
-        setErrorMsg(err.message || "Verification failed. The link may have expired.");
+        setErrorMsg(getErrorMessage(err, "Verification failed. The link may have expired."));
       });
-  }, []);
+  }, [loginWithToken, navigate, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">

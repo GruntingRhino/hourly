@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { api } from "../../lib/api";
+import type { User } from "../../hooks/useAuth";
+import { api, getErrorMessage } from "../../lib/api";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (value: string) => value.length >= 8 },
@@ -15,6 +16,11 @@ type InvitationInfo = {
   beneficiaryName: string;
   email: string;
   hasExistingAccount: boolean;
+};
+
+type AuthResult = {
+  token: string;
+  user: User;
 };
 
 export default function JoinBeneficiaryAdmin() {
@@ -39,7 +45,7 @@ export default function JoinBeneficiaryAdmin() {
     }
     api.get<InvitationInfo>(`/invitations/beneficiary-admin?token=${encodeURIComponent(token)}`)
       .then(setInvitation)
-      .catch((err: any) => setError(err.message || "This administrator invitation is invalid or expired."))
+      .catch((err: unknown) => setError(getErrorMessage(err, "This administrator invitation is invalid or expired.")))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -52,9 +58,9 @@ export default function JoinBeneficiaryAdmin() {
         await refreshUser();
         navigate("/dashboard", { replace: true });
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         acceptingExistingAccount.current = false;
-        setError(err.message || "This administrator invitation could not be accepted.");
+        setError(getErrorMessage(err, "This administrator invitation could not be accepted."));
       })
       .finally(() => setSubmitting(false));
   }, [invitation, navigate, refreshUser, token, user]);
@@ -65,11 +71,11 @@ export default function JoinBeneficiaryAdmin() {
     setSubmitting(true);
     setError("");
     try {
-      const result = await api.post<any>("/invitations/beneficiary-admin/accept", { token, name, password });
+      const result = await api.post<AuthResult>("/invitations/beneficiary-admin/accept", { token, name, password });
       loginWithToken(result.token, result.user);
       navigate("/dashboard", { replace: true });
-    } catch (err: any) {
-      setError(err.message || "Unable to create the administrator account.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to create the administrator account."));
     } finally {
       setSubmitting(false);
     }

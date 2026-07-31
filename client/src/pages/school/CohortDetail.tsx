@@ -22,7 +22,7 @@ function suggestMapping(headers: string[]): Record<string, FieldTarget> {
   const mapping: Record<string, FieldTarget> = {};
   const used = new Set<FieldTarget>();
   for (const header of headers) {
-    const normalized = header.toLowerCase().replace(/[\s_\-\.]+/g, "");
+    const normalized = header.toLowerCase().replace(/[\s_.-]+/g, "");
     let matched: FieldTarget = "skip";
     for (const [field, aliases] of Object.entries(FIELD_ALIASES) as [Exclude<FieldTarget, "skip">, string[]][]) {
       if (!used.has(field) && aliases.some((a) => normalized === a || normalized.startsWith(a) || a.startsWith(normalized))) {

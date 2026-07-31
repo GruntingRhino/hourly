@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, getErrorMessage } from "../lib/api";
 
 interface ParentProgressData {
   student: { id: string; name: string; grade?: string | null };
@@ -16,23 +16,21 @@ interface ParentProgressData {
 
 export default function ParentProgress() {
   const [params] = useSearchParams();
+  const token = params.get("token");
   const [data, setData] = useState<ParentProgressData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(Boolean(token));
+  const [error, setError] = useState(token ? "" : "Parent or guardian progress links are disabled.");
 
   useEffect(() => {
-    const token = params.get("token");
     if (!token) {
-      setError("Parent or guardian progress links are disabled.");
-      setLoading(false);
       return;
     }
 
     api.get<ParentProgressData>(`/reports/parent-progress?token=${encodeURIComponent(token)}`)
       .then(setData)
-      .catch((err: any) => setError(err.message || "Parent or guardian progress links are disabled."))
+      .catch((err: unknown) => setError(getErrorMessage(err, "Parent or guardian progress links are disabled.")))
       .finally(() => setLoading(false));
-  }, [params]);
+  }, [token]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-[var(--text-sec)]">Loading progress...</div>;

@@ -4,16 +4,14 @@ import { useAuth } from "../hooks/useAuth";
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
-  const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<"verifying" | "success" | "error">(token ? "verifying" : "error");
+  const [error, setError] = useState(token ? "" : "No verification token provided.");
 
   useEffect(() => {
-    const token = searchParams.get("token");
     if (!token) {
-      setStatus("error");
-      setError("No verification token provided.");
       return;
     }
 
@@ -34,7 +32,7 @@ export default function VerifyEmail() {
         setStatus("error");
         setError(err.message);
       });
-  }, []);
+  }, [navigate, refreshUser, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">

@@ -15,8 +15,18 @@ export class ApiError extends Error {
   }
 }
 
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function getResponseErrorMessage(body: unknown, fallback: string): string {
+  return typeof body === "object" && body !== null && "error" in body
+    ? String(body.error)
+    : fallback;
+}
+
 function getTimeoutMs(): number {
-  const envTimeout = (import.meta as any)?.env?.VITE_API_TIMEOUT_MS;
+  const envTimeout = import.meta.env.VITE_API_TIMEOUT_MS;
   const parsed = Number(envTimeout);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
@@ -44,8 +54,8 @@ async function fetchWithAuth(path: string, options?: RequestInit): Promise<Respo
       headers,
       signal: controller.signal,
     });
-  } catch (err: any) {
-    if (err?.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") {
       throw new ApiError("Request timed out", 0, { error: "Request timed out" });
     }
     throw err;
@@ -61,10 +71,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    const message =
-      typeof body === "object" && body !== null && "error" in body
-        ? String((body as any).error)
-        : `Request failed: ${res.status}`;
+    const message = getResponseErrorMessage(body, `Request failed: ${res.status}`);
     throw new ApiError(message, res.status, body);
   }
 
@@ -84,10 +91,7 @@ async function requestBlob(path: string, options?: RequestInit): Promise<Blob> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    const message =
-      typeof body === "object" && body !== null && "error" in body
-        ? String((body as any).error)
-        : `Request failed: ${res.status}`;
+    const message = getResponseErrorMessage(body, `Request failed: ${res.status}`);
     throw new ApiError(message, res.status, body);
   }
 

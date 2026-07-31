@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-markercluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-// @ts-ignore — CSS-only export, no type declarations needed
+// @ts-expect-error — CSS-only export, no type declarations needed
 import "react-leaflet-markercluster/styles";
 
 // Fix Leaflet default icon paths broken by Vite bundling

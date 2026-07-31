@@ -182,7 +182,11 @@ export function SchoolBilling({ schoolId }: { schoolId: string }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(loadSummary, [schoolId]);
+  useEffect(() => {
+    // Starting the fetch in a microtask avoids a synchronous render cascade
+    // while still resetting procurement state immediately after a school switch.
+    void Promise.resolve().then(loadSummary);
+  }, [schoolId]);
 
   if (loading) return <div className="text-[var(--text-sec)] text-sm">Loading procurement information...</div>;
   if (error) return (

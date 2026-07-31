@@ -99,7 +99,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
     try {
       const data = await api.get<LaunchWorkspace>("/schools/launch");
       onUpdate(data);
-    } catch {}
+    } catch { /* Preserve the current launch workspace when refresh fails. */ }
   };
 
   return (

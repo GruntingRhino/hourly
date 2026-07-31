@@ -454,7 +454,7 @@ export default function SchoolRegister() {
         try {
           const results = await api.get<SchoolEntry[]>(`/auth/google/schools?domain=${encodeURIComponent(domain)}`);
           if (results.length) setDomainSuggestions(results);
-        } catch {}
+        } catch { /* Domain suggestions are optional during registration. */ }
       }
       // If the user already picked a school, skip back to step 3 directly
       if (selectedSchool || customSchoolName.trim()) {

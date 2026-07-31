@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, getErrorMessage } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 
 export default function EmailVerificationRequired() {
@@ -18,8 +18,8 @@ export default function EmailVerificationRequired() {
       await api.post("/auth/dev/bypass-email-verification", {});
       await refreshUser();
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Bypass failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Bypass failed."));
     } finally {
       setBypassing(false);
     }
@@ -31,8 +31,8 @@ export default function EmailVerificationRequired() {
     try {
       await api.post("/auth/resend-verification", {});
       setResent(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to resend. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to resend. Please try again."));
     } finally {
       setResending(false);
     }

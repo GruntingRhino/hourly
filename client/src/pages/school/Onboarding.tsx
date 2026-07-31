@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 export default function SchoolOnboarding() {
@@ -42,8 +42,8 @@ export default function SchoolOnboarding() {
       await api.put("/schools/onboarding", {});
       await refreshUser();
       navigate("/launch", { replace: true });
-    } catch (err: any) {
-      setError(err.message || "Failed to save hours goal");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save hours goal"));
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import type { User } from "../../hooks/useAuth";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -16,6 +17,11 @@ interface InvInfo {
   schoolName: string;
   sentTo: string;
   beneficiaryId: string;
+}
+
+interface AuthResult {
+  token: string;
+  user: User;
 }
 
 export default function JoinBeneficiary() {
@@ -48,8 +54,8 @@ export default function JoinBeneficiary() {
         setInvInfo(info);
         setLoading(false);
       })
-      .catch((err) => {
-        setLoadError(err.message || "Invalid or expired invitation link.");
+      .catch((err: unknown) => {
+        setLoadError(getErrorMessage(err, "Invalid or expired invitation link."));
         setLoading(false);
       });
   }, [token]);
@@ -60,11 +66,11 @@ export default function JoinBeneficiary() {
     setError("");
     setSubmitting(true);
     try {
-      const result = await api.post<any>("/invitations/beneficiary/accept", { token, name, password });
+      const result = await api.post<AuthResult>("/invitations/beneficiary/accept", { token, name, password });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Failed to accept invitation.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to accept invitation."));
     } finally {
       setSubmitting(false);
     }
@@ -75,8 +81,8 @@ export default function JoinBeneficiary() {
     try {
       await api.post("/invitations/beneficiary/decline", { token });
       setDeclined(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to decline invitation.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to decline invitation."));
     } finally {
       setDeclining(false);
     }

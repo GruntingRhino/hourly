@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { api } from "../lib/api";
+import type { User } from "../hooks/useAuth";
+import { api, getErrorMessage } from "../lib/api";
+
+interface AuthResult {
+  token: string;
+  user: User;
+}
 
 export default function Login() {
   const { login, loginWithToken, refreshUser, user } = useAuth();
@@ -25,9 +31,9 @@ export default function Login() {
     acceptingAdminInvitation.current = true;
     api.post(`/beneficiaries/admin-invitations/${token}/accept`)
       .then(async () => { await refreshUser(); navigate("/dashboard", { replace: true }); })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         acceptingAdminInvitation.current = false;
-        setError(err.message || "This administrator invitation could not be accepted.");
+        setError(getErrorMessage(err, "This administrator invitation could not be accepted."));
       });
   }, [user, navigate, refreshUser, searchParams]);
 
@@ -58,7 +64,7 @@ export default function Login() {
     setError("");
 
     api
-      .post<any>(`/auth/google/callback${state ? `?state=${encodeURIComponent(state)}` : ""}`, { code })
+      .post<AuthResult>(`/auth/google/callback${state ? `?state=${encodeURIComponent(state)}` : ""}`, { code })
       .then((result) => {
         if (cancelled) return;
         if (!result.token) {
@@ -67,9 +73,9 @@ export default function Login() {
         loginWithToken(result.token, result.user);
         navigate("/dashboard", { replace: true });
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err.message || "Google sign-in failed. Please try again.");
+        setError(getErrorMessage(err, "Google sign-in failed. Please try again."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -101,8 +107,8 @@ export default function Login() {
     try {
       await login(email, password);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Invalid email or password. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Invalid email or password. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -112,7 +118,7 @@ export default function Login() {
     setError("");
     setDevGoogleLoading(true);
     try {
-      const result = await api.post<any>("/auth/google/dev-signin", {
+      const result = await api.post<AuthResult>("/auth/google/dev-signin", {
         email: devGoogleEmail.trim(),
         state: "login",
       });
@@ -121,8 +127,8 @@ export default function Login() {
       }
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Dev Google sign-in failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Dev Google sign-in failed."));
     } finally {
       setDevGoogleLoading(false);
     }

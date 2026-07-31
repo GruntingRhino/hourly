@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 interface SlotFull {
   id: string;
@@ -39,12 +39,17 @@ interface SignupResponse {
   verificationStatus?: string;
 }
 
+interface SlotLocationState {
+  slot?: SlotFull;
+}
+
 export default function SlotDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [slot, setSlot] = useState<SlotFull | null>((location.state as any)?.slot ?? null);
-  const [loading, setLoading] = useState(!((location.state as any)?.slot));
+  const initialSlot = (location.state as SlotLocationState | null)?.slot ?? null;
+  const [slot, setSlot] = useState<SlotFull | null>(initialSlot);
+  const [loading, setLoading] = useState(!initialSlot);
   const [error, setError] = useState("");
   const [signingUp, setSigningUp] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
@@ -81,8 +86,8 @@ export default function SlotDetail() {
       );
       setActionMsg(created.status === "WAITLISTED" ? "Added to the waitlist." : "Signed up successfully!");
       setActionOk(true);
-    } catch (err: any) {
-      setActionMsg(err.message || "Failed to sign up.");
+    } catch (err: unknown) {
+      setActionMsg(getErrorMessage(err, "Failed to sign up."));
       setActionOk(false);
     } finally {
       setSigningUp(false);

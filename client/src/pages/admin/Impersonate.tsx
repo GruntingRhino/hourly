@@ -1,10 +1,16 @@
 import { useState } from "react";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
+import type { User } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
 // DEV-ONLY page: shown in local dev and on hourly-dev.vercel.app
 const IS_DEV = import.meta.env.DEV === true || import.meta.env.VITE_APP_ENV === "development";
+
+interface AuthResult {
+  token: string;
+  user: User;
+}
 
 export default function ImpersonatePage() {
   const { user, loginWithToken } = useAuth();
@@ -26,11 +32,11 @@ export default function ImpersonatePage() {
     setLoading(true);
     setError("");
     try {
-      const result = await api.post<any>("/auth/impersonate", { targetEmail: email });
+      const result = await api.post<AuthResult>("/auth/impersonate", { targetEmail: email });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Failed to impersonate user.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to impersonate user."));
     } finally {
       setLoading(false);
     }

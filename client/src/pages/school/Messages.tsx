@@ -186,7 +186,7 @@ export default function SchoolMessages() {
         setNotifications((prev) =>
           prev.map((item) => (item.id === notification.id ? { ...item, read: true } : item))
         );
-      } catch {}
+      } catch { /* Navigation remains available if notification acknowledgement fails. */ }
     }
     navigate(getNotificationHref(notification));
   };

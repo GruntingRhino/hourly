@@ -1,5 +1,6 @@
 # Environment variables — never commit real credentials
 server/.env
+server/.env.test_credentials
 client/.env
 .env
 .env.local

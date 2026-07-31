@@ -61,6 +61,18 @@ export interface User {
   bio?: string;
   avatarUrl?: string | null;
   socialLinks?: { instagram?: string; tiktok?: string; twitter?: string; youtube?: string } | null;
+  notificationPreferences?: {
+    studentJoin?: { email?: boolean; inApp?: boolean };
+    hourApproval?: { email?: boolean; inApp?: boolean };
+    orgRequest?: { email?: boolean; inApp?: boolean };
+    studentSignup?: { email?: boolean; inApp?: boolean };
+    hourRequest?: { email?: boolean; inApp?: boolean };
+    schoolApproval?: { email?: boolean; inApp?: boolean };
+  } | null;
+  messagePreferences?: {
+    allowFrom?: string;
+    profileVisibility?: string;
+  } | null;
 }
 
 interface SignupResult {

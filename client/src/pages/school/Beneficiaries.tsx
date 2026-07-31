@@ -248,7 +248,7 @@ export default function SchoolBeneficiaries() {
           setSchoolLocation(nextLoc);
           loc = nextLoc;
         }
-      } catch {}
+      } catch { /* Search remains usable with the saved school location. */ }
       try {
         if (user?.schoolId && !schoolSearchCity) {
           const school = await api.get<{ city: string | null }>(`/schools/${user.schoolId}`);
@@ -258,7 +258,7 @@ export default function SchoolBeneficiaries() {
             setSearchQuery((prev) => prev || city);
           }
         }
-      } catch {}
+      } catch { /* City prefill is optional. */ }
       await runSmartSearch(searchQuery, selectedCategory, proximityRadius, loc);
     };
     void run();
