@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { useEffect, useEffectEvent, useState } from "react";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 type Admin = { id: string; name: string; email: string; beneficiaryAdminRole: "OWNER" | "ADMIN" | null };
@@ -23,12 +23,13 @@ export function AdminTeam({ beneficiaryId }: { beneficiaryId: string }) {
       } else {
         setInvitations([]);
       }
-    } catch (err: any) {
-      setMessage(err.message || "Unable to load the organization team.");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Unable to load the organization team."));
     }
   };
+  const runLoad = useEffectEvent(() => { void load(); });
 
-  useEffect(() => { void load(); }, [beneficiaryId, user?.id]);
+  useEffect(() => { const timer = window.setTimeout(runLoad, 0); return () => window.clearTimeout(timer); }, [beneficiaryId, user?.id]);
 
   const invite = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -37,8 +38,8 @@ export function AdminTeam({ beneficiaryId }: { beneficiaryId: string }) {
       await api.post(`/beneficiaries/${beneficiaryId}/admin-invitations`, { email });
       setEmail(""); setMessage("Invitation email sent.");
       await load();
-    } catch (err: any) {
-      setMessage(err.message || "Invitation failed.");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Invitation failed."));
     } finally {
       setSaving(false);
     }
@@ -51,8 +52,8 @@ export function AdminTeam({ beneficiaryId }: { beneficiaryId: string }) {
       await api.delete(`/beneficiaries/${beneficiaryId}/admins/${admin.id}`);
       setMessage("Administrator removed.");
       await load();
-    } catch (err: any) {
-      setMessage(err.message || "Unable to remove administrator.");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Unable to remove administrator."));
     } finally {
       setSaving(false);
     }
@@ -64,8 +65,8 @@ export function AdminTeam({ beneficiaryId }: { beneficiaryId: string }) {
       await api.delete(`/beneficiaries/${beneficiaryId}/admin-invitations/${invitation.id}`);
       setMessage("Invitation revoked.");
       await load();
-    } catch (err: any) {
-      setMessage(err.message || "Unable to revoke invitation.");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Unable to revoke invitation."));
     } finally {
       setSaving(false);
     }

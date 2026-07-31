@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { getErrorMessage } from "../lib/api";
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -30,7 +31,7 @@ export default function VerifyEmail() {
       })
       .catch((err) => {
         setStatus("error");
-        setError(err.message);
+        setError(getErrorMessage(err, "Request failed."));
       });
   }, [navigate, refreshUser, token]);
 

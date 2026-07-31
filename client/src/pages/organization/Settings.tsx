@@ -206,18 +206,18 @@ export default function OrgSettings() {
           } catch { /* Ignore malformed legacy preferences. */ }
         }
       });
-      loadApprovals();
+      queueMicrotask(() => { void loadApprovals(); });
     }
   }, [loadApprovals, organizationId]);
 
   useEffect(() => {
     if (tab === "analytics" && organizationId && !orgStats) {
-      loadAnalytics();
+      queueMicrotask(() => { void loadAnalytics(); });
     }
   }, [loadAnalytics, orgStats, organizationId, tab]);
 
   useEffect(() => {
-    notifPrefsRef.current = notifPrefs;
+    queueMicrotask(() => { notifPrefsRef.current = notifPrefs; });
   }, [notifPrefs]);
 
 

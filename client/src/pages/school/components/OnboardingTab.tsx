@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../../lib/api";
+import { api, getErrorMessage } from "../../../lib/api";
 import type { LaunchWorkspace, OnboardingForm } from "./types";
 
 export default function OnboardingTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
@@ -12,10 +12,10 @@ export default function OnboardingTab({ workspace, onUpdate }: { workspace: Laun
   const [onboardingMessage, setOnboardingMessage] = useState("");
 
   useEffect(() => {
-    setOnboardingForm({
+    queueMicrotask(() => setOnboardingForm({
       overview: workspace.plan.onboardingInstructions.overview,
       nextMilestone: workspace.plan.onboardingInstructions.nextMilestone,
-    });
+    }));
   }, [workspace]);
 
   const handleSaveOnboarding = async () => {
@@ -27,8 +27,8 @@ export default function OnboardingTab({ workspace, onUpdate }: { workspace: Laun
       });
       onUpdate(data);
       setOnboardingMessage("Onboarding instructions saved.");
-    } catch (err: any) {
-      setOnboardingMessage(err.message || "Failed to save onboarding instructions.");
+    } catch (err: unknown) {
+      setOnboardingMessage(getErrorMessage(err, "Failed to save onboarding instructions."));
     } finally {
       setSavingOnboarding(false);
     }

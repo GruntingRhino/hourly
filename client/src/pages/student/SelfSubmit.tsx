@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError, api } from "../../lib/api";
+import { ApiError, api, getErrorMessage } from "../../lib/api";
 import { buildOpportunityCategoryOptions } from "../../lib/opportunityCategories";
 
 interface SchoolRules {
@@ -91,7 +91,10 @@ export default function StudentSelfSubmit() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const blockedCategorySet = new Set(blockedCategories);
   const categoryOptions = buildOpportunityCategoryOptions([
@@ -125,11 +128,11 @@ export default function StudentSelfSubmit() {
       setShowForm(false);
       setSuccess("Submission sent for review.");
       void load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && typeof err.body === "object" && err.body && "categoryBlocked" in err.body) {
         void load();
       }
-      setError(err.message || "Failed to submit.");
+      setError(getErrorMessage(err, "Failed to submit."));
     } finally {
       setSubmitting(false);
     }
@@ -165,11 +168,11 @@ export default function StudentSelfSubmit() {
       setEditingId(null);
       setSuccess("Resubmitted for review.");
       void load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && typeof err.body === "object" && err.body && "categoryBlocked" in err.body) {
         void load();
       }
-      setError(err.message || "Failed to resubmit.");
+      setError(getErrorMessage(err, "Failed to resubmit."));
     } finally {
       setSubmitting(false);
     }
@@ -186,8 +189,8 @@ export default function StudentSelfSubmit() {
       }
       setSuccess("Submission cancelled.");
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to cancel submission.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to cancel submission."));
     } finally {
       setCancelingId(null);
     }

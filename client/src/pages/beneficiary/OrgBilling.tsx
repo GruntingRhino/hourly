@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 interface BillingSummary {
   id: string;
@@ -162,7 +162,7 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
   useEffect(() => {
     api.get<BillingSummary>(`/billing/organizations/${beneficiaryId}/summary`)
       .then(setSummary)
-      .catch((err: any) => setError(err.message || "Failed to load billing info"))
+      .catch((err : unknown) => setError(getErrorMessage(err, "Failed to load billing info")))
       .finally(() => setLoading(false));
   }, [beneficiaryId]);
 
@@ -184,8 +184,8 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
         { interval }
       );
       window.location.assign(url);
-    } catch (err: any) {
-      setUpgradeError(err.message || "Failed to start checkout. Please try again.");
+    } catch (err: unknown) {
+      setUpgradeError(getErrorMessage(err, "Failed to start checkout. Please try again."));
       setUpgrading(false);
     }
   };
@@ -198,8 +198,8 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
         {}
       );
       window.location.assign(url);
-    } catch (err: any) {
-      setError(err.message || "Failed to open billing portal.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to open billing portal."));
       setOpeningPortal(false);
     }
   };
@@ -227,8 +227,8 @@ export function OrgBilling({ beneficiaryId }: { beneficiaryId: string }) {
       // Refresh summary
       const fresh = await api.get<BillingSummary>(`/billing/organizations/${beneficiaryId}/summary`);
       setSummary(fresh);
-    } catch (err: any) {
-      setInvoiceMessage(err.message || "Failed to submit invoice request.");
+    } catch (err: unknown) {
+      setInvoiceMessage(getErrorMessage(err, "Failed to submit invoice request."));
       setInvoiceIsError(true);
     } finally {
       setSubmittingInvoice(false);

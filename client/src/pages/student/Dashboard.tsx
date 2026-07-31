@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { CollapsibleList } from "../../components/CollapsibleList";
 
@@ -186,7 +186,7 @@ function describeSignupAuditEvent(signup: Signup, audit: Signup["auditLogs"][num
 }
 
 /** Returns the effective service deadline: cohort override first, then school. */
-function resolveDeadline(user: any): Date | null {
+function resolveDeadline(user: import("../../hooks/useAuth").User | null): Date | null {
   const cohortEnd = user?.cohort?.serviceEndDate;
   const firstLinkedCohortEnd = user?.cohorts?.[0]?.serviceEndDate ?? null;
   const schoolEnd = user?.school?.serviceEndDate ?? user?.cohort?.school?.serviceEndDate;
@@ -326,7 +326,7 @@ export default function StudentDashboard() {
     }
   };
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void loadData(); }, 0); return () => window.clearTimeout(timer); }, []);
 
   const handleCancel = async (signupId: string) => {
     if (!confirm("Cancel your spot in this activity?")) return;
@@ -334,8 +334,8 @@ export default function StudentDashboard() {
     try {
       await api.post(`/beneficiaries/signups/${signupId}/cancel`, {});
       void loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to cancel signup.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to cancel signup."));
     } finally {
       setCancelling(null);
     }
@@ -345,8 +345,8 @@ export default function StudentDashboard() {
     try {
       await api.post(`/sessions/${sessionId}/${action}`, {});
       await loadData();
-    } catch (err: any) {
-      alert(err.message || `Failed to ${action === "checkin" ? "check in" : "check out"}.`);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, `Failed to ${action === "checkin" ? "check in" : "check out"}.`));
     }
   };
 
@@ -366,8 +366,8 @@ export default function StudentDashboard() {
       setVerificationSession(null);
       setVerificationSignature("");
       await loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to submit verification.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to submit verification."));
     } finally {
       setVerificationLoading(false);
     }

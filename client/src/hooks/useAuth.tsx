@@ -43,6 +43,7 @@ export interface User {
     serviceStartDate?: string | null;
     serviceEndDate?: string | null;
     allowSelfSubmission?: boolean | null;
+    school?: { serviceEndDate?: string | null };
   };
   cohorts?: Array<{
     id: string;
@@ -68,6 +69,8 @@ export interface User {
     studentSignup?: { email?: boolean; inApp?: boolean };
     hourRequest?: { email?: boolean; inApp?: boolean };
     schoolApproval?: { email?: boolean; inApp?: boolean };
+    hourRemoval?: { email?: boolean; inApp?: boolean };
+    eventChange?: { email?: boolean; inApp?: boolean };
   } | null;
   messagePreferences?: {
     allowFrom?: string;

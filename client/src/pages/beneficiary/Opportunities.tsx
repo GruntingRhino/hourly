@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
 import SearchableSelect from "../../components/SearchableSelect";
@@ -197,7 +197,7 @@ function formatApiErrorWithDetails(err: unknown, fallback: string): { message: s
     }
     if (body?.error) return { message: body.error, details: [] };
   }
-  if (err instanceof Error && err.message) return { message: err.message, details: [] };
+  if (err instanceof Error && getErrorMessage(err, "Request failed.")) return { message: getErrorMessage(err, "Request failed."), details: [] };
   return { message: fallback, details: [] };
 }
 
@@ -320,7 +320,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   const openChecklist = async (signup: SignupRecord) => {
     if (!benId) return;
     try { setChecklist(await api.get(`/beneficiaries/${benId}/opportunities/${signup.slot.opportunity.id}/attendance-checklist?slotId=${signup.slot.id}`)); }
-    catch (err: any) { setError(err.message || "Unable to load attendance checklist."); }
+    catch (err: unknown) { setError(getErrorMessage(err, "Unable to load attendance checklist.")); }
   };
 
   const saveChecklist = async () => {
@@ -334,8 +334,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
       });
       setChecklist(null);
       await loadSignups();
-    } catch (err: any) {
-      setError(err.message || "Unable to save attendance.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to save attendance."));
     } finally {
       setAttendanceSaving(false);
     }
@@ -379,8 +379,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
           : o
         )
       );
-    } catch (err: any) {
-      showError(err.message || "Failed to delete attachment.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to delete attachment."));
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -429,8 +429,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
 
   useEffect(() => {
     if (!benId) return;
-    void loadOpportunities();
-    prefillLocation();
+    queueMicrotask(() => { void loadOpportunities(); prefillLocation(); });
     api.get<ApprovedSchool[]>(`/beneficiaries/${benId}/schools`)
       .then((schools) => {
         setApprovedSchools(schools);
@@ -440,7 +439,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
   }, [benId]);
 
   useEffect(() => {
-    if (tab === "signups") void loadSignups();
+    if (tab === "signups") queueMicrotask(() => { void loadSignups(); });
   }, [tab, benId]);
 
   const addSlot = () => setForm((p) => ({ ...p, slots: [...p.slots, { date: "", startTime: "", endTime: "", capacity: "" }] }));
@@ -618,8 +617,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
         for (const f of attachmentFiles) fd.append("files", f);
         try {
           await api.post(`/beneficiaries/${benId}/opportunities/${created.id}/attachments`, fd);
-        } catch (uploadErr: any) {
-          showError(uploadErr.message || "Opportunity created, but file upload failed.");
+        } catch (uploadErr: unknown) {
+          showError(getErrorMessage(uploadErr, "Opportunity created, but file upload failed."));
         }
       }
       setForm(emptyForm);
@@ -643,8 +642,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
       setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
       setDeleteConfirmId(null);
       if (editOppId === oppId) handleCancelEdit();
-    } catch (err: any) {
-      showError(err.message || "Failed to delete opportunity.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to delete opportunity."));
       setDeleteConfirmId(null);
     } finally {
       setDeleting(false);
@@ -699,8 +698,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
       );
       setEditSlot(null);
       void loadOpportunities();
-    } catch (err: any) {
-      showError(err.message || "This time slot could not be updated.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "This time slot could not be updated."));
     } finally {
       setSavingSlot(false);
     }
@@ -732,7 +731,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
           return;
         }
       }
-      showError(err instanceof Error ? err.message : "This time slot could not be deleted.");
+      showError(err instanceof Error ? getErrorMessage(err, "Request failed.") : "This time slot could not be deleted.");
     } finally {
       setDeletingSlot(false);
     }
@@ -750,8 +749,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     try {
       await api.post(`/beneficiaries/signups/${signup.id}/approve`, { approvedHours: hours });
       await loadSignups();
-    } catch (err: any) {
-      showError(err.message || "Failed to approve.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to approve."));
     } finally {
       setActionId(null);
     }
@@ -765,8 +764,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
       await api.post(`/beneficiaries/signups/${signupId}/reject`, { reason });
       await loadSignups();
       setRejectReason((prev) => ({ ...prev, [signupId]: "" }));
-    } catch (err: any) {
-      showError(err.message || "Failed to reject.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to reject."));
     } finally {
       setRejectingId(null);
     }
@@ -778,8 +777,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     try {
       await api.post(`/beneficiaries/signups/${signupId}/no-show`, {});
       await loadSignups();
-    } catch (err: any) {
-      showError(err.message || "Failed to mark no-show.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to mark no-show."));
     } finally {
       setNoShowId(null);
     }
@@ -790,8 +789,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     try {
       await api.post(`/beneficiaries/signups/${signupId}/reset-review`, {});
       await loadSignups();
-    } catch (err: any) {
-      showError(err.message || "Failed to reset review.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to reset review."));
     } finally {
       setActionId(null);
     }
@@ -803,8 +802,8 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     try {
       const data = await api.get<SignupHistoryResponse>(`/beneficiaries/signups/${signupId}/history`);
       setHistorySignup(data);
-    } catch (err: any) {
-      showError(err.message || "Failed to load verification history.");
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, "Failed to load verification history."));
     } finally {
       setHistoryLoadingId(null);
     }

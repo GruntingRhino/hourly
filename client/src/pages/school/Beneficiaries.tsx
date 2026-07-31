@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import SearchableSelect from "../../components/SearchableSelect";
 import BeneficiaryDiscover from "./Discover";
@@ -124,12 +124,13 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 export default function SchoolBeneficiaries() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  type BeneficiaryTab = "pending" | "approved" | "opportunities" | "search" | "map" | "manage" | "requests";
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"pending" | "approved" | "opportunities" | "search" | "map" | "manage" | "requests">(() => {
+  const [tab, setTab] = useState<BeneficiaryTab>(() => {
     const t = searchParams.get("tab");
-    return (["pending","approved","opportunities","search","map","manage","requests"].includes(t ?? "") ? t as any : "approved");
+    return (["pending","approved","opportunities","search","map","manage","requests"].includes(t ?? "") ? t as BeneficiaryTab : "approved");
   });
   const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
   const [respondingId, setRespondingId] = useState<string | null>(null);
@@ -178,7 +179,7 @@ export default function SchoolBeneficiaries() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, []);
 
   useEffect(() => {
     if (tab !== "requests") return;
@@ -194,8 +195,8 @@ export default function SchoolBeneficiaries() {
       setPartnerRequests((prev) =>
         prev.map((r) => r.id === requestId ? { ...r, status: approve ? "APPROVED" : "REJECTED" } : r)
       );
-    } catch (err: any) {
-      setError(err.message || "Failed to respond to request.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to respond to request."));
     } finally {
       setRespondingId(null);
     }
@@ -212,7 +213,7 @@ export default function SchoolBeneficiaries() {
   const pending = beneficiaries.filter((b) => b.approvalStatus === "PENDING");
 
   useEffect(() => {
-    if (tab === "pending" && pending.length === 0 && !loading) setTab("approved");
+    if (tab === "pending" && pending.length === 0 && !loading) queueMicrotask(() => setTab("approved"));
   }, [loading, pending.length, tab]);
 
   const runSmartSearch = async (query: string, category: string, radius: number, loc: { lat: number; lng: number } | null) => {
@@ -277,10 +278,10 @@ export default function SchoolBeneficiaries() {
 
   useEffect(() => {
     if (tab !== "opportunities" || !user?.schoolId) return;
-    setApprovedPartnerOpportunitiesLoading(true);
+    queueMicrotask(() => setApprovedPartnerOpportunitiesLoading(true));
     api.get<ApprovedPartnerOpportunity[]>(`/schools/${user.schoolId}/partner-opportunities`)
       .then((data) => setApprovedPartnerOpportunities(data))
-      .catch((err: any) => setError(err.message || "Failed to load approved partner opportunities."))
+      .catch((err : unknown) => setError(getErrorMessage(err, "Failed to load approved partner opportunities.")))
       .finally(() => setApprovedPartnerOpportunitiesLoading(false));
   }, [tab, user?.schoolId]);
 
@@ -296,8 +297,8 @@ export default function SchoolBeneficiaries() {
       setSmartResults((prev) => prev.map((d) => d.id === directoryId ? { ...d, approvalStatus: "PENDING" } : d));
       setTab("pending");
       showToast("Invitation sent. This partner now appears in Pending.");
-    } catch (err: any) {
-      setError(err.message || "Failed to invite partner.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to invite partner."));
     }
   };
 
@@ -320,8 +321,8 @@ export default function SchoolBeneficiaries() {
       await load();
       setTab("pending");
       showToast("Invitation sent.");
-    } catch (err: any) {
-      setError(err.message || "Failed to send invitation.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to send invitation."));
     } finally {
       setInviting(null);
     }
@@ -339,8 +340,8 @@ const handleDrop = async (benId: string, name: string) => {
       await api.post(`/beneficiaries/${benId}/drop`);
       await load();
       showToast("Partner removed.");
-    } catch (err: any) {
-      setError(err.message || "Failed to remove partner.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to remove partner."));
     }
   };
 
@@ -363,8 +364,8 @@ const handleDrop = async (benId: string, name: string) => {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
       setTab("pending");
-    } catch (err: any) {
-      setError(err.message || "CSV import failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "CSV import failed."));
     } finally {
       setCsvImporting(false);
     }
@@ -385,8 +386,8 @@ const handleDrop = async (benId: string, name: string) => {
       setEditingBenId(null);
       await load();
       setTab("pending");
-    } catch (err: any) {
-      setError(err.message || "Failed to save partner.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save partner."));
     } finally {
       setCreating(false);
     }
@@ -423,8 +424,8 @@ const handleDrop = async (benId: string, name: string) => {
       setOpportunitiesByBeneficiary((prev) => ({ ...prev, [beneficiaryId]: data }));
       setExpandedBeneficiaryId(beneficiaryId);
       setDrawerBeneficiary(beneficiaries.find((item) => item.id === beneficiaryId) ?? null);
-    } catch (err: any) {
-      setError(err.message || "Failed to load partner opportunities.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load partner opportunities."));
     } finally {
       setLoadingOpportunityId(null);
     }

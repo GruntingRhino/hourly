@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { api, getErrorMessage } from "../../../lib/api";
 import type { LaunchWorkspace, RollbackForm } from "./types";
 
 export default function RollbackTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
@@ -15,14 +15,14 @@ export default function RollbackTab({ workspace, onUpdate }: { workspace: Launch
   const [rollbackMessage, setRollbackMessage] = useState("");
 
   useEffect(() => {
-    setRollbackForm({
+    queueMicrotask(() => setRollbackForm({
       ownerName: workspace.plan.rollbackPlan.ownerName ?? "",
       trigger: workspace.plan.rollbackPlan.trigger ?? "",
       freezeAction: workspace.plan.rollbackPlan.freezeAction ?? "",
       rollbackSteps: workspace.plan.rollbackPlan.rollbackSteps ?? "",
       restoreCheck: workspace.plan.rollbackPlan.restoreCheck ?? "",
       lastDrillAt: workspace.plan.rollbackPlan.lastDrillAt ?? "",
-    });
+    }));
   }, [workspace]);
 
   const handleSaveRollback = async () => {
@@ -34,8 +34,8 @@ export default function RollbackTab({ workspace, onUpdate }: { workspace: Launch
       });
       onUpdate(data);
       setRollbackMessage("Rollback plan saved.");
-    } catch (err: any) {
-      setRollbackMessage(err.message || "Failed to save rollback plan.");
+    } catch (err: unknown) {
+      setRollbackMessage(getErrorMessage(err, "Failed to save rollback plan."));
     } finally {
       setSavingRollback(false);
     }

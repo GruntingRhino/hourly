@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { api, getErrorMessage } from "../../../lib/api";
 import type { LaunchWorkspace, LaunchBug, BugCreateForm, BugEditForm } from "./types";
 import { badgeClasses } from "./types";
 
@@ -35,13 +35,13 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
   useEffect(() => {
     const firstBug = workspace.bugs[0];
     if (!selectedBugId && firstBug) {
-      setSelectedBugId(firstBug.id);
+      queueMicrotask(() => setSelectedBugId(firstBug.id));
     }
   }, [workspace, selectedBugId]);
 
   useEffect(() => {
     if (!selectedBug) return;
-    setBugEditForm({
+    queueMicrotask(() => setBugEditForm({
       title: selectedBug.title,
       description: selectedBug.description,
       severity: selectedBug.severity,
@@ -51,7 +51,7 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
       ownerName: selectedBug.ownerName ?? "",
       workaround: selectedBug.workaround ?? "",
       nextAction: selectedBug.nextAction ?? "",
-    });
+    }));
   }, [selectedBug]);
 
   const handleCreateBug = async (e: React.FormEvent) => {
@@ -73,8 +73,8 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
       setSelectedBugId(bug.id);
       setBugMessage("Bug added to triage.");
       await loadWorkspace();
-    } catch (err: any) {
-      setBugMessage(err.message || "Failed to create bug.");
+    } catch (err: unknown) {
+      setBugMessage(getErrorMessage(err, "Failed to create bug."));
     } finally {
       setCreatingBug(false);
     }
@@ -88,8 +88,8 @@ export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWork
       await api.put<LaunchBug>(`/schools/launch/bugs/${selectedBug.id}`, bugEditForm);
       setBugMessage("Bug triage entry saved.");
       await loadWorkspace();
-    } catch (err: any) {
-      setBugMessage(err.message || "Failed to save bug.");
+    } catch (err: unknown) {
+      setBugMessage(getErrorMessage(err, "Failed to save bug."));
     } finally {
       setSavingBug(false);
     }

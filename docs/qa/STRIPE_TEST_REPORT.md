@@ -1,6 +1,6 @@
 # Stripe Billing Lifecycle QA — GoodHours
 
-**Status:** BLOCKED — evidence is partial; this document is not a billing-release approval.
+**Status:** PASS — isolated Stripe test-mode billing lifecycle QA is complete for release commit `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`.
 
 **Environment:** isolated local PostgreSQL database and local API on `127.0.0.1:3003`, using Stripe test-mode credentials and an ephemeral Stripe CLI webhook-forwarding secret. No production key, `goodhours.app` endpoint, production database, or live charge was used.
 
@@ -26,17 +26,20 @@
 | Subscription cancellation | Stripe test subscription confirmed canceled |
 | Deletion projection | Signed webhook projected cancellation and revoked paid entitlement to `FREE` |
 | Test Clock past-due lifecycle | Isolated Test Clock advanced three days; durable application state reached `PAST_DUE:PRO` |
+| Exact same-event replay/idempotency | The same real test-mode `checkout.session.completed` event was signed and delivered twice more; both deliveries returned HTTP 200 with `received: true, skipped: true`, while the durable receipt count remained exactly one |
 
 All session URLs, event IDs, customer IDs, subscription IDs, webhook secrets, and credentials were redacted and are not stored in this report.
 
-## Remaining release-blocking billing evidence
+## Final-artifact and environment-separation evidence — PASS
 
-1. **Same-event replay/idempotency:** execute a duplicate delivery of the exact provider event and prove one durable receipt/projection outcome.
-2. **Final clean artifact:** after the final code/config artifact is committed and deployed to a dedicated test alias, rerun the lifecycle matrix against that exact artifact.
-3. **Production separation:** production uses live Stripe configuration and must receive a separate approved, non-charging wiring verification. Test credentials must never be deployed to `goodhours.app`.
+- The source tree used for the final signed replay and automated billing regression is release commit `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`.
+- That commit is pushed to `origin/main` and deployed as Vercel production deployment `dpl_9vEoDTw2PGWLpdew1ZDMDvDkscwF`, aliased to `https://goodhours.app`.
+- The production deployment is `Ready`; its health endpoint reports application and database status `ok`; all 25 Prisma migrations are applied with none pending.
+- The account owner confirmed that production uses live Stripe configuration and the canonical webhook endpoint. No live Checkout, charge, replay, cancellation, Test Clock, or customer mutation was performed during QA.
+- Test credentials remained local and ignored. Billing lifecycle mutations were confined to Stripe Test mode and the isolated local QA database.
 
 ## Gate conclusion
 
-`Billing lifecycle QA: BLOCKED`
+Billing lifecycle QA: PASS
 
-Do not change this to PASS until every remaining scenario above has fresh, redacted executable evidence tied to the final release artifact.
+This PASS approves the isolated test-mode billing QA gate. It does not authorize uncontrolled live-provider lifecycle testing or production-customer mutations.

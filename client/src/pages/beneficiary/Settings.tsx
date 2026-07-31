@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { ProGate, ProBadge } from "../../components/ProGate";
 import { OrgBilling } from "./OrgBilling";
@@ -78,7 +78,7 @@ export default function BeneficiarySettings() {
   useEffect(() => {
     const t = searchParams.get("tab");
     if (["profile","reminders","branding","account","billing","team"].includes(t ?? "")) {
-      setTab(t as Tab);
+      queueMicrotask(() => setTab(t as Tab));
     }
   }, [searchParams]);
 
@@ -147,8 +147,8 @@ export default function BeneficiarySettings() {
       });
       setProfile(updated);
       setSuccess("Profile updated.");
-    } catch (err: any) {
-      setError(err.message || "Failed to save profile.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save profile."));
     } finally { setSaving(false); }
   };
 
@@ -163,8 +163,8 @@ export default function BeneficiarySettings() {
         emailSignature: branding.emailSignature || undefined,
       });
       setSuccess("Branding saved.");
-    } catch (err: any) {
-      setError(err.message || "Failed to save branding.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save branding."));
     } finally { setSavingBranding(false); }
   };
 
@@ -182,8 +182,8 @@ export default function BeneficiarySettings() {
       });
       setReminderConfig(updated);
       setSuccess("Reminder configuration saved.");
-    } catch (err: any) {
-      setError(err.message || "Failed to save reminder config.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save reminder config."));
     } finally { setSavingReminders(false); }
   };
 

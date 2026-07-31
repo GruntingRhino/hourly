@@ -45,8 +45,7 @@ export default function JoinBeneficiary() {
 
   useEffect(() => {
     if (!token) {
-      setLoadError("No invitation token found.");
-      setLoading(false);
+      queueMicrotask(() => { setLoadError("No invitation token found."); setLoading(false); });
       return;
     }
     api.get<InvInfo>(`/invitations/beneficiary?token=${token}`)

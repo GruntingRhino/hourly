@@ -46,8 +46,7 @@ export default function JoinCohort() {
 
   useEffect(() => {
     if (!token) {
-      setLoadError("No invitation token found. Check your email invitation link.");
-      setLoading(false);
+      queueMicrotask(() => { setLoadError("No invitation token found. Check your email invitation link."); setLoading(false); });
       return;
     }
     api.get<InvitationInfo>(`/invitations/student?token=${token}`)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 interface Message {
   id: string;
@@ -89,8 +89,8 @@ export default function OrgMessages() {
       setBody("");
       setFolder("sent");
       await loadFolderMessages("sent");
-    } catch (err: any) {
-      setSendError(err.message || "Failed to send message");
+    } catch (err: unknown) {
+      setSendError(getErrorMessage(err, "Failed to send message"));
     } finally {
       setSending(false);
     }

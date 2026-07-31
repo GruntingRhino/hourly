@@ -10,14 +10,14 @@ import "react-leaflet-markercluster/styles";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   iconRetinaUrl: markerIcon2x,
   shadowUrl: markerShadow,
 });
 
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, getErrorMessage } from "../../lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -222,7 +222,7 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
       setGeocodingInProgress(data.geocodingInProgress ?? false);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setError(getErrorMessage(err, "Request failed."));
       } else {
         setError("Failed to load nearby partners.");
       }
@@ -256,19 +256,20 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
         }
       } catch (err) {
         if (err instanceof ApiError) {
-          setError(err.message);
+          setError(getErrorMessage(err, "Request failed."));
         } else {
           setError("Failed to load school data.");
         }
         setLoading(false);
       }
     }
-    init();
+    const timer = window.setTimeout(() => { void init(); }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Reload when radius changes
   useEffect(() => {
-    if (school) loadData(school);
+    if (school) queueMicrotask(() => { void loadData(school); });
   }, [radius]);
 
   // ─── Filtered list ─────────────────────────────────────────────────────────

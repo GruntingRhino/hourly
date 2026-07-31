@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 interface Classroom {
@@ -92,6 +92,17 @@ interface InterventionCaseDetail {
   lastContactedAt?: string | null;
   lastStudentActionAt?: string | null;
   followUpSeen?: boolean;
+}
+
+interface StudentSession {
+  id: string;
+  totalHours: number | null;
+  verificationStatus: string;
+  opportunity?: { title: string };
+}
+
+interface StudentReportResponse {
+  sessions: StudentSession[];
 }
 
 function deadlineLabel(daysToDeadline?: number | null): string | null {
@@ -262,7 +273,7 @@ export default function SchoolGroups() {
     if (!selectedStudentParam) return;
     const restored = displayStudents.find((s) => s.id === selectedStudentParam);
     if (restored) {
-      setSelectedStudent(restored);
+      queueMicrotask(() => setSelectedStudent(restored));
     }
   }, [displayStudents, selectedStudentParam]);
 
@@ -376,8 +387,8 @@ export default function SchoolGroups() {
       });
       setBulkResult(`Sent to ${response.recipientCount} students from the ${queueLabel.toLowerCase()}.`);
       setShowBulkCompose(false);
-    } catch (err: any) {
-      setBulkResult(err?.message || "Failed to send bulk follow-up.");
+    } catch (err: unknown) {
+      setBulkResult(getErrorMessage(err, "Failed to send bulk follow-up."));
     } finally {
       setSendingBulk(false);
     }
@@ -851,7 +862,7 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   statusColors: Record<string, string>;
   statusLabels: Record<string, string>;
 }) {
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<StudentSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
   const [sendingReminder, setSendingReminder] = useState(false);
@@ -877,12 +888,11 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   const [savingCase, setSavingCase] = useState(false);
 
   useEffect(() => {
-    setReminderBody(
+    queueMicrotask(() => setReminderBody(
       `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h approved${student.pendingHours ? `, ${student.pendingHours}h pending approval,` : ""} and ${student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h left toward your ${requiredHours}h requirement.${student.daysToDeadline != null ? ` Deadline status: ${deadlineLabel(student.daysToDeadline)}.` : ""}`,
-    );
-    setShowReminderCompose(false);
-    setShowHistory(true);
-    setCaseForm({
+    ));
+    queueMicrotask(() => { setShowReminderCompose(false); setShowHistory(true); });
+    queueMicrotask(() => setCaseForm({
       status: student.interventionCase?.status || "OPEN",
       priority: student.interventionCase?.priority || "MEDIUM",
       reason: student.riskReasons?.[0] || "",
@@ -894,14 +904,14 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
       dueDate: student.interventionCase?.dueDate ? student.interventionCase.dueDate.slice(0, 10) : "",
       ownerId: student.interventionCase?.owner?.id,
       owner: student.interventionCase?.owner || null,
-    });
+    }));
   }, [student.id, student.name, student.approvedHours, requiredHours]);
 
   const loadHistory = async () => {
     setLoadingSessions(true);
     try {
-      const data = await api.get<any[]>(`/reports/student?studentId=${student.id}`);
-      setSessions((data as any).sessions || []);
+      const data = await api.get<StudentReportResponse>(`/reports/student?studentId=${student.id}`);
+      setSessions(data.sessions || []);
     } catch {
       setSessions([]);
     } finally {
@@ -997,9 +1007,9 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
 
   useEffect(() => {
     if (showHistory) {
-      loadHistory();
+      queueMicrotask(() => { void loadHistory(); });
     }
-    void loadInterventions();
+    queueMicrotask(() => { void loadInterventions(); });
   }, [showHistory, student.id]);
 
   return (
@@ -1204,7 +1214,7 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
           ) : sessions.length === 0 ? (
             <div className="text-xs text-[var(--text-faint)]">No sessions found.</div>
           ) : (
-            sessions.slice(0, 5).map((session: any) => (
+            sessions.slice(0, 5).map((session) => (
               <div key={session.id} className="bg-[var(--surface-alt)] rounded p-2 text-xs">
                 <div className="flex justify-between">
                   <span className="font-medium">{session.opportunity?.title}</span>
@@ -1255,8 +1265,8 @@ function AddStaffModal({ schoolId, classrooms, onClose, onAdded }: {
       );
       setResult(data);
       onAdded();
-    } catch (err: any) {
-      setFormError(err.message || "Failed to create staff member");
+    } catch (err: unknown) {
+      setFormError(getErrorMessage(err, "Failed to create staff member"));
     } finally {
       setLoading(false);
     }

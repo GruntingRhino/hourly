@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -85,6 +85,11 @@ interface TeacherSummary {
   id: string;
   name: string;
   email: string;
+}
+
+interface PublishResult {
+  sent: number;
+  failed: number;
 }
 
 interface ImportResult {
@@ -217,7 +222,7 @@ export default function CohortDetail() {
     }
   };
 
-  useEffect(() => { void load(); }, [id]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [id]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -265,13 +270,13 @@ export default function CohortDetail() {
         handleBackToUpload();
       }
       void load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && err.body && typeof err.body === "object") {
         const body = err.body as { error?: string; errors?: ImportIssue[] };
-        setImportErrorMessage(body.error || err.message || "Import failed.");
+        setImportErrorMessage(body.error || getErrorMessage(err, "Import failed."));
         setImportIssues(body.errors ?? []);
       } else {
-        setImportErrorMessage(err.message || "Import failed.");
+        setImportErrorMessage(getErrorMessage(err, "Import failed."));
         setImportIssues([]);
       }
     } finally {
@@ -307,8 +312,8 @@ export default function CohortDetail() {
       setAddGrade("");
       setAddHouse("");
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to add student.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to add student."));
     } finally {
       setAddingStudent(false);
     }
@@ -316,12 +321,12 @@ export default function CohortDetail() {
 
   const handlePublish = async () => {
     try {
-      const result = await api.post<any>(`/cohorts/${id}/publish`);
+      const result = await api.post<PublishResult>(`/cohorts/${id}/publish`);
       setPublishToast(`Resent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.`);
       setTimeout(() => setPublishToast(""), 4000);
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to resend invitations.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to resend invitations."));
     }
   };
 
@@ -336,8 +341,8 @@ export default function CohortDetail() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err.message || "Failed to export cohort report.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to export cohort report."));
     } finally {
       setDownloadingReport(null);
     }
@@ -355,9 +360,9 @@ export default function CohortDetail() {
       });
       setCohort((prev) => (prev ? { ...prev, usesHouseField: updated.usesHouseField } : prev));
       if (!checked) setAddHouse("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIncludeHouseColumn(previous);
-      setError(err.message || "Failed to update house field setting.");
+      setError(getErrorMessage(err, "Failed to update house field setting."));
     } finally {
       setSavingHouseField(false);
     }
@@ -375,8 +380,8 @@ export default function CohortDetail() {
       setTeacherName("");
       setTeacherEmail("");
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to assign teacher.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to assign teacher."));
     } finally {
       setAddingTeacher(false);
     }
@@ -387,8 +392,8 @@ export default function CohortDetail() {
     try {
       await api.delete(`/cohorts/${id}/teachers/${teacherId}`);
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to remove teacher.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to remove teacher."));
     }
   };
 
@@ -399,8 +404,8 @@ export default function CohortDetail() {
     try {
       const data = await api.get<HourBreakdownData>(`/schools/${user.schoolId}/students/${studentId}/hour-breakdown`);
       setBreakdownData(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load hour breakdown.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load hour breakdown."));
     } finally {
       setBreakdownLoadingId(null);
     }
@@ -563,7 +568,7 @@ export default function CohortDetail() {
         ] as { key: string; label: string }[]).map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key as any)}
+            onClick={() => setTab(t.key as typeof tab)}
             className={`pb-2 text-sm font-medium border-b-2 ${tab === t.key ? "border-blue-600 text-[var(--action)]" : "border-transparent text-[var(--text-sec)] hover:text-[var(--text)]"}`}
           >
             {t.label}

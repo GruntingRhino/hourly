@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -178,7 +178,7 @@ export function SchoolBilling({ schoolId }: { schoolId: string }) {
     setLoading(true);
     api.get<SchoolBillingSummary>(`/school-procurement/${schoolId}/summary`)
       .then(setSummary)
-      .catch((err: any) => setError(err.message || "Failed to load procurement status"))
+      .catch((err : unknown) => setError(getErrorMessage(err, "Failed to load procurement status")))
       .finally(() => setLoading(false));
   };
 
@@ -284,8 +284,8 @@ function QuoteRequestState({
         billingContactEmail: form.billingContactEmail || undefined,
       });
       onSubmitted();
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to submit quote request.");
+    } catch (err: unknown) {
+      setSubmitError(getErrorMessage(err, "Failed to submit quote request."));
       setSubmitting(false);
     }
   };
@@ -528,8 +528,8 @@ function ProcurementStatusState({
       await api.post(`/school-procurement/${schoolId}/documents`, fd);
       setUploadSuccess(`${file.name} uploaded successfully.`);
       onRefresh();
-    } catch (err: any) {
-      setUploadError(err.message || "Upload failed.");
+    } catch (err: unknown) {
+      setUploadError(getErrorMessage(err, "Upload failed."));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

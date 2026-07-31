@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { getNotificationHref } from "../../lib/notificationRouting";
 import type { AppNotification } from "../../lib/notificationRouting";
@@ -99,7 +99,7 @@ export default function SchoolDashboard() {
   const isTeacher = user?.role === "TEACHER";
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0); // 0 = welcome, 1 = partners, 2 = cohorts
-  const schoolOnboardingComplete = (user?.school as any)?.onboardingComplete ?? false;
+  const schoolOnboardingComplete = user?.school?.onboardingComplete ?? false;
   const showOnboarding = isAdmin && !schoolOnboardingComplete && !onboardingDismissed;
   const [cohorts, setCohorts] = useState<CohortSummary[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
@@ -194,8 +194,8 @@ export default function SchoolDashboard() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err.message || "Failed to export CSV report.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to export CSV report."));
     } finally {
       setDownloadingReport(null);
     }
@@ -209,8 +209,8 @@ export default function SchoolDashboard() {
       await api.post("/messages/reminders/run", {});
       setReminderMessage("Reminder cycle completed.");
       await loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to run reminders.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to run reminders."));
     } finally {
       setRunningReminders(false);
     }

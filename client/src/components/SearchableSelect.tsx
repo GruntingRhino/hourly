@@ -32,7 +32,7 @@ export default function SearchableSelect({
   const listboxId = useId();
 
   useEffect(() => {
-    setQuery(value);
+    queueMicrotask(() => setQuery(value));
   }, [value]);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function SearchableSelect({
   }, [options, query]);
 
   useEffect(() => {
-    setHighlightedIndex(0);
+    queueMicrotask(() => setHighlightedIndex(0));
   }, [query, isOpen]);
 
   const commitValue = (nextValue: string) => {

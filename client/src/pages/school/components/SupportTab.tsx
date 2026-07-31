@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { api, getErrorMessage } from "../../../lib/api";
 import type { LaunchWorkspace, SupportForm } from "./types";
 
 export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
@@ -15,14 +15,14 @@ export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchW
   const [supportMessage, setSupportMessage] = useState("");
 
   useEffect(() => {
-    setSupportForm({
+    queueMicrotask(() => setSupportForm({
       ownerName: workspace.plan.supportProcess.ownerName ?? "",
       ownerEmail: workspace.plan.supportProcess.ownerEmail ?? "",
       responseTimeHours: String(workspace.plan.supportProcess.responseTimeHours ?? ""),
       escalationAfterHours: String(workspace.plan.supportProcess.escalationAfterHours ?? ""),
       intakeChannels: workspace.plan.supportProcess.intakeChannels.join(", "),
       notes: workspace.plan.supportProcess.notes ?? "",
-    });
+    }));
   }, [workspace]);
 
   const handleSaveSupport = async () => {
@@ -41,8 +41,8 @@ export default function SupportTab({ workspace, onUpdate }: { workspace: LaunchW
       });
       onUpdate(data);
       setSupportMessage("Support process saved.");
-    } catch (err: any) {
-      setSupportMessage(err.message || "Failed to save support process.");
+    } catch (err: unknown) {
+      setSupportMessage(getErrorMessage(err, "Failed to save support process."));
     } finally {
       setSavingSupport(false);
     }

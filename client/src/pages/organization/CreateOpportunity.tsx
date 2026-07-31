@@ -72,12 +72,12 @@ export default function CreateOpportunity() {
 
   useEffect(() => {
     if (!isEditing) {
-      setLoadingExisting(false);
+      queueMicrotask(() => setLoadingExisting(false));
       return;
     }
 
     let active = true;
-    setLoadingExisting(true);
+    queueMicrotask(() => setLoadingExisting(true));
 
     (async () => {
       try {

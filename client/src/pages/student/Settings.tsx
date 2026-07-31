@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { setAuthSession } from "../../lib/authSession";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 type Tab = "profile" | "classroom" | "security" | "notifications" | "privacy";
+
+interface StudentNotificationPreferences {
+  hourApproval?: { email?: boolean; inApp?: boolean };
+  hourRemoval?: { email?: boolean; inApp?: boolean };
+  eventChange?: { email?: boolean; inApp?: boolean };
+  orgRequest?: { email?: boolean; inApp?: boolean };
+}
 
 interface Session {
   id: string;
@@ -55,7 +62,7 @@ export default function StudentSettings() {
     eventChange: { email: true, inApp: true },
     orgRequest: { email: true, inApp: true },
   };
-  const mergeNotifPrefs = (incoming: any) => ({
+  const mergeNotifPrefs = (incoming: StudentNotificationPreferences | null | undefined) => ({
     hourApproval: {
       email: incoming?.hourApproval?.email ?? defaultNotifPrefs.hourApproval.email,
       inApp: incoming?.hourApproval?.inApp ?? defaultNotifPrefs.hourApproval.inApp,
@@ -74,7 +81,7 @@ export default function StudentSettings() {
     },
   });
   const [notifPrefs, setNotifPrefs] = useState<typeof defaultNotifPrefs>(
-    mergeNotifPrefs((user as any)?.notificationPreferences)
+    mergeNotifPrefs(user?.notificationPreferences)
   );
   const notifPrefsRef = useRef(notifPrefs);
   const [savingNotif, setSavingNotif] = useState(false);
@@ -82,15 +89,16 @@ export default function StudentSettings() {
 
   // Privacy tab
   const defaultMsgPrefs = { allowFrom: "EVERYONE", profileVisibility: "EVERYONE" };
-  const [msgPrefs, setMsgPrefs] = useState<typeof defaultMsgPrefs>(
-    (user as any)?.messagePreferences || defaultMsgPrefs
-  );
+  const [msgPrefs, setMsgPrefs] = useState<typeof defaultMsgPrefs>(() => ({
+    allowFrom: user?.messagePreferences?.allowFrom ?? defaultMsgPrefs.allowFrom,
+    profileVisibility: user?.messagePreferences?.profileVisibility ?? defaultMsgPrefs.profileVisibility,
+  }));
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [privacyMessage, setPrivacyMessage] = useState("");
 
   useEffect(() => {
     // Load signup count
-    api.get<any[]>("/signups/my").then((s) => setSignupCount(s.length)).catch(() => {});
+    api.get<unknown[]>("/signups/my").then((s) => setSignupCount(s.length)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -98,10 +106,10 @@ export default function StudentSettings() {
   }, [notifPrefs]);
 
   useEffect(() => {
-    const merged = mergeNotifPrefs((user as any)?.notificationPreferences);
+    const merged = mergeNotifPrefs(user?.notificationPreferences);
     setNotifPrefs(merged);
     notifPrefsRef.current = merged;
-  }, [(user as any)?.notificationPreferences]);
+  }, [user]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,8 +134,8 @@ export default function StudentSettings() {
       });
       await refreshUser();
       setMessage("Profile updated!");
-    } catch (err: any) {
-      setMessage(err.message || "Failed to update profile");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to update profile"));
       setIsError(true);
     } finally {
       setSaving(false);
@@ -144,8 +152,8 @@ export default function StudentSettings() {
       a.download = "my-service-hours.csv";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setMessage(err.message || "Failed to export");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to export"));
       setIsError(true);
     }
   };
@@ -176,8 +184,8 @@ export default function StudentSettings() {
       });
 
       doc.save("service-hours.pdf");
-    } catch (err: any) {
-      setMessage(err.message || "Failed to export PDF");
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Failed to export PDF"));
       setIsError(true);
     }
   };
@@ -192,8 +200,8 @@ export default function StudentSettings() {
       setClassroomMessage("Joined classroom successfully!");
       setInviteCode("");
       await refreshUser();
-    } catch (err: any) {
-      setClassroomMessage(err.message || "Failed to join classroom");
+    } catch (err: unknown) {
+      setClassroomMessage(getErrorMessage(err, "Failed to join classroom"));
       setClassroomIsError(true);
     } finally {
       setJoining(false);
@@ -208,8 +216,8 @@ export default function StudentSettings() {
       await api.post("/classrooms/leave");
       setClassroomMessage("Left classroom successfully");
       await refreshUser();
-    } catch (err: any) {
-      setClassroomMessage(err.message || "Failed to leave classroom");
+    } catch (err: unknown) {
+      setClassroomMessage(getErrorMessage(err, "Failed to leave classroom"));
       setClassroomIsError(true);
     }
   };
@@ -239,8 +247,8 @@ export default function StudentSettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordMessage(err.message || "Failed to change password");
+    } catch (err: unknown) {
+      setPasswordMessage(getErrorMessage(err, "Failed to change password"));
       setPasswordIsError(true);
     } finally {
       setChangingPassword(false);
@@ -252,8 +260,8 @@ export default function StudentSettings() {
     try {
       await api.delete("/auth/account");
       logout();
-    } catch (err: any) {
-      setPasswordMessage(err.message || "Failed to delete account");
+    } catch (err: unknown) {
+      setPasswordMessage(getErrorMessage(err, "Failed to delete account"));
       setPasswordIsError(true);
       setDeleting(false);
       setDeleteConfirm(false);
@@ -513,7 +521,7 @@ export default function StudentSettings() {
             <div>
               <div className="p-4 rounded-[3px] border mb-4" style={{ background: "var(--in-bg)", borderColor: "var(--in-b)" }}>
                 <div className="font-medium text-[14px]" style={{ color: "var(--in-t)" }}>
-                  {(user as any).classroom?.name || "Classroom"}
+                  {user?.classroom?.name || "Classroom"}
                 </div>
                 <div className="text-[13px]" style={{ color: "var(--in-t)" }}>
                   {user.school?.name || "School"}

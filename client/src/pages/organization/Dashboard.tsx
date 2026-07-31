@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 interface Opportunity {
@@ -128,8 +128,8 @@ export default function OrgDashboard() {
       const result = await api.post<{ sent: number }>(`/opportunities/${announceOppId}/announce`, { message: announceMsg });
       setAnnounceResult(`Announcement sent to ${result.sent} student${result.sent !== 1 ? "s" : ""}.`);
       setAnnounceMsg("");
-    } catch (err: any) {
-      setAnnounceResult(err.message || "Failed to send announcement");
+    } catch (err: unknown) {
+      setAnnounceResult(getErrorMessage(err, "Failed to send announcement"));
     } finally {
       setAnnouncing(false);
     }

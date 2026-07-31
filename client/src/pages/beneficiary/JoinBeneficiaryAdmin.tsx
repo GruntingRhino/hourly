@@ -39,8 +39,7 @@ export default function JoinBeneficiaryAdmin() {
 
   useEffect(() => {
     if (!token) {
-      setError("No administrator invitation token was provided.");
-      setLoading(false);
+      queueMicrotask(() => { setError("No administrator invitation token was provided."); setLoading(false); });
       return;
     }
     api.get<InvitationInfo>(`/invitations/beneficiary-admin?token=${encodeURIComponent(token)}`)

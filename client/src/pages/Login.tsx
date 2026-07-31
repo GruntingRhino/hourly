@@ -38,7 +38,7 @@ export default function Login() {
   }, [user, navigate, refreshUser, searchParams]);
 
   useEffect(() => {
-    setGoogleUrl(`${window.location.origin}/api/auth/google/url?state=login`);
+    queueMicrotask(() => setGoogleUrl(`${window.location.origin}/api/auth/google/url?state=login`));
     api
       .get<{ url: string }>("/auth/google/url?state=login")
       .then((data) => {
@@ -52,7 +52,7 @@ export default function Login() {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     if (errorParam) {
-      setError("Google sign-in was cancelled or failed. Please try again.");
+      queueMicrotask(() => setError("Google sign-in was cancelled or failed. Please try again."));
       return;
     }
     if (!code) {
@@ -60,8 +60,7 @@ export default function Login() {
     }
 
     let cancelled = false;
-    setLoading(true);
-    setError("");
+    queueMicrotask(() => { setLoading(true); setError(""); });
 
     api
       .post<AuthResult>(`/auth/google/callback${state ? `?state=${encodeURIComponent(state)}` : ""}`, { code })

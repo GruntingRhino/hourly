@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -127,6 +127,12 @@ interface HourBreakdownData {
   };
 }
 
+interface CohortResponse {
+  name: string;
+  requiredHours: number;
+  students: Array<Student & { approvedHours: number; riskReasons?: string[] }>;
+}
+
 export default function StudentList() {
   const { user } = useAuth();
   const { id: cohortId } = useParams<{ id: string }>();
@@ -144,16 +150,16 @@ export default function StudentList() {
   const isOffTrack = location.pathname.endsWith("/off-track");
   const filter = isOnTrack ? "on-track" : isOffTrack ? "off-track" : "all";
 
-  useEffect(() => { void load(); }, [cohortId, location.pathname]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [cohortId, location.pathname]);
 
   const load = async () => {
     setLoading(true);
     try {
       if (cohortId) {
-        const cohort = await api.get<any>(`/cohorts/${cohortId}`);
+        const cohort = await api.get<CohortResponse>(`/cohorts/${cohortId}`);
         setCohortName(cohort.name);
         const req = cohort.requiredHours;
-        const mapped: Student[] = cohort.students.map((s: any) => ({
+        const mapped: Student[] = cohort.students.map((s) => ({
           ...s,
           cohortId,
           cohortName: cohort.name,
@@ -180,8 +186,8 @@ export default function StudentList() {
     try {
       const data = await api.get<StudentVerificationHistory>(`/schools/${user.schoolId}/students/${studentId}/verification-history`);
       setHistoryData(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load verification history.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load verification history."));
     } finally {
       setHistoryLoadingId(null);
     }
@@ -194,8 +200,8 @@ export default function StudentList() {
     try {
       const data = await api.get<HourBreakdownData>(`/schools/${user.schoolId}/students/${studentId}/hour-breakdown`);
       setBreakdownData(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load hour breakdown.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load hour breakdown."));
     } finally {
       setBreakdownLoadingId(null);
     }

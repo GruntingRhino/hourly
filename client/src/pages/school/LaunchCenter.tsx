@@ -29,7 +29,8 @@ export default function LaunchCenter() {
   };
 
   useEffect(() => {
-    void loadWorkspace();
+    const timer = window.setTimeout(() => { void loadWorkspace(); }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (loading) {

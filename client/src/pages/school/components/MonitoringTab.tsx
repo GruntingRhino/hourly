@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../../../lib/api";
+import { api, getErrorMessage } from "../../../lib/api";
 import { useAuth } from "../../../hooks/useAuth";
 import type { LaunchWorkspace, ReminderSummary, MonitoringForm } from "./types";
 import { MetricCard, formatDate } from "./types";
@@ -166,13 +166,13 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
   }, [monitoringForm.activeStudentTarget, workspace]);
 
   useEffect(() => {
-    setMonitoringForm({
+    queueMicrotask(() => setMonitoringForm({
       launchStartDate: workspace.plan.firstUserMonitoring.launchStartDate ?? "",
       checkCadence: workspace.plan.firstUserMonitoring.checkCadence,
       activeStudentTarget: String(workspace.plan.firstUserMonitoring.activeStudentTarget),
       watchList: workspace.plan.firstUserMonitoring.watchList.join(", "),
       notes: workspace.plan.firstUserMonitoring.notes ?? "",
-    });
+    }));
   }, [workspace]);
 
   const loadInvoiceRequests = async () => {
@@ -206,7 +206,7 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
 
   useEffect(() => {
     if (!user?.isInternalAdmin) return;
-    void loadInvoiceRequests();
+    queueMicrotask(() => { void loadInvoiceRequests(); });
   }, [user?.isInternalAdmin]);
 
   useEffect(() => {
@@ -231,8 +231,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
       });
       onUpdate(data);
       setMonitoringMessage("Monitoring plan saved.");
-    } catch (err: any) {
-      setMonitoringMessage(err.message || "Failed to save monitoring plan.");
+    } catch (err: unknown) {
+      setMonitoringMessage(getErrorMessage(err, "Failed to save monitoring plan."));
     } finally {
       setSavingMonitoring(false);
     }
@@ -245,8 +245,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
       const summary = await api.post<ReminderSummary | null>("/messages/reminders/run", {});
       setLatestReminderSummary(summary);
       setMonitoringMessage("Reminder cycle completed.");
-    } catch (err: any) {
-      setMonitoringMessage(err.message || "Failed to run reminders.");
+    } catch (err: unknown) {
+      setMonitoringMessage(getErrorMessage(err, "Failed to run reminders."));
     } finally {
       setRunningReminders(false);
     }
@@ -279,8 +279,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         },
       }));
       setInvoiceQueueMessage(`Request moved to ${INTERNAL_INVOICE_STATUS_LABELS[status]}.`);
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to update request status.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to update request status."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }
@@ -333,8 +333,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         },
       }));
       setInvoiceQueueMessage("Request details saved.");
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to save request details.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to save request details."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }
@@ -366,8 +366,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         },
       }));
       setInvoiceQueueMessage(ownerUserId ? "Request owner updated." : "Request owner cleared.");
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to update owner.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to update owner."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }
@@ -391,8 +391,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
           : request)
       );
       setInvoiceQueueMessage(`${file.name} uploaded.`);
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to upload artifact.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to upload artifact."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }
@@ -423,8 +423,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         )
       );
       setInvoiceQueueMessage("Artifact removed.");
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to remove artifact.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to remove artifact."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }
@@ -451,8 +451,8 @@ export default function MonitoringTab({ workspace, onUpdate }: { workspace: Laun
         },
       }));
       setInvoiceQueueMessage("Customer update sent.");
-    } catch (err: any) {
-      setInvoiceQueueMessage(err.message || "Failed to send customer update.");
+    } catch (err: unknown) {
+      setInvoiceQueueMessage(getErrorMessage(err, "Failed to send customer update."));
     } finally {
       setUpdatingInvoiceRequestId(null);
     }

@@ -370,12 +370,12 @@ export default function SchoolSettings() {
         }
       }).finally(() => setLoading(false));
     } else {
-      setLoading(false);
+      queueMicrotask(() => setLoading(false));
     }
   }, [user]);
 
   useEffect(() => {
-    setNotifPrefs(mergeNotifPrefs(user?.notificationPreferences));
+    queueMicrotask(() => setNotifPrefs(mergeNotifPrefs(user?.notificationPreferences)));
   }, [user?.notificationPreferences]);
 
   useEffect(() => {
@@ -393,8 +393,7 @@ export default function SchoolSettings() {
 
   useEffect(() => {
     if (tab !== "data" || !isAdmin || !user?.schoolId) return;
-    setLogsLoading(true);
-    setLogsError("");
+    queueMicrotask(() => { setLogsLoading(true); setLogsError(""); });
     api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
       .then(setDataAccessLogs)
       .catch((err: unknown) => setLogsError(getErrorMessage(err, "Failed to load data access logs")))
@@ -444,7 +443,7 @@ export default function SchoolSettings() {
       ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
       : ["profile", "security", "notifications", "privacy"];
     if (requestedTab && allowedTabs.includes(requestedTab as Tab)) {
-      setTab(requestedTab as Tab);
+      queueMicrotask(() => setTab(requestedTab as Tab));
     }
 
     const canvasStatusParam = searchParams.get("canvas");
@@ -1708,7 +1707,7 @@ export default function SchoolSettings() {
                     setLogsError("");
                     api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
                       .then(setDataAccessLogs)
-                      .catch((err: any) => setLogsError(err.message || "Failed to load data access logs"))
+                      .catch((err : unknown) => setLogsError(getErrorMessage(err, "Failed to load data access logs")))
                       .finally(() => setLogsLoading(false));
                   }}
                   className="px-3 py-1.5 border border-[var(--border-s)] rounded text-xs hover:bg-[var(--surface-alt)]"

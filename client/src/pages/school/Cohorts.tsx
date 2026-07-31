@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 interface Cohort {
@@ -46,6 +46,11 @@ interface SubmissionSummary {
   student: { id: string; name: string; email: string };
 }
 
+interface PublishResult {
+  sent: number;
+  failed: number;
+}
+
 export default function SchoolCohorts() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SCHOOL_ADMIN";
@@ -84,7 +89,7 @@ export default function SchoolCohorts() {
     }
   };
 
-  useEffect(() => { void loadCohorts(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void loadCohorts(); }, 0); return () => window.clearTimeout(timer); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +105,8 @@ export default function SchoolCohorts() {
       setCreateGraduationYear("");
       setShowCreateForm(false);
       void loadCohorts();
-    } catch (err: any) {
-      setError(err.message || "Failed to create cohort.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to create cohort."));
     } finally {
       setCreating(false);
     }
@@ -109,12 +114,12 @@ export default function SchoolCohorts() {
 
   const handlePublish = async (cohortId: string) => {
     try {
-      const result = await api.post<any>(`/cohorts/${cohortId}/publish`);
+      const result = await api.post<PublishResult>(`/cohorts/${cohortId}/publish`);
       setPublishToast(`Resent ${result.sent} invitation${result.sent !== 1 ? "s" : ""}.${result.failed > 0 ? ` ${result.failed} failed.` : ""}`);
       setTimeout(() => setPublishToast(""), 4000);
       void loadCohorts();
-    } catch (err: any) {
-      setError(err.message || "Failed to resend invitations.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to resend invitations."));
     }
   };
 
@@ -129,8 +134,8 @@ export default function SchoolCohorts() {
         setTeacherCsvData("");
       }
       void loadCohorts();
-    } catch (err: any) {
-      setError(err.message || "Failed to import teacher assignments.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to import teacher assignments."));
     } finally {
       setTeacherImporting(false);
     }
@@ -147,8 +152,8 @@ export default function SchoolCohorts() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err.message || "Failed to export CSV.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to export CSV."));
     } finally {
       setDownloadingReport(null);
     }

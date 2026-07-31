@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 
 interface SelfSubmission {
   id: string;
@@ -59,8 +59,9 @@ export default function SchoolSelfSubmissions() {
       setLoading(false);
     }
   };
+  const runLoad = useEffectEvent(() => { void load(); });
 
-  useEffect(() => { void load(); }, [filter]);
+  useEffect(() => { runLoad(); }, [filter]);
 
   const openReview = (id: string, requestedHours: number) => {
     setReviewingId(id);
@@ -79,8 +80,8 @@ export default function SchoolSelfSubmissions() {
       });
       setReviewingId(null);
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to approve.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to approve."));
     } finally {
       setSubmitting(false);
     }
@@ -94,8 +95,8 @@ export default function SchoolSelfSubmissions() {
       await api.post(`/self-submissions/${id}/reject`, { reason: reviewNote });
       setReviewingId(null);
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to reject.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to reject."));
     } finally {
       setSubmitting(false);
     }
@@ -109,8 +110,8 @@ export default function SchoolSelfSubmissions() {
       await api.post(`/self-submissions/${id}/request-revision`, { note: reviewNote });
       setReviewingId(null);
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to request revision.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to request revision."));
     } finally {
       setSubmitting(false);
     }
@@ -126,8 +127,8 @@ export default function SchoolSelfSubmissions() {
       setImportResult(result);
       setCsvText("");
       if (result.imported > 0) void load();
-    } catch (err: any) {
-      setImportError(err.message || "Import failed.");
+    } catch (err: unknown) {
+      setImportError(getErrorMessage(err, "Import failed."));
     } finally {
       setImporting(false);
     }
@@ -154,8 +155,8 @@ export default function SchoolSelfSubmissions() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err.message || "Failed to export report.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to export report."));
     } finally {
       setDownloadingReport(null);
     }

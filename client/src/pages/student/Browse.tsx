@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import SearchableSelect from "../../components/SearchableSelect";
 import { api } from "../../lib/api";
@@ -261,9 +261,11 @@ export default function StudentBrowse() {
       setLoading(false);
     }
   };
+  const runLoadData = useEffectEvent(() => { void loadData(); });
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(runLoadData, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const blockedCategorySet = new Set(blockedCategories);

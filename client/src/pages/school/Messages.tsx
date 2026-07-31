@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { getNotificationHref } from "../../lib/notificationRouting";
 import type { AppNotification } from "../../lib/notificationRouting";
 
@@ -79,13 +79,13 @@ export default function SchoolMessages() {
   const [activeCases, setActiveCases] = useState<InterventionCaseCard[]>([]);
 
   useEffect(() => {
-    loadMessages();
+    queueMicrotask(() => { void loadMessages(); });
   }, [folder]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "inbox" || tab === "sent" || tab === "notifications") {
-      setFolder(tab);
+      queueMicrotask(() => setFolder(tab));
     }
   }, [searchParams]);
 
@@ -123,8 +123,8 @@ export default function SchoolMessages() {
       setSubject("");
       setBody("");
       loadMessages();
-    } catch (err: any) {
-      setSendError(err.message || "Failed to send message");
+    } catch (err: unknown) {
+      setSendError(getErrorMessage(err, "Failed to send message"));
     } finally {
       setSending(false);
     }
@@ -150,8 +150,8 @@ export default function SchoolMessages() {
       setBroadcastCohortId("");
       setBroadcastPriority(false);
       loadMessages();
-    } catch (err: any) {
-      setSendError(err.message || "Failed to send announcement");
+    } catch (err: unknown) {
+      setSendError(getErrorMessage(err, "Failed to send announcement"));
     } finally {
       setSendingBroadcast(false);
     }
@@ -165,8 +165,8 @@ export default function SchoolMessages() {
       const summary = await api.post<ReminderSummary | null>("/messages/reminders/run", {});
       setReminderSummary(summary);
       setBroadcastMessage("Reminder cycle completed.");
-    } catch (err: any) {
-      setSendError(err.message || "Failed to run reminders");
+    } catch (err: unknown) {
+      setSendError(getErrorMessage(err, "Failed to run reminders"));
     } finally {
       setRunningReminders(false);
     }

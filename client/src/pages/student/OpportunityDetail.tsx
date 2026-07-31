@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import SignaturePad from "../../components/SignaturePad";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -38,6 +38,20 @@ interface Session {
   rejectionReason: string | null;
 }
 
+interface MySessionResponse extends Session {
+  opportunity?: { id: string };
+  opportunityId?: string;
+}
+
+interface CustomFieldValue {
+  label?: unknown;
+  name?: unknown;
+  key?: unknown;
+  value?: unknown;
+  answer?: unknown;
+  text?: unknown;
+}
+
 interface SignupRecord {
   id: string;
   status: string;
@@ -72,10 +86,10 @@ export default function OpportunityDetail() {
       // Session fetch runs separately so detail actions render without waiting
       // on the full "/sessions/my" payload.
       const sessions = await api
-        .get<any[]>(`/sessions/my?opportunityId=${encodeURIComponent(String(id || ""))}`)
+        .get<MySessionResponse[]>(`/sessions/my?opportunityId=${encodeURIComponent(String(id || ""))}`)
         .catch(() => []);
       if (requestId !== loadRequestIdRef.current) return;
-      const sess = sessions.find((s) => s?.opportunity?.id === id || s?.opportunityId === id) || null;
+      const sess = sessions.find((s) => s.opportunity?.id === id || s.opportunityId === id) || null;
       setMySession(sess);
     } catch (err) {
       if (requestId !== loadRequestIdRef.current) return;
@@ -87,8 +101,11 @@ export default function OpportunityDetail() {
     }
   };
 
+  const runLoadData = useEffectEvent(() => { void loadData(); });
+
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(runLoadData, 0);
+    return () => window.clearTimeout(timer);
   }, [id, user?.id]);
 
   const handleSignup = async () => {
@@ -102,11 +119,11 @@ export default function OpportunityDetail() {
       const created = await api.post<SignupRecord>("/signups", { opportunityId: id });
       setMySignup(created);
       void loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isWaitlistAttempt) {
         setMySignup(null);
       }
-      setActionError(err.message || "Failed to sign up");
+      setActionError(getErrorMessage(err, "Failed to sign up"));
     } finally {
       setActionLoading(false);
     }
@@ -127,9 +144,9 @@ export default function OpportunityDetail() {
     setMySession((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
     try {
       await api.post(`/signups/${mySignup.id}/cancel`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMySignup(previousSignup);
-      setActionError(err.message || "Failed to cancel");
+      setActionError(getErrorMessage(err, "Failed to cancel"));
       void loadData();
     } finally {
       setActionLoading(false);
@@ -143,8 +160,8 @@ export default function OpportunityDetail() {
     try {
       await api.post(`/sessions/${mySession.id}/checkin`);
       await loadData();
-    } catch (err: any) {
-      setActionError(err.message || "Failed to check in");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err, "Failed to check in"));
     } finally {
       setActionLoading(false);
     }
@@ -157,8 +174,8 @@ export default function OpportunityDetail() {
     try {
       await api.post(`/sessions/${mySession.id}/checkout`);
       await loadData();
-    } catch (err: any) {
-      setActionError(err.message || "Failed to check out");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err, "Failed to check out"));
     } finally {
       setActionLoading(false);
     }
@@ -198,7 +215,7 @@ export default function OpportunityDetail() {
           if (contentType.includes("application/json")) {
             const data = await res.json().catch(() => null);
             if (data && typeof data === "object" && "error" in data) {
-              message = String((data as any).error || message);
+              message = String((data as { error?: unknown }).error || message);
             }
           } else {
             const text = await res.text().catch(() => "");
@@ -220,8 +237,8 @@ export default function OpportunityDetail() {
           : prev,
       );
       void loadData();
-    } catch (err: any) {
-      setActionError(err.message || "Failed to submit verification");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err, "Failed to submit verification"));
     } finally {
       setActionLoading(false);
     }
@@ -246,20 +263,21 @@ export default function OpportunityDetail() {
       const parsed = JSON.parse(opp.customFields);
       if (Array.isArray(parsed)) {
         return parsed
-          .map((item: any) => {
+          .map((item: unknown) => {
             if (!item) return null;
             if (typeof item === "string") {
               return { label: "Custom Field", value: item };
             }
-            const label = String(item.label ?? item.name ?? item.key ?? "Custom Field");
-            const value = String(item.value ?? item.answer ?? item.text ?? "");
+            const field = item as CustomFieldValue;
+            const label = String(field.label ?? field.name ?? field.key ?? "Custom Field");
+            const value = String(field.value ?? field.answer ?? field.text ?? "");
             return value ? { label, value } : null;
           })
           .filter(Boolean) as Array<{ label: string; value: string }>;
       }
 
       if (parsed && typeof parsed === "object") {
-        return Object.entries(parsed as Record<string, any>)
+        return Object.entries(parsed as Record<string, unknown>)
           .map(([label, value]) => ({
             label,
             value: value == null ? "" : String(value),

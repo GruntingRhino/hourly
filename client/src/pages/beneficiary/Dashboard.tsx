@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 
 interface Signup {
@@ -70,16 +70,17 @@ export default function BeneficiaryDashboard() {
       setLoading(false);
     }
   };
+  const runLoad = useEffectEvent(() => { void load(); });
 
-  useEffect(() => { void load(); }, [benId]);
+  useEffect(() => { const timer = window.setTimeout(runLoad, 0); return () => window.clearTimeout(timer); }, [benId]);
 
   const handleApprove = async (signupId: string, hours: number) => {
     setApproving(signupId);
     try {
       await api.post(`/beneficiaries/signups/${signupId}/approve`, { hoursApproved: hours });
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to approve.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to approve."));
     } finally {
       setApproving(null);
     }
@@ -96,8 +97,8 @@ export default function BeneficiaryDashboard() {
       setRejectingId(null);
       setRejectReason("");
       void load();
-    } catch (err: any) {
-      setError(err.message || "Failed to reject.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to reject."));
     } finally {
       setApproving(null);
     }
@@ -110,8 +111,8 @@ export default function BeneficiaryDashboard() {
       setInvitations((prev) =>
         prev.map((inv) => (inv.id === invId ? { ...inv, status: action } : inv))
       );
-    } catch (err: any) {
-      setError(err.message || "Failed to respond.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to respond."));
     } finally {
       setRespondingId(null);
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
 import { classifyEmailDomain, type EmailDomainStatus } from "../../lib/emailDomainPolicy";
 
@@ -22,6 +22,23 @@ interface SchoolEntry {
   claimed: boolean;
   gradeRange: string | null;
   enrollment: number | null;
+}
+
+interface RegistrationResponse {
+  token: string;
+  user: import("../../hooks/useAuth").User;
+  requiresSchoolRegistration?: boolean;
+  registrationToken: string;
+  name: string;
+  email: string;
+  domainSuggestions?: SchoolEntry[];
+  sentTo?: string;
+}
+
+interface RegistrationPayload {
+  registrationToken: string;
+  schoolName: string;
+  directorySchoolId?: string;
 }
 
 type Step = "google" | "email-collect" | "search" | "contact" | "sent";
@@ -118,13 +135,13 @@ export default function SchoolRegister() {
     setSubmitting(true);
     setError("");
     try {
-      const payload: any = { registrationToken: regToken, schoolName };
+      const payload: RegistrationPayload = { registrationToken: regToken, schoolName };
       if (directorySchoolId) payload.directorySchoolId = directorySchoolId;
-      const result = await api.post<any>("/auth/google/complete-registration", payload);
+      const result = await api.post<RegistrationResponse>("/auth/google/complete-registration", payload);
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Registration failed. Please try again."));
       setSubmitting(false);
     }
   };
@@ -136,7 +153,7 @@ export default function SchoolRegister() {
       const stateSuffix = searchParams.get("state")
         ? `?state=${encodeURIComponent(searchParams.get("state")!)}`
         : "";
-      const result = await api.post<any>(`/auth/google/callback${stateSuffix}`, { code });
+      const result = await api.post<RegistrationResponse>(`/auth/google/callback${stateSuffix}`, { code });
       if (result.token && !result.requiresSchoolRegistration) {
         loginWithToken(result.token, result.user);
         navigate("/dashboard");
@@ -164,8 +181,8 @@ export default function SchoolRegister() {
         setContactEmail(result.email || "");
         setStep("search");
       }
-    } catch (err: any) {
-      setError(err.message || "Google sign-in failed. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Google sign-in failed. Please try again."));
     }
   };
 
@@ -173,7 +190,7 @@ export default function SchoolRegister() {
     setError("");
     setDevGoogleLoading(true);
     try {
-      const result = await api.post<any>("/auth/google/dev-signin", {
+      const result = await api.post<RegistrationResponse>("/auth/google/dev-signin", {
         email: devGoogleEmail.trim(),
         name: devGoogleName.trim() || undefined,
       });
@@ -202,8 +219,8 @@ export default function SchoolRegister() {
       }
 
       throw new Error("Dev Google sign-in failed.");
-    } catch (err: any) {
-      setError(err.message || "Dev Google sign-in failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Dev Google sign-in failed."));
     } finally {
       setDevGoogleLoading(false);
     }
@@ -320,21 +337,21 @@ export default function SchoolRegister() {
         navigate("/email-verification-required");
       } else {
         // Google OAuth path: send magic link to complete registration
-        const payload: any = {
+        const payload: RegistrationPayload & { contactEmail: string } = {
           registrationToken,
           schoolName,
           contactEmail,
         };
         if (selectedSchool) payload.directorySchoolId = selectedSchool.id;
-        const result = await api.post<any>("/auth/google/register-school", payload);
+        const result = await api.post<RegistrationResponse>("/auth/google/register-school", payload);
         setSentTo(result.sentTo || contactEmail);
         setStep("sent");
       }
-    } catch (err: any) {
-      if (err?.message === "Email already registered") {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "Email already registered") {
         setError("This email address is already linked to another school on GoodHours.");
       } else {
-        setError(err.message || "Registration failed. Please try again.");
+        setError(getErrorMessage(err, "Registration failed. Please try again."));
       }
     } finally {
       setSubmitting(false);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, getErrorMessage } from "../../lib/api";
 import BeneficiaryOpportunities from "../beneficiary/Opportunities";
 
 export default function SchoolOpportunities() {
@@ -10,7 +10,7 @@ export default function SchoolOpportunities() {
     api.get<{ id: string; name: string }>("/schools/my-beneficiary")
       .then((b) => setBenId(b.id))
       .catch((err) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load school opportunities.");
+        setError(err instanceof ApiError ? getErrorMessage(err, "Request failed.") : "Failed to load school opportunities.");
       });
   }, []);
 
