@@ -23,16 +23,14 @@ case "$mode" in
     ;;
   billing)
     test -f "$root/docs/qa/STRIPE_TEST_REPORT.md" || fail "missing Stripe QA evidence"
-    # This gate intentionally stays closed until a redacted test-mode sandbox report
-    # records Checkout, signed delivery, entitlement, replay, signature failure,
-    # cancellation/deletion, and Test Clock past_due evidence.
+    (cd "$root/server" && npm run test:billing)
+    # The report records real test-mode lifecycle evidence. The executable regression
+    # suite above prevents a report-only PASS from masking current billing breakage.
     rg -q '^Billing lifecycle QA: PASS$' "$root/docs/qa/STRIPE_TEST_REPORT.md" || fail "Stripe lifecycle evidence incomplete"
     pass
     ;;
   production)
-    test -f "$root/docs/qa/PRODUCTION_CHECKLIST.md" || fail "missing production checklist"
-    rg -q '^Production deployment SHA: [0-9a-f]{40}$' "$root/docs/qa/PRODUCTION_CHECKLIST.md" || fail "missing deployed-SHA evidence"
-    rg -q '^Production release readiness: PASS$' "$root/docs/qa/PRODUCTION_CHECKLIST.md" || fail "production checklist incomplete"
+    bash "$root/scripts/verify-production-provenance.sh"
     pass
     ;;
   *) fail "unknown readiness gate" ;;

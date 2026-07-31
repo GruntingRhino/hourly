@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "security:verify-no-rsc": "node scripts/verify-no-rsc.mjs",
     "security:verify-react-router-rsc-advisory": "node scripts/verify-react-router-rsc-advisory.mjs",
     "preview": "vite preview"
