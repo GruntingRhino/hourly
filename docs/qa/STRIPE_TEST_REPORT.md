@@ -1,6 +1,6 @@
 # Stripe Billing Lifecycle QA — GoodHours
 
-**Status:** PASS — isolated Stripe test-mode billing lifecycle QA is complete for release commit `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`.
+**Status:** PASS — isolated Stripe test-mode billing lifecycle QA baseline was completed at `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`; current readiness also re-executes billing regression tests and rejects billing-critical code changes since that evidence.
 
 **Environment:** isolated local PostgreSQL database and local API on `127.0.0.1:3003`, using Stripe test-mode credentials and an ephemeral Stripe CLI webhook-forwarding secret. No production key, `goodhours.app` endpoint, production database, or live charge was used.
 
@@ -32,8 +32,8 @@ All session URLs, event IDs, customer IDs, subscription IDs, webhook secrets, an
 
 ## Final-artifact and environment-separation evidence — PASS
 
-- The source tree used for the final signed replay and automated billing regression is release commit `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`.
-- That commit is pushed to `origin/main` and deployed as Vercel production deployment `dpl_9vEoDTw2PGWLpdew1ZDMDvDkscwF`, aliased to `https://goodhours.app`.
+- The source tree used for the signed replay was commit `e09fddeea454dd51390fe374dcc5e1ad4d03b00e`.
+- The billing readiness gate re-executes the billing regression suite and fails if billing-critical source files differ from that signed-replay baseline; current production provenance is verified separately against live Vercel state.
 - The production deployment is `Ready`; its health endpoint reports application and database status `ok`; all 25 Prisma migrations are applied with none pending.
 - The account owner confirmed that production uses live Stripe configuration and the canonical webhook endpoint. No live Checkout, charge, replay, cancellation, Test Clock, or customer mutation was performed during QA.
 - Test credentials remained local and ignored. Billing lifecycle mutations were confined to Stripe Test mode and the isolated local QA database.

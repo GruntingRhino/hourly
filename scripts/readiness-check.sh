@@ -24,6 +24,12 @@ case "$mode" in
   billing)
     test -f "$root/docs/qa/STRIPE_TEST_REPORT.md" || fail "missing Stripe QA evidence"
     (cd "$root/server" && npm run test:billing)
+    billing_evidence_commit="e09fddeea454dd51390fe374dcc5e1ad4d03b00e"
+    git -C "$root" diff --quiet "$billing_evidence_commit"..HEAD -- \
+      server/src/routes/billing.ts \
+      server/src/routes/stripeWebhooks.ts \
+      server/src/lib/stripe.ts \
+      server/src/lib/stripeWebhookProcessor.ts || fail "billing code changed since sandbox lifecycle evidence"
     # The report records real test-mode lifecycle evidence. The executable regression
     # suite above prevents a report-only PASS from masking current billing breakage.
     rg -q '^Billing lifecycle QA: PASS$' "$root/docs/qa/STRIPE_TEST_REPORT.md" || fail "Stripe lifecycle evidence incomplete"
