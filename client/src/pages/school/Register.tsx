@@ -111,12 +111,6 @@ export default function SchoolRegister() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const code = searchParams.get("code");
-    if (code) handleOAuthCallback(code);
-    api.get<{ url: string }>("/auth/google/url").then((d) => setGoogleUrl(d.url)).catch(() => {});
-  }, []);
-
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -131,7 +125,7 @@ export default function SchoolRegister() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const completeGoogleRegistration = async (regToken: string, schoolName: string, directorySchoolId?: string) => {
+  const completeGoogleRegistration = useCallback(async (regToken: string, schoolName: string, directorySchoolId?: string) => {
     setSubmitting(true);
     setError("");
     try {
@@ -144,9 +138,9 @@ export default function SchoolRegister() {
       setError(getErrorMessage(err, "Registration failed. Please try again."));
       setSubmitting(false);
     }
-  };
+  }, [loginWithToken, navigate]);
 
-  const handleOAuthCallback = async (code: string) => {
+  const handleOAuthCallback = useCallback(async (code: string) => {
     // state is "<flow>.<nonce>" — the nonce is the server's OAuth CSRF token
     const isLoginFlow = (searchParams.get("state") ?? "").split(".")[0] === "login";
     try {
@@ -184,7 +178,13 @@ export default function SchoolRegister() {
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Google sign-in failed. Please try again."));
     }
-  };
+  }, [completeGoogleRegistration, loginWithToken, navigate, searchParams]);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (code) void (async () => { await handleOAuthCallback(code); })();
+    api.get<{ url: string }>("/auth/google/url").then((d) => setGoogleUrl(d.url)).catch(() => {});
+  }, [handleOAuthCallback, searchParams]);
 
   const handleDevGoogleSignin = async () => {
     setError("");

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api, getErrorMessage } from "../../lib/api";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -174,19 +174,17 @@ export function SchoolBilling({ schoolId }: { schoolId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadSummary = () => {
+  const loadSummary = useCallback(() => {
     setLoading(true);
     api.get<SchoolBillingSummary>(`/school-procurement/${schoolId}/summary`)
       .then(setSummary)
       .catch((err : unknown) => setError(getErrorMessage(err, "Failed to load procurement status")))
       .finally(() => setLoading(false));
-  };
+  }, [schoolId]);
 
   useEffect(() => {
-    // Starting the fetch in a microtask avoids a synchronous render cascade
-    // while still resetting procurement state immediately after a school switch.
-    void Promise.resolve().then(loadSummary);
-  }, [schoolId]);
+    void (async () => { await loadSummary(); })();
+  }, [loadSummary]);
 
   if (loading) return <div className="text-[var(--text-sec)] text-sm">Loading procurement information...</div>;
   if (error) return (

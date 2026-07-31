@@ -57,12 +57,11 @@ export default function SlotDetail() {
 
   useEffect(() => {
     if (!slot) {
-      setLoading(true);
       api.get<SlotFull>(`/beneficiaries/slots/${id}`)
         .then((data) => { setSlot(data); setLoading(false); })
         .catch(() => { setError("Failed to load details."); setLoading(false); });
     }
-  }, [id]);
+  }, [id, slot]);
 
   const handleSignup = async () => {
     setSigningUp(true);

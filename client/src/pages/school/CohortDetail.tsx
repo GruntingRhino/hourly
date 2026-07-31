@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
@@ -209,7 +209,7 @@ export default function CohortDetail() {
 
   const isAdmin = user?.role === "SCHOOL_ADMIN";
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.get<CohortDetail>(`/cohorts/${id}`);
@@ -220,9 +220,9 @@ export default function CohortDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [id]);
+  useEffect(() => { void (async () => { await load(); })(); }, [load]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

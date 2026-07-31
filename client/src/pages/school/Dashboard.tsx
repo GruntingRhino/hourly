@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -118,11 +118,7 @@ export default function SchoolDashboard() {
     try { await api.put("/schools/onboarding", {}); } catch { /* Local dismissal remains valid if persistence fails. */ }
   };
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -145,7 +141,9 @@ export default function SchoolDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [schoolId]);
+
+  useEffect(() => { void (async () => { await loadData(); })(); }, [loadData]);
 
   const handleExportPdf = async () => {
     try {

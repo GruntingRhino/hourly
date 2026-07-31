@@ -259,6 +259,12 @@ interface HourTotals {
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const [signups, setSignups] = useState<Signup[]>([]);
   const [selfSubs, setSelfSubs] = useState<SelfSubmission[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
@@ -429,7 +435,7 @@ export default function StudentDashboard() {
   const pastActivities: PastActivityItem[] = [
     ...signups
       .filter((s) => s.status !== "CANCELLED" && s.status !== "WAITLISTED")
-      .filter((s) => getSlotEndAt(s.slot.date, s.slot.endTime).getTime() < Date.now() || s.verificationStatus === "APPROVED")
+      .filter((s) => getSlotEndAt(s.slot.date, s.slot.endTime).getTime() < currentTime || s.verificationStatus === "APPROVED")
       .map((s) => ({
         id: `signup-${s.id}`,
         sortTime: getSlotEndAt(s.slot.date, s.slot.endTime).getTime(),

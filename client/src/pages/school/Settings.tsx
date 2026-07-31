@@ -315,8 +315,11 @@ export default function SchoolSettings() {
   const [canvasConnectMode, setCanvasConnectMode] = useState<"MOCK" | "OAUTH">("MOCK");
   const [canvasBaseUrl, setCanvasBaseUrl] = useState("https://canvas.mock.local");
   const [canvasBusyAction, setCanvasBusyAction] = useState<"" | "connect" | "disconnect" | "preview" | "apply">("");
-  const [canvasMessage, setCanvasMessage] = useState("");
-  const [canvasIsError, setCanvasIsError] = useState(false);
+  const [canvasMessage, setCanvasMessage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("canvas") === "connected" ? "Canvas OAuth connection established." : params.get("canvasError") || "";
+  });
+  const [canvasIsError, setCanvasIsError] = useState(() => Boolean(new URLSearchParams(window.location.search).get("canvasError")));
   const [canvasPreview, setCanvasPreview] = useState<IntegrationSyncSummary | null>(null);
   const [googleClassroomStatus, setGoogleClassroomStatus] = useState<IntegrationStatusResponse | null>(null);
   const [googleClassroomErrors, setGoogleClassroomErrors] = useState<IntegrationSyncErrorEntry[]>([]);
@@ -324,8 +327,11 @@ export default function SchoolSettings() {
   const [googleClassroomConnectMode, setGoogleClassroomConnectMode] = useState<"MOCK" | "OAUTH">("MOCK");
   const [googleClassroomBaseUrl, setGoogleClassroomBaseUrl] = useState("https://classroom.googleapis.com");
   const [googleClassroomBusyAction, setGoogleClassroomBusyAction] = useState<"" | "connect" | "disconnect" | "preview" | "apply">("");
-  const [googleClassroomMessage, setGoogleClassroomMessage] = useState("");
-  const [googleClassroomIsError, setGoogleClassroomIsError] = useState(false);
+  const [googleClassroomMessage, setGoogleClassroomMessage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("googleClassroom") === "connected" ? "Google Classroom OAuth connection established." : params.get("googleClassroomError") || "";
+  });
+  const [googleClassroomIsError, setGoogleClassroomIsError] = useState(() => Boolean(new URLSearchParams(window.location.search).get("googleClassroomError")));
   const [googleClassroomPreview, setGoogleClassroomPreview] = useState<IntegrationSyncSummary | null>(null);
 
   useEffect(() => {
@@ -369,14 +375,8 @@ export default function SchoolSettings() {
           setCapRows(normalizeCapRows([]));
         }
       }).finally(() => setLoading(false));
-    } else {
-      queueMicrotask(() => setLoading(false));
     }
   }, [user]);
-
-  useEffect(() => {
-    queueMicrotask(() => setNotifPrefs(mergeNotifPrefs(user?.notificationPreferences)));
-  }, [user?.notificationPreferences]);
 
   useEffect(() => {
     if (!joinByCodeToast) return;
@@ -393,7 +393,7 @@ export default function SchoolSettings() {
 
   useEffect(() => {
     if (tab !== "data" || !isAdmin || !user?.schoolId) return;
-    queueMicrotask(() => { setLogsLoading(true); setLogsError(""); });
+    void (async () => { setLogsLoading(true); setLogsError(""); })();
     api.get<DataAccessLogEntry[]>(`/schools/${user.schoolId}/data-access-logs`)
       .then(setDataAccessLogs)
       .catch((err: unknown) => setLogsError(getErrorMessage(err, "Failed to load data access logs")))
@@ -438,32 +438,10 @@ export default function SchoolSettings() {
   }, [tab, isAdmin, user?.schoolId]);
 
   useEffect(() => {
-    const requestedTab = searchParams.get("tab");
-    const allowedTabs: Tab[] = isAdmin
-      ? ["profile", "rules", "security", "notifications", "privacy", "integrations", "data", "billing"]
-      : ["profile", "security", "notifications", "privacy"];
-    if (requestedTab && allowedTabs.includes(requestedTab as Tab)) {
-      queueMicrotask(() => setTab(requestedTab as Tab));
-    }
-
     const canvasStatusParam = searchParams.get("canvas");
     const canvasErrorParam = searchParams.get("canvasError");
     const googleClassroomStatusParam = searchParams.get("googleClassroom");
     const googleClassroomErrorParam = searchParams.get("googleClassroomError");
-    if (canvasStatusParam === "connected") {
-      setCanvasMessage("Canvas OAuth connection established.");
-      setCanvasIsError(false);
-    } else if (canvasErrorParam) {
-      setCanvasMessage(canvasErrorParam);
-      setCanvasIsError(true);
-    }
-    if (googleClassroomStatusParam === "connected") {
-      setGoogleClassroomMessage("Google Classroom OAuth connection established.");
-      setGoogleClassroomIsError(false);
-    } else if (googleClassroomErrorParam) {
-      setGoogleClassroomMessage(googleClassroomErrorParam);
-      setGoogleClassroomIsError(true);
-    }
     if (!canvasStatusParam && !canvasErrorParam && !googleClassroomStatusParam && !googleClassroomErrorParam) return;
 
     const next = new URLSearchParams(searchParams);

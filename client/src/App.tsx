@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AuthProvider } from "./hooks/AuthProvider";
+import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import SessionPrefBanner from "./components/SessionPrefBanner";
 import { getSessionPref } from "./lib/authSession";

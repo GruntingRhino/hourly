@@ -105,12 +105,6 @@ export default function StudentSettings() {
     notifPrefsRef.current = notifPrefs;
   }, [notifPrefs]);
 
-  useEffect(() => {
-    const merged = mergeNotifPrefs(user?.notificationPreferences);
-    setNotifPrefs(merged);
-    notifPrefsRef.current = merged;
-  }, [user]);
-
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

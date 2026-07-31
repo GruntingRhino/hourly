@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
 import { useAuth } from "../../hooks/useAuth";
@@ -391,7 +391,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     setErrorDetails(details);
   };
 
-  const loadOpportunities = async () => {
+  const loadOpportunities = useCallback(async () => {
     if (!benId) return;
     setLoading(true);
     try {
@@ -402,9 +402,9 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     } finally {
       setLoading(false);
     }
-  };
+  }, [benId]);
 
-  const loadSignups = async () => {
+  const loadSignups = useCallback(async () => {
     if (!benId) return;
     setSignupsLoading(true);
     try {
@@ -415,9 +415,9 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
     } finally {
       setSignupsLoading(false);
     }
-  };
+  }, [benId]);
 
-  const prefillLocation = () => {
+  const prefillLocation = useCallback(() => {
     if (!benId) return;
     api.get<{ address?: string; city?: string; state?: string; zip?: string }>(`/beneficiaries/${benId}`)
       .then((ben) => {
@@ -425,22 +425,21 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
         if (parts.length) setForm((p) => ({ ...p, location: parts.join(", ") }));
       })
       .catch(() => {});
-  };
+  }, [benId]);
 
   useEffect(() => {
     if (!benId) return;
-    queueMicrotask(() => { void loadOpportunities(); prefillLocation(); });
+    void (async () => { await loadOpportunities(); })();
+    prefillLocation();
     api.get<ApprovedSchool[]>(`/beneficiaries/${benId}/schools`)
       .then((schools) => {
         setApprovedSchools(schools);
         setSelectedSchools(schools.map((s) => s.id));
       })
       .catch(() => {});
-  }, [benId]);
+  }, [benId, loadOpportunities, prefillLocation]);
 
-  useEffect(() => {
-    if (tab === "signups") queueMicrotask(() => { void loadSignups(); });
-  }, [tab, benId]);
+  useEffect(() => { if (tab === "signups") void (async () => { await loadSignups(); })(); }, [tab, loadSignups]);
 
   const addSlot = () => setForm((p) => ({ ...p, slots: [...p.slots, { date: "", startTime: "", endTime: "", capacity: "" }] }));
   const updateSlot = (i: number, field: string, value: string) =>

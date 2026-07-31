@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../lib/api";
 
 interface Message {
@@ -43,11 +43,7 @@ export default function OrgMessages() {
   const [sendError, setSendError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadMessages();
-  }, [folder]);
-
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     setLoading(true);
     try {
       if (folder === "notifications") {
@@ -60,7 +56,9 @@ export default function OrgMessages() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [folder]);
+
+  useEffect(() => { void (async () => { await loadMessages(); })(); }, [loadMessages]);
 
   const loadFolderMessages = async (nextFolder: "inbox" | "sent" | "notifications") => {
     setLoading(true);

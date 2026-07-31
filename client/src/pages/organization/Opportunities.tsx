@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -77,12 +77,7 @@ export default function OrgOpportunities() {
     [filter, opportunities, effectiveOptimisticById],
   );
 
-  useEffect(() => {
-    if (!user?.organizationId) return;
-    void loadData();
-  }, [filter, user?.organizationId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user?.organizationId) {
       setOpportunities([]);
       setLoading(false);
@@ -99,7 +94,9 @@ export default function OrgOpportunities() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, user]);
+
+  useEffect(() => { if (user?.organizationId) void (async () => { await loadData(); })(); }, [loadData, user?.organizationId]);
 
   const handleCancel = async (id: string) => {
     const target = visibleOpportunities.find((opp) => opp.id === id) || opportunities.find((opp) => opp.id === id);

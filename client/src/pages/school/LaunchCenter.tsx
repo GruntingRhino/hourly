@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import type { Tab, LaunchWorkspace } from "./components/types";
-import { summaryClasses, badgeClasses } from "./components/types";
+import { summaryClasses, badgeClasses } from "./components/launchCenterUtils";
 import MonitoringTab from "./components/MonitoringTab";
 import OnboardingTab from "./components/OnboardingTab";
 import SupportTab from "./components/SupportTab";

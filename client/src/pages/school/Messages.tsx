@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import { getNotificationHref } from "../../lib/notificationRouting";
@@ -79,24 +79,13 @@ export default function SchoolMessages() {
   const [activeCases, setActiveCases] = useState<InterventionCaseCard[]>([]);
 
   useEffect(() => {
-    queueMicrotask(() => { void loadMessages(); });
-  }, [folder]);
-
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "inbox" || tab === "sent" || tab === "notifications") {
-      queueMicrotask(() => setFolder(tab));
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
     api.get<CohortSummary[]>("/cohorts").then(setCohorts).catch(() => {});
     api.get<{ cases: InterventionCaseCard[] }>("/messages/interventions/cases?limit=8")
       .then((data) => setActiveCases(data.cases.filter((item) => item.status !== "RESOLVED")))
       .catch(() => setActiveCases([]));
   }, []);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     setLoading(true);
     try {
       if (folder === "notifications") {
@@ -109,7 +98,9 @@ export default function SchoolMessages() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [folder]);
+
+  useEffect(() => { void (async () => { await loadMessages(); })(); }, [loadMessages]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();

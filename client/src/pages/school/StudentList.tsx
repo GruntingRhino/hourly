@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import { formatAuditDetails } from "../../lib/auditDetails";
@@ -150,9 +150,7 @@ export default function StudentList() {
   const isOffTrack = location.pathname.endsWith("/off-track");
   const filter = isOnTrack ? "on-track" : isOffTrack ? "off-track" : "all";
 
-  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [cohortId, location.pathname]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       if (cohortId) {
@@ -177,7 +175,9 @@ export default function StudentList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cohortId]);
+
+  useEffect(() => { void (async () => { await load(); })(); }, [load, location.pathname]);
 
   const loadVerificationHistory = async (studentId: string) => {
     if (!user?.schoolId) return;

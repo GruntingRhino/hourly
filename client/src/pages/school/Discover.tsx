@@ -263,14 +263,13 @@ export default function BeneficiaryDiscover({ embedded = false }: { embedded?: b
         setLoading(false);
       }
     }
-    const timer = window.setTimeout(() => { void init(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    void init();
+  }, [loadData]);
 
   // Reload when radius changes
   useEffect(() => {
-    if (school) queueMicrotask(() => { void loadData(school); });
-  }, [radius]);
+    if (school) void (async () => { await loadData(school); })();
+  }, [school, loadData]);
 
   // ─── Filtered list ─────────────────────────────────────────────────────────
 

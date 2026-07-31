@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api, getErrorMessage } from "../../lib/api";
 
@@ -48,7 +48,7 @@ export default function SchoolSelfSubmissions() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.get<SelfSubmission[]>(`/self-submissions?status=${filter}`);
@@ -58,10 +58,9 @@ export default function SchoolSelfSubmissions() {
     } finally {
       setLoading(false);
     }
-  };
-  const runLoad = useEffectEvent(() => { void load(); });
+  }, [filter]);
 
-  useEffect(() => { runLoad(); }, [filter]);
+  useEffect(() => { void (async () => { await load(); })(); }, [load]);
 
   const openReview = (id: string, requestedHours: number) => {
     setReviewingId(id);

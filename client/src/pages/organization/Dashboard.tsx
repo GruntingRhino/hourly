@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -55,11 +55,7 @@ export default function OrgDashboard() {
   const [rejecting, setRejecting] = useState(false);
   const [overrideHours, setOverrideHours] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const orgId = user?.organizationId;
       const [opps, pend, st, notifs] = await Promise.all([
@@ -77,7 +73,9 @@ export default function OrgDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => { void (async () => { await loadData(); })(); }, [loadData]);
 
   const handleApprove = async (sessionId: string) => {
     const raw = overrideHours[sessionId]?.trim();

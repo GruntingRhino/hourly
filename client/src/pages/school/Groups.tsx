@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -186,9 +186,12 @@ export default function SchoolGroups() {
   const schoolId = user?.schoolId;
   const isOwner = user?.role === "SCHOOL_ADMIN";
 
-  useEffect(() => {
-    loadData();
-  }, [schoolId]);
+  const calcStatus = (hours: number, required: number): "COMPLETED" | "ON_TRACK" | "AT_RISK" | "NOT_STARTED" => {
+    if (hours >= required) return "COMPLETED";
+    if (hours >= required * 0.5) return "ON_TRACK";
+    if (hours > 0) return "AT_RISK";
+    return "NOT_STARTED";
+  };
 
   useEffect(() => {
     if (selectedClassroom && schoolId) {
@@ -200,9 +203,9 @@ export default function SchoolGroups() {
         })));
       }).catch(() => setStudents([]));
     }
-  }, [selectedClassroom]);
+  }, [schoolId, selectedClassroom]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!schoolId) return;
     try {
       const [cls, all] = await Promise.all([
@@ -216,7 +219,9 @@ export default function SchoolGroups() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [schoolId]);
+
+  useEffect(() => { void (async () => { await loadData(); })(); }, [loadData]);
 
   const handleSelectClassroom = (id: string) => {
     setSelectedClassroom(id);
@@ -241,12 +246,6 @@ export default function SchoolGroups() {
     }
   };
 
-  const calcStatus = (hours: number, required: number): "COMPLETED" | "ON_TRACK" | "AT_RISK" | "NOT_STARTED" => {
-    if (hours >= required) return "COMPLETED";
-    if (hours >= required * 0.5) return "ON_TRACK";
-    if (hours > 0) return "AT_RISK";
-    return "NOT_STARTED";
-  };
 
   const enrichedAll: StudentInfo[] = allStudents.map((s) => ({
     id: s.id,
@@ -273,7 +272,7 @@ export default function SchoolGroups() {
     if (!selectedStudentParam) return;
     const restored = displayStudents.find((s) => s.id === selectedStudentParam);
     if (restored) {
-      queueMicrotask(() => setSelectedStudent(restored));
+      void (async () => { setSelectedStudent(restored); })();
     }
   }, [displayStudents, selectedStudentParam]);
 
@@ -888,11 +887,11 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
   const [savingCase, setSavingCase] = useState(false);
 
   useEffect(() => {
-    queueMicrotask(() => setReminderBody(
-      `Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h approved${student.pendingHours ? `, ${student.pendingHours}h pending approval,` : ""} and ${student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h left toward your ${requiredHours}h requirement.${student.daysToDeadline != null ? ` Deadline status: ${deadlineLabel(student.daysToDeadline)}.` : ""}`,
-    ));
-    queueMicrotask(() => { setShowReminderCompose(false); setShowHistory(true); });
-    queueMicrotask(() => setCaseForm({
+    void (async () => {
+      setReminderBody(`Hi ${student.name}, this is a friendly reminder to complete your community service hours. You currently have ${student.approvedHours}h approved${student.pendingHours ? `, ${student.pendingHours}h pending approval,` : ""} and ${student.remainingHours ?? Math.max(0, requiredHours - student.approvedHours)}h left toward your ${requiredHours}h requirement.${student.daysToDeadline != null ? ` Deadline status: ${deadlineLabel(student.daysToDeadline)}.` : ""}`);
+      setShowReminderCompose(false);
+      setShowHistory(true);
+      setCaseForm({
       status: student.interventionCase?.status || "OPEN",
       priority: student.interventionCase?.priority || "MEDIUM",
       reason: student.riskReasons?.[0] || "",
@@ -904,10 +903,11 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
       dueDate: student.interventionCase?.dueDate ? student.interventionCase.dueDate.slice(0, 10) : "",
       ownerId: student.interventionCase?.owner?.id,
       owner: student.interventionCase?.owner || null,
-    }));
-  }, [student.id, student.name, student.approvedHours, requiredHours]);
+      });
+    })();
+  }, [student.id, student.name, student.approvedHours, student.pendingHours, student.remainingHours, student.daysToDeadline, student.riskReasons, student.interventionCase?.status, student.interventionCase?.priority, student.interventionCase?.summary, student.interventionCase?.dueDate, student.interventionCase?.owner, requiredHours]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoadingSessions(true);
     try {
       const data = await api.get<StudentReportResponse>(`/reports/student?studentId=${student.id}`);
@@ -917,9 +917,9 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
     } finally {
       setLoadingSessions(false);
     }
-  };
+  }, [student.id]);
 
-  const loadInterventions = async () => {
+  const loadInterventions = useCallback(async () => {
     setLoadingInterventions(true);
     try {
       const [caseData, historyData] = await Promise.all([
@@ -952,7 +952,7 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
     } finally {
       setLoadingInterventions(false);
     }
-  };
+  }, [student.id]);
 
   const saveCase = async () => {
     setSavingCase(true);
@@ -1007,10 +1007,10 @@ function StudentDetail({ student, requiredHours, triageMode, savedView, onRemove
 
   useEffect(() => {
     if (showHistory) {
-      queueMicrotask(() => { void loadHistory(); });
+      void (async () => { await loadHistory(); })();
     }
-    queueMicrotask(() => { void loadInterventions(); });
-  }, [showHistory, student.id]);
+    void (async () => { await loadInterventions(); })();
+  }, [showHistory, loadHistory, loadInterventions]);
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3px] p-4">

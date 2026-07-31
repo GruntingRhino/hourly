@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../../lib/api";
 import type { LaunchWorkspace, LaunchBug, BugCreateForm, BugEditForm } from "./types";
-import { badgeClasses } from "./types";
+import { badgeClasses } from "./launchCenterUtils";
 
 export default function BugsTab({ workspace, onUpdate }: { workspace: LaunchWorkspace; onUpdate: (data: LaunchWorkspace) => void }) {
   const [createBugForm, setCreateBugForm] = useState<BugCreateForm>({

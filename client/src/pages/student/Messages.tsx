@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../lib/api";
 
 interface Message {
@@ -62,14 +62,10 @@ export default function StudentMessages() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadMessages();
-  }, [folder]);
-
-  useEffect(() => {
     api.get<StudentSupportSummary>("/reports/student").then(setSupportSummary).catch(() => setSupportSummary(null));
   }, []);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     setLoading(true);
     try {
       if (folder === "notifications") {
@@ -84,7 +80,9 @@ export default function StudentMessages() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [folder]);
+
+  useEffect(() => { void (async () => { await loadMessages(); })(); }, [loadMessages]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();

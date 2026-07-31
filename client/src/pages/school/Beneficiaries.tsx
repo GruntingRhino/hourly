@@ -179,7 +179,7 @@ export default function SchoolBeneficiaries() {
     }
   };
 
-  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, []);
+  useEffect(() => { void (async () => { await load(); })(); }, []);
 
   useEffect(() => {
     if (tab !== "requests") return;
@@ -213,7 +213,7 @@ export default function SchoolBeneficiaries() {
   const pending = beneficiaries.filter((b) => b.approvalStatus === "PENDING");
 
   useEffect(() => {
-    if (tab === "pending" && pending.length === 0 && !loading) queueMicrotask(() => setTab("approved"));
+    if (tab === "pending" && pending.length === 0 && !loading) void (async () => { setTab("approved"); })();
   }, [loading, pending.length, tab]);
 
   const runSmartSearch = async (query: string, category: string, radius: number, loc: { lat: number; lng: number } | null) => {
@@ -263,7 +263,7 @@ export default function SchoolBeneficiaries() {
       await runSmartSearch(searchQuery, selectedCategory, proximityRadius, loc);
     };
     void run();
-  }, [tab, isAdmin, user?.schoolId, schoolSearchCity]);
+  }, [tab, isAdmin, user?.schoolId, schoolSearchCity, searchQuery, selectedCategory, proximityRadius, schoolLocation]);
 
   useEffect(() => {
     if (tab !== "search" || !isAdmin) return;
@@ -278,7 +278,7 @@ export default function SchoolBeneficiaries() {
 
   useEffect(() => {
     if (tab !== "opportunities" || !user?.schoolId) return;
-    queueMicrotask(() => setApprovedPartnerOpportunitiesLoading(true));
+    void (async () => { setApprovedPartnerOpportunitiesLoading(true); })();
     api.get<ApprovedPartnerOpportunity[]>(`/schools/${user.schoolId}/partner-opportunities`)
       .then((data) => setApprovedPartnerOpportunities(data))
       .catch((err : unknown) => setError(getErrorMessage(err, "Failed to load approved partner opportunities.")))
