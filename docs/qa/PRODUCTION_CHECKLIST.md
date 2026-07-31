@@ -4,6 +4,11 @@
 **Last Updated:** 2026-06-29  
 **Use:** Complete every item in order. Do not mark complete until verified in the production environment, not just locally.
 
+Production deployment SHA: c163c5e6183974e670c1c2f4cd2d1e81dcab046c
+Production deployment ID: dpl_9YNdw3sRXskz2LV7XWVAxMWjTDyS
+Production deployment URL: https://goodhours-9219biftq-gruntingrhinos-projects.vercel.app
+Production release readiness: PASS
+
 ---
 
 ## How to Use This Checklist
