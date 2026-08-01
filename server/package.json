@@ -9,6 +9,7 @@
     "test:billing": "node --import tsx --test tests/billing.test.ts tests/stripeWebhookProcessor.test.ts tests/stripeWebhookArchitecture.test.ts tests/stripeSubscriptionPolicy.test.ts tests/stripeCheckoutConcurrencyArchitecture.test.ts",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
