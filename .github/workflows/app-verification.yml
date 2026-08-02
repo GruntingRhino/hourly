@@ -56,7 +56,8 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate --schema=server/prisma/schema.prisma
+        working-directory: server
+        run: npx prisma generate
 
       - name: Validate Prisma schema and migration history
         working-directory: server
