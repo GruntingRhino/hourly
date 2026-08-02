@@ -12,6 +12,9 @@ jobs:
     name: Build app and parse pilot-critical specs
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
+      JWT_SECRET: ci-only-release-verification-secret-not-for-production
     services:
       postgres:
         image: postgres:16
@@ -52,6 +55,16 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=server/prisma/schema.prisma
+
+      - name: Validate Prisma schema and migration history
+        working-directory: server
+        run: |
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+
       - name: Run server tests
         working-directory: server
         env:
@@ -60,20 +73,12 @@ jobs:
           VERCEL_ENV: development
         run: npm test
 
-      - name: Validate Prisma schema and migration history
-        working-directory: server
-        env:
-          DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
-        run: |
-          npx prisma validate
-          npx prisma migrate deploy
-          npx prisma migrate status
-
       - name: Audit production dependencies
         run: |
           npm audit --omit=dev --audit-level=high
           (cd server && npm audit --omit=dev --audit-level=high)
-          (cd client && npm audit --omit=dev --audit-level=high)
+          (cd client && npm run security:verify-react-router-rsc-advisory)
+          (cd client && npm run security:verify-no-rsc)
 
       - name: Build server
         working-directory: server
