@@ -16,6 +16,7 @@ const Signup = lazy(() => import("./pages/Signup"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const CancelSignup = lazy(() => import("./pages/CancelSignup"));
 const EmailVerificationRequired = lazy(() => import("./pages/EmailVerificationRequired"));
 const ParentProgress = lazy(() => import("./pages/ParentProgress"));
 const JoinCohort = lazy(() => import("./pages/student/JoinCohort"));
@@ -86,6 +87,7 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/cancel/:token" element={<CancelSignup />} />
       <Route path="/school/register" element={<SchoolRegister />} />
       <Route path="/school/verify-registration" element={<SchoolVerifyRegistration />} />
       <Route path="/school/confirm-transfer" element={<SchoolConfirmTransfer />} />

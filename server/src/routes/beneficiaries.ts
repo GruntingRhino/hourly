@@ -2505,8 +2505,12 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
     if (slot.opportunity.status !== "ACTIVE") return res.status(400).json({ error: "This opportunity is no longer active" });
 
-    // Resolve the student's school
-    const studentSchoolId = await resolveStudentSchoolId(req.user!.userId);
+    // Use the canonical owning school; cohort/classroom associations cannot establish tenancy.
+    const student = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    const studentSchoolId = student?.schoolId ?? null;
     if (!studentSchoolId) {
       return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }
@@ -2562,6 +2566,7 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
         data: {
           slotId: slot.id,
           studentId: req.user!.userId,
+          schoolId: studentSchoolId,
           status,
           cancellationToken: crypto.randomUUID(),
         },
@@ -3234,8 +3239,51 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
   }
 });
 
-// GET /api/beneficiaries/cancel/:token — public one-click cancellation link (no auth required)
+// GET /api/beneficiaries/cancel/:token — read-only confirmation lookup (no auth required).
+// Never mutates state: email scanners, link previewers, and crawlers must not be able to
+// cancel a signup merely by requesting the link.
 router.get("/cancel/:token", async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { cancellationToken: req.params.token },
+      select: {
+        status: true,
+        verificationStatus: true,
+        slot: {
+          select: {
+            date: true,
+            startTime: true,
+            endTime: true,
+            opportunity: { select: { title: true } },
+          },
+        },
+      },
+    });
+
+    if (!signup) return res.status(404).json({ error: "Cancellation link not found or already used." });
+    if (signup.status === "CANCELLED") {
+      return res.json({ requiresConfirmation: false, alreadyCancelled: true, opportunityTitle: signup.slot.opportunity.title });
+    }
+    if (signup.verificationStatus === "APPROVED") {
+      return res.status(400).json({ error: "Cannot cancel an already-approved signup." });
+    }
+
+    res.json({
+      requiresConfirmation: true,
+      opportunityTitle: signup.slot.opportunity.title,
+      date: signup.slot.date,
+      startTime: signup.slot.startTime,
+      endTime: signup.slot.endTime,
+    });
+  } catch (err) {
+    console.error("Cancel link lookup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/cancel/:token — explicit, one-time confirmation that consumes
+// the cancellation token and performs the mutation (no auth required; the token is the capability).
+router.post("/cancel/:token", async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { cancellationToken: req.params.token },
@@ -3280,7 +3328,9 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
           action: "SIGNUP_CANCELLED",
           actorId: signup.studentId,
           signupId: signup.id,
-          details: JSON.stringify({ source: "one_click_cancel", previousStatus: signup.status }),
+          // Possession of the bearer link proves the cancellation capability, not that
+          // the student personally submitted the request — record that distinction.
+          details: JSON.stringify({ source: "one_click_cancel", actorType: "CANCELLATION_CAPABILITY", previousStatus: signup.status }),
         },
       });
 
