@@ -653,27 +653,35 @@ model BeneficiaryAdminInvitation {
 
 // ─── Self-Submitted Volunteering Requests ───────────────────────
 
+enum SelfSubmittedRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+  CANCELLED
+}
+
 model SelfSubmittedRequest {
-  id                 String    @id @default(cuid())
+  id                 String                     @id @default(cuid())
   studentId          String
-  student            User      @relation(fields: [studentId], references: [id])
+  student            User                       @relation(fields: [studentId], references: [id])
   schoolId           String
-  school             School    @relation(fields: [schoolId], references: [id])
+  school             School                     @relation(fields: [schoolId], references: [id])
   organizationName   String // name of place they volunteered at
   description        String
   date               DateTime
   hours              Float
   evidenceNote       String? // optional description/link
-  status             String    @default("PENDING") // PENDING, APPROVED, REJECTED, REVISION_REQUESTED
+  status             SelfSubmittedRequestStatus @default(PENDING)
   reviewedBy         String?
   reviewedAt         DateTime?
   rejectionReason    String?
   revisionNote       String? // admin note when requesting revision
-  timesRevised       Int       @default(0)
+  timesRevised       Int                        @default(0)
   convertedSessionId String? // if approved → creates a ServiceSession
   category           String? // e.g. "environment", "education", "food", "health", "general"
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   @@index([studentId, status])
   @@index([schoolId, status])

@@ -16,6 +16,8 @@ import {
 
 const router = Router();
 
+const selfSubmittedRequestStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "REVISION_REQUESTED", "CANCELLED"]);
+
 // POST /api/self-submissions — student submits self-selected volunteering
 router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -221,7 +223,10 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     if (["SCHOOL_ADMIN", "TEACHER"].includes(user.role)) {
       const scope = await getStaffAccessScope(req.user!.userId);
       if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
-      const statusFilter = req.query.status as string | undefined;
+      const statusFilter = selfSubmittedRequestStatusEnum.optional().safeParse(req.query.status);
+      if (!statusFilter.success) {
+        return res.status(400).json({ error: "status must be PENDING, APPROVED, REJECTED, REVISION_REQUESTED, or CANCELLED" });
+      }
       const submissions = await prisma.selfSubmittedRequest.findMany({
         where: {
           schoolId: scope.schoolId,
@@ -233,7 +238,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
               ],
             },
           }),
-          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(statusFilter.data ? { status: statusFilter.data } : {}),
         },
         include: {
           student: { select: { id: true, name: true, email: true, cohortId: true } },
