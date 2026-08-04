@@ -534,23 +534,20 @@ function ProcurementStatusState({
     }
   };
 
-  const handleDownloadDoc = (docId: string, originalName: string) => {
-    const token = localStorage.getItem("token");
-    const url = `/api/school-procurement/${schoolId}/documents/${docId}`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.setAttribute("download", originalName);
-    // Use fetch to attach auth header
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const burl = URL.createObjectURL(blob);
-        a.href = burl;
-        document.body.appendChild(a);
-        a.click();
-        URL.revokeObjectURL(burl);
-        document.body.removeChild(a);
-      });
+  const handleDownloadDoc = async (docId: string, originalName: string) => {
+    try {
+      const blob = await api.download(`/school-procurement/${schoolId}/documents/${docId}`);
+      const burl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = burl;
+      a.setAttribute("download", originalName);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(burl);
+    } catch (err: unknown) {
+      setUploadError(getErrorMessage(err, "Download failed."));
+    }
   };
 
   return (

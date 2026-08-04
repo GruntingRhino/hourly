@@ -182,6 +182,12 @@ export default function CreateOpportunity() {
       };
 
       if (isEditing) {
+        // Wait for confirmed success before redirecting — a fire-and-forget
+        // write here previously navigated away immediately regardless of
+        // whether the PUT actually succeeded, so a failed update looked
+        // identical to a successful one.
+        await api.put(`/opportunities/${id}`, payload);
+
         const params = new URLSearchParams({
           updatedId: String(id || ""),
           updatedTitle: form.title,
@@ -191,22 +197,7 @@ export default function CreateOpportunity() {
           updatedLocation: form.location,
           updatedCapacity: String(parseInt(form.capacity) || 0),
         });
-        const redirectTo = `/opportunities?${params.toString()}`;
-
-        const token = localStorage.getItem("goodhours_token");
-        void fetch(`/api/opportunities/${id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch(() => {
-          // List refresh/rollback handles eventual consistency if this update fails.
-        });
-
-        window.location.assign(redirectTo);
+        navigate(`/opportunities?${params.toString()}`);
       } else {
         await api.post("/opportunities", payload);
         navigate("/opportunities");
