@@ -7,7 +7,19 @@ is the source of truth for **what's done vs. still open** — update it every
 time a session finishes a chunk of this work instead of re-deriving status
 from scratch.
 
-**Last updated:** 2026-08-04 (pre-commit — see verification block for current state).
+**Last updated:** 2026-08-04, commit `bf578c9`.
+
+**Session boundary note:** as of this commit, every issue independently
+identified and verified across `security_findings.md` (Findings 1–10) and
+every other audit markdown file in the repo (see "Other audit docs" below)
+is fixed except one cosmetic, test-data-only gap. That is not the same as
+"the goal is complete" — sections §7–§19 of the `/goal` brief (canonical
+event-time model, service-hour ledger, staged imports, durable reminder
+jobs, object storage, client/server auth consistency, schema enums, legacy
+architecture consolidation, build reproducibility) are largely **unbuilt**,
+not "fixed." Those are fresh multi-file architecture projects, not bug
+fixes to existing code, and need explicit scoping before starting — see the
+table below for what's actually there today.
 
 This file now also consolidates findings from the other, older audit markdown
 files scattered around the repo (`docs/qa/SECURITY_AUDIT.md`,
