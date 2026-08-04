@@ -40,6 +40,8 @@ import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
 import { slotDateTime } from "../lib/icsGenerator";
 import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
 
+const schoolBeneficiaryApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "BLOCKED"]);
+
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
 /**
@@ -461,12 +463,18 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     if (!schoolId) return res.json([]);
 
     const search = req.query.search as string | undefined;
-    const status = req.query.status as string | undefined; // APPROVED, PENDING, ALL
+    const rawStatus = req.query.status;
+    const statusFilter = schoolBeneficiaryApprovalStatusEnum
+      .optional()
+      .safeParse(rawStatus === "ALL" ? undefined : rawStatus);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be PENDING, APPROVED, REJECTED, BLOCKED, or ALL" });
+    }
 
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
       where: {
         schoolId,
-        status: usesPublicBeneficiaryDto ? "APPROVED" : (status && status !== "ALL" ? status : undefined),
+        status: usesPublicBeneficiaryDto ? "APPROVED" : statusFilter.data,
       },
       select: {
         id: true,

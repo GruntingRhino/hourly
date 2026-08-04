@@ -565,15 +565,22 @@ model BeneficiaryDirectory {
 
 // ─── School <-> Beneficiary Approval ────────────────────────────
 
+enum SchoolBeneficiaryApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
 model SchoolBeneficiaryApproval {
-  id            String      @id @default(cuid())
+  id            String                          @id @default(cuid())
   schoolId      String
   beneficiaryId String
-  status        String      @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
+  status        SchoolBeneficiaryApprovalStatus @default(PENDING)
   approvedAt    DateTime?
-  school        School      @relation(fields: [schoolId], references: [id])
-  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  createdAt     DateTime    @default(now())
+  school        School                          @relation(fields: [schoolId], references: [id])
+  beneficiary   Beneficiary                     @relation(fields: [beneficiaryId], references: [id])
+  createdAt     DateTime                        @default(now())
 
   @@unique([schoolId, beneficiaryId])
 }
@@ -856,15 +863,22 @@ model Organization {
 
 // ─── Legacy: School <-> Organization approval ───────────────────
 
+enum SchoolOrganizationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
 model SchoolOrganization {
-  id             String       @id @default(cuid())
+  id             String                   @id @default(cuid())
   schoolId       String
   organizationId String
-  status         String       @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
+  status         SchoolOrganizationStatus @default(PENDING)
   approvedAt     DateTime?
-  school         School       @relation(fields: [schoolId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime     @default(now())
+  school         School                   @relation(fields: [schoolId], references: [id])
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime                 @default(now())
 
   @@unique([schoolId, organizationId])
 }
