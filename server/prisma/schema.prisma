@@ -162,12 +162,18 @@ model SchoolRegistrationIntent {
 
 // ─── Schools ────────────────────────────────────────────────────
 
+enum SchoolOwnershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model School {
-  id                            String           @id @default(cuid())
+  id                            String                @id @default(cuid())
   name                          String
   // Directory reference — if this school came from the schools directory
   directoryId                   String? // references SchoolDirectory.id
-  directoryEntry                SchoolDirectory? @relation(fields: [directoryId], references: [id])
+  directoryEntry                SchoolDirectory?      @relation(fields: [directoryId], references: [id])
   type                          String? // public, private, charter
   address                       String?
   city                          String?
@@ -176,32 +182,32 @@ model School {
   latitude                      Float?
   longitude                     Float?
   domain                        String? // official email domain(s) — eligibility check only, not self-enrollment
-  verified                      Boolean          @default(false)
-  ownershipStatus               String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  verified                      Boolean               @default(false)
+  ownershipStatus               SchoolOwnershipStatus @default(PENDING)
   ownershipEvidenceVerifiedAt   DateTime?
   ownershipReviewedAt           DateTime?
   ownershipReviewedById         String?
   ownershipReviewNote           String?
   // Magic link registration
-  registrationToken             String?          @unique
+  registrationToken             String?               @unique
   registrationTokenExpires      DateTime?
   registrationEmail             String? // email to which the magic link was sent
   createdById                   String?
-  createdBy                     User?            @relation("SchoolCreator", fields: [createdById], references: [id])
-  ownershipTransferToken        String?          @unique
+  createdBy                     User?                 @relation("SchoolCreator", fields: [createdById], references: [id])
+  ownershipTransferToken        String?               @unique
   ownershipTransferExpires      DateTime?
   ownershipTransferTargetUserId String?
-  requiredHours                 Float            @default(40)
-  verificationStandard          String           @default("STANDARD")
+  requiredHours                 Float                 @default(40)
+  verificationStandard          String                @default("STANDARD")
   serviceStartDate              DateTime?
   serviceEndDate                DateTime?
-  allowSelfSubmission           Boolean          @default(true)
-  ferpaBeneficiaryPiiEnabled    Boolean          @default(false) // when true, student names are shared with beneficiary admins
-  requireOrgVerification        Boolean          @default(false)
+  allowSelfSubmission           Boolean               @default(true)
+  ferpaBeneficiaryPiiEnabled    Boolean               @default(false) // when true, student names are shared with beneficiary admins
+  requireOrgVerification        Boolean               @default(false)
   categoryHourCaps              String? // JSON: { [category: string]: number }
   // Legacy
-  allowJoinByCode               Boolean          @default(false)
-  onboardingComplete            Boolean          @default(false)
+  allowJoinByCode               Boolean               @default(false)
+  onboardingComplete            Boolean               @default(false)
   partnerInviteTemplate         String?
   launchOnboardingConfig        String?
   launchSupportConfig           String?
@@ -209,11 +215,11 @@ model School {
   launchMonitoringConfig        String?
   zipCodes                      String? // JSON array of zip codes (service area)
   // Billing / procurement
-  billingStatus                 String           @default("NONE")
-  accessStatus                  String           @default("PROCUREMENT")
+  billingStatus                 String                @default("NONE")
+  accessStatus                  String                @default("PROCUREMENT")
   pilotExpiresAt                DateTime?
-  createdAt                     DateTime         @default(now())
-  updatedAt                     DateTime         @updatedAt
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
 
   staff                   User[]                       @relation("SchoolStaff")
   cohorts                 Cohort[]
