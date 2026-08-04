@@ -497,8 +497,24 @@ model IntegrationSyncError {
 
 // ─── Beneficiaries ──────────────────────────────────────────────
 
+enum BeneficiaryStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum BeneficiaryVisibilityStatus {
+  PUBLIC
+  PRIVATE
+}
+
+enum BeneficiaryPlanTierStatus {
+  FREE
+  PRO
+}
+
 model Beneficiary {
-  id                String                @id @default(cuid())
+  id                String                      @id @default(cuid())
   name              String
   email             String?
   phone             String?
@@ -513,19 +529,19 @@ model Beneficiary {
   longitude         Float?
   // Directory status
   directoryId       String? // references BeneficiaryDirectory.id
-  directoryEntry    BeneficiaryDirectory? @relation(fields: [directoryId], references: [id])
-  status            String                @default("PENDING") // PENDING, ACTIVE, SUSPENDED
-  visibility        String                @default("PRIVATE") // PUBLIC, PRIVATE (school-created)
-  claimed           Boolean               @default(false)
+  directoryEntry    BeneficiaryDirectory?       @relation(fields: [directoryId], references: [id])
+  status            BeneficiaryStatus           @default(PENDING)
+  visibility        BeneficiaryVisibilityStatus @default(PRIVATE)
+  claimed           Boolean                     @default(false)
   createdBySchoolId String? // if school-created custom beneficiary
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
-  planTier                  String    @default("FREE") // FREE, PRO
-  hasSchoolComplimentaryPro Boolean   @default(false)
+  planTier                  BeneficiaryPlanTierStatus @default(FREE)
+  hasSchoolComplimentaryPro Boolean                   @default(false)
   proActivatedAt            DateTime?
-  timezone                  String    @default("America/New_York") // IANA timezone for event times
-  uploadAbuseStrikes        Int       @default(0)
+  timezone                  String                    @default("America/New_York") // IANA timezone for event times
+  uploadAbuseStrikes        Int                       @default(0)
   uploadSuspendedUntil      DateTime?
 
   // Custom email branding (Pro)
