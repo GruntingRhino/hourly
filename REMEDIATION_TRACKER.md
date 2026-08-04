@@ -7,7 +7,7 @@ is the source of truth for **what's done vs. still open** — update it every
 time a session finishes a chunk of this work instead of re-deriving status
 from scratch.
 
-**Last updated:** 2026-08-04, commit `f82d200`.
+**Last updated:** 2026-08-04, commit `d9f36db`.
 
 **Session boundary note:** as of this commit, every issue independently
 identified and verified across `security_findings.md` (Findings 1–10) and
