@@ -7,7 +7,7 @@ is the source of truth for **what's done vs. still open** — update it every
 time a session finishes a chunk of this work instead of re-deriving status
 from scratch.
 
-**Last updated:** 2026-08-04, commit `af38e01`.
+**Last updated:** 2026-08-04, commit `4fdfacd`.
 
 **Session boundary note:** as of this commit, every issue independently
 identified and verified across `security_findings.md` (Findings 1–10) and
@@ -152,7 +152,9 @@ a fresh multi-file project, not a bug fix:
 - `.env.example` / `server/.env.example` → placeholders only, no real secrets
 - `.gitignore` → covers `.env*`, `node_modules`, `dist`, local DBs, uploads, test results
 
-Not yet run this session: full E2E suite (`tests/*.spec.ts` — Playwright), dependency/secret scan (`npm audit` showed pre-existing "1 low, 1 high" findings during an unrelated `npm install` — not yet triaged), lint (server has no configured lint script; client lint only spot-checked on touched files, not run repo-wide).
+- **Dependency scan**: `npm audit` in `server/` found `ip-address <=10.3.0` (transitive via `express-rate-limit`) with 3 HIGH-severity SSRF/trust-boundary-bypass advisories, and a low-severity `esbuild` (transitive via `tsx`, dev-only) advisory. Confirmed `lib/lmsOutboundSecurity.ts`'s own SSRF checks don't use this package (unaffected), but `express-rate-limit`'s IP trust logic was exposed. Both resolved via `npm update` within already-declared semver ranges (no `package.json` version bumps needed) — `npm audit` now reports **zero vulnerabilities**. Commit `4fdfacd`
+
+Not yet run this session: full E2E suite (`tests/*.spec.ts` — Playwright), lint (server has no configured lint script; client lint only spot-checked on touched files, not run repo-wide).
 
 ---
 
