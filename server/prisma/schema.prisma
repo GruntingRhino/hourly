@@ -857,18 +857,25 @@ model Classroom {
 // ─── Legacy: Organizations ──────────────────────────────────────
 // Kept for backward compat — new entities use Beneficiary model
 
+enum OrganizationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 model Organization {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
   email       String
   phone       String?
   description String?
   website     String?
   avatarUrl   String?
-  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
+  status      OrganizationStatus @default(PENDING)
   zipCodes    String? // JSON array of zip codes
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   members         User[]               @relation("OrgMembers")
   opportunities   Opportunity[]
