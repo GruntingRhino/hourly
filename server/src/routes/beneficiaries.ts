@@ -524,13 +524,20 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     const lng = parseFloat(req.query.lng as string);
     const radius = Math.min(parseFloat((req.query.radius as string) || "10"), 50);
     const category = req.query.category as string | undefined;
-    const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = parseInt((req.query.limit as string) || "10000", 10);
-    const offset = (page - 1) * limit;
+    const page = req.query.page !== undefined ? parseInt(req.query.page as string, 10) : 1;
+    const limit = req.query.limit !== undefined ? parseInt(req.query.limit as string, 10) : 10000;
 
     if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ error: "lat and lng query params required" });
     }
+    // page/limit are interpolated directly into the raw SQL LIMIT/OFFSET clause below
+    // (not passed as bound params), so an invalid value must be rejected here rather
+    // than silently coerced — a NaN or negative value would otherwise reach the query
+    // as malformed SQL text.
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 10000) {
+      return res.status(400).json({ error: "page must be a positive integer and limit must be between 1 and 10000" });
+    }
+    const offset = (page - 1) * limit;
 
     const q = (req.query.q as string | undefined)?.trim() || undefined;
 
