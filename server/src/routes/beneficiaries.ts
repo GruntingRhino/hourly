@@ -2637,14 +2637,16 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
       : [];
     const studentMap = new Map(students.map((student) => [student.id, student.name]));
 
-    // FERPA disclosure log: beneficiary admin accessed student signup list
-    logDataAccess({
+    // FERPA disclosure log: beneficiary admin accessed student signup list.
+    // Awaited (not fire-and-forget) so a failed audit write aborts the
+    // response instead of silently releasing student data with no trail.
+    await logDataAccess({
       actorId: req.user!.userId,
       action: "VIEW_BENEFICIARY_SIGNUPS",
       targetType: "beneficiary",
       targetId: req.params.id,
       details: { studentCount: signups.length, statusFilter: statusFilter ?? "all" },
-    }).catch(() => {});
+    });
 
     const result = signups.map((s) => ({
       ...s,

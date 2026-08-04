@@ -1,10 +1,18 @@
 import type { Request } from "express";
+import crypto from "crypto";
 import prisma from "./prisma";
 import { resolveSchoolIdFromUserAssociations } from "./userAssociations";
 
 /**
  * Log a data access event for FERPA audit purposes.
- * Non-blocking — failures are swallowed so they never break the request.
+ *
+ * Deliberately fails open in the caller's favor by failing CLOSED here: this
+ * throws on a write failure rather than swallowing it. Every current caller
+ * awaits this before sending a response that discloses student records, so a
+ * failed audit write now aborts the response (existing route try/catch blocks
+ * turn the rejection into a 500) instead of releasing data with no
+ * accountability trail. Do not wrap calls to this in a try/catch that
+ * discards the error for a sensitive read.
  */
 export async function logDataAccess(params: {
   actorId: string;
@@ -14,20 +22,16 @@ export async function logDataAccess(params: {
   schoolId?: string;
   details?: Record<string, unknown>;
 }): Promise<void> {
-  try {
-    await prisma.dataAccessLog.create({
-      data: {
-        actorId: params.actorId,
-        action: params.action,
-        targetType: params.targetType ?? null,
-        targetId: params.targetId ?? null,
-        schoolId: params.schoolId ?? null,
-        details: params.details ? JSON.stringify(params.details) : null,
-      },
-    });
-  } catch (err) {
-    console.error("[FERPA] DataAccessLog write failed:", err);
-  }
+  await prisma.dataAccessLog.create({
+    data: {
+      actorId: params.actorId,
+      action: params.action,
+      targetType: params.targetType ?? null,
+      targetId: params.targetId ?? null,
+      schoolId: params.schoolId ?? null,
+      details: params.details ? JSON.stringify(params.details) : null,
+    },
+  });
 }
 
 /**
@@ -71,17 +75,37 @@ export function buildRequestAuditMetadata(req: Request): Record<string, unknown>
   };
 }
 
-export function summarizeStudentSubjects(
-  students: Array<{ name: string | null; email?: string | null }>,
-  limit = 25
-): Record<string, unknown> {
-  const includedStudents = students
-    .map((student) => (student.name || student.email || "").trim())
-    .filter(Boolean);
+let _digestKey: Buffer | null = null;
 
+/**
+ * Derive a digest key from FIELD_ENCRYPTION_KEY with domain separation, so the
+ * audit-subject digest never reuses the raw field-encryption key material.
+ * Falls back to a fixed non-secret salt outside production, where
+ * FIELD_ENCRYPTION_KEY is optional — the digest is then not confidential, but
+ * production (where it matters) always has the key configured.
+ */
+function getDigestKey(): Buffer {
+  if (_digestKey) return _digestKey;
+  const base = process.env.FIELD_ENCRYPTION_KEY ?? "dev-only-audit-digest-salt";
+  _digestKey = crypto.createHash("sha256").update(`${base}:audit-subject-digest`).digest();
+  return _digestKey;
+}
+
+/**
+ * Summarize the students affected by a data-access event without duplicating
+ * their names or emails into the audit trail. Only a count and a stable,
+ * keyed digest of the subject-ID set are retained, so the audit log cannot
+ * itself become an unauthoritative copy of student PII.
+ */
+export function summarizeStudentSubjects(
+  students: Array<{ id: string }>
+): Record<string, unknown> {
+  const ids = [...new Set(students.map((student) => student.id))].sort();
   return {
-    studentCount: includedStudents.length,
-    includedStudents: includedStudents.slice(0, limit),
-    omittedStudentCount: Math.max(0, includedStudents.length - limit),
+    studentCount: ids.length,
+    subjectSetDigest: crypto
+      .createHmac("sha256", getDigestKey())
+      .update(ids.join("\n"))
+      .digest("base64url"),
   };
 }

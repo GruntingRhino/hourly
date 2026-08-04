@@ -46,7 +46,7 @@ function buildSchoolReportAuditDetails(params: {
   actorRole: string;
   scope: Awaited<ReturnType<typeof getStaffAccessScope>>;
   selectedCohortNames: string[];
-  students: Array<{ name: string; email: string }>;
+  students: Array<{ id: string }>;
 }) {
   const isAssignedCohortScope = !!params.scope && !params.scope.isSchoolAdmin;
   return {
@@ -91,6 +91,15 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       });
     }
 
+    const reportOwner = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { schoolId: true },
+    });
+    if (!reportOwner?.schoolId) {
+      return res.status(404).json({ error: "Student school not found" });
+    }
+    const owningSchoolId = reportOwner.schoolId;
+
     const fallbackResponse = {
       totalApprovedHours: 0,
       totalPendingHours: 0,
@@ -108,7 +117,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
 
     try {
       const sessions = await prisma.serviceSession.findMany({
-        where: { userId },
+        where: { userId, schoolId: owningSchoolId },
         include: {
           opportunity: {
             include: { organization: { select: { id: true, name: true } } },
@@ -123,7 +132,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const rejected = sessions.filter((s) => s.verificationStatus === "REJECTED");
 
     // Aggregate hours from all sources: BeneficiarySignup + SelfSubmittedRequest + ServiceSession (legacy)
-    const hoursMap = await calculateStudentHours([userId]);
+    const hoursMap = await calculateStudentHours([userId], owningSchoolId);
     const studentHours = hoursMap.get(userId) ?? { approved: 0, pending: 0 };
 
     // totalCommittedHours remains ServiceSession-only (no equivalent concept in other models)
@@ -317,6 +326,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: school.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -352,7 +362,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
         actorRole: req.user!.role,
         scope,
         selectedCohortNames: selectedCohorts.map((cohort) => cohort.name),
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 

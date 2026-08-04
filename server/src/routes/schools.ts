@@ -24,6 +24,8 @@ import { safeSchoolSelect } from "../lib/schoolSelect";
 import { geocodeAddress } from "../lib/geocode";
 import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { calculateStudentHours } from "../lib/hoursCalculator";
+import { isInternalAdminUser } from "../lib/internalAdmin";
+import { reviewSchoolOwnership } from "../lib/schoolActivation";
 import {
   assertStudentAccessibleToStaff,
   buildCohortScopedStudentWhere,
@@ -43,6 +45,10 @@ const router = Router();
 const IS_PROD_LIKE =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 const REQUIRED_CATEGORY_CAP = "Community Service";
+const schoolOwnershipReviewSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().trim().min(1).max(2000).optional(),
+}).strict();
 
 type CategoryCapWarning = {
   studentId: string;
@@ -167,7 +173,7 @@ function buildStaffStudentAuditDetails(params: {
   scopeType: "school" | "cohort_selection" | "assigned_cohorts";
   assignedCohorts?: string[];
   filters?: Record<string, unknown>;
-  students: Array<{ name: string; email: string }>;
+  students: Array<{ id: string }>;
 }) {
   return {
     accessKind: params.accessKind,
@@ -207,6 +213,41 @@ async function runOwnershipTransfer(params: {
     });
   });
 }
+
+// POST /api/schools/ownership-reviews/:schoolId — every initial school claim
+// requires an independently allowlisted GoodHours operator.
+router.post("/ownership-reviews/:schoolId", authenticate, async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, email: true, role: true },
+    });
+    if (!actor || !isInternalAdminUser(actor)) {
+      return res.status(403).json({ error: "Internal school-ownership reviewer required" });
+    }
+
+    const input = schoolOwnershipReviewSchema.parse(req.body);
+    const reviewed = await reviewSchoolOwnership({
+      schoolId: req.params.schoolId,
+      reviewerId: actor.id,
+      decision: input.decision,
+      note: input.note,
+    });
+    return res.json({ school: reviewed });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0]?.message || "Invalid review" });
+    }
+    const status = typeof err === "object" && err && "status" in err
+      ? Number((err as { status: unknown }).status)
+      : 500;
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({ error: err instanceof Error ? err.message : "Review failed" });
+    }
+    console.error("School ownership review error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // GET /api/schools — public search (for orgs to find schools)
 router.get("/", authenticate, async (req: Request, res: Response) => {
@@ -1081,6 +1122,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
     const accessibleCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -1117,7 +1159,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
           ? school.name
           : accessibleCohorts.map((cohort) => cohort.name).join(", "),
         assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 
@@ -1257,7 +1299,7 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
 
     const [beneficiarySignups, selfSubmissions, legacySessions, totalsMap] = await Promise.all([
       prisma.beneficiarySignup.findMany({
-        where: { studentId: student.id },
+        where: { studentId: student.id, schoolId: req.params.id },
         include: {
           slot: {
             include: {
@@ -1273,11 +1315,11 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         orderBy: [{ slot: { date: "desc" } }, { createdAt: "desc" }],
       }),
       prisma.selfSubmittedRequest.findMany({
-        where: { studentId: student.id },
+        where: { studentId: student.id, schoolId: req.params.id },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       }),
       prisma.serviceSession.findMany({
-        where: { userId: student.id },
+        where: { userId: student.id, schoolId: req.params.id },
         include: {
           opportunity: {
             include: {
@@ -1288,7 +1330,7 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         },
         orderBy: [{ createdAt: "desc" }],
       }),
-      calculateStudentHours([student.id]),
+      calculateStudentHours([student.id], req.params.id),
     ]);
 
     const actorIds = [
@@ -1528,6 +1570,7 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), a
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -1789,7 +1832,7 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
         },
       }),
       prisma.school.findUnique({ where: { id: req.params.id }, select: { requiredHours: true } }),
-      calculateStudentHours(studentIds),
+      calculateStudentHours(studentIds, req.params.id),
     ]);
 
     const result = students.map((s) => {
@@ -2087,6 +2130,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -2116,7 +2160,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
             : accessibleCohorts.map((cohort) => cohort.name).join(", ")),
         assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
         filters: cohortLabel ? { cohort: cohortLabel } : {},
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 
@@ -2377,6 +2421,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
     let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
     try {
       progress = await buildStudentProgressRecords(students, {
+        schoolId: req.params.id,
         requiredHours: school.requiredHours,
         serviceStartDate: school.serviceStartDate,
         serviceEndDate: school.serviceEndDate,
