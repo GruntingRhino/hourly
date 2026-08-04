@@ -587,18 +587,25 @@ model SchoolBeneficiaryApproval {
 
 // ─── Beneficiary Invitations ─────────────────────────────────────
 
+enum BeneficiaryInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 model BeneficiaryInvitation {
-  id            String      @id @default(cuid())
+  id            String                      @id @default(cuid())
   schoolId      String // which school is inviting
   beneficiaryId String
-  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  token         String      @unique
+  beneficiary   Beneficiary                 @relation(fields: [beneficiaryId], references: [id])
+  token         String                      @unique
   expiresAt     DateTime
-  status        String      @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  status        BeneficiaryInvitationStatus @default(PENDING)
   sentTo        String // email address sent to
   acceptedAt    DateTime?
   respondedAt   DateTime?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime                    @default(now())
 }
 
 enum BeneficiaryAdminInvitationStatus {
