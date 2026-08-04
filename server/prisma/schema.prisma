@@ -689,12 +689,18 @@ model SelfSubmittedRequest {
 
 // ─── Beneficiary Opportunities ───────────────────────────────────
 
+enum BeneficiaryOpportunityStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
 model BeneficiaryOpportunity {
-  id                 String      @id @default(cuid())
+  id                 String                       @id @default(cuid())
   title              String
   description        String
   beneficiaryId      String
-  beneficiary        Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  beneficiary        Beneficiary                  @relation(fields: [beneficiaryId], references: [id])
   category           String?
   location           String?
   address            String?
@@ -702,7 +708,7 @@ model BeneficiaryOpportunity {
   longitude          Float?
   startDate          DateTime
   endDate            DateTime?
-  status             String      @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
+  status             BeneficiaryOpportunityStatus @default(ACTIVE)
   requirementsNote   String?
   customFields       String? // JSON
   schoolRestrictions String? // JSON array of school IDs (null = all approved schools)
