@@ -949,8 +949,14 @@ model SchoolLaunchBug {
 
 // ─── Legacy: Opportunities ──────────────────────────────────────
 
+enum OpportunityStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
 model Opportunity {
-  id               String       @id @default(cuid())
+  id               String            @id @default(cuid())
   title            String
   description      String
   tags             String? // JSON array string
@@ -965,14 +971,14 @@ model Opportunity {
   capacity         Int
   ageRequirement   Int?
   gradeRequirement String?
-  isRecurring      Boolean      @default(false)
+  isRecurring      Boolean           @default(false)
   recurringPattern String? // JSON
   customFields     String? // JSON: [{label:string, value:string}]
-  status           String       @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
+  status           OpportunityStatus @default(ACTIVE)
   organizationId   String
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   signups         Signup[]
   serviceSessions ServiceSession[]

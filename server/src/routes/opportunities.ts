@@ -30,14 +30,20 @@ const createSchema = z.object({
   customFields: z.string().optional(), // JSON string: [{label, value}]
 });
 
+const opportunityStatusEnum = z.enum(["ACTIVE", "CANCELLED", "COMPLETED"]);
+
 // GET /api/opportunities — browse (public, filtered)
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { search, date, tag, organizationId, status, schoolId, approvedOnly } = req.query;
+    const { search, date, tag, organizationId, schoolId, approvedOnly } = req.query;
+    const statusFilter = opportunityStatusEnum.optional().safeParse(req.query.status);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be ACTIVE, CANCELLED, or COMPLETED" });
+    }
     const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
     const take = Number.isFinite(limitRaw) ? Math.min(300, Math.max(1, Math.floor(limitRaw))) : 150;
 
-    const where: any = { status: (status as string) || "ACTIVE" };
+    const where: any = { status: statusFilter.data ?? "ACTIVE" };
 
     if (search) {
       where.OR = [
@@ -264,7 +270,13 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
       return res.status(403).json({ error: "Not your organization's opportunity" });
     }
 
-    const updateData: any = { ...req.body };
+    // Validated against the same field whitelist as creation (createSchema)
+    // instead of spreading req.body directly into the Prisma update — an
+    // unvalidated spread here previously let a caller set arbitrary model
+    // fields (e.g. organizationId, transferring the opportunity to another
+    // org) rather than only the fields the edit form actually exposes.
+    const parsed = createSchema.partial().parse(req.body);
+    const updateData: any = { ...parsed };
     if (updateData.tags && Array.isArray(updateData.tags)) {
       updateData.tags = JSON.stringify(updateData.tags);
     }
@@ -309,6 +321,9 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: err.errors });
+    }
     if (err instanceof Error && err.message.startsWith("CAPACITY_FLOOR:")) {
       const confirmedCount = Number(err.message.split(":")[1] || "0");
       return res.status(400).json({ error: `Capacity cannot be lower than the ${confirmedCount} confirmed volunteer(s).` });
