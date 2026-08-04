@@ -64,6 +64,46 @@ Status legend: ✅ Fixed & verified · 🟡 Partially done · ⬜ Not started ·
 
 ---
 
+## security_findings.md: full read-through complete (2026-08-04)
+
+As of this session, every section of `security_findings.md` (§1 threat model,
+§2 the 10 numbered findings, §3 attack surface expansion, §4 hardening/
+verification plan, §5 student security, §6 SIS/procurement compliance) has
+been read and checked against current code — not just the numbered findings.
+Notes from §3–§6:
+
+- **§3.2 (insecure seed defaults)** — was genuinely unfixed; closed this
+  session (see additional-issues table above, commit `40af038`).
+- **§4 Criterion 2's exact SQL invariant** (`StudentCohortMembership` rows
+  where the student's school ≠ the cohort's school) was run directly against
+  the real dev database. Found **one** violating row — a Playwright test
+  fixture (`isTestAccount: true`) whose `schoolId` is `NULL` (not a
+  different school), predating `ensureStudentCohortMembership`'s write-time
+  enforcement (Finding 4, already fixed and tested in
+  `studentCohortsSecurity.test.ts`). Confirmed this is stale QA data, not a
+  live bypass — the enforcement blocks this exact case for any new write.
+  Not cleaned up (test-data hygiene in a QA-only database, not a security
+  fix).
+- **§4 Criterion 4's "audit-write failure → 503"**: the fail-closed fix
+  (Finding 9, commit `8db748a`) returns `500` via each route's existing
+  generic catch block, not a dedicated `503`. The security property the
+  criterion cares about — no student data is released on audit-write
+  failure — is satisfied and tested; the specific status code is a minor,
+  optional refinement, not fixed.
+- **§5 "Parent access" bearer links** — already securely disabled
+  (`POST /reports/parent-link` and `GET /reports/parent-progress` both
+  return a fixed 403 with no token logic reachable at all), matching the
+  goal's "disable until redesigned" directive. Nothing to fix.
+- **§3 (rest), §4 (rest), §5.3–§5.4, §6 entirely** — MFA/SSO/SCIM enforcement,
+  malware scanning, SBOM, penetration testing, DPAs, VPAT/ACR, SOC 2,
+  incident response plans, backup/DR testing, subprocessor governance,
+  insurance certificates, and similar — these are organizational/legal/
+  compliance evidence, not code. No code-level fix applies; out of scope per
+  this goal's own instruction to work from evidence in the code, not produce
+  paperwork.
+
+---
+
 ## Other audit docs — cross-checked against current code (2026-08-04)
 
 A background research pass read every other security/QA markdown file in the
