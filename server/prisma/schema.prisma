@@ -810,19 +810,26 @@ model OrgReminderConfig {
 
 // ─── Event Reminder Log (idempotency) ───────────────────────────
 
+enum OrgEventReminderDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model OrgEventReminderLog {
-  id                String            @id @default(cuid())
+  id                String                         @id @default(cuid())
   signupId          String
-  signup            BeneficiarySignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  signup            BeneficiarySignup              @relation(fields: [signupId], references: [id], onDelete: Cascade)
   beneficiaryId     String
   opportunityId     String
   reminderType      String // FREE_24H | PRO_CUSTOM_{minutesBefore}
   scheduledFor      DateTime
   sentAt            DateTime?
-  deliveryStatus    String            @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  deliveryStatus    OrgEventReminderDeliveryStatus @default(PENDING)
   providerMessageId String?
   failureReason     String?
-  createdAt         DateTime          @default(now())
+  createdAt         DateTime                       @default(now())
 
   @@unique([signupId, reminderType])
   @@index([beneficiaryId, deliveryStatus])
