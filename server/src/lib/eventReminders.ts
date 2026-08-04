@@ -60,17 +60,29 @@ async function processReminder(
     ? "FREE_24H"
     : `PRO_CUSTOM_${minutesBefore}`;
 
-  // Idempotency: skip if already sent or in progress
+  const freshScheduledFor = new Date(
+    slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime()
+      - minutesBefore * 60 * 1000
+  );
+
   const existing = await prisma.orgEventReminderLog.findUnique({
     where: { signupId_reminderType: { signupId: signup.id, reminderType } },
   });
-  if (existing && existing.deliveryStatus !== "FAILED") return;
+
+  // A log keyed only by signupId+reminderType would otherwise silently
+  // suppress a replacement reminder after the event's date/time changes:
+  // "SENT" for the old schedule reads as "already handled" even though the
+  // student has never been notified about the new time. Comparing the
+  // stored scheduledFor against what the current slot data computes to
+  // detects that the old log is stale and must not gate a resend.
+  const isStaleForRescheduledEvent = !!existing && existing.scheduledFor.getTime() !== freshScheduledFor.getTime();
+  if (existing && existing.deliveryStatus !== "FAILED" && !isStaleForRescheduledEvent) return;
 
   // Create or update the log record (PENDING → we own this slot)
   const log = existing
     ? await prisma.orgEventReminderLog.update({
         where: { id: existing.id },
-        data: { deliveryStatus: "PENDING", failureReason: null },
+        data: { deliveryStatus: "PENDING", failureReason: null, scheduledFor: freshScheduledFor },
       })
     : await prisma.orgEventReminderLog.create({
         data: {
@@ -78,7 +90,7 @@ async function processReminder(
           beneficiaryId: signup.slot.opportunity.beneficiaryId,
           opportunityId: signup.slot.opportunity.id,
           reminderType,
-          scheduledFor: new Date(slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime() - minutesBefore * 60 * 1000),
+          scheduledFor: freshScheduledFor,
           deliveryStatus: "PENDING",
         },
       });
