@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/studentProgress";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendStudentLeftClassroomEmail } from "../services/email";
@@ -136,7 +136,7 @@ router.get(
         serviceStartDate: school?.serviceStartDate ?? null,
         serviceEndDate: school?.serviceEndDate ?? null,
       });
-      const progressByClassroomId = new Map<string, typeof progress>();
+      const progressByClassroomId = new Map<string, StudentProgressRecord[]>();
       for (const student of progress) {
         const sourceStudent = students.find((row) => row.id === student.id);
         if (!sourceStudent?.classroomId) continue;

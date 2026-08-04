@@ -9,7 +9,7 @@ import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendPasswordResetEmail, sendStudentInvitationEmail, sendTeacherInvitationEmail, sendTeacherAssignmentEmail, CLIENT_URL } from "../services/email";
-import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/studentProgress";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { safeSchoolSelect } from "../lib/schoolSelect";
 import {
@@ -394,7 +394,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
     console.warn("[cohorts] student lookup failed; returning empty progress:", err);
   }
 
-  let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+  let progress: StudentProgressRecord[] = [];
   try {
     progress = await buildStudentProgressRecords(students, {
       schoolId: scope.schoolId,
@@ -405,7 +405,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
   } catch (err) {
     console.warn("[cohorts] progress calculation failed; returning empty progress:", err);
   }
-  const progressByCohort = new Map<string, typeof progress>();
+  const progressByCohort = new Map<string, StudentProgressRecord[]>();
   for (const student of progress) {
     const sourceStudent = students.find((row) => row.id === student.id);
     const targetCohortIds = new Set<string>();
@@ -599,7 +599,7 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
       console.warn("[cohorts] school-students lookup failed; returning empty list:", err);
     }
 
-    let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+    let progress: StudentProgressRecord[] = [];
     try {
       progress = await buildStudentProgressRecords(students, {
         schoolId: scope.schoolId,

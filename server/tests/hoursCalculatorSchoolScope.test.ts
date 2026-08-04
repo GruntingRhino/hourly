@@ -45,6 +45,8 @@ test("hour aggregation excludes records owned by another school", async () => {
     const result = await (calculateStudentHours as any)(["student-1"], "school-a");
     assert.deepEqual(result.get("student-1"), { approved: 6, pending: 0 });
     assert.deepEqual(observedSchools, ["school-a", "school-a", "school-a"]);
+    assert.equal(result.dataState, "COMPLETE");
+    assert.deepEqual(result.failedSources, []);
   } finally {
     prismaClient.beneficiarySignup.findMany = original.beneficiary;
     prismaClient.selfSubmittedRequest.findMany = original.selfSubmitted;

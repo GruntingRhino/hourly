@@ -173,6 +173,10 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       totalCommittedHours: Math.round(totalCommittedHours * 100) / 100,
       requiredHours: user?.cohort?.requiredHours ?? school?.requiredHours ?? 40,
       activitiesCompleted: approved.length,
+      // COMPLETE unless one or more underlying hour sources failed to load — in that
+      // case the totals above may be understated and should not be treated as final.
+      dataState: hoursMap.dataState,
+      ...(hoursMap.dataState === "PARTIAL" ? { failedSources: hoursMap.failedSources } : {}),
       sessions,
       approved,
       pending,
@@ -372,6 +376,11 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       totalStudents: report.length,
       studentsCompleted: report.filter((r) => r.completed).length,
       students: report,
+      // COMPLETE unless one or more underlying hour/no-show sources failed to
+      // load for this batch — in that case some students' totals above may be
+      // understated and should not be treated as final.
+      dataState: progress.dataState,
+      ...(progress.dataState === "PARTIAL" ? { failedSources: progress.failedSources } : {}),
     });
     } catch (err) {
       console.error("School report enrichment failed:", err);

@@ -22,7 +22,7 @@ import {
 import { getCategoryCapStatusesForStudent, resolveEffectiveRules } from "../lib/schoolRules";
 import { safeSchoolSelect } from "../lib/schoolSelect";
 import { geocodeAddress } from "../lib/geocode";
-import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/studentProgress";
 import { calculateStudentHours } from "../lib/hoursCalculator";
 import { isInternalAdminUser } from "../lib/internalAdmin";
 import { reviewSchoolOwnership } from "../lib/schoolActivation";
@@ -1490,6 +1490,11 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
           expectedApproved: roundHours(expectedTotals.approved),
           expectedPending: roundHours(expectedTotals.pending),
           reconciled: approved === roundHours(expectedTotals.approved) && pending === roundHours(expectedTotals.pending),
+          // COMPLETE unless one or more underlying hour sources failed to load —
+          // in that case expectedApproved/expectedPending (and any resulting
+          // "reconciled: false") should not be treated as a confirmed discrepancy.
+          dataState: totalsMap.dataState,
+          ...(totalsMap.dataState === "PARTIAL" ? { failedSources: totalsMap.failedSources } : {}),
         },
       },
       records: {
@@ -2417,7 +2422,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       orderBy: { name: "asc" },
     });
 
-    let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+    let progress: StudentProgressRecord[] = [];
     try {
       progress = await buildStudentProgressRecords(students, {
         schoolId: req.params.id,

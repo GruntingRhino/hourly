@@ -179,31 +179,56 @@ function assessStudentProgress(
   };
 }
 
+/**
+ * Same pattern as StudentHoursMap: dataState/failedSources are attached as
+ * extra properties on the returned array rather than changing its shape, so
+ * every existing `.map()`/`.filter()`/array consumer keeps working
+ * unchanged. Callers that surface this to a report or compliance decision
+ * should check `.dataState` before treating the batch as final.
+ */
+export type StudentProgressList = StudentProgressRecord[] & {
+  dataState: "COMPLETE" | "PARTIAL";
+  failedSources: string[];
+};
+
 export async function buildStudentProgressRecords(
   students: StudentForProgress[],
   schoolDefaults: SchoolDefaults
-): Promise<StudentProgressRecord[]> {
-  if (students.length === 0) return [];
+): Promise<StudentProgressList> {
+  if (students.length === 0) {
+    return Object.assign([], { dataState: "COMPLETE" as const, failedSources: [] });
+  }
 
   const studentIds = students.map((student) => student.id);
 
-  let hoursMap = new Map<string, { approved: number; pending: number }>();
-  let noShowRows: Array<{ studentId: string }> = [];
+  const [hoursResult, noShowResult] = await Promise.allSettled([
+    calculateStudentHours(studentIds, schoolDefaults.schoolId),
+    prisma.beneficiarySignup.findMany({
+      where: {
+        studentId: { in: studentIds },
+        schoolId: schoolDefaults.schoolId,
+        status: "NO_SHOW",
+      },
+      select: { studentId: true },
+    }),
+  ]);
 
-  try {
-    [hoursMap, noShowRows] = await Promise.all([
-      calculateStudentHours(studentIds, schoolDefaults.schoolId),
-      prisma.beneficiarySignup.findMany({
-        where: {
-          studentId: { in: studentIds },
-          schoolId: schoolDefaults.schoolId,
-          status: "NO_SHOW",
-        },
-        select: { studentId: true },
-      }),
-    ]);
-  } catch (err) {
-    console.warn("[studentProgress] Falling back to zero-hour progress due to lookup error:", err);
+  const failedSources: string[] = [];
+  let hoursMap = new Map<string, { approved: number; pending: number }>();
+  if (hoursResult.status === "fulfilled") {
+    hoursMap = hoursResult.value;
+    failedSources.push(...hoursResult.value.failedSources);
+  } else {
+    failedSources.push("hoursCalculator");
+    console.warn("[studentProgress] Hours lookup failed; treating all students' hours as unavailable:", hoursResult.reason);
+  }
+
+  let noShowRows: Array<{ studentId: string }> = [];
+  if (noShowResult.status === "fulfilled") {
+    noShowRows = noShowResult.value;
+  } else {
+    failedSources.push("noShowLookup");
+    console.warn("[studentProgress] No-show lookup failed; omitting this source:", noShowResult.reason);
   }
 
   const noShowCounts = new Map<string, number>();
@@ -211,7 +236,7 @@ export async function buildStudentProgressRecords(
     noShowCounts.set(row.studentId, (noShowCounts.get(row.studentId) ?? 0) + 1);
   }
 
-  return students.map((student) => {
+  const records = students.map((student) => {
     const hours = hoursMap.get(student.id) ?? { approved: 0, pending: 0 };
     return assessStudentProgress(
       student,
@@ -220,5 +245,10 @@ export async function buildStudentProgressRecords(
       hours.pending,
       noShowCounts.get(student.id) ?? 0
     );
+  });
+
+  return Object.assign(records, {
+    dataState: (failedSources.length ? "PARTIAL" : "COMPLETE") as "COMPLETE" | "PARTIAL",
+    failedSources,
   });
 }
