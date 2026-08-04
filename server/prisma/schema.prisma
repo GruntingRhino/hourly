@@ -800,28 +800,46 @@ model BeneficiaryTimeSlot {
 
 // ─── Beneficiary Signups (new model) ────────────────────────────
 
+enum BeneficiarySignupStatus {
+  CONFIRMED
+  WAITLISTED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BeneficiarySignupVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BeneficiarySignupAttendance {
+  ATTENDED
+  NO_SHOW
+}
+
 model BeneficiarySignup {
-  id                 String              @id @default(cuid())
+  id                 String                              @id @default(cuid())
   slotId             String
-  slot               BeneficiaryTimeSlot @relation(fields: [slotId], references: [id])
+  slot               BeneficiaryTimeSlot                 @relation(fields: [slotId], references: [id])
   studentId          String
   schoolId           String?
-  school             School?             @relation(fields: [schoolId], references: [id], onDelete: SetNull)
-  status             String              @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
-  checkedIn          Boolean             @default(false)
+  school             School?                             @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  status             BeneficiarySignupStatus             @default(CONFIRMED)
+  checkedIn          Boolean                             @default(false)
   checkedInAt        DateTime?
-  checkedOut         Boolean             @default(false)
+  checkedOut         Boolean                             @default(false)
   checkedOutAt       DateTime?
   totalHours         Float?
-  verificationStatus String              @default("PENDING") // PENDING, APPROVED, REJECTED
+  verificationStatus BeneficiarySignupVerificationStatus @default(PENDING)
   verifiedBy         String?
   verifiedAt         DateTime?
   rejectionReason    String?
   // One-click cancellation (token emailed to volunteer; single-use)
-  cancellationToken  String?             @unique
+  cancellationToken  String?                             @unique
 
   // Attendance outcome (recorded after the event by the org)
-  attendance String? // ATTENDED | NO_SHOW | null (not yet recorded)
+  attendance BeneficiarySignupAttendance? // null = not yet recorded
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

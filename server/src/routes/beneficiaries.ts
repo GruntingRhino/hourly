@@ -41,6 +41,7 @@ import { slotDateTime } from "../lib/icsGenerator";
 import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
 
 const schoolBeneficiaryApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "BLOCKED"]);
+const beneficiarySignupVerificationStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED"]);
 
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
@@ -2628,11 +2629,14 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
   try {
     if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
-    const statusFilter = req.query.status as string | undefined;
+    const statusFilter = beneficiarySignupVerificationStatusEnum.optional().safeParse(req.query.status);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be PENDING, APPROVED, or REJECTED" });
+    }
     const signups = await prisma.beneficiarySignup.findMany({
       where: {
         slot: { opportunity: { beneficiaryId: req.params.id } },
-        ...(statusFilter ? { verificationStatus: statusFilter } : {}),
+        ...(statusFilter.data ? { verificationStatus: statusFilter.data } : {}),
       },
       include: {
         slot: {
@@ -3425,25 +3429,20 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
       return res.status(404).json({ error: "Opportunity not found" });
     }
 
-    // Expect body: { records: Array<{ signupId: string; attendance: "ATTENDED" | "NO_SHOW" }>, earlyOverride?, earlyOverrideReason? }
-    const { records, earlyOverride, earlyOverrideReason } = req.body as {
-      records?: Array<{ signupId: string; attendance: string }>;
-      earlyOverride?: boolean;
-      earlyOverrideReason?: string;
-    };
-    if (!Array.isArray(records) || records.length === 0) {
-      return res.status(400).json({ error: "records array is required" });
-    }
     const MAX_BATCH_SIZE = 200;
-    if (records.length > MAX_BATCH_SIZE) {
-      return res.status(400).json({ error: `records cannot exceed ${MAX_BATCH_SIZE} per request` });
+    const bulkAttendanceSchema = z.object({
+      records: z.array(z.object({
+        signupId: z.string().min(1),
+        attendance: z.enum(["ATTENDED", "NO_SHOW"]),
+      })).min(1).max(MAX_BATCH_SIZE),
+      earlyOverride: z.boolean().optional(),
+      earlyOverrideReason: z.string().trim().min(1).max(1000).optional(),
+    });
+    const parsedBody = bulkAttendanceSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: "records array is required; each record must have signupId and attendance (ATTENDED | NO_SHOW), max 200 per request" });
     }
-
-    const VALID = new Set(["ATTENDED", "NO_SHOW"]);
-    const invalid = records.find((r) => !r.signupId || !VALID.has(r.attendance));
-    if (invalid) {
-      return res.status(400).json({ error: "Each record must have signupId and attendance (ATTENDED | NO_SHOW)" });
-    }
+    const { records, earlyOverride, earlyOverrideReason } = parsedBody.data;
     const signupIds = records.map((r) => r.signupId);
     if (new Set(signupIds).size !== signupIds.length) {
       return res.status(400).json({ error: "records contains duplicate signupId values" });
