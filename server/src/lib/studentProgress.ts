@@ -56,6 +56,7 @@ type StudentForProgress = {
 };
 
 type SchoolDefaults = {
+  schoolId: string;
   requiredHours: number;
   serviceStartDate: Date | null;
   serviceEndDate: Date | null;
@@ -191,10 +192,11 @@ export async function buildStudentProgressRecords(
 
   try {
     [hoursMap, noShowRows] = await Promise.all([
-      calculateStudentHours(studentIds),
+      calculateStudentHours(studentIds, schoolDefaults.schoolId),
       prisma.beneficiarySignup.findMany({
         where: {
           studentId: { in: studentIds },
+          schoolId: schoolDefaults.schoolId,
           status: "NO_SHOW",
         },
         select: { studentId: true },

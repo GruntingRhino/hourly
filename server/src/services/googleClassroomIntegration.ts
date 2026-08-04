@@ -8,11 +8,20 @@ import prisma from "../lib/prisma";
 import { decryptField, encryptField } from "../lib/fieldEncryption";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { deactivateStudentCohortMembership, ensureStudentCohortMembership } from "../lib/studentCohorts";
+import {
+  assertKnownCourseSelection,
+  assertPublicApprovedUrl,
+  fetchApprovedLmsUrl,
+  getAllowedGoogleOrigins,
+  GOOGLE_CLASSROOM_API_ORIGIN,
+  GOOGLE_CLASSROOM_AUTH_ORIGIN,
+  GOOGLE_CLASSROOM_TOKEN_ORIGIN,
+  normalizeSelectedExternalCourseIds,
+} from "../lib/lmsOutboundSecurity";
 import { getGoogleClassroomMockDataset, type GoogleClassroomMockDataset, type GoogleClassroomMockScenario } from "./googleClassroomMock";
+import { isProdLike } from "../lib/isProdLike";
 
-const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
-const GOOGLE_CLASSROOM_ENABLE_MOCK = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true" || !IS_PROD_LIKE;
+const GOOGLE_CLASSROOM_ENABLE_MOCK = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true" || !isProdLike();
 const GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS = Number(process.env.GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS || 15000);
 const GOOGLE_CLASSROOM_PAGE_SIZE = Math.max(1, Math.min(100, Number(process.env.GOOGLE_CLASSROOM_PAGE_SIZE || 100)));
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -20,31 +29,28 @@ const CLIENT_URL = process.env.CLIENT_URL || process.env.APP_URL || "http://127.
 const GOOGLE_CLASSROOM_CLIENT_ID = process.env.GOOGLE_CLASSROOM_CLIENT_ID || "";
 const GOOGLE_CLASSROOM_CLIENT_SECRET = process.env.GOOGLE_CLASSROOM_CLIENT_SECRET || "";
 const GOOGLE_CLASSROOM_CALLBACK_URL = process.env.GOOGLE_CLASSROOM_CALLBACK_URL || "http://localhost:3001/api/integrations/googleClassroom/oauth/callback";
-const GOOGLE_CLASSROOM_API_BASE_URL = (process.env.GOOGLE_CLASSROOM_API_BASE_URL || "https://classroom.googleapis.com").replace(/\/+$/, "");
-const GOOGLE_CLASSROOM_AUTH_BASE_URL = (process.env.GOOGLE_CLASSROOM_AUTH_BASE_URL || "https://accounts.google.com").replace(/\/+$/, "");
-const GOOGLE_CLASSROOM_TOKEN_BASE_URL = (process.env.GOOGLE_CLASSROOM_TOKEN_BASE_URL || "https://oauth2.googleapis.com").replace(/\/+$/, "");
-
 const googleClassroomConnectSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("MOCK"),
     baseUrl: z.string().url().optional(),
     displayName: z.string().min(1).max(255).optional(),
     mockScenario: z.enum(["default", "renamed", "archived", "deleted", "student_removed"]).optional(),
-  }),
+  }).strict(),
   z.object({
     mode: z.literal("OAUTH"),
-    baseUrl: z.string().url().optional(),
     displayName: z.string().min(1).max(255).optional(),
-  }),
+  }).strict(),
 ]);
 
 type GoogleClassroomConnectionConfig =
   | {
       mode: "MOCK";
       mockScenario: GoogleClassroomMockScenario;
+      selectedExternalCourseIds: string[];
     }
   | {
       mode: "OAUTH";
+      selectedExternalCourseIds: string[];
     };
 
 type GoogleClassroomCredentials = {
@@ -59,7 +65,7 @@ type GoogleClassroomStatePayload = {
   purpose: "googleClassroom-oauth";
   schoolId: string;
   actorId: string;
-  baseUrl: string | null;
+  testOrigin: string | null;
   displayName: string;
 };
 
@@ -207,27 +213,21 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function normalizeGoogleClassroomBaseUrl(baseUrl: string): string {
-  const normalized = baseUrl.trim().replace(/\/+$/, "");
-  if (!normalized) throw new Error("Google Classroom base URL is required.");
-  const parsed = new URL(normalized);
-  if (IS_PROD_LIKE && parsed.protocol !== "https:") {
-    throw new Error("Google Classroom base URL must use HTTPS in production-like environments.");
-  }
-  return normalized;
-}
-
 function parseConnectionConfig(raw: string | null): GoogleClassroomConnectionConfig {
-  if (!raw) return { mode: "MOCK", mockScenario: "default" };
+  if (!raw) return { mode: "MOCK", mockScenario: "default", selectedExternalCourseIds: [] };
   try {
-    const parsed = JSON.parse(raw) as { mode?: "MOCK" | "OAUTH"; mockScenario?: GoogleClassroomMockScenario };
-    if (parsed.mode === "OAUTH") return { mode: "OAUTH" };
+    const parsed = JSON.parse(raw) as { mode?: "MOCK" | "OAUTH"; mockScenario?: GoogleClassroomMockScenario; selectedExternalCourseIds?: unknown };
+    const selectedExternalCourseIds = Array.isArray(parsed.selectedExternalCourseIds)
+      ? parsed.selectedExternalCourseIds.filter((value): value is string => typeof value === "string")
+      : [];
+    if (parsed.mode === "OAUTH") return { mode: "OAUTH", selectedExternalCourseIds };
     return {
       mode: "MOCK",
       mockScenario: parsed.mockScenario ?? "default",
+      selectedExternalCourseIds,
     };
   } catch {
-    return { mode: "MOCK", mockScenario: "default" };
+    return { mode: "MOCK", mockScenario: "default", selectedExternalCourseIds: [] };
   }
 }
 
@@ -281,6 +281,7 @@ function safeConnectionResponse(connection: any) {
     lastSyncStatus: connection.lastSyncStatus,
     scenario: config.mode === "MOCK" ? config.mockScenario : "oauth",
     mode: config.mode,
+    selectedExternalCourseIds: config.selectedExternalCourseIds,
   };
 }
 
@@ -418,16 +419,22 @@ export async function getGoogleClassroomOperationalStatus(params?: { schoolId?: 
   };
 }
 
-async function googleClassroomFetch(url: string, init: RequestInit = {}): Promise<Response> {
+async function googleClassroomFetch(url: string, init: RequestInit = {}, expectedOrigin?: string): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        ...(init.headers ?? {}),
+    const origin = expectedOrigin ?? new URL(url).origin;
+    return await fetchApprovedLmsUrl({
+      url,
+      approvedOrigins: getAllowedGoogleOrigins(),
+      expectedOrigin: origin,
+      init: {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          ...(init.headers ?? {}),
+        },
       },
     });
   } catch (error) {
@@ -443,13 +450,14 @@ async function googleClassroomFetch(url: string, init: RequestInit = {}): Promis
 async function listGoogleClassroomPages<T>(initialUrl: string, accessToken: string, collectionKey: string): Promise<T[]> {
   const items: T[] = [];
   let nextUrl = new URL(initialUrl);
+  const expectedOrigin = nextUrl.origin;
 
   while (nextUrl) {
     const response = await googleClassroomFetch(nextUrl.toString(), {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    });
+    }, expectedOrigin);
     if (!response.ok) {
       const body = await response.json().catch(async () => ({ error: await response.text() }));
       throw new Error(`Google Classroom API request failed (${response.status}): ${JSON.stringify(body).slice(0, 300)}`);
@@ -470,13 +478,14 @@ async function listGoogleClassroomPagesForConnection<T>(connection: any, initial
   let nextUrl = new URL(initialUrl);
   let credentials = await ensureLiveAccessToken(connection);
   let refreshRetried = false;
+  const expectedOrigin = nextUrl.origin;
 
   while (nextUrl) {
     const response = await googleClassroomFetch(nextUrl.toString(), {
       headers: {
         Authorization: `Bearer ${credentials.accessToken}`,
       },
-    });
+    }, expectedOrigin);
 
     if ((response.status === 401 || response.status === 403) && !refreshRetried) {
       refreshRetried = true;
@@ -590,16 +599,17 @@ async function markConnectionError(connectionId: string, actorId: string | null,
   }
 }
 
-function getGoogleClassroomTokenBaseUrl(baseUrl?: string | null): string {
-  return baseUrl?.trim() ? normalizeGoogleClassroomBaseUrl(baseUrl) : GOOGLE_CLASSROOM_TOKEN_BASE_URL;
+async function normalizeGoogleTestOrigin(testOrigin?: string | null): Promise<string | null> {
+  if (!testOrigin?.trim()) return null;
+  if (isProdLike()) throw new Error("Custom Google Classroom OAuth destinations are not allowed.");
+  const parsed = new URL(testOrigin);
+  await assertPublicApprovedUrl(parsed, getAllowedGoogleOrigins(), parsed.origin);
+  return parsed.origin;
 }
 
-function getGoogleClassroomAuthBaseUrl(baseUrl?: string | null): string {
-  return baseUrl?.trim() ? normalizeGoogleClassroomBaseUrl(baseUrl) : GOOGLE_CLASSROOM_AUTH_BASE_URL;
-}
-
-async function exchangeAuthorizationCode(code: string, baseUrl?: string | null): Promise<GoogleClassroomOAuthTokenResponse> {
+async function exchangeAuthorizationCode(code: string, testOrigin?: string | null): Promise<GoogleClassroomOAuthTokenResponse> {
   assertOAuthConfigured();
+  const tokenOrigin = await normalizeGoogleTestOrigin(testOrigin) ?? GOOGLE_CLASSROOM_TOKEN_ORIGIN;
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: GOOGLE_CLASSROOM_CLIENT_ID,
@@ -608,11 +618,11 @@ async function exchangeAuthorizationCode(code: string, baseUrl?: string | null):
     code,
   });
 
-  const response = await googleClassroomFetch(`${getGoogleClassroomTokenBaseUrl(baseUrl)}/token`, {
+  const response = await googleClassroomFetch(`${tokenOrigin}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
-  });
+  }, tokenOrigin);
   if (!response.ok) {
     const errorBody = await response.json().catch(async () => ({ error: await response.text() })) as GoogleClassroomApiTokenError;
     throw new Error(`Google Classroom OAuth token exchange failed: ${JSON.stringify(errorBody).slice(0, 300)}`);
@@ -627,8 +637,12 @@ async function refreshOAuthCredentials(connection: any): Promise<GoogleClassroom
     throw new Error("Google Classroom credentials are missing a refresh token.");
   }
   assertOAuthConfigured();
+  const testOrigin = connection.baseUrl && connection.baseUrl !== GOOGLE_CLASSROOM_API_ORIGIN
+    ? await normalizeGoogleTestOrigin(connection.baseUrl)
+    : null;
+  const tokenOrigin = testOrigin ?? GOOGLE_CLASSROOM_TOKEN_ORIGIN;
 
-  const response = await googleClassroomFetch(`${getGoogleClassroomTokenBaseUrl(connection.baseUrl)}/token`, {
+  const response = await googleClassroomFetch(`${tokenOrigin}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -637,7 +651,7 @@ async function refreshOAuthCredentials(connection: any): Promise<GoogleClassroom
       client_secret: GOOGLE_CLASSROOM_CLIENT_SECRET,
       refresh_token: credentials.refreshToken,
     }),
-  });
+  }, tokenOrigin);
 
   if (!response.ok) {
     const errorBody = await response.json().catch(async () => ({ error: await response.text() })) as GoogleClassroomApiTokenError;
@@ -668,15 +682,19 @@ async function ensureLiveAccessToken(connection: any): Promise<GoogleClassroomCr
   return refreshOAuthCredentials(connection);
 }
 
-async function fetchGoogleClassroomOAuthDataset(connection: any): Promise<GoogleClassroomSyncDataset> {
-  const baseUrl = connection.baseUrl ? normalizeGoogleClassroomBaseUrl(connection.baseUrl) : GOOGLE_CLASSROOM_API_BASE_URL;
+async function fetchGoogleClassroomOAuthDataset(connection: any, selectedExternalCourseIds: string[]): Promise<GoogleClassroomSyncDataset> {
+  const testOrigin = connection.baseUrl && connection.baseUrl !== GOOGLE_CLASSROOM_API_ORIGIN
+    ? await normalizeGoogleTestOrigin(connection.baseUrl)
+    : null;
+  const baseUrl = testOrigin ?? GOOGLE_CLASSROOM_API_ORIGIN;
 
   try {
-    const courses = await listGoogleClassroomPagesForConnection<GoogleClassroomApiCourse>(
+    const availableCourses = await listGoogleClassroomPagesForConnection<GoogleClassroomApiCourse>(
       connection,
       `${baseUrl}/v1/courses?pageSize=${GOOGLE_CLASSROOM_PAGE_SIZE}&courseStates=ACTIVE&courseStates=ARCHIVED&courseStates=PROVISIONED`,
       "courses"
     );
+    const courses = assertKnownCourseSelection(availableCourses, selectedExternalCourseIds);
 
     const userById = new Map<string, GoogleClassroomSyncDataset["users"][number]>();
     const enrollmentRows: GoogleClassroomSyncDataset["enrollments"] = [];
@@ -749,12 +767,45 @@ async function fetchGoogleClassroomOAuthDataset(connection: any): Promise<Google
   }
 }
 
-async function getGoogleClassroomDataset(connection: any): Promise<GoogleClassroomSyncDataset> {
+async function getGoogleClassroomDataset(connection: any, selectedExternalCourseIds: string[]): Promise<GoogleClassroomSyncDataset> {
   const config = parseConnectionConfig(connection.config);
   if (config.mode === "MOCK") {
-    return getGoogleClassroomMockDataset(config.mockScenario) as GoogleClassroomMockDataset as GoogleClassroomSyncDataset;
+    const dataset = getGoogleClassroomMockDataset(config.mockScenario) as GoogleClassroomMockDataset as GoogleClassroomSyncDataset;
+    const courses = assertKnownCourseSelection(dataset.courses, selectedExternalCourseIds);
+    const courseIds = new Set(courses.map((course) => course.id));
+    const enrollments = dataset.enrollments.filter((enrollment) => courseIds.has(enrollment.courseId));
+    const userIds = new Set(enrollments.map((enrollment) => enrollment.userId));
+    return {
+      ...dataset,
+      courses,
+      enrollments,
+      users: dataset.users.filter((user) => userIds.has(user.id)),
+    };
   }
-  return fetchGoogleClassroomOAuthDataset(connection);
+  return fetchGoogleClassroomOAuthDataset(connection, selectedExternalCourseIds);
+}
+
+async function listGoogleClassroomCourseMetadata(connection: any): Promise<GoogleClassroomSyncDataset["courses"]> {
+  const config = parseConnectionConfig(connection.config);
+  if (config.mode === "MOCK") {
+    const dataset = getGoogleClassroomMockDataset(config.mockScenario) as GoogleClassroomMockDataset as GoogleClassroomSyncDataset;
+    return dataset.courses;
+  }
+  const testOrigin = connection.baseUrl && connection.baseUrl !== GOOGLE_CLASSROOM_API_ORIGIN
+    ? await normalizeGoogleTestOrigin(connection.baseUrl)
+    : null;
+  const baseUrl = testOrigin ?? GOOGLE_CLASSROOM_API_ORIGIN;
+  const courses = await listGoogleClassroomPagesForConnection<GoogleClassroomApiCourse>(
+    connection,
+    `${baseUrl}/v1/courses?pageSize=${GOOGLE_CLASSROOM_PAGE_SIZE}&courseStates=ACTIVE&courseStates=ARCHIVED&courseStates=PROVISIONED`,
+    "courses",
+  );
+  return courses.map((course) => ({
+    id: String(course.id),
+    name: course.name || "Untitled Classroom",
+    section: course.section || null,
+    workflowState: course.courseState || "ACTIVE",
+  }));
 }
 
 async function ensureTeacherUser(params: {
@@ -875,14 +926,17 @@ async function runGoogleClassroomSync(params: {
   schoolId: string;
   actorId: string;
   mode: "PREVIEW" | "APPLY";
+  selectedExternalCourseIds?: unknown;
 }): Promise<{ connection: any; job: any; summary: SyncSummary }> {
   const connection = await getConnectionForSchool(params.schoolId);
   if (!connection || !["CONNECTED", "ERROR"].includes(connection.status)) {
     throw new Error("Google Classroom is not connected for this school.");
   }
 
-  const dataset = await getGoogleClassroomDataset(connection);
-  const plans = buildSectionPlans(dataset).sort((a, b) => a.cohortName.localeCompare(b.cohortName));
+  const config = parseConnectionConfig(connection.config);
+  const selectedExternalCourseIds = normalizeSelectedExternalCourseIds(
+    params.selectedExternalCourseIds ?? config.selectedExternalCourseIds,
+  );
   const job = await prisma.integrationSyncJob.create({
     data: {
       connectionId: connection.id,
@@ -893,7 +947,30 @@ async function runGoogleClassroomSync(params: {
       status: "RUNNING",
     },
   });
-
+  let dataset: GoogleClassroomSyncDataset;
+  try {
+    dataset = await getGoogleClassroomDataset(connection, selectedExternalCourseIds);
+  } catch (error) {
+    await prisma.integrationSyncJob.update({
+      where: { id: job.id },
+      data: {
+        status: "FAILED",
+        summary: JSON.stringify({ stage: "PROVIDER_DATASET", error: "Google Classroom provider request failed" }),
+        finishedAt: new Date(),
+      },
+    });
+    throw error;
+  }
+  if (params.mode === "APPLY") {
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        config: JSON.stringify({ ...config, selectedExternalCourseIds }),
+        updatedById: params.actorId,
+      },
+    });
+  }
+  const plans = buildSectionPlans(dataset).sort((a, b) => a.cohortName.localeCompare(b.cohortName));
   const summary: SyncSummary = {
     provider: "GOOGLE_CLASSROOM",
     mode: params.mode,
@@ -1091,7 +1168,7 @@ async function runGoogleClassroomSync(params: {
       const mappedUser = userMappingByExternalId.get(student.id);
       if (mappedUser?.localType === "User") {
         existingStudent = await prisma.user.findFirst({
-          where: { id: mappedUser.localId, role: "STUDENT" },
+          where: { id: mappedUser.localId, role: "STUDENT", schoolId: params.schoolId },
           select: { id: true, cohortId: true, schoolId: true },
         });
       }
@@ -1100,7 +1177,7 @@ async function runGoogleClassroomSync(params: {
           where: {
             email: student.email,
             role: "STUDENT",
-            OR: [{ schoolId: params.schoolId }, { cohort: { schoolId: params.schoolId } }],
+            schoolId: params.schoolId,
           },
           select: { id: true, cohortId: true, schoolId: true },
         });
@@ -1365,17 +1442,18 @@ async function runGoogleClassroomSync(params: {
 export async function getGoogleClassroomOAuthUrlForSchool(params: {
   schoolId: string;
   actorId: string;
-  baseUrl?: string;
+  testOrigin?: string;
   displayName?: string;
 }) {
   assertOAuthConfigured();
-  const normalizedBaseUrl = params.baseUrl?.trim() ? normalizeGoogleClassroomBaseUrl(params.baseUrl) : null;
+  const testOrigin = await normalizeGoogleTestOrigin(params.testOrigin);
+  const authOrigin = testOrigin ?? GOOGLE_CLASSROOM_AUTH_ORIGIN;
   const displayName = params.displayName?.trim() || "Google Classroom";
   const state = buildGoogleClassroomStateToken({
     purpose: "googleClassroom-oauth",
     schoolId: params.schoolId,
     actorId: params.actorId,
-    baseUrl: normalizedBaseUrl,
+    testOrigin,
     displayName,
   });
   const scope = encodeURIComponent([
@@ -1386,7 +1464,7 @@ export async function getGoogleClassroomOAuthUrlForSchool(params: {
     "https://www.googleapis.com/auth/classroom.rosters.readonly",
   ].join(" "));
   const url =
-    `${getGoogleClassroomAuthBaseUrl(normalizedBaseUrl)}/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLASSROOM_CLIENT_ID)}` +
+    `${authOrigin}/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLASSROOM_CLIENT_ID)}` +
     `&response_type=code&redirect_uri=${encodeURIComponent(GOOGLE_CLASSROOM_CALLBACK_URL)}` +
     `&access_type=offline&prompt=consent&scope=${scope}&state=${encodeURIComponent(state)}`;
   return { url };
@@ -1412,16 +1490,17 @@ export async function handleGoogleClassroomOAuthCallback(params: {
 
   try {
     const state = verifyGoogleClassroomStateToken(params.state);
-    const token = await exchangeAuthorizationCode(params.code, state.baseUrl);
+    const token = await exchangeAuthorizationCode(params.code, state.testOrigin);
     const encryptedCredentials = serializeCredentials(token);
+    const apiOrigin = state.testOrigin ?? GOOGLE_CLASSROOM_API_ORIGIN;
     await prisma.integrationConnection.upsert({
       where: { provider_schoolId: { provider: "GOOGLE_CLASSROOM", schoolId: state.schoolId } },
       update: {
         status: "CONNECTED",
         displayName: state.displayName,
-        baseUrl: state.baseUrl,
+        baseUrl: apiOrigin,
         credentialsEncrypted: encryptedCredentials,
-        config: JSON.stringify({ mode: "OAUTH" }),
+        config: JSON.stringify({ mode: "OAUTH", selectedExternalCourseIds: [] }),
         disconnectedAt: null,
         updatedById: state.actorId,
       },
@@ -1430,9 +1509,9 @@ export async function handleGoogleClassroomOAuthCallback(params: {
         schoolId: state.schoolId,
         status: "CONNECTED",
         displayName: state.displayName,
-        baseUrl: state.baseUrl,
+        baseUrl: apiOrigin,
         credentialsEncrypted: encryptedCredentials,
-        config: JSON.stringify({ mode: "OAUTH" }),
+        config: JSON.stringify({ mode: "OAUTH", selectedExternalCourseIds: [] }),
         createdById: state.actorId,
         updatedById: state.actorId,
       },
@@ -1473,7 +1552,6 @@ export async function connectGoogleClassroomForSchool(params: {
     return getGoogleClassroomOAuthUrlForSchool({
       schoolId: params.schoolId,
       actorId: params.actorId,
-      baseUrl: input.baseUrl,
       displayName: input.displayName,
     });
   }
@@ -1482,13 +1560,15 @@ export async function connectGoogleClassroomForSchool(params: {
   const config: GoogleClassroomConnectionConfig = {
     mode: "MOCK",
     mockScenario: input.mockScenario ?? "default",
+    selectedExternalCourseIds: [],
   };
+  const mockBaseUrl = new URL(input.baseUrl ?? "https://google-classroom.mock.local").origin;
   const connection = await prisma.integrationConnection.upsert({
     where: { provider_schoolId: { provider: "GOOGLE_CLASSROOM", schoolId: params.schoolId } },
     update: {
       status: "CONNECTED",
       displayName: input.displayName ?? "Google Classroom Mock Sandbox",
-      baseUrl: normalizeGoogleClassroomBaseUrl(input.baseUrl ?? "https://google-classroom.mock.local"),
+      baseUrl: mockBaseUrl,
       credentialsEncrypted: encryptField(JSON.stringify({ mode: "MOCK", placeholderToken: "dev-only" })),
       config: JSON.stringify(config),
       disconnectedAt: null,
@@ -1499,7 +1579,7 @@ export async function connectGoogleClassroomForSchool(params: {
       schoolId: params.schoolId,
       status: "CONNECTED",
       displayName: input.displayName ?? "Google Classroom Mock Sandbox",
-      baseUrl: normalizeGoogleClassroomBaseUrl(input.baseUrl ?? "https://google-classroom.mock.local"),
+      baseUrl: mockBaseUrl,
       credentialsEncrypted: encryptField(JSON.stringify({ mode: "MOCK", placeholderToken: "dev-only" })),
       config: JSON.stringify(config),
       createdById: params.actorId,
@@ -1596,8 +1676,25 @@ export async function getGoogleClassroomErrorsForSchool(schoolId: string) {
   }));
 }
 
-export async function previewGoogleClassroomSyncForSchool(params: { schoolId: string; actorId: string }) {
-  const result = await runGoogleClassroomSync({ schoolId: params.schoolId, actorId: params.actorId, mode: "PREVIEW" });
+export async function getGoogleClassroomCoursesForSchool(schoolId: string) {
+  const connection = await getConnectionForSchool(schoolId);
+  if (!connection || !["CONNECTED", "ERROR"].includes(connection.status)) {
+    throw new Error("Google Classroom is not connected for this school.");
+  }
+  const config = parseConnectionConfig(connection.config);
+  return {
+    courses: await listGoogleClassroomCourseMetadata(connection),
+    selectedExternalCourseIds: config.selectedExternalCourseIds,
+  };
+}
+
+export async function previewGoogleClassroomSyncForSchool(params: { schoolId: string; actorId: string; selectedExternalCourseIds?: unknown }) {
+  const result = await runGoogleClassroomSync({
+    schoolId: params.schoolId,
+    actorId: params.actorId,
+    mode: "PREVIEW",
+    selectedExternalCourseIds: params.selectedExternalCourseIds,
+  });
   return {
     connection: safeConnectionResponse(result.connection),
     jobId: result.job.id,
@@ -1606,8 +1703,13 @@ export async function previewGoogleClassroomSyncForSchool(params: { schoolId: st
   };
 }
 
-export async function applyGoogleClassroomSyncForSchool(params: { schoolId: string; actorId: string }) {
-  const result = await runGoogleClassroomSync({ schoolId: params.schoolId, actorId: params.actorId, mode: "APPLY" });
+export async function applyGoogleClassroomSyncForSchool(params: { schoolId: string; actorId: string; selectedExternalCourseIds?: unknown }) {
+  const result = await runGoogleClassroomSync({
+    schoolId: params.schoolId,
+    actorId: params.actorId,
+    mode: "APPLY",
+    selectedExternalCourseIds: params.selectedExternalCourseIds,
+  });
   return {
     connection: safeConnectionResponse(result.connection),
     jobId: result.job.id,

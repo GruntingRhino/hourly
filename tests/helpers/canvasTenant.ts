@@ -42,8 +42,11 @@ type CanvasTenantScenario = "default" | "revoked" | "renamed" | "archived" | "st
 export type MockCanvasTenant = {
   server: http.Server;
   baseUrl: string;
+  requests: string[];
   close: () => Promise<void>;
 };
+
+export const MOCK_CANVAS_TENANT_ORIGIN = "http://127.0.0.1:39101";
 
 const COURSE_BIO = "oauth-course-bio";
 const COURSE_SERVICE = "oauth-course-service";
@@ -204,9 +207,11 @@ function buildScenarioData(scenario: CanvasTenantScenario): {
 
 export async function startMockCanvasTenant(scenario: CanvasTenantScenario = "default"): Promise<MockCanvasTenant> {
   const tenant = buildScenarioData(scenario);
+  const requests: string[] = [];
 
   const server = http.createServer((req, res) => {
-    const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
+    const requestUrl = new URL(req.url || "/", `http://${req.headers.host ?? "127.0.0.1:39101"}`);
+    requests.push(`${req.method ?? "GET"} ${requestUrl.pathname}`);
 
     if (req.method === "GET" && requestUrl.pathname === "/login/oauth2/auth") {
       res.statusCode = 302;
@@ -316,12 +321,13 @@ export async function startMockCanvasTenant(scenario: CanvasTenantScenario = "de
     res.end("not found");
   });
 
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  await new Promise<void>((resolve) => server.listen(39101, "127.0.0.1", () => resolve()));
   const address = server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${address.port}`;
   return {
     server,
     baseUrl,
+    requests,
     close: () => new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve())),
   };
 }

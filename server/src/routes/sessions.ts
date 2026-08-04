@@ -3,9 +3,14 @@ import multer from "multer";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { logDataAccess } from "../lib/dataAccessLog";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 import { detectSignatureMime } from "../lib/signatureStorage";
+import {
+  assertStudentAccessibleToStaff,
+  buildCohortScopedStudentWhere,
+  getStaffAccessScope,
+} from "../lib/cohortAccess";
 
 const router = Router();
 
@@ -311,6 +316,7 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
       where: { id: req.params.id },
       select: {
         userId: true,
+        schoolId: true,
         signatureFileName: true,
         signatureFileBytes: true,
         signatureFileMimeType: true,
@@ -325,11 +331,19 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
       where: { id: req.user!.userId },
       select: { role: true, organizationId: true },
     });
-    const allowed = actor?.role === "STUDENT"
-      ? session.userId === req.user!.userId
-      : actor?.role === "ORG_ADMIN"
-        ? actor.organizationId === session.opportunity.organizationId
-        : (await resolveStudentSchoolId(session.userId)) === (await resolveStudentSchoolId(req.user!.userId));
+    let allowed = false;
+    if (actor?.role === "STUDENT") {
+      allowed = session.userId === req.user!.userId;
+    } else if (actor?.role === "ORG_ADMIN") {
+      allowed = actor.organizationId === session.opportunity.organizationId;
+    } else if (actor?.role === "SCHOOL_ADMIN" || actor?.role === "TEACHER") {
+      const scope = await getStaffAccessScope(req.user!.userId);
+      allowed = Boolean(
+        scope &&
+        session.schoolId === scope.schoolId &&
+        await assertStudentAccessibleToStaff(scope, session.userId)
+      );
+    }
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
 
     const safeName = (session.signatureFileName ?? "signature").replace(/[\r\n"]/g, "_");
@@ -345,28 +359,22 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
 // GET /api/sessions/school — school sees all student sessions
 router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
 
     const { studentId, verificationStatus } = req.query;
 
-    // If viewing a specific student, verify they belong to this school first
     if (studentId) {
-      const studentSchoolId = await resolveStudentSchoolId(studentId as string);
-      if (studentSchoolId !== user.schoolId) {
-        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      const allowed = await assertStudentAccessibleToStaff(scope, studentId as string);
+      if (!allowed) {
+        return res.status(404).json({ error: "Student not found" });
       }
     }
 
-    // Scope to students in this school — include both legacy classroom and new cohort students
-    const schoolScope = {
-      OR: [
-        { classroom: { schoolId: user.schoolId } },
-        { cohort: { schoolId: user.schoolId } },
-        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: user.schoolId } } } },
-      ],
+    const where: any = {
+      schoolId: scope.schoolId,
+      user: buildCohortScopedStudentWhere(scope),
     };
-    const where: any = { user: schoolScope };
     if (studentId) where.userId = studentId;
     if (verificationStatus) where.verificationStatus = verificationStatus;
 
@@ -385,8 +393,8 @@ router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
       actorId: req.user!.userId,
       action: "VIEW_SESSIONS",
       targetType: studentId ? "student" : "school",
-      targetId: (studentId as string | undefined) ?? user.schoolId,
-      schoolId: user.schoolId,
+      targetId: (studentId as string | undefined) ?? scope.schoolId,
+      schoolId: scope.schoolId,
       details: { sessionCount: sessions.length },
     });
 

@@ -504,6 +504,7 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
   ]);
 
   const progress = await buildStudentProgressRecords(students, {
+    schoolId,
     requiredHours: school.requiredHours,
     serviceStartDate: school.serviceStartDate,
     serviceEndDate: school.serviceEndDate,

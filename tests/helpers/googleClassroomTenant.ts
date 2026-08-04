@@ -29,8 +29,11 @@ type TenantRosterUser = {
 export type MockGoogleClassroomTenant = {
   server: http.Server;
   baseUrl: string;
+  requests: string[];
   close: () => Promise<void>;
 };
+
+export const MOCK_GOOGLE_CLASSROOM_TENANT_ORIGIN = "http://127.0.0.1:39102";
 
 function paginate<T>(items: T[], requestUrl: URL): { page: T[]; nextPageToken?: string } {
   const pageSize = Math.max(1, Number(requestUrl.searchParams.get("pageSize") || "100"));
@@ -102,9 +105,11 @@ function buildScenarioData(scenario: GoogleClassroomTenantScenario) {
 
 export async function startMockGoogleClassroomTenant(scenario: GoogleClassroomTenantScenario = "default"): Promise<MockGoogleClassroomTenant> {
   const tenant = buildScenarioData(scenario);
+  const requests: string[] = [];
 
   const server = http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
+    requests.push(`${req.method ?? "GET"} ${requestUrl.pathname}`);
 
     if (req.method === "GET" && requestUrl.pathname === "/o/oauth2/v2/auth") {
       res.statusCode = 302;
@@ -208,13 +213,14 @@ export async function startMockGoogleClassroomTenant(scenario: GoogleClassroomTe
     res.end(JSON.stringify({ error: "not_found" }));
   });
 
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  await new Promise<void>((resolve) => server.listen(39102, "127.0.0.1", () => resolve()));
   const address = server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   return {
     server,
     baseUrl,
+    requests,
     close: () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
   };
 }

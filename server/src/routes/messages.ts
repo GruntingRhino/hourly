@@ -7,6 +7,12 @@ import { buildStudentProgressRecords } from "../lib/studentProgress";
 import { runReminderCycle } from "../lib/reminders";
 import { resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 import { createHybridRateLimit } from "../middleware/rateLimit";
+import {
+  assertStudentAccessibleToStaff,
+  buildCohortScopedStudentWhere,
+  canAccessCohort,
+  getStaffAccessScope,
+} from "../lib/cohortAccess";
 
 const router = Router();
 const SYSTEM_NOTIFICATION_PREFIX = "_SYSTEM_";
@@ -490,31 +496,23 @@ router.get("/interventions/cases", authenticate, requireRole("SCHOOL_ADMIN", "TE
       limit: z.coerce.number().int().min(1).max(100).optional(),
     }).parse(req.query);
 
-    const actor = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: {
-        schoolId: true,
-        cohort: { select: { schoolId: true } },
-        classroom: { select: { schoolId: true } },
-        cohortMemberships: {
-          where: { isActive: true },
-          orderBy: [{ updatedAt: "desc" }],
-          select: { cohort: { select: { schoolId: true } } },
-        },
-      },
-    });
-    const actorSchoolId = actor ? resolveSchoolId(actor) : null;
-    if (!actorSchoolId) return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
+    if (query.studentId && !await assertStudentAccessibleToStaff(scope, query.studentId)) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    const studentWhere = buildCohortScopedStudentWhere(scope);
 
     const school = await prisma.school.findUnique({
-      where: { id: actorSchoolId },
+      where: { id: scope.schoolId },
       select: { id: true, requiredHours: true, serviceStartDate: true, serviceEndDate: true },
     });
     if (!school) return res.status(404).json({ error: "School not found" });
 
     const cases = await prisma.interventionCase.findMany({
       where: {
-        schoolId: actorSchoolId,
+        schoolId: scope.schoolId,
+        student: studentWhere,
         ...(query.studentId ? { studentId: query.studentId } : {}),
         ...(query.status ? { status: query.status } : {}),
       },
@@ -541,6 +539,7 @@ router.get("/interventions/cases", authenticate, requireRole("SCHOOL_ADMIN", "TE
     });
 
     const progress = await buildStudentProgressRecords(cases.map((item) => item.student), {
+      schoolId: scope.schoolId,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -551,6 +550,8 @@ router.get("/interventions/cases", authenticate, requireRole("SCHOOL_ADMIN", "TE
       ? await prisma.serviceSession.findMany({
           where: {
             userId: { in: cases.map((item) => item.studentId) },
+            schoolId: scope.schoolId,
+            user: buildCohortScopedStudentWhere(scope),
           },
           select: { userId: true, submittedAt: true, checkInTime: true, checkOutTime: true },
           orderBy: { updatedAt: "desc" },
@@ -638,50 +639,25 @@ router.put("/interventions/cases/:studentId", authenticate, requireRole("SCHOOL_
       ownerId: z.string().optional().or(z.literal("")),
     }).parse(req.body);
 
-    const actor = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: {
-        schoolId: true,
-        cohort: { select: { schoolId: true } },
-        classroom: { select: { schoolId: true } },
-        cohortMemberships: {
-          where: { isActive: true },
-          orderBy: [{ updatedAt: "desc" }],
-          select: { cohort: { select: { schoolId: true } } },
-        },
-      },
-    });
-    const actorSchoolId = actor ? resolveSchoolId(actor) : null;
-    if (!actorSchoolId) return res.status(400).json({ error: "Not associated with a school" });
-
-    const student = await prisma.user.findFirst({
-      where: {
-        id: req.params.studentId,
-        role: "STUDENT",
-        OR: [
-          { schoolId: actorSchoolId },
-          { cohort: { schoolId: actorSchoolId } },
-          { classroom: { schoolId: actorSchoolId } },
-          { cohortMemberships: { some: { isActive: true, cohort: { schoolId: actorSchoolId } } } },
-        ],
-      },
-      select: { id: true },
-    });
-    if (!student) return res.status(404).json({ error: "Student not found for this school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
+    if (!await assertStudentAccessibleToStaff(scope, req.params.studentId)) {
+      return res.status(404).json({ error: "Student not found" });
+    }
 
     if (body.ownerId) {
       const owner = await prisma.user.findFirst({
-        where: { id: body.ownerId, schoolId: actorSchoolId, role: { in: ["SCHOOL_ADMIN", "TEACHER"] } },
+        where: { id: body.ownerId, schoolId: scope.schoolId, role: { in: ["SCHOOL_ADMIN", "TEACHER"] } },
         select: { id: true },
       });
       if (!owner) return res.status(404).json({ error: "Owner not found for this school" });
     }
 
     const interventionCase = await prisma.interventionCase.upsert({
-      where: { schoolId_studentId: { schoolId: actorSchoolId, studentId: student.id } },
+      where: { schoolId_studentId: { schoolId: scope.schoolId, studentId: req.params.studentId } },
       create: {
-        schoolId: actorSchoolId,
-        studentId: student.id,
+        schoolId: scope.schoolId,
+        studentId: req.params.studentId,
         ownerId: body.ownerId || req.user!.userId,
         status: body.status,
         priority: body.priority,
@@ -729,24 +705,28 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
       limit: z.coerce.number().int().min(1).max(100).optional(),
     }).parse(req.query);
 
-    const actor = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { schoolId: true },
-    });
-    if (!actor?.schoolId) {
-      return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
+    if (query.studentId && !await assertStudentAccessibleToStaff(scope, query.studentId)) {
+      return res.status(404).json({ error: "Student not found" });
     }
 
     let campaigns;
     try {
       campaigns = await prisma.interventionCampaign.findMany({
         where: {
-          schoolId: actor.schoolId,
-          ...(query.studentId ? { recipients: { some: { studentId: query.studentId } } } : {}),
+          schoolId: scope.schoolId,
+          recipients: {
+            some: {
+              student: buildCohortScopedStudentWhere(scope),
+              ...(query.studentId ? { studentId: query.studentId } : {}),
+            },
+          },
         },
         include: {
           actor: { select: { id: true, name: true, role: true } },
           recipients: {
+            where: { student: buildCohortScopedStudentWhere(scope) },
             include: {
               student: { select: { id: true, name: true, email: true } },
               message: { select: { id: true, createdAt: true, subject: true, priority: true } },
@@ -770,6 +750,8 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
           const followUpSessions = await prisma.serviceSession.findMany({
             where: {
               userId: { in: recipientIds },
+              schoolId: scope.schoolId,
+              user: buildCohortScopedStudentWhere(scope),
               OR: [
                 { updatedAt: { gt: campaign.createdAt } },
                 { submittedAt: { gt: campaign.createdAt } },
@@ -841,16 +823,16 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
       return res.status(400).json({ error: "Either audience or receiverIds is required" });
     }
 
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
     const actor = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { id: true, schoolId: true, name: true },
+      select: { id: true, name: true },
     });
-    if (!actor?.schoolId) {
-      return res.status(400).json({ error: "Not associated with a school" });
-    }
+    if (!actor) return res.status(404).json({ error: "Staff account not found" });
 
     const school = await prisma.school.findUnique({
-      where: { id: actor.schoolId },
+      where: { id: scope.schoolId },
       select: {
         id: true,
         name: true,
@@ -866,6 +848,9 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
     }
 
     if (body.cohortId) {
+      if (!canAccessCohort(scope, body.cohortId)) {
+        return res.status(404).json({ error: "Cohort not found" });
+      }
       const cohort = await prisma.cohort.findFirst({
         where: { id: body.cohortId, schoolId: school.id },
         select: { id: true },
@@ -878,11 +863,7 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
     const students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { classroom: { schoolId: school.id } },
-          { cohort: { schoolId: school.id } },
-          { cohortMemberships: { some: { isActive: true, cohort: { schoolId: school.id } } } },
-        ],
+        ...buildCohortScopedStudentWhere(scope),
         ...(body.cohortId ? {
           AND: [{
             OR: [
@@ -937,6 +918,7 @@ router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async
           .map((id) => ({ id }))
       : body.audience === "AT_RISK_STUDENTS"
         ? (await buildStudentProgressRecords(students, {
+            schoolId: scope.schoolId,
             requiredHours: school.requiredHours,
             serviceStartDate: school.serviceStartDate,
             serviceEndDate: school.serviceEndDate,

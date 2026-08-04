@@ -397,6 +397,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
   let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
   try {
     progress = await buildStudentProgressRecords(students, {
+      schoolId: scope.schoolId,
       requiredHours,
       serviceStartDate: school?.serviceStartDate ?? null,
       serviceEndDate: school?.serviceEndDate ?? null,
@@ -601,6 +602,7 @@ router.get("/school-students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHE
     let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
     try {
       progress = await buildStudentProgressRecords(students, {
+        schoolId: scope.schoolId,
         requiredHours: defaultRequired,
         serviceStartDate: school?.serviceStartDate ?? null,
         serviceEndDate: school?.serviceEndDate ?? null,
@@ -889,6 +891,7 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
       },
     }));
     const progress = await buildStudentProgressRecords(studentsForProgress, {
+      schoolId: cohort.schoolId,
       requiredHours: cohort.school.requiredHours ?? 40,
       serviceStartDate: cohort.school.serviceStartDate ?? null,
       serviceEndDate: cohort.school.serviceEndDate ?? null,

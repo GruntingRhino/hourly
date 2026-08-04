@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
@@ -8,10 +7,7 @@ import prisma from "../lib/prisma";
 import { authenticate, signToken, signUserToken, verifyToken } from "../middleware/auth";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
-import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
-import { schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import {
-  emailDomainMatchesWebsite,
   extractDomainFromWebsite,
   isPersonalEmailDomain,
   isQaSignupBypassEmail,
@@ -21,6 +17,7 @@ import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations 
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import { isUniqueConstraintError } from "../lib/prismaErrors";
 import { isInternalAdminUser } from "../lib/internalAdmin";
+import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
 import {
   firstZodError,
   opaqueIdSchema,
@@ -35,11 +32,8 @@ import {
   CLIENT_URL,
   getCapturedMailinatorInbox,
 } from "../services/email";
+import { isProdLike } from "../lib/isProdLike";
 
-const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" ||
-  process.env.VERCEL_ENV === "production" ||
-  process.env.APP_ENV === "production";
 const ENABLE_IMPERSONATION = process.env.ENABLE_IMPERSONATION === "true";
 
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
@@ -69,6 +63,7 @@ const schoolAuthSelect = {
   name: true,
   domain: true,
   verified: true,
+  ownershipStatus: true,
   requiredHours: true,
   verificationStandard: true,
   zipCodes: true,
@@ -170,7 +165,7 @@ const forgotPasswordLimiter = createEmailSendRateLimit({
 
 const resendVerificationLimiter = createEmailSendRateLimit({
   namespace: "resend-verification",
-  recipientKey: (req) => req.user?.userId,
+  recipientKey: (req) => emailRecipientRateLimitKey(req.body?.email),
 });
 
 // Login global IP window: 50 failed attempts per IP/UA per 15 minutes.
@@ -344,7 +339,7 @@ async function safeBcryptCompare(plain: string, hash: string): Promise<boolean> 
 }
 
 
-if (!IS_PROD_LIKE) {
+if (!isProdLike()) {
   router.get("/__test-email", publicAuthLimiter, (req: Request, res: Response) => {
     const inbox = String(req.query.inbox || "").trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(inbox)) {
@@ -431,36 +426,9 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
     data.email = normalizeEmail(data.email);
     const isQaBypass = isQaSignupBypassEmail(data.email, ALLOW_QA_SIGNUP_BYPASS);
 
-    if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass) {
+    if (isProdLike() && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass) {
       if (isPersonalEmailDomain(data.email)) {
         return res.status(403).json({ error: "Personal email addresses are not allowed. Please use your school's official email address." });
-      }
-    }
-
-    // If a directory school was selected, validate email domain against its known domain.
-    // Skipped in non-prod environments when ALLOW_PERSONAL_EMAIL_DOMAINS=true so any email can be used for testing.
-    if (data.directorySchoolId) {
-      const dirEntry = await prisma.schoolDirectory.findUnique({
-        where: { id: data.directorySchoolId },
-        select: { emailDomain: true, website: true },
-      });
-      if (!dirEntry) {
-        return res.status(400).json({
-          error: "Selected school is no longer available. Please search again.",
-        });
-      }
-      if (IS_PROD_LIKE && !ALLOW_PERSONAL_EMAIL_DOMAINS && !isQaBypass && data.role === "SCHOOL_ADMIN") {
-        // Prefer the explicit emailDomain field; fall back to parsing the website URL
-        const schoolDomain = dirEntry.emailDomain || (dirEntry.website ? extractDomainFromWebsite(dirEntry.website) : null);
-        if (schoolDomain) {
-          const emailDomain = data.email.split("@")[1]?.toLowerCase().trim() || "";
-          const isEdu = emailDomain.endsWith(".edu");
-          if (!isEdu && !emailDomainMatchesWebsite(emailDomain, schoolDomain)) {
-            return res.status(403).json({
-              error: `Email domain does not match the school's domain (${schoolDomain}). Please use your school email address.`,
-            });
-          }
-        }
       }
     }
 
@@ -470,8 +438,6 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
-
-    let schoolId: string | undefined;
 
     // Generate email verification token — only the hash is stored
     const emailVerificationToken = generateToken();
@@ -491,6 +457,7 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
             latitude: true,
             longitude: true,
             emailDomain: true,
+            website: true,
             claimed: true,
           },
         })
@@ -514,162 +481,81 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
       }
     }
 
+    const approvedDirectoryDomain = directorySchool?.emailDomain ||
+      (directorySchool?.website ? extractDomainFromWebsite(directorySchool.website) : null);
+    if (approvedDirectoryDomain && (isProdLike() || !ALLOW_PERSONAL_EMAIL_DOMAINS) && !isQaBypass) {
+      try {
+        assertExactSchoolDomain(data.email, approvedDirectoryDomain);
+      } catch {
+        return res.status(403).json({
+          error: `Email domain does not match the school's domain (${approvedDirectoryDomain}). Please use your school email address.`,
+          code: "SCHOOL_DOMAIN_MISMATCH",
+        });
+      }
+    }
+
     const schoolName = directorySchool?.name || data.schoolName || data.name;
     const schoolDomain = directorySchool?.emailDomain || data.schoolDomain || null;
 
-    signupStage = "user.create";
-    let user;
+    signupStage = "transaction.pending-authority";
+    let user: {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+    };
+    let schoolId: string;
     try {
-      user = await prisma.user.create({
-        data: {
-          email: data.email,
-          passwordHash,
-          name: data.name,
-          role: data.role,
-          emailVerified: false,
-          emailVerificationToken: hashToken(emailVerificationToken),
-          emailVerificationExpires,
-        },
-      });
-    } catch (err) {
-      if (isUniqueConstraintError(err)) {
-        return res.status(409).json({ error: "Email already registered" });
-      }
-      throw err;
-    }
+      const created = await prisma.$transaction(async (tx) => {
+        const txUser = await tx.user.create({
+          data: {
+            email: data.email,
+            passwordHash,
+            name: data.name,
+            role: data.role,
+            emailVerified: false,
+            emailVerificationToken: hashToken(emailVerificationToken),
+            emailVerificationExpires,
+          },
+          select: { id: true, email: true, name: true, role: true },
+        });
 
-    let school;
-    try {
-      signupStage = "transaction.school.create";
-      school = await prisma.$transaction(async (tx) => {
         const txSchool = await tx.school.create({
           data: {
             name: schoolName,
             verified: false,
+            ownershipStatus: "PENDING",
+            registrationEmail: data.email,
+            createdById: txUser.id,
+            domain: schoolDomain || undefined,
+            directoryId: data.directorySchoolId || undefined,
+            type: directorySchool?.type || undefined,
+            address: directorySchool?.address || undefined,
+            city: directorySchool?.city || undefined,
+            state: directorySchool?.state || undefined,
+            zip: directorySchool?.zip || undefined,
+            latitude: directorySchool?.latitude ?? undefined,
+            longitude: directorySchool?.longitude ?? undefined,
+            zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
           },
-          select: { id: true, name: true },
+          select: { id: true },
         });
 
-        signupStage = "transaction.school.update";
-        try {
-          await tx.school.update({
-            where: { id: txSchool.id },
-            data: {
-              domain: schoolDomain || undefined,
-              directoryId: data.directorySchoolId || undefined,
-              type: directorySchool?.type || undefined,
-              address: directorySchool?.address || undefined,
-              city: directorySchool?.city || undefined,
-              state: directorySchool?.state || undefined,
-              zip: directorySchool?.zip || undefined,
-              latitude: directorySchool?.latitude ?? undefined,
-              longitude: directorySchool?.longitude ?? undefined,
-              zipCodes: data.zipCodes ? JSON.stringify(data.zipCodes) : undefined,
-            },
-            select: { id: true, name: true },
-          });
-        } catch (err) {
-          console.error("[signup] Failed to apply school metadata:", err);
-        }
-
-        signupStage = "transaction.user.update";
         await tx.user.update({
-          where: { id: user.id },
+          where: { id: txUser.id },
           data: { schoolId: txSchool.id },
         });
 
-        return txSchool;
+        return { user: txUser, schoolId: txSchool.id };
       });
+      user = created.user;
+      schoolId = created.schoolId;
     } catch (err) {
-      await prisma.user.delete({ where: { id: user.id } }).catch((cleanupErr) => {
-        console.error("[signup] Failed to clean up orphaned user after school creation failure:", cleanupErr);
-      });
+      if (isUniqueConstraintError(err)) {
+        return res.status(409).json({ error: "Email or school is already registered" });
+      }
       throw err;
     }
-
-    schoolId = school.id;
-
-    try {
-      await prisma.school.update({
-        where: { id: school.id },
-        data: { createdById: user.id },
-      });
-    } catch (err) {
-      console.error("[signup] Failed to mark school creator:", err);
-    }
-
-    try {
-      const existingClassroom = await prisma.classroom.findFirst({
-        where: { schoolId: school.id, name: "General" },
-      });
-      if (!existingClassroom) {
-        const inviteCode = crypto.randomBytes(4).toString("hex");
-        await prisma.classroom.create({
-          data: {
-            name: "General",
-            schoolId: school.id,
-            teacherId: user.id,
-            inviteCode,
-          },
-        });
-      }
-    } catch (err) {
-      console.error("[signup] Failed to create default classroom:", err);
-    }
-
-    try {
-      const schoolBeneficiary = await prisma.beneficiary.findFirst({
-        where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
-      }) ?? await prisma.beneficiary.create({
-        data: {
-          name: school.name,
-          visibility: "PRIVATE",
-          status: "ACTIVE",
-          createdBySchoolId: school.id,
-          ...schoolCreatedBeneficiaryPlan("PRIVATE"),
-        },
-      });
-      await prisma.beneficiary.update({
-        where: { id: schoolBeneficiary.id },
-        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
-      });
-      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
-        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
-      });
-      if (!existingApproval) {
-        await prisma.schoolBeneficiaryApproval.create({
-          data: {
-            schoolId: school.id,
-            beneficiaryId: schoolBeneficiary.id,
-            status: "APPROVED",
-            approvedAt: new Date(),
-          },
-        });
-      }
-    } catch (err) {
-      console.error("[signup] Failed to create default school beneficiary:", err);
-    }
-
-    // Link to BeneficiaryDirectory if a directory school was chosen
-    try {
-      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
-    } catch (err) {
-      console.error("[signup] Failed to link school to BeneficiaryDirectory:", err);
-    }
-
-    if (directorySchool && !directorySchool.claimed) {
-      await prisma.schoolDirectory.update({
-        where: { id: directorySchool.id },
-        data: {
-          claimed: true,
-          claimedBySchoolId: school.id,
-        },
-      }).catch((err) => {
-        console.error("[signup] Failed to mark SchoolDirectory row as claimed:", err);
-      });
-    }
-
-    const token = signUserToken(user);
 
     const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
 
@@ -682,17 +568,11 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
     }
 
     res.status(201).json({
-      token,
       requiresEmailVerification: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        emailVerified: false,
-        organizationId: user.organizationId,
-        schoolId,
-      },
+      requiresSchoolOwnershipReview: true,
+      ownershipStatus: "PENDING",
+      email: user.email,
+      schoolApplicationId: schoolId,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -727,6 +607,9 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
         cohortId: true,
         beneficiaryId: true,
         tokenVersion: true,
+        school: {
+          select: { verified: true, ownershipStatus: true },
+        },
       },
     });
     if (!user) {
@@ -745,6 +628,17 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
     const valid = await safeBcryptCompare(data.password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const eligibility = evaluateSessionEligibility({
+      ...user,
+      isInternalAdmin: isInternalAdminUser(user),
+    });
+    if (eligibility.allowed === false) {
+      return res.status(eligibility.status).json({
+        error: eligibility.error,
+        code: eligibility.code,
+      });
     }
 
     const token = signUserToken(user);
@@ -886,27 +780,52 @@ router.get("/verify-email", publicAuthLimiter, async (req: Request, res: Respons
       token: typeof req.query.token === "string" ? req.query.token : undefined,
     });
 
-    const user = await prisma.user.findFirst({
-      where: {
-        emailVerificationToken: hashToken(token),
-        emailVerificationExpires: { gt: new Date() },
-      },
+    const tokenDigest = hashToken(token);
+    const user = await prisma.$transaction(async (tx) => {
+      const candidate = await tx.user.findFirst({
+        where: {
+          emailVerificationToken: tokenDigest,
+          emailVerificationExpires: { gt: new Date() },
+          emailVerified: false,
+        },
+        select: { id: true, role: true, schoolId: true },
+      });
+      if (!candidate) return null;
+
+      const consumed = await tx.user.updateMany({
+        where: {
+          id: candidate.id,
+          emailVerificationToken: tokenDigest,
+          emailVerificationExpires: { gt: new Date() },
+          emailVerified: false,
+        },
+        data: {
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+        },
+      });
+      if (consumed.count !== 1) return null;
+
+      if (candidate.role === "SCHOOL_ADMIN" && candidate.schoolId) {
+        await tx.school.updateMany({
+          where: { id: candidate.schoolId, ownershipStatus: "PENDING" },
+          data: { ownershipEvidenceVerifiedAt: new Date() },
+        });
+      }
+
+      return candidate;
     });
 
     if (!user) {
       return res.status(400).json({ error: "Invalid or expired verification token" });
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpires: null,
-      },
+    res.json({
+      message: "Email verified successfully",
+      requiresSchoolOwnershipReview: user.role === "SCHOOL_ADMIN",
+      ownershipStatus: user.role === "SCHOOL_ADMIN" ? "PENDING" : undefined,
     });
-
-    res.json({ message: "Email verified successfully", userId: user.id });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: firstZodError(err) });
@@ -916,31 +835,36 @@ router.get("/verify-email", publicAuthLimiter, async (req: Request, res: Respons
   }
 });
 
-// POST /api/auth/resend-verification
-router.post("/resend-verification", authenticate, resendVerificationLimiter, async (req: Request, res: Response) => {
+// POST /api/auth/resend-verification — public and enumeration-resistant because
+// pending users intentionally do not possess an application session.
+router.post("/resend-verification", publicAuthLimiter, resendVerificationLimiter, async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user) return res.status(404).json({ error: "User not found" });
-    if (user.emailVerified) return res.status(400).json({ error: "Email already verified" });
+    const { email } = forgotPasswordSchema.parse(req.body);
+    const normalizedEmail = normalizeEmail(email);
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
-    const emailVerificationToken = generateToken();
-    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    if (user && !user.emailVerified) {
+      const emailVerificationToken = generateToken();
+      const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerificationToken: hashToken(emailVerificationToken), emailVerificationExpires },
-    });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: hashToken(emailVerificationToken), emailVerificationExpires },
+      });
 
-    const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
-
-    try {
-      await sendVerificationEmail(user.email, verificationUrl);
-    } catch (emailErr) {
-      console.error("[resend-verification] Failed to send verification email:", emailErr);
+      const verificationUrl = `${CLIENT_URL}/verify-email?token=${emailVerificationToken}`;
+      try {
+        await sendVerificationEmail(user.email, verificationUrl);
+      } catch (emailErr) {
+        console.error("[resend-verification] Failed to send verification email:", emailErr);
+      }
     }
 
-    res.json({ message: "Verification email sent" });
+    res.json({ message: "If an unverified account exists, a verification email has been sent." });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err, "Valid email is required") });
+    }
     console.error("Resend verification error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1216,7 +1140,7 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   }
 });
 
-if (!IS_PROD_LIKE && ENABLE_IMPERSONATION) {
+if (!isProdLike() && ENABLE_IMPERSONATION) {
   // POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
   router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
     try {
@@ -1314,7 +1238,7 @@ if (!IS_PROD_LIKE && ENABLE_IMPERSONATION) {
       res.status(500).json({ error: "Internal server error" });
     }
   });
-} else if (!IS_PROD_LIKE && !ENABLE_IMPERSONATION) {
+} else if (!isProdLike() && !ENABLE_IMPERSONATION) {
   console.warn("[Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.");
 }
 

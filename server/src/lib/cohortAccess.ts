@@ -1,5 +1,4 @@
 import prisma from "./prisma";
-import { resolveSchoolIdFromUserAssociations } from "./userAssociations";
 
 export type StaffAccessScope = {
   userId: string;
@@ -69,15 +68,12 @@ export function canAccessCohort(scope: StaffAccessScope, cohortId: string): bool
 export function buildCohortScopedStudentWhere(scope: StaffAccessScope): Record<string, unknown> {
   if (scope.isSchoolAdmin) {
     return {
-      OR: [
-        { classroom: { schoolId: scope.schoolId } },
-        { cohort: { schoolId: scope.schoolId } },
-        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: scope.schoolId } } } },
-      ],
+      schoolId: scope.schoolId,
     };
   }
 
   return {
+    schoolId: scope.schoolId,
     OR: [
       { cohortId: { in: scope.assignedCohortIds } },
       { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },
@@ -108,8 +104,7 @@ export async function assertStudentAccessibleToStaff(
   });
   if (!student || student.role !== "STUDENT") return false;
 
-  const studentSchoolId = resolveSchoolIdFromUserAssociations(student);
-  if (studentSchoolId !== scope.schoolId) return false;
+  if (student.schoolId !== scope.schoolId) return false;
 
   if (scope.isSchoolAdmin) return true;
   if (student.cohortId && scope.assignedCohortIds.includes(student.cohortId)) return true;

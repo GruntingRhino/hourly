@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => { const data = await api.post<{ token: string; user: User }>("/auth/login", { email, password }); setAuthSession(data.token, data.user); setUser(data.user); }, []);
   const loginWithToken = useCallback((token: string, u: User) => { setAuthSession(token, u); setUser(u); }, []);
-  const signup = useCallback(async (signupData: SignupData): Promise<SignupResult> => { const data = await api.post<SignupResult>("/auth/signup", signupData); setAuthSession(data.token, data.user); setUser(data.user); return data; }, []);
+  const signup = useCallback(async (signupData: SignupData): Promise<SignupResult> => api.post<SignupResult>("/auth/signup", signupData), []);
   const logout = useCallback(() => { markAuthSyncOptOut(); clearAuthSession(); setUser(null); }, []);
 
   return <AuthContext.Provider value={{ user, loading, login, loginWithToken, signup, logout, refreshUser }}>{children}</AuthContext.Provider>;

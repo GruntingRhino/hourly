@@ -8,9 +8,9 @@ function internalAuth() {
   return secret ? { headers: { Authorization: `Bearer ${secret}` } } : undefined;
 }
 
-async function completeGoogleClassroomOAuth(ctx: APIRequestContext, token: string, baseUrl: string, code: string) {
+async function completeGoogleClassroomOAuth(ctx: APIRequestContext, token: string, testOrigin: string, code: string) {
   const urlRes = await ctx.get(
-    `${BASE}/api/integrations/googleClassroom/oauth/url?baseUrl=${encodeURIComponent(baseUrl)}&displayName=${encodeURIComponent("Google Classroom OAuth Test")}`,
+    `${BASE}/api/integrations/googleClassroom/oauth/url?testOrigin=${encodeURIComponent(testOrigin)}&displayName=${encodeURIComponent("Google Classroom OAuth Test")}`,
     auth(token)
   );
   expect(urlRes.ok()).toBeTruthy();
@@ -39,11 +39,37 @@ test.describe("Google Classroom OAuth flow", () => {
     expect(callbackRes.status()).toBe(302);
     expect(callbackRes.headers().location).toContain("/settings?tab=integrations&googleClassroom=connected");
 
-    const previewRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, auth(adminToken));
+    const coursesRes = await ctx.get(`${BASE}/api/integrations/googleClassroom/courses`, auth(adminToken));
+    const coursesBody = await coursesRes.json();
+    expect(coursesRes.ok(), JSON.stringify(coursesBody)).toBeTruthy();
+    expect(coursesBody.courses.map((course: any) => course.id)).toContain("oauth-course-bio");
+
+    const requestsBeforeRejectedSelection = mock.requests.length;
+    const emptySelectionRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: [] },
+    });
+    expect(emptySelectionRes.status()).toBe(400);
+    expect(mock.requests.length).toBe(requestsBeforeRejectedSelection);
+
+    const unknownSelectionRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["unknown-course"] },
+    });
+    expect(unknownSelectionRes.status()).toBe(400);
+    expect(mock.requests.some((entry) => entry.includes("unknown-course"))).toBeFalsy();
+
+    const previewRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["oauth-course-bio"] },
+    });
     expect(previewRes.ok()).toBeTruthy();
     const previewBody = await previewRes.json();
     expect(previewBody.summary.counts.cohortsCreated + previewBody.summary.counts.cohortsUpdated).toBeGreaterThan(0);
-    expect(previewBody.summary.operations.some((operation: any) => /OAuth Advisory/.test(operation.target))).toBeTruthy();
+    expect(previewBody.summary.operations.some((operation: any) => /OAuth Biology/.test(operation.target))).toBeTruthy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-bio/students"))).toBeTruthy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-service/students"))).toBeFalsy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-advisory/students"))).toBeFalsy();
 
     const statusRes = await ctx.get(`${BASE}/api/integrations/googleClassroom/status`, auth(adminToken));
     expect(statusRes.ok()).toBeTruthy();
@@ -78,7 +104,10 @@ test.describe("Google Classroom OAuth flow", () => {
     const callbackRes = await completeGoogleClassroomOAuth(ctx, adminToken, mock.baseUrl, "good-code");
     expect(callbackRes.status()).toBe(302);
 
-    const previewRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, auth(adminToken));
+    const previewRes = await ctx.post(`${BASE}/api/integrations/googleClassroom/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["oauth-course-bio"] },
+    });
     expect(previewRes.status()).toBe(500);
 
     const statusRes = await ctx.get(`${BASE}/api/integrations/googleClassroom/status`, auth(adminToken));

@@ -113,10 +113,15 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
     if (existing) {
       // If the user exists and is already a STUDENT, link them to the cohort
       if (existing.role === "STUDENT") {
+        if (existing.schoolId && existing.schoolId !== inv.cohort.schoolId) {
+          return res.status(409).json({
+            error: "This account belongs to another school; an authorized school transfer is required.",
+          });
+        }
         await prisma.user.update({
           where: { id: existing.id },
           data: {
-            schoolId: inv.cohort.schoolId,
+            schoolId: existing.schoolId ?? inv.cohort.schoolId,
             grade: existing.grade ?? inv.grade,
             house: existing.house ?? inv.house,
           },

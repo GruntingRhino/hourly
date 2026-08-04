@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
-import { useAuth } from "../../hooks/useAuth";
-import type { User } from "../../hooks/useAuth";
 
-interface AuthResult {
-  token: string;
-  user: User;
+interface VerificationResult {
+  requiresSchoolOwnershipReview: true;
+  school: {
+    id: string;
+    name: string;
+    verified: false;
+    ownershipStatus: "PENDING";
+  };
 }
 
 export default function SchoolVerifyRegistration() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
-  const { loginWithToken } = useAuth();
   const [status, setStatus] = useState<"verifying" | "success" | "error">(token ? "verifying" : "error");
   const [errorMsg, setErrorMsg] = useState(token ? "" : "No verification token found in the link.");
 
@@ -21,17 +23,16 @@ export default function SchoolVerifyRegistration() {
     if (!token) {
       return;
     }
-    api.get<AuthResult>(`/auth/google/verify-school?token=${token}`)
-      .then((result) => {
-        loginWithToken(result.token, result.user);
+    api.get<VerificationResult>(`/auth/google/verify-school?token=${token}`)
+      .then(() => {
         setStatus("success");
-        setTimeout(() => navigate("/dashboard"), 2000);
+        setTimeout(() => navigate("/login"), 4000);
       })
       .catch((err: unknown) => {
         setStatus("error");
         setErrorMsg(getErrorMessage(err, "Verification failed. The link may have expired."));
       });
-  }, [loginWithToken, navigate, token]);
+  }, [navigate, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
@@ -47,8 +48,8 @@ export default function SchoolVerifyRegistration() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold mb-2">School Verified!</h2>
-            <p className="text-sm text-[var(--text-sec)]">Your school has been registered on GoodHours. Redirecting to your dashboard...</p>
+            <h2 className="text-xl font-bold mb-2">School contact verified</h2>
+            <p className="text-sm text-[var(--text-sec)]">Your authority claim is pending independent review. No school-administrator access is available until it is approved.</p>
           </div>
         )}
         {status === "error" && (

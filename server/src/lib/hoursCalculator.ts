@@ -15,7 +15,8 @@ export interface StudentHours {
  * Returns a Map keyed by studentId.
  */
 export async function calculateStudentHours(
-  studentIds: string[]
+  studentIds: string[],
+  schoolId: string
 ): Promise<Map<string, StudentHours>> {
   if (studentIds.length === 0) return new Map();
 
@@ -33,6 +34,7 @@ export async function calculateStudentHours(
     prisma.beneficiarySignup.findMany({
       where: {
         studentId: { in: studentIds },
+        schoolId,
         verificationStatus: { in: ["APPROVED", "PENDING"] },
         status: { not: "CANCELLED" },
       },
@@ -41,6 +43,7 @@ export async function calculateStudentHours(
     prisma.selfSubmittedRequest.findMany({
       where: {
         studentId: { in: studentIds },
+        schoolId,
         status: { in: ["APPROVED", "PENDING", "REVISION_REQUESTED"] },
       },
       select: { studentId: true, hours: true, status: true },
@@ -48,6 +51,7 @@ export async function calculateStudentHours(
     prisma.serviceSession.findMany({
       where: {
         userId: { in: studentIds },
+        schoolId,
         verificationStatus: { in: ["APPROVED", "PENDING"] },
       },
       select: { userId: true, totalHours: true, verificationStatus: true },

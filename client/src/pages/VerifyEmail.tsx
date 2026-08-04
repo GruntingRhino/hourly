@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../lib/api";
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+
   const [status, setStatus] = useState<"verifying" | "success" | "error">(token ? "verifying" : "error");
   const [error, setError] = useState(token ? "" : "No verification token provided.");
 
@@ -24,16 +23,15 @@ export default function VerifyEmail() {
         }
         return res.json();
       })
-      .then(async () => {
-        await refreshUser();
+      .then(() => {
         setStatus("success");
-        setTimeout(() => navigate("/dashboard"), 2000);
+        setTimeout(() => navigate("/login"), 3000);
       })
       .catch((err) => {
         setStatus("error");
         setError(getErrorMessage(err, "Request failed."));
       });
-  }, [navigate, refreshUser, token]);
+  }, [navigate, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-alt)] px-4">
@@ -49,7 +47,7 @@ export default function VerifyEmail() {
           <div>
             <div className="text-4xl mb-4">✅</div>
             <h2 className="text-[20px] font-semibold text-[var(--ok-t)]">Email verified!</h2>
-            <p className="text-[var(--text-sec)] mt-2">Redirecting to your dashboard...</p>
+            <p className="text-[var(--text-sec)] mt-2">Mailbox verified. School ownership review is still required before sign-in.</p>
           </div>
         )}
         {status === "error" && (

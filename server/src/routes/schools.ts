@@ -39,11 +39,10 @@ import {
   normalizeRollbackPlanConfig,
   normalizeSupportProcessConfig,
 } from "../lib/launchCenter";
+import { isProdLike } from "../lib/isProdLike";
 
 const router = Router();
 
-const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 const REQUIRED_CATEGORY_CAP = "Community Service";
 const schoolOwnershipReviewSchema = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
@@ -1954,7 +1953,7 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       role: teacher.role,
     };
     // Only expose temp password outside production (dev/staging only)
-    if (!IS_PROD_LIKE) {
+    if (!isProdLike()) {
       responseBody.tempPassword = tempPassword;
     }
     res.status(201).json(responseBody);

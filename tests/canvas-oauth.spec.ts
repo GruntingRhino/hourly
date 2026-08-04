@@ -29,12 +29,12 @@ test.describe("Canvas OAuth flow", () => {
   test.describe.configure({ mode: "serial" });
 
   test("OAuth URL requests only the Canvas scopes used by the live provider", async () => {
+    const mock = await startMockCanvasTenant("default");
     const ctx = await request.newContext();
     const adminToken = await getToken("schoolA");
-    const baseUrl = "https://canvas.example.edu";
 
     const urlRes = await ctx.get(
-      `${BASE}/api/integrations/canvas/oauth/url?baseUrl=${encodeURIComponent(baseUrl)}&displayName=${encodeURIComponent("Canvas OAuth Test")}`,
+      `${BASE}/api/integrations/canvas/oauth/url?baseUrl=${encodeURIComponent(mock.baseUrl)}&displayName=${encodeURIComponent("Canvas OAuth Test")}`,
       auth(adminToken)
     );
     expect(urlRes.ok()).toBeTruthy();
@@ -51,6 +51,7 @@ test.describe("Canvas OAuth flow", () => {
     expect(scope).not.toContain("url:GET|/api/v1/courses/:id/enrollments");
 
     await ctx.dispose();
+    await mock.close();
   });
 
   test("OAuth callback stores a real connection and syncs via refreshed token against a paginated Canvas-like tenant", async () => {
@@ -64,11 +65,37 @@ test.describe("Canvas OAuth flow", () => {
     expect(callbackRes.status()).toBe(302);
     expect(callbackRes.headers().location).toContain("/settings?tab=integrations&canvas=connected");
 
-    const previewRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, auth(adminToken));
+    const coursesRes = await ctx.get(`${BASE}/api/integrations/canvas/courses`, auth(adminToken));
+    const coursesBody = await coursesRes.json();
+    expect(coursesRes.ok(), JSON.stringify(coursesBody)).toBeTruthy();
+    expect(coursesBody.courses.map((course: any) => course.id)).toContain("oauth-course-bio");
+
+    const requestsBeforeRejectedSelection = mock.requests.length;
+    const emptySelectionRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: [] },
+    });
+    expect(emptySelectionRes.status()).toBe(400);
+    expect(mock.requests.length).toBe(requestsBeforeRejectedSelection);
+
+    const unknownSelectionRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["unknown-course"] },
+    });
+    expect(unknownSelectionRes.status()).toBe(400);
+    expect(mock.requests.some((entry) => entry.includes("unknown-course"))).toBeFalsy();
+
+    const previewRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["oauth-course-bio"] },
+    });
     expect(previewRes.ok()).toBeTruthy();
     const previewBody = await previewRes.json();
     expect(previewBody.summary.counts.cohortsCreated + previewBody.summary.counts.cohortsUpdated).toBeGreaterThan(0);
-    expect(previewBody.summary.operations.some((operation: any) => /OAuth Advisory/.test(operation.target))).toBeTruthy();
+    expect(previewBody.summary.operations.some((operation: any) => /OAuth Biology/.test(operation.target))).toBeTruthy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-bio/enrollments"))).toBeTruthy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-service/enrollments"))).toBeFalsy();
+    expect(mock.requests.some((entry) => entry.includes("/courses/oauth-course-unpublished/enrollments"))).toBeFalsy();
 
     const statusRes = await ctx.get(`${BASE}/api/integrations/canvas/status`, auth(adminToken));
     expect(statusRes.ok()).toBeTruthy();
@@ -103,7 +130,10 @@ test.describe("Canvas OAuth flow", () => {
     const callbackRes = await completeCanvasOAuth(ctx, adminToken, mock.baseUrl, "good-code");
     expect(callbackRes.status()).toBe(302);
 
-    const previewRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, auth(adminToken));
+    const previewRes = await ctx.post(`${BASE}/api/integrations/canvas/preview`, {
+      ...auth(adminToken),
+      data: { selectedExternalCourseIds: ["oauth-course-bio"] },
+    });
     expect(previewRes.status()).toBe(500);
 
     const statusRes = await ctx.get(`${BASE}/api/integrations/canvas/status`, auth(adminToken));

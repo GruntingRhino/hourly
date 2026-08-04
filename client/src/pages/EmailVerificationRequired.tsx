@@ -1,35 +1,22 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../lib/api";
-import { useAuth } from "../hooks/useAuth";
 
 export default function EmailVerificationRequired() {
-  const { user, logout, refreshUser } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const email = typeof location.state === "object" && location.state && "email" in location.state
+    ? String((location.state as { email: unknown }).email)
+    : "your email address";
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const [bypassing, setBypassing] = useState(false);
   const [error, setError] = useState("");
-
-  const handleBypassVerification = async () => {
-    setBypassing(true);
-    setError("");
-    try {
-      await api.post("/auth/dev/bypass-email-verification", {});
-      await refreshUser();
-      navigate("/dashboard");
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, "Bypass failed."));
-    } finally {
-      setBypassing(false);
-    }
-  };
 
   const handleResend = async () => {
     setResending(true);
     setError("");
     try {
-      await api.post("/auth/resend-verification", {});
+      await api.post("/auth/resend-verification", { email });
       setResent(true);
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Failed to resend. Please try again."));
@@ -39,7 +26,6 @@ export default function EmailVerificationRequired() {
   };
 
   const handleSignIn = () => {
-    logout();
     navigate("/login");
   };
 
@@ -63,7 +49,7 @@ export default function EmailVerificationRequired() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--in-bg)] text-2xl">✉️</div>
           <h2 className="text-2xl font-semibold text-[var(--text)] mb-2">Verify your email</h2>
           <p className="text-[var(--text-sec)] text-sm mb-5 break-words">
-            A verification link was sent to <strong>{user?.email}</strong>. Check your inbox and click the link to activate your account.
+            A verification link was sent to <strong>{email}</strong>. Verify the mailbox, then GoodHours will independently review the school-authority claim.
           </p>
 
           {resent && (
@@ -86,15 +72,6 @@ export default function EmailVerificationRequired() {
             {resending ? "Sending..." : "Resend verification email"}
           </button>
 
-          {(import.meta.env.DEV && import.meta.env.VITE_APP_ENV !== "production") && (
-            <button
-              onClick={handleBypassVerification}
-              disabled={bypassing}
-              className="w-full py-[9px] bg-[var(--wn-bg)]0 text-white rounded-[3px] font-medium hover:bg-yellow-600 disabled:opacity-50 mb-3 text-sm"
-            >
-              {bypassing ? "Bypassing..." : "[Dev] Skip email verification"}
-            </button>
-          )}
 
           <button onClick={handleSignIn} className="w-full py-[9px] border border-[var(--border-s)] rounded-[3px] text-sm hover:bg-[var(--surface-alt)]">
             Sign in here

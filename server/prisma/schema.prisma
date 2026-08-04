@@ -46,43 +46,43 @@ enum IntegrationExternalObjectType {
 // ─── Users & Identity ───────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String?   // nullable — Google-OAuth users may not have a password initially
-  name          String
-  phone         String?
-  role          String    // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
-  status        String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
-  emailVerified Boolean   @default(false)
-  emailVerificationToken String?
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  passwordHash             String? // nullable — Google-OAuth users may not have a password initially
+  name                     String
+  phone                    String?
+  role                     String // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
+  status                   String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
+  emailVerified            Boolean   @default(false)
+  emailVerificationToken   String?
   emailVerificationExpires DateTime?
-  passwordResetToken String?
-  passwordResetExpires DateTime?
-  tokenVersion  Int       @default(0) // bumped on password change/reset to revoke outstanding JWTs
-  googleId      String?   @unique
-  isTestAccount Boolean   @default(false) // true = Playwright/QA account, hidden from all lists
-  notificationPreferences String?  // JSON blob for notification prefs
-  messagePreferences      String?  // JSON blob for message/privacy prefs
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
+  tokenVersion             Int       @default(0) // bumped on password change/reset to revoke outstanding JWTs
+  googleId                 String?   @unique
+  isTestAccount            Boolean   @default(false) // true = Playwright/QA account, hidden from all lists
+  notificationPreferences  String? // JSON blob for notification prefs
+  messagePreferences       String? // JSON blob for message/privacy prefs
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   // Student-specific
-  grade         String?
-  house         String?   // optional house affiliation (configurable per school)
-  cohortId      String?
-  cohort        Cohort?   @relation("CohortStudents", fields: [cohortId], references: [id])
+  grade    String?
+  house    String? // optional house affiliation (configurable per school)
+  cohortId String?
+  cohort   Cohort? @relation("CohortStudents", fields: [cohortId], references: [id])
 
   // Legacy classroom (kept for migration, no longer used for new students)
-  classroomId   String?
-  classroom     Classroom? @relation("ClassroomStudents", fields: [classroomId], references: [id])
+  classroomId String?
+  classroom   Classroom? @relation("ClassroomStudents", fields: [classroomId], references: [id])
 
   // Staff school association (SCHOOL_ADMIN, TEACHER)
-  schoolId      String?
-  school        School?   @relation("SchoolStaff", fields: [schoolId], references: [id])
+  schoolId String?
+  school   School? @relation("SchoolStaff", fields: [schoolId], references: [id])
 
   // Beneficiary association (BENEFICIARY_ADMIN)
-  beneficiaryId String?
-  beneficiary   Beneficiary? @relation("BeneficiaryMembers", fields: [beneficiaryId], references: [id])
+  beneficiaryId        String?
+  beneficiary          Beneficiary? @relation("BeneficiaryMembers", fields: [beneficiaryId], references: [id])
   beneficiaryAdminRole String? // OWNER | ADMIN; only applies to BENEFICIARY_ADMIN
 
   // Legacy org (kept for backward compat during migration)
@@ -90,112 +90,133 @@ model User {
   organization   Organization? @relation("OrgMembers", fields: [organizationId], references: [id])
 
   // Relations
-  signups              Signup[]
-  serviceSessions      ServiceSession[]
-  sentMessages         Message[]        @relation("SentMessages")
-  receivedMessages     Message[]        @relation("ReceivedMessages")
-  interventionCampaigns InterventionCampaign[] @relation("InterventionActor")
-  interventionRecipients InterventionRecipient[] @relation("InterventionStudent")
-  interventionOwnedCases InterventionCase[] @relation("InterventionOwner")
-  interventionStudentCases InterventionCase[] @relation("InterventionStudentCase")
-  notifications        Notification[]
-  auditLogs            AuditLog[]       @relation("AuditActor")
-  dataAccessLogs       DataAccessLog[]  @relation("DataAccessActor")
-  savedOpportunities   SavedOpportunity[]
-  createdSchools       School[]         @relation("SchoolCreator")
-  taughtClassrooms     Classroom[]      @relation("ClassroomTeacher")
-  selfSubmissions      SelfSubmittedRequest[]
-  assignedCohorts      CohortTeacherAssignment[]
-  cohortMemberships    StudentCohortMembership[]
-  integrationConnectionsCreated IntegrationConnection[] @relation("IntegrationConnectionCreator")
-  integrationConnectionsUpdated IntegrationConnection[] @relation("IntegrationConnectionUpdater")
-  integrationSyncJobsStarted    IntegrationSyncJob[]    @relation("IntegrationSyncJobStarter")
-  ownedOrganizationInvoiceRequests OrganizationInvoiceRequest[] @relation("OrganizationInvoiceRequestOwner")
-  organizationInvoiceAuditLogs     OrganizationInvoiceAuditLog[] @relation("OrganizationInvoiceAuditActor")
+  signups                              Signup[]
+  serviceSessions                      ServiceSession[]
+  sentMessages                         Message[]                     @relation("SentMessages")
+  receivedMessages                     Message[]                     @relation("ReceivedMessages")
+  interventionCampaigns                InterventionCampaign[]        @relation("InterventionActor")
+  interventionRecipients               InterventionRecipient[]       @relation("InterventionStudent")
+  interventionOwnedCases               InterventionCase[]            @relation("InterventionOwner")
+  interventionStudentCases             InterventionCase[]            @relation("InterventionStudentCase")
+  notifications                        Notification[]
+  auditLogs                            AuditLog[]                    @relation("AuditActor")
+  dataAccessLogs                       DataAccessLog[]               @relation("DataAccessActor")
+  savedOpportunities                   SavedOpportunity[]
+  createdSchools                       School[]                      @relation("SchoolCreator")
+  taughtClassrooms                     Classroom[]                   @relation("ClassroomTeacher")
+  selfSubmissions                      SelfSubmittedRequest[]
+  assignedCohorts                      CohortTeacherAssignment[]
+  cohortMemberships                    StudentCohortMembership[]
+  integrationConnectionsCreated        IntegrationConnection[]       @relation("IntegrationConnectionCreator")
+  integrationConnectionsUpdated        IntegrationConnection[]       @relation("IntegrationConnectionUpdater")
+  integrationSyncJobsStarted           IntegrationSyncJob[]          @relation("IntegrationSyncJobStarter")
+  ownedOrganizationInvoiceRequests     OrganizationInvoiceRequest[]  @relation("OrganizationInvoiceRequestOwner")
+  organizationInvoiceAuditLogs         OrganizationInvoiceAuditLog[] @relation("OrganizationInvoiceAuditActor")
   uploadedOrganizationInvoiceArtifacts OrganizationInvoiceArtifact[] @relation("OrganizationInvoiceArtifactUploader")
+}
+
+model SchoolRegistrationIntent {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  googleId   String
+  email      String
+  name       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([expiresAt, consumedAt])
 }
 
 // ─── Schools ────────────────────────────────────────────────────
 
 model School {
-  id               String   @id @default(cuid())
-  name             String
+  id                            String           @id @default(cuid())
+  name                          String
   // Directory reference — if this school came from the schools directory
-  directoryId      String?  // references SchoolDirectory.id
-  directoryEntry   SchoolDirectory? @relation(fields: [directoryId], references: [id])
-  type             String?  // public, private, charter
-  address          String?
-  city             String?
-  state            String?
-  zip              String?
-  latitude         Float?
-  longitude        Float?
-  domain           String?  // official email domain(s) — eligibility check only, not self-enrollment
-  verified         Boolean  @default(false)
+  directoryId                   String? // references SchoolDirectory.id
+  directoryEntry                SchoolDirectory? @relation(fields: [directoryId], references: [id])
+  type                          String? // public, private, charter
+  address                       String?
+  city                          String?
+  state                         String?
+  zip                           String?
+  latitude                      Float?
+  longitude                     Float?
+  domain                        String? // official email domain(s) — eligibility check only, not self-enrollment
+  verified                      Boolean          @default(false)
+  ownershipStatus               String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  ownershipEvidenceVerifiedAt   DateTime?
+  ownershipReviewedAt           DateTime?
+  ownershipReviewedById         String?
+  ownershipReviewNote           String?
   // Magic link registration
-  registrationToken      String?   @unique
-  registrationTokenExpires DateTime?
-  registrationEmail      String?   // email to which the magic link was sent
-  createdById      String?
-  createdBy        User?    @relation("SchoolCreator", fields: [createdById], references: [id])
-  ownershipTransferToken String? @unique
-  ownershipTransferExpires DateTime?
+  registrationToken             String?          @unique
+  registrationTokenExpires      DateTime?
+  registrationEmail             String? // email to which the magic link was sent
+  createdById                   String?
+  createdBy                     User?            @relation("SchoolCreator", fields: [createdById], references: [id])
+  ownershipTransferToken        String?          @unique
+  ownershipTransferExpires      DateTime?
   ownershipTransferTargetUserId String?
-  requiredHours    Float    @default(40)
-  verificationStandard String @default("STANDARD")
-  serviceStartDate       DateTime?
-  serviceEndDate         DateTime?
-  allowSelfSubmission    Boolean   @default(true)
-  ferpaBeneficiaryPiiEnabled Boolean   @default(false) // when true, student names are shared with beneficiary admins
-  requireOrgVerification Boolean   @default(false)
-  categoryHourCaps       String?   // JSON: { [category: string]: number }
+  requiredHours                 Float            @default(40)
+  verificationStandard          String           @default("STANDARD")
+  serviceStartDate              DateTime?
+  serviceEndDate                DateTime?
+  allowSelfSubmission           Boolean          @default(true)
+  ferpaBeneficiaryPiiEnabled    Boolean          @default(false) // when true, student names are shared with beneficiary admins
+  requireOrgVerification        Boolean          @default(false)
+  categoryHourCaps              String? // JSON: { [category: string]: number }
   // Legacy
-  allowJoinByCode  Boolean  @default(false)
-  onboardingComplete Boolean @default(false)
-  partnerInviteTemplate String?
-  launchOnboardingConfig String?
-  launchSupportConfig    String?
-  launchRollbackConfig   String?
-  launchMonitoringConfig String?
-  zipCodes         String?  // JSON array of zip codes (service area)
+  allowJoinByCode               Boolean          @default(false)
+  onboardingComplete            Boolean          @default(false)
+  partnerInviteTemplate         String?
+  launchOnboardingConfig        String?
+  launchSupportConfig           String?
+  launchRollbackConfig          String?
+  launchMonitoringConfig        String?
+  zipCodes                      String? // JSON array of zip codes (service area)
   // Billing / procurement
-  billingStatus  String   @default("NONE")
-  accessStatus   String   @default("PROCUREMENT")
-  pilotExpiresAt DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  billingStatus                 String           @default("NONE")
+  accessStatus                  String           @default("PROCUREMENT")
+  pilotExpiresAt                DateTime?
+  createdAt                     DateTime         @default(now())
+  updatedAt                     DateTime         @updatedAt
 
-  staff            User[]               @relation("SchoolStaff")
-  cohorts          Cohort[]
-  classrooms       Classroom[]          // legacy
-  approvedOrgs     SchoolOrganization[] // legacy
-  beneficiaryApprovals SchoolBeneficiaryApproval[]
-  groups           StudentGroup[]
-  verifiedDomains  VerifiedDomain[]
-  selfSubmissions  SelfSubmittedRequest[]
-  launchBugs       SchoolLaunchBug[]
-  integrationConnections IntegrationConnection[]
-  integrationSyncJobs    IntegrationSyncJob[]
-  integrationSyncErrors  IntegrationSyncError[]
-  integrationMappings    IntegrationExternalMapping[]
-  interventionCampaigns  InterventionCampaign[]
-  interventionCases      InterventionCase[]
-  billingRecord  SchoolBillingRecord?
-  quoteRequests  SchoolQuoteRequest[]
-  partnerRequestsSent     SchoolPartnerRequest[] @relation("PartnerRequestFrom")
-  partnerRequestsReceived SchoolPartnerRequest[] @relation("PartnerRequestTo")
+  staff                   User[]                       @relation("SchoolStaff")
+  cohorts                 Cohort[]
+  classrooms              Classroom[] // legacy
+  approvedOrgs            SchoolOrganization[] // legacy
+  beneficiaryApprovals    SchoolBeneficiaryApproval[]
+  groups                  StudentGroup[]
+  verifiedDomains         VerifiedDomain[]
+  selfSubmissions         SelfSubmittedRequest[]
+  beneficiarySignups      BeneficiarySignup[]
+  serviceSessions         ServiceSession[]
+  launchBugs              SchoolLaunchBug[]
+  integrationConnections  IntegrationConnection[]
+  integrationSyncJobs     IntegrationSyncJob[]
+  integrationSyncErrors   IntegrationSyncError[]
+  integrationMappings     IntegrationExternalMapping[]
+  interventionCampaigns   InterventionCampaign[]
+  interventionCases       InterventionCase[]
+  billingRecord           SchoolBillingRecord?
+  quoteRequests           SchoolQuoteRequest[]
+  partnerRequestsSent     SchoolPartnerRequest[]       @relation("PartnerRequestFrom")
+  partnerRequestsReceived SchoolPartnerRequest[]       @relation("PartnerRequestTo")
 }
 
 model SchoolPartnerRequest {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   fromSchoolId String
   toSchoolId   String
-  fromSchool   School   @relation("PartnerRequestFrom", fields: [fromSchoolId], references: [id])
-  toSchool     School   @relation("PartnerRequestTo",   fields: [toSchoolId],   references: [id])
-  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  fromSchool   School    @relation("PartnerRequestFrom", fields: [fromSchoolId], references: [id])
+  toSchool     School    @relation("PartnerRequestTo", fields: [toSchoolId], references: [id])
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
   message      String?
   respondedAt  DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   @@unique([fromSchoolId, toSchoolId])
 }
@@ -203,37 +224,37 @@ model SchoolPartnerRequest {
 // ─── School Directory (imported from CSV data) ───────────────────
 
 model SchoolDirectory {
-  id       String  @id @default(cuid())
-  name     String
-  type     String? // public, private, charter
-  address  String?
-  city     String?
-  state    String?
-  zip      String?
-  latitude Float?
-  longitude Float?
-  emailDomain String? // known official email domain if any
-  claimed  Boolean @default(false)
+  id                String   @id @default(cuid())
+  name              String
+  type              String? // public, private, charter
+  address           String?
+  city              String?
+  state             String?
+  zip               String?
+  latitude          Float?
+  longitude         Float?
+  emailDomain       String? // known official email domain if any
+  claimed           Boolean  @default(false)
   claimedBySchoolId String?
-  ncessId   String?   @unique  // NCES school ID
-  gradeRange String?   // "PK-12", "9-12", etc.
-  enrollment Int?
-  phone     String?
-  county    String?
-  website   String?   // official school website
-  source    String?   // "NCES_CCD", "NCES_PSS"
-  updatedAt DateTime  @default(now()) @updatedAt
+  ncessId           String?  @unique // NCES school ID
+  gradeRange        String? // "PK-12", "9-12", etc.
+  enrollment        Int?
+  phone             String?
+  county            String?
+  website           String? // official school website
+  source            String? // "NCES_CCD", "NCES_PSS"
+  updatedAt         DateTime @default(now()) @updatedAt
 
-  schools  School[]
+  schools School[]
 }
 
 // ─── Verified Domains (per school) ──────────────────────────────
 
 model VerifiedDomain {
-  id       String @id @default(cuid())
-  schoolId String
-  domain   String // e.g. "lincoln.edu"
-  school   School @relation(fields: [schoolId], references: [id])
+  id        String   @id @default(cuid())
+  schoolId  String
+  domain    String // e.g. "lincoln.edu"
+  school    School   @relation(fields: [schoolId], references: [id])
   createdAt DateTime @default(now())
 
   @@unique([schoolId, domain])
@@ -242,25 +263,25 @@ model VerifiedDomain {
 // ─── Cohorts (replaces Classroom for new arch) ──────────────────
 
 model Cohort {
-  id            String   @id @default(cuid())
-  name          String   // e.g. "Class of 2028"
-  schoolId      String
-  school        School   @relation(fields: [schoolId], references: [id])
-  requiredHours Float?   // override school default if set
+  id                  String    @id @default(cuid())
+  name                String // e.g. "Class of 2028"
+  schoolId            String
+  school              School    @relation(fields: [schoolId], references: [id])
+  requiredHours       Float? // override school default if set
   serviceStartDate    DateTime?
   serviceEndDate      DateTime?
-  allowSelfSubmission Boolean?   // null = inherit from school
-  categoryHourCaps    String?    // JSON override; null = inherit from school
-  usesHouseField      Boolean    @default(false)
-  graduationYear Int?
-  status        String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
-  publishedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  allowSelfSubmission Boolean? // null = inherit from school
+  categoryHourCaps    String? // JSON override; null = inherit from school
+  usesHouseField      Boolean   @default(false)
+  graduationYear      Int?
+  status              String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  students      User[]            @relation("CohortStudents")
-  memberships   StudentCohortMembership[]
-  invitations   StudentInvitation[]
+  students           User[]                    @relation("CohortStudents")
+  memberships        StudentCohortMembership[]
+  invitations        StudentInvitation[]
   teacherAssignments CohortTeacherAssignment[]
 }
 
@@ -273,8 +294,8 @@ model StudentCohortMembership {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  student   User     @relation(fields: [studentId], references: [id])
-  cohort    Cohort   @relation(fields: [cohortId], references: [id])
+  student User   @relation(fields: [studentId], references: [id])
+  cohort  Cohort @relation(fields: [cohortId], references: [id])
 
   @@unique([studentId, cohortId])
   @@index([cohortId, isActive])
@@ -287,8 +308,8 @@ model CohortTeacherAssignment {
   teacherId String
   createdAt DateTime @default(now())
 
-  cohort     Cohort @relation(fields: [cohortId], references: [id])
-  teacher    User   @relation(fields: [teacherId], references: [id])
+  cohort  Cohort @relation(fields: [cohortId], references: [id])
+  teacher User   @relation(fields: [teacherId], references: [id])
 
   @@unique([cohortId, teacherId])
 }
@@ -296,114 +317,114 @@ model CohortTeacherAssignment {
 // ─── Student Invitations ─────────────────────────────────────────
 
 model StudentInvitation {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   cohortId      String
-  cohort        Cohort   @relation(fields: [cohortId], references: [id])
+  cohort        Cohort    @relation(fields: [cohortId], references: [id])
   email         String
   name          String?
   grade         String?
   house         String?
-  startingHours Float?   // pre-existing hours to credit as approved on join
-  token         String   @unique
+  startingHours Float? // pre-existing hours to credit as approved on join
+  token         String    @unique
   expiresAt     DateTime
   acceptedAt    DateTime?
-  status        String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-  createdAt     DateTime @default(now())
+  status        String    @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  createdAt     DateTime  @default(now())
 
   @@unique([cohortId, email])
 }
 
 model IntegrationConnection {
-  id                 String                      @id @default(cuid())
-  provider           IntegrationProvider
-  schoolId           String
-  school             School                      @relation(fields: [schoolId], references: [id])
-  status             IntegrationConnectionStatus @default(CONNECTED)
-  displayName        String?
-  baseUrl            String?
+  id                   String                      @id @default(cuid())
+  provider             IntegrationProvider
+  schoolId             String
+  school               School                      @relation(fields: [schoolId], references: [id])
+  status               IntegrationConnectionStatus @default(CONNECTED)
+  displayName          String?
+  baseUrl              String?
   credentialsEncrypted String?
-  config             String?
-  lastSyncedAt       DateTime?
-  lastSyncStatus     IntegrationSyncJobStatus?
-  lastSyncJobId      String?
-  createdById        String
-  createdBy          User                        @relation("IntegrationConnectionCreator", fields: [createdById], references: [id])
-  updatedById        String?
-  updatedBy          User?                       @relation("IntegrationConnectionUpdater", fields: [updatedById], references: [id])
-  connectedAt        DateTime                    @default(now())
-  disconnectedAt     DateTime?
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
+  config               String?
+  lastSyncedAt         DateTime?
+  lastSyncStatus       IntegrationSyncJobStatus?
+  lastSyncJobId        String?
+  createdById          String
+  createdBy            User                        @relation("IntegrationConnectionCreator", fields: [createdById], references: [id])
+  updatedById          String?
+  updatedBy            User?                       @relation("IntegrationConnectionUpdater", fields: [updatedById], references: [id])
+  connectedAt          DateTime                    @default(now())
+  disconnectedAt       DateTime?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
 
-  mappings           IntegrationExternalMapping[]
-  syncJobs           IntegrationSyncJob[]
-  syncErrors         IntegrationSyncError[]
+  mappings   IntegrationExternalMapping[]
+  syncJobs   IntegrationSyncJob[]
+  syncErrors IntegrationSyncError[]
 
   @@unique([provider, schoolId])
   @@index([schoolId, provider])
 }
 
 model IntegrationExternalMapping {
-  id                 String                      @id @default(cuid())
-  connectionId       String
-  connection         IntegrationConnection       @relation(fields: [connectionId], references: [id])
-  provider           IntegrationProvider
-  schoolId           String
-  school             School                      @relation(fields: [schoolId], references: [id])
-  externalType       IntegrationExternalObjectType
-  externalId         String
-  externalParentId   String?
-  externalName       String?
-  localType          String
-  localId            String
-  isActive           Boolean                     @default(true)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
+  id               String                        @id @default(cuid())
+  connectionId     String
+  connection       IntegrationConnection         @relation(fields: [connectionId], references: [id])
+  provider         IntegrationProvider
+  schoolId         String
+  school           School                        @relation(fields: [schoolId], references: [id])
+  externalType     IntegrationExternalObjectType
+  externalId       String
+  externalParentId String?
+  externalName     String?
+  localType        String
+  localId          String
+  isActive         Boolean                       @default(true)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
 
   @@unique([connectionId, externalType, externalId])
   @@index([schoolId, provider, localType, localId])
 }
 
 model IntegrationSyncJob {
-  id                 String                   @id @default(cuid())
-  connectionId       String
-  connection         IntegrationConnection    @relation(fields: [connectionId], references: [id])
-  provider           IntegrationProvider
-  schoolId           String
-  school             School                   @relation(fields: [schoolId], references: [id])
-  mode               IntegrationSyncMode
-  status             IntegrationSyncJobStatus @default(RUNNING)
-  startedById        String
-  startedBy          User                     @relation("IntegrationSyncJobStarter", fields: [startedById], references: [id])
-  summary            String?
-  startedAt          DateTime                 @default(now())
-  finishedAt         DateTime?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  id           String                   @id @default(cuid())
+  connectionId String
+  connection   IntegrationConnection    @relation(fields: [connectionId], references: [id])
+  provider     IntegrationProvider
+  schoolId     String
+  school       School                   @relation(fields: [schoolId], references: [id])
+  mode         IntegrationSyncMode
+  status       IntegrationSyncJobStatus @default(RUNNING)
+  startedById  String
+  startedBy    User                     @relation("IntegrationSyncJobStarter", fields: [startedById], references: [id])
+  summary      String?
+  startedAt    DateTime                 @default(now())
+  finishedAt   DateTime?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
 
-  errors             IntegrationSyncError[]
+  errors IntegrationSyncError[]
 
   @@index([connectionId, createdAt])
   @@index([schoolId, provider, createdAt])
 }
 
 model IntegrationSyncError {
-  id                 String                      @id @default(cuid())
-  syncJobId          String
-  syncJob            IntegrationSyncJob          @relation(fields: [syncJobId], references: [id])
-  connectionId       String
-  connection         IntegrationConnection       @relation(fields: [connectionId], references: [id])
-  provider           IntegrationProvider
-  schoolId           String
-  school             School                      @relation(fields: [schoolId], references: [id])
-  externalType       IntegrationExternalObjectType?
-  externalId         String?
-  localType          String?
-  localId            String?
-  code               String
-  message            String
-  details            String?
-  createdAt          DateTime                    @default(now())
+  id           String                         @id @default(cuid())
+  syncJobId    String
+  syncJob      IntegrationSyncJob             @relation(fields: [syncJobId], references: [id])
+  connectionId String
+  connection   IntegrationConnection          @relation(fields: [connectionId], references: [id])
+  provider     IntegrationProvider
+  schoolId     String
+  school       School                         @relation(fields: [schoolId], references: [id])
+  externalType IntegrationExternalObjectType?
+  externalId   String?
+  localType    String?
+  localId      String?
+  code         String
+  message      String
+  details      String?
+  createdAt    DateTime                       @default(now())
 
   @@index([syncJobId, createdAt])
   @@index([schoolId, provider, createdAt])
@@ -412,59 +433,59 @@ model IntegrationSyncError {
 // ─── Beneficiaries ──────────────────────────────────────────────
 
 model Beneficiary {
-  id          String   @id @default(cuid())
-  name        String
-  email       String?
-  phone       String?
-  description String?
-  website     String?
-  category    String?  // environment, education, food, etc.
-  address     String?
-  city        String?
-  state       String?
-  zip         String?
-  latitude    Float?
-  longitude   Float?
+  id                String                @id @default(cuid())
+  name              String
+  email             String?
+  phone             String?
+  description       String?
+  website           String?
+  category          String? // environment, education, food, etc.
+  address           String?
+  city              String?
+  state             String?
+  zip               String?
+  latitude          Float?
+  longitude         Float?
   // Directory status
-  directoryId String?  // references BeneficiaryDirectory.id
-  directoryEntry BeneficiaryDirectory? @relation(fields: [directoryId], references: [id])
-  status      String   @default("PENDING") // PENDING, ACTIVE, SUSPENDED
-  visibility  String   @default("PRIVATE") // PUBLIC, PRIVATE (school-created)
-  claimed     Boolean  @default(false)
+  directoryId       String? // references BeneficiaryDirectory.id
+  directoryEntry    BeneficiaryDirectory? @relation(fields: [directoryId], references: [id])
+  status            String                @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  visibility        String                @default("PRIVATE") // PUBLIC, PRIVATE (school-created)
+  claimed           Boolean               @default(false)
   createdBySchoolId String? // if school-created custom beneficiary
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   planTier                  String    @default("FREE") // FREE, PRO
   hasSchoolComplimentaryPro Boolean   @default(false)
   proActivatedAt            DateTime?
-  timezone             String    @default("America/New_York") // IANA timezone for event times
-  uploadAbuseStrikes   Int       @default(0)
-  uploadSuspendedUntil DateTime?
+  timezone                  String    @default("America/New_York") // IANA timezone for event times
+  uploadAbuseStrikes        Int       @default(0)
+  uploadSuspendedUntil      DateTime?
 
   // Custom email branding (Pro)
-  brandColor      String?
-  logoUrl         String?
-  emailSignature  String?
+  brandColor     String?
+  logoUrl        String?
+  emailSignature String?
 
   // Stripe subscription fields
-  stripeCustomerId     String? @unique
-  stripeSubscriptionId String? @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
   stripePriceId        String?
   stripeEventCreatedAt DateTime?
-  subscriptionStatus   String  @default("FREE")
+  subscriptionStatus   String    @default("FREE")
   currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean  @default(false)
-  billingInterval      String?  // "monthly" | "annual"
+  cancelAtPeriodEnd    Boolean   @default(false)
+  billingInterval      String? // "monthly" | "annual"
 
-  members     User[]              @relation("BeneficiaryMembers")
-  opportunities BeneficiaryOpportunity[]
-  schoolApprovals SchoolBeneficiaryApproval[]
-  invitations BeneficiaryInvitation[]
-  adminInvitations BeneficiaryAdminInvitation[]
-  attachments BeneficiaryOpportunityAttachment[]
-  reminderConfig  OrgReminderConfig?
-  invoiceRequests OrganizationInvoiceRequest[]
+  members               User[]                             @relation("BeneficiaryMembers")
+  opportunities         BeneficiaryOpportunity[]
+  schoolApprovals       SchoolBeneficiaryApproval[]
+  invitations           BeneficiaryInvitation[]
+  adminInvitations      BeneficiaryAdminInvitation[]
+  attachments           BeneficiaryOpportunityAttachment[]
+  reminderConfig        OrgReminderConfig?
+  invoiceRequests       OrganizationInvoiceRequest[]
   stripeCheckoutAttempt StripeCheckoutAttempt?
 }
 
@@ -485,26 +506,26 @@ model StripeCheckoutAttempt {
 // ─── Beneficiary Directory (IRS 501c3 + public institutions) ────
 
 model BeneficiaryDirectory {
-  id       String  @id @default(cuid())
-  name     String
-  ein      String? @unique // EIN for 501c3s
-  category String?
-  address  String?
-  city     String?
-  state    String?
-  zip      String?
-  latitude Float?
+  id        String   @id @default(cuid())
+  name      String
+  ein       String?  @unique // EIN for 501c3s
+  category  String?
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  latitude  Float?
   longitude Float?
-  email    String?
-  website  String?
-  claimed  Boolean @default(false)
-  nteeCode  String?   // NTEE classification code (IRS)
-  ncessId   String?   @unique  // NCES school ID (for schools imported from NCES data)
+  email     String?
+  website   String?
+  claimed   Boolean  @default(false)
+  nteeCode  String? // NTEE classification code (IRS)
+  ncessId   String?  @unique // NCES school ID (for schools imported from NCES data)
   phone     String?
-  source    String?   // "IRS", "NCES", "IMLS", "MANUAL"
+  source    String? // "IRS", "NCES", "IMLS", "MANUAL"
   county    String?
   active    Boolean  @default(true)
-  updatedAt DateTime  @default(now()) @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   beneficiaries Beneficiary[]
 }
@@ -512,14 +533,14 @@ model BeneficiaryDirectory {
 // ─── School <-> Beneficiary Approval ────────────────────────────
 
 model SchoolBeneficiaryApproval {
-  id             String      @id @default(cuid())
-  schoolId       String
-  beneficiaryId  String
-  status         String      @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
-  approvedAt     DateTime?
-  school         School      @relation(fields: [schoolId], references: [id])
-  beneficiary    Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  createdAt      DateTime    @default(now())
+  id            String      @id @default(cuid())
+  schoolId      String
+  beneficiaryId String
+  status        String      @default("PENDING") // PENDING, APPROVED, REJECTED, BLOCKED
+  approvedAt    DateTime?
+  school        School      @relation(fields: [schoolId], references: [id])
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  createdAt     DateTime    @default(now())
 
   @@unique([schoolId, beneficiaryId])
 }
@@ -527,17 +548,17 @@ model SchoolBeneficiaryApproval {
 // ─── Beneficiary Invitations ─────────────────────────────────────
 
 model BeneficiaryInvitation {
-  id             String      @id @default(cuid())
-  schoolId       String      // which school is inviting
-  beneficiaryId  String
-  beneficiary    Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  token          String      @unique
-  expiresAt      DateTime
-  status         String      @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
-  sentTo         String      // email address sent to
-  acceptedAt     DateTime?
-  respondedAt    DateTime?
-  createdAt      DateTime    @default(now())
+  id            String      @id @default(cuid())
+  schoolId      String // which school is inviting
+  beneficiaryId String
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  token         String      @unique
+  expiresAt     DateTime
+  status        String      @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  sentTo        String // email address sent to
+  acceptedAt    DateTime?
+  respondedAt   DateTime?
+  createdAt     DateTime    @default(now())
 }
 
 model BeneficiaryAdminInvitation {
@@ -559,26 +580,26 @@ model BeneficiaryAdminInvitation {
 // ─── Self-Submitted Volunteering Requests ───────────────────────
 
 model SelfSubmittedRequest {
-  id              String   @id @default(cuid())
-  studentId       String
-  student         User     @relation(fields: [studentId], references: [id])
-  schoolId        String
-  school          School   @relation(fields: [schoolId], references: [id])
-  organizationName String  // name of place they volunteered at
-  description     String
-  date            DateTime
-  hours           Float
-  evidenceNote    String?  // optional description/link
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED, REVISION_REQUESTED
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  rejectionReason String?
-  revisionNote    String?  // admin note when requesting revision
-  timesRevised    Int      @default(0)
+  id                 String    @id @default(cuid())
+  studentId          String
+  student            User      @relation(fields: [studentId], references: [id])
+  schoolId           String
+  school             School    @relation(fields: [schoolId], references: [id])
+  organizationName   String // name of place they volunteered at
+  description        String
+  date               DateTime
+  hours              Float
+  evidenceNote       String? // optional description/link
+  status             String    @default("PENDING") // PENDING, APPROVED, REJECTED, REVISION_REQUESTED
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  revisionNote       String? // admin note when requesting revision
+  timesRevised       Int       @default(0)
   convertedSessionId String? // if approved → creates a ServiceSession
-  category        String?  // e.g. "environment", "education", "food", "health", "general"
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  category           String? // e.g. "environment", "education", "food", "health", "general"
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([studentId, status])
   @@index([schoolId, status])
@@ -587,39 +608,39 @@ model SelfSubmittedRequest {
 // ─── Beneficiary Opportunities ───────────────────────────────────
 
 model BeneficiaryOpportunity {
-  id              String      @id @default(cuid())
-  title           String
-  description     String
-  beneficiaryId   String
-  beneficiary     Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  category        String?
-  location        String?
-  address         String?
-  latitude        Float?
-  longitude       Float?
-  startDate       DateTime
-  endDate         DateTime?
-  status          String      @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
-  requirementsNote String?
-  customFields    String?     // JSON
-  schoolRestrictions String?  // JSON array of school IDs (null = all approved schools)
-  recurrenceRule  String?     // JSON: { type, dayOfWeek?, weeksOfMonth?, datesOfMonth?, startTime, endTime, capacity }
+  id                 String      @id @default(cuid())
+  title              String
+  description        String
+  beneficiaryId      String
+  beneficiary        Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  category           String?
+  location           String?
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  startDate          DateTime
+  endDate            DateTime?
+  status             String      @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
+  requirementsNote   String?
+  customFields       String? // JSON
+  schoolRestrictions String? // JSON array of school IDs (null = all approved schools)
+  recurrenceRule     String? // JSON: { type, dayOfWeek?, weeksOfMonth?, datesOfMonth?, startTime, endTime, capacity }
 
   // Event content fields (visible in reminder emails)
-  preparationNotes     String?   // what volunteers should bring / prepare
-  arrivalInstructions  String?   // parking, entrance, check-in details
-  contactInfo          String?   // on-site contact name + number
+  preparationNotes    String? // what volunteers should bring / prepare
+  arrivalInstructions String? // parking, entrance, check-in details
+  contactInfo         String? // on-site contact name + number
 
   // Required-form / waiver (Free: attachment visible; Pro: automated follow-up reminders)
   requiredFormUrl        String?
   requiredFormName       String?
-  requiredFormIsRequired Boolean   @default(false)
+  requiredFormIsRequired Boolean @default(false)
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  timeSlots       BeneficiaryTimeSlot[]
-  attachments     BeneficiaryOpportunityAttachment[]
+  timeSlots   BeneficiaryTimeSlot[]
+  attachments BeneficiaryOpportunityAttachment[]
 }
 
 // ─── Beneficiary Opportunity Attachments ──────────────────────────
@@ -630,30 +651,30 @@ model BeneficiaryOpportunityAttachment {
   opportunity   BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   beneficiaryId String
   beneficiary   Beneficiary            @relation(fields: [beneficiaryId], references: [id])
-  filename      String   // stored filename on disk (UUID-based); multiple records may share a filename via dedup
-  originalName  String   // original filename from uploader
-  mimeType      String   // verified from magic bytes, not client-supplied header
-  size          Int      // bytes, verified from fs.stat after upload
-  sha256        String   // SHA-256 hex digest for deduplication
-  contentBytes  Bytes?   // durable DB-backed storage for serverless deployments
-  createdAt     DateTime @default(now())
+  filename      String // stored filename on disk (UUID-based); multiple records may share a filename via dedup
+  originalName  String // original filename from uploader
+  mimeType      String // verified from magic bytes, not client-supplied header
+  size          Int // bytes, verified from fs.stat after upload
+  sha256        String // SHA-256 hex digest for deduplication
+  contentBytes  Bytes? // durable DB-backed storage for serverless deployments
+  createdAt     DateTime               @default(now())
 }
 
 // ─── Beneficiary Time Slots ───────────────────────────────────────
 
 model BeneficiaryTimeSlot {
-  id              String                 @id @default(cuid())
-  opportunityId   String
-  opportunity     BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id])
-  date            DateTime
-  startTime       String  // "10:00 AM"
-  endTime         String  // "2:00 PM"
+  id               String                 @id @default(cuid())
+  opportunityId    String
+  opportunity      BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id])
+  date             DateTime
+  startTime        String // "10:00 AM"
+  endTime          String // "2:00 PM"
   durationHours    Float
-  capacity         Int      @default(10)
-  recurringGroupId String?  // links all slots in the same recurrence series
-  createdAt        DateTime @default(now())
+  capacity         Int                    @default(10)
+  recurringGroupId String? // links all slots in the same recurrence series
+  createdAt        DateTime               @default(now())
 
-  signups          BeneficiarySignup[]
+  signups BeneficiarySignup[]
 
   @@index([date])
 }
@@ -661,33 +682,36 @@ model BeneficiaryTimeSlot {
 // ─── Beneficiary Signups (new model) ────────────────────────────
 
 model BeneficiarySignup {
-  id          String              @id @default(cuid())
-  slotId      String
-  slot        BeneficiaryTimeSlot @relation(fields: [slotId], references: [id])
-  studentId   String
-  status      String              @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
-  checkedIn   Boolean             @default(false)
-  checkedInAt DateTime?
-  checkedOut  Boolean             @default(false)
-  checkedOutAt DateTime?
-  totalHours  Float?
-  verificationStatus String      @default("PENDING") // PENDING, APPROVED, REJECTED
-  verifiedBy  String?
-  verifiedAt  DateTime?
-  rejectionReason String?
+  id                 String              @id @default(cuid())
+  slotId             String
+  slot               BeneficiaryTimeSlot @relation(fields: [slotId], references: [id])
+  studentId          String
+  schoolId           String?
+  school             School?             @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  status             String              @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
+  checkedIn          Boolean             @default(false)
+  checkedInAt        DateTime?
+  checkedOut         Boolean             @default(false)
+  checkedOutAt       DateTime?
+  totalHours         Float?
+  verificationStatus String              @default("PENDING") // PENDING, APPROVED, REJECTED
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  rejectionReason    String?
   // One-click cancellation (token emailed to volunteer; single-use)
-  cancellationToken String?  @unique
+  cancellationToken  String?             @unique
 
   // Attendance outcome (recorded after the event by the org)
-  attendance  String?  // ATTENDED | NO_SHOW | null (not yet recorded)
+  attendance String? // ATTENDED | NO_SHOW | null (not yet recorded)
 
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  auditLogs   BeneficiaryAuditLog[]
+  auditLogs    BeneficiaryAuditLog[]
   reminderLogs OrgEventReminderLog[]
 
   @@unique([slotId, studentId])
+  @@index([schoolId, studentId])
   @@index([studentId, verificationStatus, status])
   @@index([slotId, status])
   @@index([status, verificationStatus])
@@ -696,13 +720,13 @@ model BeneficiarySignup {
 // ─── Beneficiary Audit Log ────────────────────────────────────────
 
 model BeneficiaryAuditLog {
-  id        String            @id @default(cuid())
-  action    String            // APPROVE, REJECT, OVERRIDE, CHECK_IN, CHECK_OUT
-  details   String?           // JSON
+  id        String             @id @default(cuid())
+  action    String // APPROVE, REJECT, OVERRIDE, CHECK_IN, CHECK_OUT
+  details   String? // JSON
   actorId   String
   signupId  String?
   signup    BeneficiarySignup? @relation(fields: [signupId], references: [id])
-  createdAt DateTime          @default(now())
+  createdAt DateTime           @default(now())
 }
 
 // ─── Org Reminder Configuration (Pro) ───────────────────────────
@@ -715,13 +739,13 @@ model OrgReminderConfig {
   // JSON array of {minutesBefore:number, enabled:boolean, label:string}
   // Free default: [{minutesBefore:1440, enabled:true, label:"24 hours before"}]
   // Pro default adds 48h+3h entries
-  reminders     String      @default("[{\"minutesBefore\":1440,\"enabled\":true,\"label\":\"24 hours before\"}]")
+  reminders String @default("[{\"minutesBefore\":1440,\"enabled\":true,\"label\":\"24 hours before\"}]")
 
   // Pro-only waitlist controls
-  waitlistCutoffHours         Int?     // stop promoting waitlist this many hours before event
-  requireApprovalForPromotion Boolean  @default(false)
-  disableAutoPromotion        Boolean  @default(false)
-  promoMessageTemplate        String?  // custom message sent to promoted volunteer
+  waitlistCutoffHours         Int? // stop promoting waitlist this many hours before event
+  requireApprovalForPromotion Boolean @default(false)
+  disableAutoPromotion        Boolean @default(false)
+  promoMessageTemplate        String? // custom message sent to promoted volunteer
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -730,18 +754,18 @@ model OrgReminderConfig {
 // ─── Event Reminder Log (idempotency) ───────────────────────────
 
 model OrgEventReminderLog {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   signupId          String
   signup            BeneficiarySignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
   beneficiaryId     String
   opportunityId     String
-  reminderType      String   // FREE_24H | PRO_CUSTOM_{minutesBefore}
+  reminderType      String // FREE_24H | PRO_CUSTOM_{minutesBefore}
   scheduledFor      DateTime
   sentAt            DateTime?
-  deliveryStatus    String   @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  deliveryStatus    String            @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
   providerMessageId String?
   failureReason     String?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime          @default(now())
 
   @@unique([signupId, reminderType])
   @@index([beneficiaryId, deliveryStatus])
@@ -752,38 +776,38 @@ model OrgEventReminderLog {
 // Kept for backward compat — new schools use Cohorts instead
 
 model Classroom {
-  id          String   @id @default(cuid())
-  name        String
-  schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id])
-  teacherId   String
-  teacher     User     @relation("ClassroomTeacher", fields: [teacherId], references: [id])
-  inviteCode  String   @unique
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id])
+  teacherId  String
+  teacher    User     @relation("ClassroomTeacher", fields: [teacherId], references: [id])
+  inviteCode String   @unique
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  students    User[]   @relation("ClassroomStudents")
+  students User[] @relation("ClassroomStudents")
 }
 
 // ─── Legacy: Organizations ──────────────────────────────────────
 // Kept for backward compat — new entities use Beneficiary model
 
 model Organization {
-  id           String   @id @default(cuid())
-  name         String
-  email        String
-  phone        String?
-  description  String?
-  website      String?
-  avatarUrl    String?
-  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
-  zipCodes     String?  // JSON array of zip codes
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  description String?
+  website     String?
+  avatarUrl   String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
+  zipCodes    String? // JSON array of zip codes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  members      User[]              @relation("OrgMembers")
-  opportunities Opportunity[]
+  members         User[]               @relation("OrgMembers")
+  opportunities   Opportunity[]
   schoolApprovals SchoolOrganization[]
 }
 
@@ -811,7 +835,7 @@ model StudentGroup {
   school    School   @relation(fields: [schoolId], references: [id])
   createdAt DateTime @default(now())
 
-  members   StudentGroupMember[]
+  members StudentGroupMember[]
 }
 
 model StudentGroupMember {
@@ -826,20 +850,20 @@ model StudentGroupMember {
 
 model SchoolLaunchBug {
   id          String   @id @default(cuid())
-  schoolId     String
-  school       School   @relation(fields: [schoolId], references: [id])
-  title        String
-  description  String?
-  severity     String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  status       String   @default("OPEN") // OPEN, INVESTIGATING, BLOCKED, FIXED, MONITORING, CLOSED
-  area         String?
-  source       String?
-  ownerName    String?
-  workaround   String?
-  nextAction   String?
-  createdById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id])
+  title       String
+  description String?
+  severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status      String   @default("OPEN") // OPEN, INVESTIGATING, BLOCKED, FIXED, MONITORING, CLOSED
+  area        String?
+  source      String?
+  ownerName   String?
+  workaround  String?
+  nextAction  String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([schoolId, status])
   @@index([schoolId, severity])
@@ -848,29 +872,29 @@ model SchoolLaunchBug {
 // ─── Legacy: Opportunities ──────────────────────────────────────
 
 model Opportunity {
-  id              String       @id @default(cuid())
-  title           String
-  description     String
-  tags            String?      // JSON array string
-  location        String
-  address         String?
-  latitude        Float?
-  longitude       Float?
-  date            DateTime
-  startTime       String       // "10:00 AM"
-  endTime         String       // "2:00 PM"
-  durationHours   Float
-  capacity        Int
-  ageRequirement  Int?
+  id               String       @id @default(cuid())
+  title            String
+  description      String
+  tags             String? // JSON array string
+  location         String
+  address          String?
+  latitude         Float?
+  longitude        Float?
+  date             DateTime
+  startTime        String // "10:00 AM"
+  endTime          String // "2:00 PM"
+  durationHours    Float
+  capacity         Int
+  ageRequirement   Int?
   gradeRequirement String?
-  isRecurring     Boolean      @default(false)
-  recurringPattern String?     // JSON
-  customFields    String?      // JSON: [{label:string, value:string}]
-  status          String       @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isRecurring      Boolean      @default(false)
+  recurringPattern String? // JSON
+  customFields     String? // JSON: [{label:string, value:string}]
+  status           String       @default("ACTIVE") // ACTIVE, CANCELLED, COMPLETED
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   signups         Signup[]
   serviceSessions ServiceSession[]
@@ -880,15 +904,15 @@ model Opportunity {
 // ─── Legacy: Signups ────────────────────────────────────────────
 
 model Signup {
-  id              String      @id @default(cuid())
-  userId          String
-  opportunityId   String
-  status          String      @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  opportunityId String
+  status        String   @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user            User        @relation(fields: [userId], references: [id])
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
 
   @@unique([userId, opportunityId])
 }
@@ -896,14 +920,14 @@ model Signup {
 // ─── Saved/Bookmarked Opportunities ─────────────────────────────
 
 model SavedOpportunity {
-  id              String      @id @default(cuid())
-  userId          String
-  opportunityId   String
-  status          String      @default("SAVED") // SAVED, SKIPPED, DISCARDED
-  createdAt       DateTime    @default(now())
+  id            String   @id @default(cuid())
+  userId        String
+  opportunityId String
+  status        String   @default("SAVED") // SAVED, SKIPPED, DISCARDED
+  createdAt     DateTime @default(now())
 
-  user            User        @relation(fields: [userId], references: [id])
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
 
   @@unique([userId, opportunityId])
 }
@@ -911,50 +935,53 @@ model SavedOpportunity {
 // ─── Service Sessions (attendance records) ──────────────────────
 
 model ServiceSession {
-  id              String      @id @default(cuid())
-  userId          String
-  opportunityId   String
-  checkInTime     DateTime?
-  checkOutTime    DateTime?
-  totalHours      Float?
-  status          String      @default("COMMITTED") // COMMITTED, PENDING_VERIFICATION, VERIFIED, REJECTED, PENDING_CHECKIN, CHECKED_IN, CHECKED_OUT
-  verificationStatus String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  verifiedBy      String?
-  verifiedAt      DateTime?
-  rejectionReason String?
+  id                 String    @id @default(cuid())
+  userId             String
+  schoolId           String?
+  opportunityId      String
+  checkInTime        DateTime?
+  checkOutTime       DateTime?
+  totalHours         Float?
+  status             String    @default("COMMITTED") // COMMITTED, PENDING_VERIFICATION, VERIFIED, REJECTED, PENDING_CHECKIN, CHECKED_IN, CHECKED_OUT
+  verificationStatus String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  rejectionReason    String?
 
   // Verification submission fields
-  signatureType     String?   // "DRAWN" or "FILE"
-  signatureData     String?   // Base64 eSignature data (for DRAWN type)
-  signatureFileName String?   // Original filename
-  signatureFileBytes Bytes?   // Durable file-signature evidence; never a temporary filesystem path
+  signatureType         String? // "DRAWN" or "FILE"
+  signatureData         String? // Base64 eSignature data (for DRAWN type)
+  signatureFileName     String? // Original filename
+  signatureFileBytes    Bytes? // Durable file-signature evidence; never a temporary filesystem path
   signatureFileMimeType String?
-  submittedAt       DateTime? // When verification was submitted
+  submittedAt           DateTime? // When verification was submitted
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user            User        @relation(fields: [userId], references: [id])
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
-  auditLogs       AuditLog[]
+  user        User        @relation(fields: [userId], references: [id])
+  school      School?     @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  auditLogs   AuditLog[]
 
   @@unique([userId, opportunityId])
   @@index([userId, verificationStatus])
+  @@index([schoolId, userId, verificationStatus])
   @@index([status, verificationStatus])
 }
 
 // ─── Audit Log (immutable) ──────────────────────────────────────
 
 model AuditLog {
-  id              String         @id @default(cuid())
-  action          String         // CHECK_IN, CHECK_OUT, APPROVE, REJECT, OVERRIDE, etc.
-  details         String?        // JSON
-  actorId         String
-  sessionId       String?
-  createdAt       DateTime       @default(now())
+  id        String   @id @default(cuid())
+  action    String // CHECK_IN, CHECK_OUT, APPROVE, REJECT, OVERRIDE, etc.
+  details   String? // JSON
+  actorId   String
+  sessionId String?
+  createdAt DateTime @default(now())
 
-  actor           User           @relation("AuditActor", fields: [actorId], references: [id])
-  session         ServiceSession? @relation(fields: [sessionId], references: [id])
+  actor   User            @relation("AuditActor", fields: [actorId], references: [id])
+  session ServiceSession? @relation(fields: [sessionId], references: [id])
 
   @@index([action, createdAt])
   @@index([sessionId, createdAt])
@@ -963,15 +990,15 @@ model AuditLog {
 // ─── Data Access Log (FERPA compliance — read-access trail) ─────
 
 model DataAccessLog {
-  id          String   @id @default(cuid())
-  actorId     String
-  actor       User     @relation("DataAccessActor", fields: [actorId], references: [id])
-  action      String   // VIEW_STUDENT_REPORT, VIEW_SCHOOL_REPORT, EXPORT_CSV, VIEW_SESSIONS, VIEW_STUDENT_LIST, EXPORT_SCHOOL_DATA, DELETE_STUDENT
-  targetType  String?  // "student", "school", "session"
-  targetId    String?  // ID of the accessed record
-  schoolId    String?  // school context of the access
-  details     String?  // JSON
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation("DataAccessActor", fields: [actorId], references: [id])
+  action     String // VIEW_STUDENT_REPORT, VIEW_SCHOOL_REPORT, EXPORT_CSV, VIEW_SESSIONS, VIEW_STUDENT_LIST, EXPORT_SCHOOL_DATA, DELETE_STUDENT
+  targetType String? // "student", "school", "session"
+  targetId   String? // ID of the accessed record
+  schoolId   String? // school context of the access
+  details    String? // JSON
+  createdAt  DateTime @default(now())
 
   @@index([schoolId, createdAt])
   @@index([actorId, createdAt])
@@ -980,17 +1007,17 @@ model DataAccessLog {
 // ─── Messages ───────────────────────────────────────────────────
 
 model Message {
-  id          String   @id @default(cuid())
-  subject     String?
-  body        String
-  senderId    String
-  receiverId  String
-  priority    Boolean  @default(false)
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  subject    String?
+  body       String
+  senderId   String
+  receiverId String
+  priority   Boolean  @default(false)
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender                User                   @relation("SentMessages", fields: [senderId], references: [id])
+  receiver              User                   @relation("ReceivedMessages", fields: [receiverId], references: [id])
   interventionRecipient InterventionRecipient?
 
   @@index([receiverId, createdAt])
@@ -1012,9 +1039,9 @@ model InterventionCampaign {
   metadata       String?
   createdAt      DateTime @default(now())
 
-  school         School   @relation(fields: [schoolId], references: [id])
-  actor          User     @relation("InterventionActor", fields: [actorId], references: [id])
-  recipients     InterventionRecipient[]
+  school     School                  @relation(fields: [schoolId], references: [id])
+  actor      User                    @relation("InterventionActor", fields: [actorId], references: [id])
+  recipients InterventionRecipient[]
 
   @@index([schoolId, createdAt])
   @@index([actorId, createdAt])
@@ -1027,21 +1054,21 @@ model InterventionRecipient {
   messageId  String?  @unique
   createdAt  DateTime @default(now())
 
-  campaign   InterventionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  student    User                 @relation("InterventionStudent", fields: [studentId], references: [id])
-  message    Message?             @relation(fields: [messageId], references: [id])
+  campaign InterventionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  student  User                 @relation("InterventionStudent", fields: [studentId], references: [id])
+  message  Message?             @relation(fields: [messageId], references: [id])
 
   @@unique([campaignId, studentId])
   @@index([studentId, createdAt])
 }
 
 model InterventionCase {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   schoolId            String
   studentId           String
   ownerId             String?
-  status              String   @default("OPEN")
-  priority            String   @default("MEDIUM")
+  status              String    @default("OPEN")
+  priority            String    @default("MEDIUM")
   reason              String?
   summary             String?
   nextStepForStudent  String?
@@ -1052,12 +1079,12 @@ model InterventionCase {
   lastContactedAt     DateTime?
   lastStudentActionAt DateTime?
   resolvedAt          DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  school              School   @relation(fields: [schoolId], references: [id])
-  student             User     @relation("InterventionStudentCase", fields: [studentId], references: [id])
-  owner               User?    @relation("InterventionOwner", fields: [ownerId], references: [id])
+  school  School @relation(fields: [schoolId], references: [id])
+  student User   @relation("InterventionStudentCase", fields: [studentId], references: [id])
+  owner   User?  @relation("InterventionOwner", fields: [ownerId], references: [id])
 
   @@unique([schoolId, studentId])
   @@index([schoolId, status, priority])
@@ -1069,14 +1096,14 @@ model InterventionCase {
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // SIGNUP_CONFIRMED, EVENT_REMINDER, VERIFICATION_UPDATE, INVITATION, etc.
+  type      String // SIGNUP_CONFIRMED, EVENT_REMINDER, VERIFICATION_UPDATE, INVITATION, etc.
   title     String
   body      String
   read      Boolean  @default(false)
-  data      String?  // JSON
+  data      String? // JSON
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@index([userId, read, createdAt])
@@ -1086,50 +1113,50 @@ model Notification {
 // ─── Organization Billing ─────────────────────────────────────────────────
 
 model OrganizationInvoiceRequest {
-  id                     String      @id @default(cuid())
-  beneficiaryId          String
-  beneficiary            Beneficiary @relation(fields: [beneficiaryId], references: [id])
-  status                 String      @default("SUBMITTED")
-  ownerUserId            String?
-  ownerUser              User?       @relation("OrganizationInvoiceRequestOwner", fields: [ownerUserId], references: [id])
-  legalName              String
-  address                String
-  billingContactName     String
-  billingContactEmail    String
-  purchaseOrderRequired  Boolean     @default(false)
-  taxExempt              Boolean     @default(false)
-  requestedBillingInterval String?   // "monthly" or "annual" for procurement quotes
-  preferredPaymentMethod String?
-  additionalNotes        String?
-  internalNotes          String?
-  quoteAmountCents       Int?
-  quoteSentAt            DateTime?
-  invoiceNumber          String?
-  invoiceSentAt          DateTime?
-  paidAt                 DateTime?
-  rejectedReason         String?
-  lastContactedAt        DateTime?
-  createdAt              DateTime    @default(now())
-  updatedAt              DateTime    @updatedAt
-  auditLogs              OrganizationInvoiceAuditLog[]
-  artifacts              OrganizationInvoiceArtifact[]
+  id                       String                        @id @default(cuid())
+  beneficiaryId            String
+  beneficiary              Beneficiary                   @relation(fields: [beneficiaryId], references: [id])
+  status                   String                        @default("SUBMITTED")
+  ownerUserId              String?
+  ownerUser                User?                         @relation("OrganizationInvoiceRequestOwner", fields: [ownerUserId], references: [id])
+  legalName                String
+  address                  String
+  billingContactName       String
+  billingContactEmail      String
+  purchaseOrderRequired    Boolean                       @default(false)
+  taxExempt                Boolean                       @default(false)
+  requestedBillingInterval String? // "monthly" or "annual" for procurement quotes
+  preferredPaymentMethod   String?
+  additionalNotes          String?
+  internalNotes            String?
+  quoteAmountCents         Int?
+  quoteSentAt              DateTime?
+  invoiceNumber            String?
+  invoiceSentAt            DateTime?
+  paidAt                   DateTime?
+  rejectedReason           String?
+  lastContactedAt          DateTime?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  auditLogs                OrganizationInvoiceAuditLog[]
+  artifacts                OrganizationInvoiceArtifact[]
 
   @@index([ownerUserId])
 }
 
 model OrganizationInvoiceAuditLog {
-  id              String                     @id @default(cuid())
-  invoiceRequestId String
-  invoiceRequest   OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id], onDelete: Cascade)
-  previousStatus  String?
-  newStatus       String
-  changedByUserId String
-  changedByUser   User                       @relation("OrganizationInvoiceAuditActor", fields: [changedByUserId], references: [id])
-  entryType       String                     @default("STATUS")
-  visibleToCustomer Boolean                  @default(false)
-  subject         String?
-  note            String?
-  changedAt       DateTime                   @default(now())
+  id                String                     @id @default(cuid())
+  invoiceRequestId  String
+  invoiceRequest    OrganizationInvoiceRequest @relation(fields: [invoiceRequestId], references: [id], onDelete: Cascade)
+  previousStatus    String?
+  newStatus         String
+  changedByUserId   String
+  changedByUser     User                       @relation("OrganizationInvoiceAuditActor", fields: [changedByUserId], references: [id])
+  entryType         String                     @default("STATUS")
+  visibleToCustomer Boolean                    @default(false)
+  subject           String?
+  note              String?
+  changedAt         DateTime                   @default(now())
 
   @@index([invoiceRequestId, changedAt])
 }
@@ -1155,10 +1182,10 @@ model OrganizationInvoiceArtifact {
 // ─── School Procurement ───────────────────────────────────────────────────
 
 model SchoolBillingRecord {
-  id                   String    @id @default(cuid())
-  schoolId             String    @unique
-  school               School    @relation(fields: [schoolId], references: [id])
-  billingStatus        String    @default("QUOTE_REQUESTED")
+  id                   String                      @id @default(cuid())
+  schoolId             String                      @unique
+  school               School                      @relation(fields: [schoolId], references: [id])
+  billingStatus        String                      @default("QUOTE_REQUESTED")
   pricePerStudentCents Int?
   annualMinimumCents   Int?
   enrollmentCount      Int?
@@ -1174,8 +1201,8 @@ model SchoolBillingRecord {
   invoiceNumber        String?
   paymentStatus        String?
   internalNotes        String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
   auditLogs            SchoolBillingAuditLog[]
   documents            SchoolProcurementDocument[]
 }
@@ -1240,7 +1267,7 @@ model SchoolBillingAuditLog {
 
 // Stripe webhook idempotency — prevents duplicate processing of replayed events
 model StripeProcessedEvent {
-  id          String   @id  // Stripe event ID (e.g. "evt_...")
+  id          String   @id // Stripe event ID (e.g. "evt_...")
   processedAt DateTime @default(now())
 }
 
@@ -1255,11 +1282,11 @@ model RateLimitBucket {
 }
 
 model ScheduledJobLease {
-  jobName    String   @id
+  jobName    String    @id
   leaseUntil DateTime
   lastRunAt  DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([leaseUntil])
 }
