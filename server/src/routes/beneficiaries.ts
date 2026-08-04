@@ -3417,8 +3417,12 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
       return res.status(404).json({ error: "Opportunity not found" });
     }
 
-    // Expect body: { records: Array<{ signupId: string; attendance: "ATTENDED" | "NO_SHOW" }> }
-    const { records } = req.body as { records?: Array<{ signupId: string; attendance: string }> };
+    // Expect body: { records: Array<{ signupId: string; attendance: "ATTENDED" | "NO_SHOW" }>, earlyOverride?, earlyOverrideReason? }
+    const { records, earlyOverride, earlyOverrideReason } = req.body as {
+      records?: Array<{ signupId: string; attendance: string }>;
+      earlyOverride?: boolean;
+      earlyOverrideReason?: string;
+    };
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: "records array is required" });
     }
@@ -3439,7 +3443,7 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
 
     const existing = await prisma.beneficiarySignup.findMany({
       where: { id: { in: signupIds }, slot: { opportunity: { id: req.params.oppId } } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, slot: { select: { date: true, endTime: true } } },
     });
     const existingById = new Map(existing.map((s) => [s.id, s]));
 
@@ -3450,6 +3454,21 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
       // skip rather than silently overwrite.
       return current && current.status !== "CANCELLED" && current.status !== "WAITLISTED";
     });
+
+    // No-show normally requires the event to have ended, same as the
+    // single-signup /no-show route — an explicit override is required to
+    // mark it early.
+    const hasEarlyNoShow = applicable.some((r) => {
+      if (r.attendance !== "NO_SHOW") return false;
+      const slot = existingById.get(r.signupId)!.slot;
+      return getSlotEndAt(slot.date, slot.endTime) > new Date();
+    });
+    if (hasEarlyNoShow && (!earlyOverride || !earlyOverrideReason)) {
+      return res.status(400).json({
+        error: "One or more no-show records are for events that haven't ended yet. Pass earlyOverride: true and earlyOverrideReason to mark them early.",
+        earlyOverrideRequired: true,
+      });
+    }
 
     const updated = await runSerializableTransaction(async (tx) => {
       const results = [];
@@ -3473,7 +3492,7 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
       }
       await tx.beneficiaryAuditLog.create({
         data: {
-          action: "ATTENDANCE_BATCH_RECORDED",
+          action: hasEarlyNoShow ? "ATTENDANCE_BATCH_RECORDED_EARLY_OVERRIDE" : "ATTENDANCE_BATCH_RECORDED",
           actorId: req.user!.userId,
           signupId: applicable[0]?.signupId ?? null,
           details: JSON.stringify({
@@ -3481,6 +3500,7 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
             recordCount: applicable.length,
             attendedCount: applicable.filter((r) => r.attendance === "ATTENDED").length,
             noShowCount: applicable.filter((r) => r.attendance === "NO_SHOW").length,
+            ...(hasEarlyNoShow ? { earlyOverride: true, earlyOverrideReason } : {}),
           }),
         },
       });
@@ -3757,6 +3777,19 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
     if (signup.status === "CANCELLED") return res.status(400).json({ error: "Cannot mark a cancelled signup as no-show" });
     if (signup.status === "WAITLISTED") return res.status(400).json({ error: "Waitlisted signups cannot be marked as no-show" });
     if (signup.status === "NO_SHOW") return res.status(400).json({ error: "Student is already marked as a no-show" });
+
+    const { earlyOverride, earlyOverrideReason } = z.object({
+      earlyOverride: z.boolean().optional(),
+      earlyOverrideReason: z.string().trim().min(1).max(1000).optional(),
+    }).parse(req.body ?? {});
+    const eventHasEnded = getSlotEndAt(signup.slot.date, signup.slot.endTime) <= new Date();
+    if (!eventHasEnded && (!earlyOverride || !earlyOverrideReason)) {
+      return res.status(400).json({
+        error: "No-show can normally only be marked after the event has ended. Pass earlyOverride: true and earlyOverrideReason to mark it early.",
+        earlyOverrideRequired: true,
+      });
+    }
+
     const fromStatus = getBeneficiarySignupDisplayStatus(signup);
 
     const updated = await prisma.beneficiarySignup.update({
@@ -3776,10 +3809,14 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: "NO_SHOW",
+        action: eventHasEnded ? "NO_SHOW" : "NO_SHOW_EARLY_OVERRIDE",
         actorId: req.user!.userId,
         signupId: signup.id,
-        details: JSON.stringify({ studentId: signup.studentId, previousStatus: fromStatus }),
+        details: JSON.stringify({
+          studentId: signup.studentId,
+          previousStatus: fromStatus,
+          ...(!eventHasEnded ? { earlyOverride: true, earlyOverrideReason } : {}),
+        }),
       },
     });
 
