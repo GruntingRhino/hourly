@@ -34,17 +34,18 @@ Status legend: ✅ Fixed & verified · 🟡 Partially done · ⬜ Not started ·
 | 6 | Beneficiary signup list leaks real student names/IDs and cancellation capability to partners | ✅ | `pseudonymousStudentLabel` used in `beneficiaries.ts` signup responses; DTO trimmed to non-identifying fields |
 | 7 | Accepted beneficiary invitation token remains reusable as a login credential | ✅ | All invitation accept branches now return "already accepted"/409, no session-minting on repeat use — verified across `invitations.ts` |
 | 8 | Public `GET /cancel/:token` mutates state (cancels signup, promotes waitlist) — scanner/crawler-triggerable | ✅ | Fixed 2026-08-03 (commit `e5651f5`): split into non-mutating GET + confirming POST; added missing client page `CancelSignup.tsx` (email link pointed at a route that never existed); audit now records actor as a bearer-link capability, not an authenticated student action. Test: `beneficiaryCancellationLink.integration.test.ts` |
-| 9 | FERPA `dataAccessLog` write is fail-open (swallows errors, response still returns real data); audit details duplicate student PII | ✅ | Fixed 2026-08-04 (commit pending): `logDataAccess` no longer swallows write errors — every caller already awaits it before `res.json`, so a failed audit write now correctly 500s via the route's existing catch block. `summarizeStudentSubjects` no longer stores raw student names/emails; stores only a count + keyed HMAC digest of the subject-ID set. Test: `dataAccessLogFailClosed.test.ts` |
+| 9 | FERPA `dataAccessLog` write is fail-open (swallows errors, response still returns real data); audit details duplicate student PII | ✅ | Fixed 2026-08-04 (commit `8db748a`): `logDataAccess` no longer swallows write errors — every caller already awaits it before `res.json`, so a failed audit write now correctly 500s via the route's existing catch block. `summarizeStudentSubjects` no longer stores raw student names/emails; stores only a count + keyed HMAC digest of the subject-ID set. Test: `dataAccessLogFailClosed.test.ts` |
 | 10 | LMS sync pulls every course/roster visible to the connected identity — no course allowlist before fetching identities | ✅ | `selectedExternalCourseIds` present in `canvasIntegration.ts` config/sync path |
 
 ## Additional issues found this session (2026-08-04, not in the original 10)
 
 | Issue | Status | Evidence |
 |---|---|---|
-| `IS_PROD_LIKE` duplicated independently in 7 files; `routes/schools.ts`'s copy tested only `NODE_ENV`/`VERCEL_ENV` and missed `APP_ENV`, so an `APP_ENV`-only production config would leak a newly created teacher's temp password in the create-staff API response | ✅ | Centralized into `server/src/lib/isProdLike.ts` (deliberately NOT `env.ts`, which runs `process.exit(1)` at import time and would break any lightweight importer). All 7 files now import it. Test: `isProdLike.test.ts` |
-| `beneficiaries.ts:527-529` — `page`/`limit` on `GET /directory/nearby` not validated before use in a raw-SQL `OFFSET`; non-numeric input → `NaN` → 500 | ⬜ | Found by background doc-audit agent, not yet fixed |
-| No DB-level `CHECK` constraint preventing `ServiceSession.status = 'VERIFIED'` with a null `checkOutTime` | ⬜ | Defense-in-depth gap; enforcement is currently application-only in `routes/verification.ts` |
-| Seed script doesn't create `AuditLog` rows for seeded `VERIFIED` sessions | ⬜ | Cosmetic, test-data only — low priority |
+| `IS_PROD_LIKE` duplicated independently in 7 files; `routes/schools.ts`'s copy tested only `NODE_ENV`/`VERCEL_ENV` and missed `APP_ENV`, so an `APP_ENV`-only production config would leak a newly created teacher's temp password in the create-staff API response | ✅ | Centralized into `server/src/lib/isProdLike.ts` (deliberately NOT `env.ts`, which runs `process.exit(1)` at import time and would break any lightweight importer). All 7 files now import it. Test: `isProdLike.test.ts`. Commit `273f531` |
+| `beneficiaries.ts:527-529` — `page`/`limit` on `GET /directory/nearby` not validated before use in a raw-SQL `OFFSET`; non-numeric input → `NaN` → 500 | ✅ | Fixed: rejects non-integer/out-of-range page or limit with 400 before building the query. Test: `beneficiaryDirectoryNearbyPagination.test.ts`. Commit `3cbf01a` |
+| No DB-level `CHECK` constraint preventing `ServiceSession.status = 'VERIFIED'` with a null `checkOutTime` | ✅ | Migration `20260804153210_service_session_verified_requires_checkout` adds a `NOT VALID` CHECK constraint (won't fail on pre-existing violations, blocks all new ones). Verified by replaying all migrations into a fresh disposable Postgres DB and confirming by direct insert that the invalid case is rejected. Commit `ee123fd` |
+| `server/src/services/email.ts` had **zero HTML escaping anywhere** — every email function interpolates caller-controlled strings (student/org/school/cohort names, custom messages, notes, org branding `brandColor`/`orgLogoUrl`/`emailSignature`) directly into HTML sent to real recipients, with no sanitizer. `brandColor` and `orgLogoUrl` are org-branding (Pro) fields reachable by any beneficiary/org admin, giving attribute-breakout HTML injection and a `javascript:`/arbitrary-scheme URL as an `<img src>`. Matches goal §13.1 exactly. | ✅ | Added `escapeHtml`/`escapeHtmlMultiline`/`sanitizeHexColor`/`sanitizeHttpUrl` helpers; applied across all ~25 email functions in the file (every dynamic text field escaped, `brandColor` restricted to `#hex` or falls back to default, `orgLogoUrl`/`requiredFormUrl`/CTA URLs restricted to http(s) or dropped). Verified with a real capture test (not just log-mode, which strips tags before logging and would pass trivially) — sends to a `@mailinator.com` address and inspects the actual captured HTML. Test: `emailHtmlEscaping.test.ts` |
+| Seed script doesn't create `AuditLog` rows for seeded `VERIFIED` sessions | ⬜ | Cosmetic, test-data only — low priority, not yet fixed |
 
 ---
 
@@ -126,7 +127,7 @@ a fresh multi-file project, not a bug fix:
 
 - `cd server && npx tsc --noEmit` → clean
 - `cd client && npx tsc --noEmit` → clean
-- `cd server && npm test` → **261 pass / 0 fail / 1 skipped** (262 total)
+- `cd server && npm test` → **268 pass / 0 fail / 1 skipped** (269 total)
 - `cd client && npx vite build` → succeeds
 - `cd server && npx tsc` (full build) → succeeds
 - `.env.example` / `server/.env.example` → placeholders only, no real secrets

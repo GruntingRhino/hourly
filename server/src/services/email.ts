@@ -1,6 +1,59 @@
 import { Resend } from "resend";
 import crypto from "crypto";
 
+/**
+ * HTML-escape a plain-text value before interpolating it into an email
+ * template. Every field in this file that can originate from a school,
+ * organization, beneficiary, student, or staff member (names, custom
+ * messages, notes, branding text) must go through this — none of these
+ * templates use a sanitizer or component-based renderer that would do it
+ * automatically, so raw interpolation is a stored HTML/attribute-injection
+ * vector reaching real recipients' inboxes.
+ */
+function escapeHtml(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Escape a value and convert newlines to <br> for a multi-line text block. */
+function escapeHtmlMultiline(value: string | null | undefined): string {
+  return escapeHtml(value).replace(/\n/g, "<br>");
+}
+
+/**
+ * Validate a caller-supplied color used in an inline `style` attribute.
+ * Only exact 3- or 6-digit hex colors are accepted; anything else (including
+ * an attempt to break out of the attribute with a quote) falls back to the
+ * default brand color.
+ */
+function sanitizeHexColor(value: string | null | undefined, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : fallback;
+}
+
+/**
+ * Validate a caller-supplied URL used as an href/src. Only http(s) URLs are
+ * accepted — rejects `javascript:`, `data:`, and other schemes, and rejects
+ * values that aren't parseable URLs at all (which could otherwise break out
+ * of the surrounding HTML attribute).
+ */
+function sanitizeHttpUrl(value: string | null | undefined): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 let resendClient: Resend | null | undefined;
 
 const FROM = process.env.EMAIL_FROM;
@@ -120,9 +173,14 @@ if (process.env.VERCEL_ENV === "production") {
 }
 
 function base(title: string, body: string, cta?: { label: string; url: string }): string {
-  const ctaHtml = cta
+  // `body` is a pre-built HTML fragment assembled by each caller from
+  // already-escaped pieces — callers must escape their own dynamic values
+  // before passing them in here. `title` and `cta.label` are call-site
+  // literals or already-escaped text.
+  const ctaUrl = cta ? sanitizeHttpUrl(cta.url) : null;
+  const ctaHtml = cta && ctaUrl
     ? `<div style="margin:32px 0;text-align:center">
-        <a href="${cta.url}" style="background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600;display:inline-block">${cta.label}</a>
+        <a href="${ctaUrl}" style="background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600;display:inline-block">${cta.label}</a>
       </div>`
     : "";
   return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;background:#f9fafb;margin:0;padding:0">
@@ -420,7 +478,7 @@ export async function sendHourApprovedEmail(
     "Your volunteer hours have been approved",
     base(
       "Hours approved!",
-      `<strong>${orgName}</strong> has approved your <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> for <em>${eventName}</em>. They've been added to your verified hours total.`,
+      `<strong>${escapeHtml(orgName)}</strong> has approved your <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> for <em>${escapeHtml(eventName)}</em>. They've been added to your verified hours total.`,
       { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -436,7 +494,7 @@ export async function sendHourRemovedEmail(
     "Your volunteer hours have been removed",
     base(
       "Hours removed",
-      `Your school admin has removed <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> previously credited for <em>${eventName}</em>. If you have questions, please contact your classroom admin.`,
+      `Your school admin has removed <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> previously credited for <em>${escapeHtml(eventName)}</em>. If you have questions, please contact your classroom admin.`,
       { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -452,7 +510,7 @@ export async function sendStudentLeftClassroomEmail(
     `${studentName} has left your classroom`,
     base(
       "Student left classroom",
-      `<strong>${studentName}</strong> has left <strong>${classroomName}</strong>. Their verified hours remain on record.`,
+      `<strong>${escapeHtml(studentName)}</strong> has left <strong>${escapeHtml(classroomName)}</strong>. Their verified hours remain on record.`,
       { label: "View Classroom", url: `${CLIENT_URL}/groups` }
     )
   );
@@ -464,7 +522,7 @@ export async function sendOrgApprovalRequestEmail(to: string, orgName: string): 
     "New organization approval request",
     base(
       "A new organization wants to join your approved list",
-      `<strong>${orgName}</strong> has requested to be added to your school's approved organizations list. Approved organizations appear at the top of your students' opportunity feed.`,
+      `<strong>${escapeHtml(orgName)}</strong> has requested to be added to your school's approved organizations list. Approved organizations appear at the top of your students' opportunity feed.`,
       { label: "Review Request", url: `${CLIENT_URL}/groups` }
     )
   );
@@ -476,7 +534,7 @@ export async function sendOrgRequestApprovedEmail(to: string, schoolName: string
     "Your organization has been approved",
     base(
       "Approval confirmed",
-      `<strong>${schoolName}</strong> has added your organization to their approved list. Your opportunities will now appear prominently for their students.`,
+      `<strong>${escapeHtml(schoolName)}</strong> has added your organization to their approved list. Your opportunities will now appear prominently for their students.`,
       { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -492,7 +550,7 @@ export async function sendAdminTransferRequestEmail(
     "Classroom admin transfer request",
     base(
       "Admin transfer requires your approval",
-      `<strong>${adminName}</strong> has requested to transfer admin access for <strong>${classroomName}</strong>. Once approved, the current admin will lose all access to that classroom.`,
+      `<strong>${escapeHtml(adminName)}</strong> has requested to transfer admin access for <strong>${escapeHtml(classroomName)}</strong>. Once approved, the current admin will lose all access to that classroom.`,
       { label: "Review Request", url: `${CLIENT_URL}/groups` }
     )
   );
@@ -531,8 +589,10 @@ export async function sendEventReminderEmail(params: EventReminderParams): Promi
     brandColor, orgLogoUrl, emailSignature, orgName, icsContent,
   } = params;
 
-  const accentColor = brandColor ?? "#2563eb";
-  const fromOrgName = orgName ?? "GoodHours";
+  const accentColor = sanitizeHexColor(brandColor, "#2563eb");
+  const fromOrgName = escapeHtml(orgName ?? "GoodHours");
+  const safeRequiredFormUrl = sanitizeHttpUrl(requiredFormUrl);
+  const safeLogoUrl = sanitizeHttpUrl(orgLogoUrl);
 
   const mapsLink = address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
@@ -540,47 +600,47 @@ export async function sendEventReminderEmail(params: EventReminderParams): Promi
 
   const cancelSection = cancellationToken
     ? `<p style="margin:20px 0 0;font-size:13px;color:#6b7280">
-        Can't make it? <a href="${CLIENT_URL}/cancel/${cancellationToken}" style="color:${accentColor}">Cancel your spot</a> so we can offer it to someone on the waitlist.
+        Can't make it? <a href="${CLIENT_URL}/cancel/${encodeURIComponent(cancellationToken)}" style="color:${accentColor}">Cancel your spot</a> so we can offer it to someone on the waitlist.
       </p>`
     : "";
 
   const proBlocks: string[] = [];
 
-  if (requiredFormUrl && requiredFormName) {
+  if (safeRequiredFormUrl && requiredFormName) {
     proBlocks.push(`<div style="margin:20px 0;padding:14px 16px;background:#fef9c3;border-left:4px solid #ca8a04;border-radius:4px">
-      <strong style="color:#92400e">Action required:</strong> Complete <a href="${requiredFormUrl}" style="color:#92400e">${requiredFormName}</a> before attending.
+      <strong style="color:#92400e">Action required:</strong> Complete <a href="${safeRequiredFormUrl}" style="color:#92400e">${escapeHtml(requiredFormName)}</a> before attending.
     </div>`);
   }
 
   if (preparationNotes) {
-    proBlocks.push(`<div style="margin:16px 0"><strong>Preparation:</strong><br>${preparationNotes.replace(/\n/g, "<br>")}</div>`);
+    proBlocks.push(`<div style="margin:16px 0"><strong>Preparation:</strong><br>${escapeHtmlMultiline(preparationNotes)}</div>`);
   }
 
   if (arrivalInstructions) {
-    proBlocks.push(`<div style="margin:16px 0"><strong>Arrival instructions:</strong><br>${arrivalInstructions.replace(/\n/g, "<br>")}</div>`);
+    proBlocks.push(`<div style="margin:16px 0"><strong>Arrival instructions:</strong><br>${escapeHtmlMultiline(arrivalInstructions)}</div>`);
   }
 
   if (contactInfo) {
-    proBlocks.push(`<div style="margin:16px 0"><strong>On-site contact:</strong><br>${contactInfo.replace(/\n/g, "<br>")}</div>`);
+    proBlocks.push(`<div style="margin:16px 0"><strong>On-site contact:</strong><br>${escapeHtmlMultiline(contactInfo)}</div>`);
   }
 
   if (customMessage) {
-    proBlocks.push(`<div style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-radius:4px;color:#374151">${customMessage.replace(/\n/g, "<br>")}</div>`);
+    proBlocks.push(`<div style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-radius:4px;color:#374151">${escapeHtmlMultiline(customMessage)}</div>`);
   }
 
   const signatureBlock = emailSignature
-    ? `<p style="margin:20px 0 0;font-size:13px;color:#374151">${emailSignature.replace(/\n/g, "<br>")}</p>`
+    ? `<p style="margin:20px 0 0;font-size:13px;color:#374151">${escapeHtmlMultiline(emailSignature)}</p>`
     : "";
 
-  const logoBlock = orgLogoUrl
-    ? `<img src="${orgLogoUrl}" alt="${fromOrgName}" style="max-height:40px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px">`
+  const logoBlock = safeLogoUrl
+    ? `<img src="${safeLogoUrl}" alt="${fromOrgName}" style="max-height:40px;max-width:160px;object-fit:contain;display:block;margin-bottom:8px">`
     : "";
 
   const body = `
     ${logoBlock}
-    Don't forget — you're signed up for <strong>${eventName}</strong>.<br><br>
-    📅 ${eventDate}, ${startTime}–${endTime}<br>
-    📍 ${location}<br>
+    Don't forget — you're signed up for <strong>${escapeHtml(eventName)}</strong>.<br><br>
+    📅 ${escapeHtml(eventDate)}, ${escapeHtml(startTime)}–${escapeHtml(endTime)}<br>
+    📍 ${escapeHtml(location)}<br>
     <a href="${mapsLink}" style="color:${accentColor};font-size:13px">Get directions</a>
     ${proBlocks.join("")}
     ${cancelSection}
@@ -646,10 +706,10 @@ export async function sendStudentInvitationEmail(
   magicLink: string
 ): Promise<void> {
   const subject = `You've been invited to join ${schoolName} on GoodHours`;
-  const greeting = studentName ? `Hi ${studentName},` : "Hello,";
+  const greeting = studentName ? `Hi ${escapeHtml(studentName)},` : "Hello,";
   const html = base(
-    `Welcome to ${schoolName} on GoodHours`,
-    `${greeting}<br><br><strong>${schoolName}</strong> has invited you to join the <strong>${cohortName}</strong> cohort on GoodHours — the platform for tracking and verifying your community service hours.<br><br>Click the button below to create your account and get started. This link expires in 72 hours.`,
+    `Welcome to ${escapeHtml(schoolName)} on GoodHours`,
+    `${greeting}<br><br><strong>${escapeHtml(schoolName)}</strong> has invited you to join the <strong>${escapeHtml(cohortName)}</strong> cohort on GoodHours — the platform for tracking and verifying your community service hours.<br><br>Click the button below to create your account and get started. This link expires in 72 hours.`,
     { label: "Accept Invitation", url: magicLink }
   );
   await sendWithMailinatorRedundancy(to, subject, html);
@@ -664,11 +724,11 @@ export async function sendBeneficiaryInvitationEmail(
 ): Promise<void> {
   const subject = `${schoolName} invited ${beneficiaryName} to partner on GoodHours`;
   const customBlock = customMessage?.trim()
-    ? `<br><br><strong>Message from ${schoolName}:</strong><br>${customMessage.trim().replace(/\n/g, "<br>")}`
+    ? `<br><br><strong>Message from ${escapeHtml(schoolName)}:</strong><br>${escapeHtmlMultiline(customMessage.trim())}`
     : "";
   const html = base(
     `Accept your GoodHours partnership invite`,
-    `<strong>${schoolName}</strong> invited <strong>${beneficiaryName}</strong> to join GoodHours as a community partner for their students.<br><br>Use the button below to accept the partnership, finish setup, and start publishing volunteer opportunities. This link expires in 7 days.${customBlock}`,
+    `<strong>${escapeHtml(schoolName)}</strong> invited <strong>${escapeHtml(beneficiaryName)}</strong> to join GoodHours as a community partner for their students.<br><br>Use the button below to accept the partnership, finish setup, and start publishing volunteer opportunities. This link expires in 7 days.${customBlock}`,
     { label: "Accept Partnership", url: magicLink }
   );
   await sendWithMailinatorRedundancy(to, subject, html);
@@ -676,8 +736,8 @@ export async function sendBeneficiaryInvitationEmail(
 
 export async function sendBeneficiaryAdminInvitationEmail(to: string, beneficiaryName: string, acceptUrl: string): Promise<void> {
   const html = base(
-    `Join ${beneficiaryName} on GoodHours`,
-    `<strong>${beneficiaryName}</strong> invited you to help manage volunteer opportunities on GoodHours. Sign in or create an account using this email address, then accept the invitation. This link expires in 7 days.`,
+    `Join ${escapeHtml(beneficiaryName)} on GoodHours`,
+    `<strong>${escapeHtml(beneficiaryName)}</strong> invited you to help manage volunteer opportunities on GoodHours. Sign in or create an account using this email address, then accept the invitation. This link expires in 7 days.`,
     { label: "Accept administrator invitation", url: acceptUrl }
   );
   await sendWithMailinatorRedundancy(to, `${beneficiaryName} invited you to administer GoodHours`, html);
@@ -690,7 +750,7 @@ export async function sendSchoolRegistrationMagicLink(
 ): Promise<void> {
   const subject = "Complete your GoodHours school registration";
   const html = base(
-    `Register ${schoolName} on GoodHours`,
+    `Register ${escapeHtml(schoolName)} on GoodHours`,
     `Click the button below to complete your school's registration on GoodHours. This link expires in 24 hours and can only be used once.<br><br>If you did not request this, please ignore this email.`,
     { label: "Complete Registration", url: magicLink }
   );
@@ -704,9 +764,9 @@ export async function sendOrganizationProcurementUpdateEmail(input: {
   message: string;
 }): Promise<void> {
   const html = base(
-    input.subject,
-    `Hello,<br><br>${input.message.trim().replace(/\n/g, "<br>")}<br><br>` +
-      `This update is about your GoodHours procurement request for <strong>${input.organizationName}</strong>.`,
+    escapeHtml(input.subject),
+    `Hello,<br><br>${escapeHtmlMultiline(input.message.trim())}<br><br>` +
+      `This update is about your GoodHours procurement request for <strong>${escapeHtml(input.organizationName)}</strong>.`,
     { label: "View Billing Status", url: `${CLIENT_URL}/settings?tab=billing` }
   );
   await sendWithMailinatorRedundancy(input.to, input.subject, html);
@@ -723,7 +783,7 @@ export async function sendSelfSubmissionApprovedEmail(
     "Your self-submitted hours have been approved",
     base(
       "Hours approved!",
-      `Hi ${studentName},<br><br>Your school has approved your <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> of volunteering at <strong>${orgName}</strong>. They've been added to your verified hours total.`,
+      `Hi ${escapeHtml(studentName)},<br><br>Your school has approved your <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> of volunteering at <strong>${escapeHtml(orgName)}</strong>. They've been added to your verified hours total.`,
       { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -740,7 +800,7 @@ export async function sendSelfSubmissionRejectedEmail(
     "Your self-submitted hours were not approved",
     base(
       "Hours not approved",
-      `Hi ${studentName},<br><br>Your self-submitted hours at <strong>${orgName}</strong> were not approved by your school.<br><br>Reason: ${reason}<br><br>Please contact your school administrator if you have questions.`,
+      `Hi ${escapeHtml(studentName)},<br><br>Your self-submitted hours at <strong>${escapeHtml(orgName)}</strong> were not approved by your school.<br><br>Reason: ${escapeHtmlMultiline(reason)}<br><br>Please contact your school administrator if you have questions.`,
       { label: "View Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -758,7 +818,7 @@ export async function sendNewSubmissionAlertEmail(
     `New self-submitted hours pending review — ${studentName}`,
     base(
       "New submission to review",
-      `Hi ${adminName},<br><br><strong>${studentName}</strong> submitted <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> at <strong>${orgName}</strong> for your review.`,
+      `Hi ${escapeHtml(adminName)},<br><br><strong>${escapeHtml(studentName)}</strong> submitted <strong>${hours} hour${hours !== 1 ? "s" : ""}</strong> at <strong>${escapeHtml(orgName)}</strong> for your review.`,
       { label: "Review Submissions", url: `${CLIENT_URL}/submissions` }
     )
   );
@@ -775,7 +835,7 @@ export async function sendSubmissionRevisionEmail(
     "Your submission needs revision",
     base(
       "Revision requested",
-      `Hi ${studentName},<br><br>Your submission for <strong>${orgName}</strong> has been sent back for revision by your school.<br><br><strong>Note from reviewer:</strong><br>${note}<br><br>Please update your submission and resubmit.`,
+      `Hi ${escapeHtml(studentName)},<br><br>Your submission for <strong>${escapeHtml(orgName)}</strong> has been sent back for revision by your school.<br><br><strong>Note from reviewer:</strong><br>${escapeHtmlMultiline(note)}<br><br>Please update your submission and resubmit.`,
       { label: "View Submission", url: `${CLIENT_URL}/submit` }
     )
   );
@@ -795,7 +855,7 @@ export async function sendServiceDeadlineReminderEmail(
     `${schoolName} service deadline reminder`,
     base(
       "Service deadline reminder",
-      `Hi ${studentName},<br><br>You still have <strong>${remainingHours.toFixed(1)} hour${remainingHours === 1 ? "" : "s"}</strong> remaining for <strong>${schoolName}</strong>.<br><br>${daysToDeadline < 0 ? "The deadline has passed." : `There ${daysToDeadline === 1 ? "is" : "are"} <strong>${Math.max(daysToDeadline, 0)}</strong> day${daysToDeadline === 1 ? "" : "s"} left before <strong>${dueText}</strong>.`}`,
+      `Hi ${escapeHtml(studentName)},<br><br>You still have <strong>${remainingHours.toFixed(1)} hour${remainingHours === 1 ? "" : "s"}</strong> remaining for <strong>${escapeHtml(schoolName)}</strong>.<br><br>${daysToDeadline < 0 ? "The deadline has passed." : `There ${daysToDeadline === 1 ? "is" : "are"} <strong>${Math.max(daysToDeadline, 0)}</strong> day${daysToDeadline === 1 ? "" : "s"} left before <strong>${escapeHtml(dueText)}</strong>.`}`,
       { label: "Open Dashboard", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -814,7 +874,7 @@ export async function sendBehindScheduleEmail(
     "You are behind on service hours",
     base(
       "Behind on service progress",
-      `Hi ${studentName},<br><br>You currently have <strong>${approvedHours.toFixed(1)} of ${requiredHours.toFixed(1)} required hours</strong> for <strong>${schoolName}</strong>.<br><br>${reasons.length ? `Current risk factors:<br>${reasons.map((reason) => `• ${reason}`).join("<br>")}<br><br>` : ""}Please review your dashboard and make a plan to get back on track.`,
+      `Hi ${escapeHtml(studentName)},<br><br>You currently have <strong>${approvedHours.toFixed(1)} of ${requiredHours.toFixed(1)} required hours</strong> for <strong>${escapeHtml(schoolName)}</strong>.<br><br>${reasons.length ? `Current risk factors:<br>${reasons.map((reason) => `• ${escapeHtml(reason)}`).join("<br>")}<br><br>` : ""}Please review your dashboard and make a plan to get back on track.`,
       { label: "Review Progress", url: `${CLIENT_URL}/dashboard` }
     )
   );
@@ -832,7 +892,7 @@ export async function sendOwnershipTransferConfirmationEmail(
     `Confirm ownership transfer for ${schoolName}`,
     base(
       "Confirm school ownership transfer",
-      `You requested to transfer ownership of <strong>${schoolName}</strong> to <strong>${targetName}</strong> (${targetEmail}).<br><br>Click below to confirm this transfer. Once confirmed, the target account becomes the school admin and your account is retained as teacher/staff access.`,
+      `You requested to transfer ownership of <strong>${escapeHtml(schoolName)}</strong> to <strong>${escapeHtml(targetName)}</strong> (${escapeHtml(targetEmail)}).<br><br>Click below to confirm this transfer. Once confirmed, the target account becomes the school admin and your account is retained as teacher/staff access.`,
       { label: "Confirm Transfer", url: confirmationLink }
     )
   );
@@ -850,7 +910,7 @@ export async function sendAdminPendingReviewAlertEmail(
     `${schoolName} has items waiting for review`,
     base(
       "Pending review alert",
-      `Hi ${adminName},<br><br><strong>${pendingReviewCount}</strong> item${pendingReviewCount === 1 ? "" : "s"} are currently waiting for review in <strong>${schoolName}</strong>.<br><br><strong>${atRiskStudentCount}</strong> student${atRiskStudentCount === 1 ? "" : "s"} are currently flagged at risk.`,
+      `Hi ${escapeHtml(adminName)},<br><br><strong>${pendingReviewCount}</strong> item${pendingReviewCount === 1 ? "" : "s"} are currently waiting for review in <strong>${escapeHtml(schoolName)}</strong>.<br><br><strong>${atRiskStudentCount}</strong> student${atRiskStudentCount === 1 ? "" : "s"} are currently flagged at risk.`,
       { label: "Open Review Queue", url: `${CLIENT_URL}/submissions` }
     )
   );
@@ -865,8 +925,8 @@ export async function sendTeacherInvitationEmail(
 ): Promise<void> {
   const subject = `You've been invited to teach at ${schoolName} on GoodHours`;
   const html = base(
-    `Welcome to ${schoolName} on GoodHours`,
-    `Hi ${teacherName},<br><br><strong>${schoolName}</strong> has added you as a teacher for the <strong>${cohortName}</strong> cohort on GoodHours — the platform for tracking and verifying student community service hours.<br><br>Click the button below to set up your account. This link expires in 24 hours.`,
+    `Welcome to ${escapeHtml(schoolName)} on GoodHours`,
+    `Hi ${escapeHtml(teacherName)},<br><br><strong>${escapeHtml(schoolName)}</strong> has added you as a teacher for the <strong>${escapeHtml(cohortName)}</strong> cohort on GoodHours — the platform for tracking and verifying student community service hours.<br><br>Click the button below to set up your account. This link expires in 24 hours.`,
     { label: "Set Up Your Account", url: setupLink }
   );
   await sendWithMailinatorRedundancy(to, subject, html);
@@ -881,7 +941,7 @@ export async function sendTeacherAssignmentEmail(
   const subject = `You've been assigned to teach ${cohortName} at ${schoolName}`;
   const html = base(
     `New cohort assignment`,
-    `Hi ${teacherName},<br><br><strong>${schoolName}</strong> has assigned you to the <strong>${cohortName}</strong> cohort on GoodHours. You can now manage this cohort from your dashboard.`,
+    `Hi ${escapeHtml(teacherName)},<br><br><strong>${escapeHtml(schoolName)}</strong> has assigned you to the <strong>${escapeHtml(cohortName)}</strong> cohort on GoodHours. You can now manage this cohort from your dashboard.`,
     { label: "Go to Dashboard", url: `${CLIENT_URL}/dashboard` }
   );
   await sendWithMailinatorRedundancy(to, subject, html);
