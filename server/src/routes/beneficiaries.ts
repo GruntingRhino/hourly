@@ -2690,10 +2690,27 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       return res.status(400).json({ error: "Hour approval is only available after the time slot has ended" });
     }
 
-    const { approvedHours, overrideCap } = z.object({
+    const { approvedHours, overrideCap, overrideNoShow, noShowOverrideReason } = z.object({
       approvedHours: z.number().positive().optional(),
       overrideCap: z.boolean().optional(),
+      overrideNoShow: z.boolean().optional(),
+      noShowOverrideReason: z.string().trim().min(1).max(1000).optional(),
     }).parse(req.body);
+
+    // A NO_SHOW signup must not silently receive approved hours — that would
+    // both grant credit the student never earned and erase the no-show
+    // record (the update below resets status back to CONFIRMED). Require an
+    // explicit override flag and a documented reason, matching the same
+    // elevated-confirmation pattern already used for overrideCap.
+    if (signup.status === "NO_SHOW") {
+      if (!overrideNoShow || !noShowOverrideReason) {
+        return res.status(400).json({
+          error: "This signup is marked as a no-show. Pass overrideNoShow: true and noShowOverrideReason to approve hours anyway.",
+          noShowOverrideRequired: true,
+        });
+      }
+    }
+
     if (approvedHours !== undefined && approvedHours > signup.slot.durationHours) {
       return res.status(400).json({ error: `approvedHours cannot exceed the slot duration of ${signup.slot.durationHours}h` });
     }
@@ -2732,7 +2749,9 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
+        action: signup.status === "NO_SHOW"
+          ? "NO_SHOW_OVERRIDE_APPROVED"
+          : signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
         actorId: req.user!.userId,
         signupId: signup.id,
         details: JSON.stringify({
@@ -2740,6 +2759,7 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
           approvedHours: hours,
           originalHours: signup.slot.durationHours,
           ...(overrideCap ? { capOverride: true } : {}),
+          ...(signup.status === "NO_SHOW" ? { noShowOverride: true, noShowOverrideReason } : {}),
         }),
       },
     });
