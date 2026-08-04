@@ -61,26 +61,32 @@ enum LaunchBugStatus {
 
 // ─── Users & Identity ───────────────────────────────────────────
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
 model User {
-  id                       String    @id @default(cuid())
-  email                    String    @unique
+  id                       String     @id @default(cuid())
+  email                    String     @unique
   passwordHash             String? // nullable — Google-OAuth users may not have a password initially
   name                     String
   phone                    String?
   role                     String // SCHOOL_ADMIN, TEACHER, STUDENT, BENEFICIARY_ADMIN
-  status                   String    @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
-  emailVerified            Boolean   @default(false)
+  status                   UserStatus @default(ACTIVE)
+  emailVerified            Boolean    @default(false)
   emailVerificationToken   String?
   emailVerificationExpires DateTime?
   passwordResetToken       String?
   passwordResetExpires     DateTime?
-  tokenVersion             Int       @default(0) // bumped on password change/reset to revoke outstanding JWTs
-  googleId                 String?   @unique
-  isTestAccount            Boolean   @default(false) // true = Playwright/QA account, hidden from all lists
+  tokenVersion             Int        @default(0) // bumped on password change/reset to revoke outstanding JWTs
+  googleId                 String?    @unique
+  isTestAccount            Boolean    @default(false) // true = Playwright/QA account, hidden from all lists
   notificationPreferences  String? // JSON blob for notification prefs
   messagePreferences       String? // JSON blob for message/privacy prefs
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
 
   // Student-specific
   grade    String?
