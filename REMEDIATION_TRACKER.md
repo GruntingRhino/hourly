@@ -196,6 +196,32 @@ a fresh multi-file project, not a bug fix:
 
 - **Dependency scan**: `npm audit` in `server/` found `ip-address <=10.3.0` (transitive via `express-rate-limit`) with 3 HIGH-severity SSRF/trust-boundary-bypass advisories, and a low-severity `esbuild` (transitive via `tsx`, dev-only) advisory. Confirmed `lib/lmsOutboundSecurity.ts`'s own SSRF checks don't use this package (unaffected), but `express-rate-limit`'s IP trust logic was exposed. Both resolved via `npm update` within already-declared semver ranges (no `package.json` version bumps needed) — `npm audit` now reports **zero vulnerabilities**. Commit `4fdfacd`
 
+### Full CI pipeline reproduced locally (2026-08-04)
+
+`.github/workflows/app-verification.yml` is this repo's actual release-gating
+CI pipeline. Rather than approximating it, every one of its 10 steps was run
+locally in the same order with the same commands, the same env vars, and a
+database named identically to CI's (`goodhours_ci`, dropped after use):
+
+1. `npm ci --ignore-scripts` (root) → clean install, 510 packages
+2. `npm ci` (client) → clean install, 206 packages
+3. `npm ci` (server) → clean install, 215 packages
+4. `npx prisma generate` → succeeds (both client-output locations)
+5. `npx prisma validate` + `npx prisma migrate deploy` + `npx prisma migrate status` against a fresh `goodhours_ci` database → schema valid, all 28 migrations applied cleanly, "Database schema is up to date!"
+6. `npm test` (server) with CI's exact `APP_ENV=test NODE_ENV=test VERCEL_ENV=development` → **313 pass / 0 fail / 1 skipped** (confirms this session's `isPubliclyDeployed()` fix behaves correctly under CI's actual env config, not just an assumed one)
+7. `npm audit --omit=dev --audit-level=high` at root and in `server/` → **0 vulnerabilities** both. Client's audit surfaced the known `react-router` RSC-mode CSRF advisory (high) — ran both of the project's existing compensating scripts (`security:verify-react-router-rsc-advisory`, `security:verify-no-rsc`) and confirmed they still pass: the app is a `BrowserRouter` SPA with no RSC runtime, so the advisory doesn't apply. Independently re-verified `docs/qa/DEPENDENCY_ADVISORY_EXCEPTIONS.md`'s claim that no patched `react-router-dom` is published yet — still true as of today, exception not expired (recheck-by 2026-08-31)
+8. `npm run build` (server) → clean
+9. `npm run build` (client) → clean
+10. `git diff --check` → clean; `npx playwright test tests/launch-center.spec.ts tests/intervention-workflow.spec.ts --list` → both pilot-critical specs parse and list correctly
+
+All three `npm ci` runs left the working tree byte-for-byte clean afterward
+(`git status --short` empty) — confirming the committed lockfiles are
+genuinely deterministic, not just "close enough." One known deviation from
+CI: this sandbox runs Node v26.4.0, not CI's pinned Node 24 — `engines.node`
+is intentionally unbounded above (see §19 commit `47725a4`) so this doesn't
+trigger an engine warning, but it means Node-version-specific CI behavior
+wasn't reproduced exactly.
+
 Not yet run this session: full E2E suite (`tests/*.spec.ts` — Playwright), lint (server has no configured lint script; client lint only spot-checked on touched files, not run repo-wide).
 
 ---
