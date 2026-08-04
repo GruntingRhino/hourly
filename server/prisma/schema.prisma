@@ -356,20 +356,27 @@ model CohortTeacherAssignment {
 
 // ─── Student Invitations ─────────────────────────────────────────
 
+enum StudentInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 model StudentInvitation {
-  id            String    @id @default(cuid())
+  id            String                  @id @default(cuid())
   cohortId      String
-  cohort        Cohort    @relation(fields: [cohortId], references: [id])
+  cohort        Cohort                  @relation(fields: [cohortId], references: [id])
   email         String
   name          String?
   grade         String?
   house         String?
   startingHours Float? // pre-existing hours to credit as approved on join
-  token         String    @unique
+  token         String                  @unique
   expiresAt     DateTime
   acceptedAt    DateTime?
-  status        String    @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-  createdAt     DateTime  @default(now())
+  status        StudentInvitationStatus @default(PENDING)
+  createdAt     DateTime                @default(now())
 
   @@unique([cohortId, email])
 }
