@@ -1175,19 +1175,29 @@ model Notification {
 
 // ─── Organization Billing ─────────────────────────────────────────────────
 
+enum OrganizationInvoiceRequestStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  INVOICE_SENT
+  PAID
+  REJECTED
+  CANCELLED
+}
+
 model OrganizationInvoiceRequest {
-  id                       String                        @id @default(cuid())
+  id                       String                           @id @default(cuid())
   beneficiaryId            String
-  beneficiary              Beneficiary                   @relation(fields: [beneficiaryId], references: [id])
-  status                   String                        @default("SUBMITTED")
+  beneficiary              Beneficiary                      @relation(fields: [beneficiaryId], references: [id])
+  status                   OrganizationInvoiceRequestStatus @default(SUBMITTED)
   ownerUserId              String?
-  ownerUser                User?                         @relation("OrganizationInvoiceRequestOwner", fields: [ownerUserId], references: [id])
+  ownerUser                User?                            @relation("OrganizationInvoiceRequestOwner", fields: [ownerUserId], references: [id])
   legalName                String
   address                  String
   billingContactName       String
   billingContactEmail      String
-  purchaseOrderRequired    Boolean                       @default(false)
-  taxExempt                Boolean                       @default(false)
+  purchaseOrderRequired    Boolean                          @default(false)
+  taxExempt                Boolean                          @default(false)
   requestedBillingInterval String? // "monthly" or "annual" for procurement quotes
   preferredPaymentMethod   String?
   additionalNotes          String?
@@ -1199,8 +1209,8 @@ model OrganizationInvoiceRequest {
   paidAt                   DateTime?
   rejectedReason           String?
   lastContactedAt          DateTime?
-  createdAt                DateTime                      @default(now())
-  updatedAt                DateTime                      @updatedAt
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
   auditLogs                OrganizationInvoiceAuditLog[]
   artifacts                OrganizationInvoiceArtifact[]
 

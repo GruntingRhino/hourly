@@ -885,7 +885,7 @@ router.get("/internal/invoice-requests", authenticate, async (req: Request, res:
 
     const query = z.object({
       limit: z.coerce.number().int().min(1).max(100).optional(),
-      status: z.string().trim().min(1).optional(),
+      status: z.enum(INTERNAL_REQUEST_STATUSES).optional(),
     }).parse(req.query);
 
     const requests = await prisma.organizationInvoiceRequest.findMany({
