@@ -293,22 +293,28 @@ model VerifiedDomain {
 
 // ─── Cohorts (replaces Classroom for new arch) ──────────────────
 
+enum CohortStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model Cohort {
-  id                  String    @id @default(cuid())
+  id                  String       @id @default(cuid())
   name                String // e.g. "Class of 2028"
   schoolId            String
-  school              School    @relation(fields: [schoolId], references: [id])
+  school              School       @relation(fields: [schoolId], references: [id])
   requiredHours       Float? // override school default if set
   serviceStartDate    DateTime?
   serviceEndDate      DateTime?
   allowSelfSubmission Boolean? // null = inherit from school
   categoryHourCaps    String? // JSON override; null = inherit from school
-  usesHouseField      Boolean   @default(false)
+  usesHouseField      Boolean      @default(false)
   graduationYear      Int?
-  status              String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  status              CohortStatus @default(DRAFT)
   publishedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   students           User[]                    @relation("CohortStudents")
   memberships        StudentCohortMembership[]
