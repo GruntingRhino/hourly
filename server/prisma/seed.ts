@@ -504,7 +504,7 @@ async function main() {
   }
 
   // Create a completed, verified session for student1
-  await prisma.serviceSession.create({
+  const student1Opp1Session = await prisma.serviceSession.create({
     data: {
       userId: student1.id,
       opportunityId: opp1.id,
@@ -515,6 +515,15 @@ async function main() {
       verificationStatus: "APPROVED",
       verifiedBy: ben1User.id,
       verifiedAt: new Date("2025-08-27T15:00:00"),
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      action: "APPROVE",
+      actorId: ben1User.id,
+      sessionId: student1Opp1Session.id,
+      details: JSON.stringify({ approvedHours: 3.92, originalHours: 3.92 }),
+      createdAt: new Date("2025-08-27T15:00:00"),
     },
   });
 
@@ -535,17 +544,29 @@ async function main() {
     await prisma.signup.create({
       data: { userId: student1.id, opportunityId: opp.id, status: "CONFIRMED" },
     });
-    await prisma.serviceSession.create({
+    const verifiedBy = opp.organizationId === org2.id ? ben2User.id : ben1User.id;
+    const approvedHours = Math.max(0, opp.durationHours - 0.08);
+    const verifiedAt = new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000);
+    const session = await prisma.serviceSession.create({
       data: {
         userId: student1.id,
         opportunityId: opp.id,
         checkInTime: new Date(opp.date.getTime() + 5 * 60000),
         checkOutTime: new Date(opp.date.getTime() + opp.durationHours * 3600000),
-        totalHours: Math.max(0, opp.durationHours - 0.08),
+        totalHours: approvedHours,
         status: "VERIFIED",
         verificationStatus: "APPROVED",
-        verifiedBy: opp.organizationId === org2.id ? ben2User.id : ben1User.id,
-        verifiedAt: new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
+        verifiedBy,
+        verifiedAt,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "APPROVE",
+        actorId: verifiedBy,
+        sessionId: session.id,
+        details: JSON.stringify({ approvedHours, originalHours: approvedHours }),
+        createdAt: verifiedAt,
       },
     });
   }
@@ -569,19 +590,32 @@ async function main() {
     await prisma.signup.create({
       data: { userId: student2.id, opportunityId: opp.id, status: "CONFIRMED" },
     });
-    await prisma.serviceSession.create({
+    const approvedHours = opp.durationHours - 0.08;
+    const verifiedAt = orgQueuePending ? null : new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000);
+    const session = await prisma.serviceSession.create({
       data: {
         userId: student2.id,
         opportunityId: opp.id,
         checkInTime: new Date(opp.date.getTime() + 5 * 60000),
         checkOutTime: new Date(opp.date.getTime() + opp.durationHours * 3600000),
-        totalHours: opp.durationHours - 0.08,
+        totalHours: approvedHours,
         status: orgQueuePending ? "CHECKED_OUT" : "VERIFIED",
         verificationStatus: orgQueuePending ? "PENDING" : "APPROVED",
         verifiedBy: orgQueuePending ? null : ben1User.id,
-        verifiedAt: orgQueuePending ? null : new Date(opp.date.getTime() + (opp.durationHours + 1) * 3600000),
+        verifiedAt,
       },
     });
+    if (!orgQueuePending) {
+      await prisma.auditLog.create({
+        data: {
+          action: "APPROVE",
+          actorId: ben1User.id,
+          sessionId: session.id,
+          details: JSON.stringify({ approvedHours, originalHours: approvedHours }),
+          createdAt: verifiedAt!,
+        },
+      });
+    }
   }
 
   await prisma.signup.create({

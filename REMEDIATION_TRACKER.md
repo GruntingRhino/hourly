@@ -57,7 +57,7 @@ Status legend: ✅ Fixed & verified · 🟡 Partially done · ⬜ Not started ·
 | `beneficiaries.ts:527-529` — `page`/`limit` on `GET /directory/nearby` not validated before use in a raw-SQL `OFFSET`; non-numeric input → `NaN` → 500 | ✅ | Fixed: rejects non-integer/out-of-range page or limit with 400 before building the query. Test: `beneficiaryDirectoryNearbyPagination.test.ts`. Commit `3cbf01a` |
 | No DB-level `CHECK` constraint preventing `ServiceSession.status = 'VERIFIED'` with a null `checkOutTime` | ✅ | Migration `20260804153210_service_session_verified_requires_checkout` adds a `NOT VALID` CHECK constraint (won't fail on pre-existing violations, blocks all new ones). Verified by replaying all migrations into a fresh disposable Postgres DB and confirming by direct insert that the invalid case is rejected. Commit `ee123fd` |
 | `server/src/services/email.ts` had **zero HTML escaping anywhere** — every email function interpolates caller-controlled strings (student/org/school/cohort names, custom messages, notes, org branding `brandColor`/`orgLogoUrl`/`emailSignature`) directly into HTML sent to real recipients, with no sanitizer. `brandColor` and `orgLogoUrl` are org-branding (Pro) fields reachable by any beneficiary/org admin, giving attribute-breakout HTML injection and a `javascript:`/arbitrary-scheme URL as an `<img src>`. Matches goal §13.1 exactly. | ✅ | Added `escapeHtml`/`escapeHtmlMultiline`/`sanitizeHexColor`/`sanitizeHttpUrl` helpers; applied across all ~25 email functions in the file (every dynamic text field escaped, `brandColor` restricted to `#hex` or falls back to default, `orgLogoUrl`/`requiredFormUrl`/CTA URLs restricted to http(s) or dropped). Verified with a real capture test (not just log-mode, which strips tags before logging and would pass trivially) — sends to a `@mailinator.com` address and inspects the actual captured HTML. Test: `emailHtmlEscaping.test.ts` |
-| Seed script doesn't create `AuditLog` rows for seeded `VERIFIED` sessions | ⬜ | Cosmetic, test-data only — low priority, not yet fixed |
+| Seed script doesn't create `AuditLog` rows for seeded `VERIFIED` sessions | ✅ | Cosmetic, test-data only — but genuinely a real gap (every seeded VERIFIED session was indistinguishable from one with no approval trail). Fixed: each of the 4 `serviceSession.create` call sites that seed `status: "VERIFIED"` now also creates a matching `AuditLog` row (`action: "APPROVE"`, matching `actorId`/`sessionId`/`details` shape used by the real `POST /verification/:sessionId/approve` route). Verified by running `prisma/seed.ts` end-to-end against a real disposable Postgres DB and querying for orphaned VERIFIED sessions — none found. |
 | `security_findings.md` §3.2: `prisma/seed.ts` had **zero safety checks** before running `TRUNCATE CASCADE` on every core table (User, School, Organization, Beneficiary, ServiceSession, etc.) and replacing data with fixed test accounts. Also found while fixing it: CLAUDE.md documents test-account passwords as "(set via SEED_PASSWORD env var)" but the script never read that env var — hardcoded `bcrypt.hash("password123", 12)` six times instead. `seed-playwright.ts` (non-destructive, upsert-only) had a fixed source-visible password and no environment check either. | ✅ | Extracted `assertSafeToRunDestructiveSeed()` (`src/lib/destructiveSeedGuard.ts`, unit tested) requiring: not production-like, `ALLOW_DESTRUCTIVE_TEST_SEED=yes` explicit opt-in, and a `DATABASE_URL` host/name that looks local or clearly disposable. `seed.ts` now requires `SEED_PASSWORD` (no fallback) and uses it everywhere; `seed-playwright.ts` gained an `isProdLike()` guard. Verified end-to-end against real disposable Postgres DBs: each guard condition independently blocks, and the script still seeds successfully once satisfied. Documented both new env vars in `server/.env.example`. Test: `destructiveSeedGuard.test.ts`. Commit `40af038` |
 | `GET /api/geocode` had no `authenticate` middleware — a fully open, unauthenticated proxy to Nominatim, even though its own rate limiter was already configured with a `maxPerUser` tier that could never apply. No client code calls it directly (geocoding happens server-side inside other authenticated routes). Matches goal §16.1. | ✅ | Added `authenticate`; hardened `lib/geocode.ts` with an 8s outbound timeout (previously none) and a bounded/TTL cache (previously an unbounded `Map` that grew forever and never expired). Test: `geocode.test.ts`. Commit `44ce4b0` |
 | `calculateStudentHours`/`buildStudentProgressRecords` silently treated a failed data source as zero rows (console warning only) — a temporary DB hiccup on one source made a student's hours look genuinely lower than they are, with the response indistinguishable from a real zero. Matches goal §9.4/§12.2 exactly ("reports must never return legitimate-looking zeros when calculation failed"). | ✅ | Both functions now attach `dataState`("COMPLETE"\|"PARTIAL")/`failedSources` as extra properties on their existing Map/array return values (zero breakage for the 13 existing call sites). Wired into the 3 report/compliance-facing responses: `GET /api/reports/student`, `GET /api/reports/school`, and the per-student hour-breakdown reconciliation block in `schools.ts`. The plain-array `GET /api/schools/:id/students` list endpoint keeps its existing response shape (client consumes it as a bare array) but still benefits from the underlying fix — one failed source no longer zeroes every student's progress. Test: `hoursDataStatePartialFailure.test.ts`. Commit `6585c30` |
@@ -115,17 +115,30 @@ Full detail lives in this session's history; summary:
   FINDING-001 (rate-limit bypass via unverified JWT decode) — fixed.
   FINDING-002 (wildcard CORS) — fixed. FINDING-003 (`IS_PROD_LIKE` drift) —
   now fully fixed (see above). FINDING-004 (dev-only test-email endpoint) —
-  still open but low risk/intentionally dev-gated. FINDING-005 (NaN in
-  `/directory/nearby` OFFSET) — still open, tracked above.
+  **corrected 2026-08-04: already fixed**, not open — `routes/auth.ts`'s
+  `/__test-email` route is gated behind `!isPubliclyDeployed()` (part of the
+  `isPubliclyDeployed()` fix above), confirmed by direct code read.
+  FINDING-005 (NaN in `/directory/nearby` OFFSET) — **corrected 2026-08-04:
+  already fixed** (commit `3cbf01a`, see additional-issues table above); this
+  bullet's earlier "still open" note was stale documentation, not a live bug
+  — confirmed by direct code read of `beneficiaries.ts`'s `/directory/nearby`
+  handler, which already rejects non-integer/out-of-range `page`/`limit`.
 - **`docs/qa/FINAL_RELEASE_REPORT.md`** (2026-06-29): SEC-001 (Stripe fields
   leaked via beneficiary GET), SEC-002/003 (dupes of SECURITY_AUDIT
   FINDING-001/002), SEC-005 (Stripe webhook replay), SEC-006 (attachment
   download auth), DEFECT-001..005 (input validation, race conditions, JSON
-  404s) — all fixed. SEC-004/SEC-009 are dupes of the two still-open items
-  above.
-- **`docs/qa/DATA_INTEGRITY_REPORT.md`** (2026-06-29): seeded-session audit
-  gap and missing VERIFIED/checkOutTime constraint — both still open, tracked
-  above; both are low severity.
+  404s) — all fixed. SEC-004/SEC-009 are dupes of the two SECURITY_AUDIT
+  items above, both now confirmed fixed.
+- **`docs/qa/DATA_INTEGRITY_REPORT.md`** (2026-06-29): missing VERIFIED/
+  checkOutTime constraint — **corrected 2026-08-04: already fixed** (migration
+  `20260804153210_service_session_verified_requires_checkout`, see additional-
+  issues table above); this bullet's earlier "still open" note was stale.
+  Seeded-session audit gap — genuinely was open, **fixed 2026-08-04**
+  (commit pending): `prisma/seed.ts` now creates a matching `AuditLog`
+  `APPROVE` row for every `ServiceSession` it seeds with `status: "VERIFIED"`
+  (previously none did). Verified by running the seed script end-to-end
+  against a real disposable Postgres DB and confirming all 4 seeded VERIFIED
+  sessions have a matching audit row.
 - **`docs/qa/ACCESSIBILITY_REPORT.md`**: contrast and label findings (V-01,
   V-02, V-03, V-06) — fixed. V-04/V-05 (tab order, link-in-text-block) —
   unclear without a real browser check, not independently verified.
