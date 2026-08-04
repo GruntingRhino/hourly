@@ -43,6 +43,22 @@ enum IntegrationExternalObjectType {
   ENROLLMENT
 }
 
+enum LaunchBugSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum LaunchBugStatus {
+  OPEN
+  INVESTIGATING
+  BLOCKED
+  FIXED
+  MONITORING
+  CLOSED
+}
+
 // ─── Users & Identity ───────────────────────────────────────────
 
 model User {
@@ -863,21 +879,21 @@ model StudentGroupMember {
 }
 
 model SchoolLaunchBug {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id])
+  school      School            @relation(fields: [schoolId], references: [id])
   title       String
   description String?
-  severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  status      String   @default("OPEN") // OPEN, INVESTIGATING, BLOCKED, FIXED, MONITORING, CLOSED
+  severity    LaunchBugSeverity @default(MEDIUM)
+  status      LaunchBugStatus   @default(OPEN)
   area        String?
   source      String?
   ownerName   String?
   workaround  String?
   nextAction  String?
   createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@index([schoolId, status])
   @@index([schoolId, severity])
