@@ -1,6 +1,6 @@
 import dns from "node:dns/promises";
 import net from "node:net";
-import { isProdLike } from "./isProdLike";
+import { isPubliclyDeployed } from "./isProdLike";
 
 export const GOOGLE_CLASSROOM_AUTH_ORIGIN = "https://accounts.google.com";
 export const GOOGLE_CLASSROOM_TOKEN_ORIGIN = "https://oauth2.googleapis.com";
@@ -8,7 +8,7 @@ export const GOOGLE_CLASSROOM_API_ORIGIN = "https://classroom.googleapis.com";
 
 function canonicalOrigin(value: string, allowHttpTestOrigin = false): string {
   const url = new URL(value.trim());
-  if (url.protocol !== "https:" && !(allowHttpTestOrigin && !isProdLike() && process.env.LMS_ALLOW_TEST_ORIGINS === "true")) {
+  if (url.protocol !== "https:" && !(allowHttpTestOrigin && !isPubliclyDeployed() && process.env.LMS_ALLOW_TEST_ORIGINS === "true")) {
     throw new Error("LMS destinations must use HTTPS.");
   }
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
@@ -29,7 +29,7 @@ function configuredOrigins(name: string, allowHttpTestOrigin = false): Set<strin
 
 export function getApprovedCanvasOrigins(): Set<string> {
   const origins = configuredOrigins("CANVAS_ALLOWED_ORIGINS");
-  if (!isProdLike() && process.env.LMS_ALLOW_TEST_ORIGINS === "true") {
+  if (!isPubliclyDeployed() && process.env.LMS_ALLOW_TEST_ORIGINS === "true") {
     for (const origin of configuredOrigins("LMS_TEST_ALLOWED_ORIGINS", true)) origins.add(origin);
   }
   return origins;
@@ -41,7 +41,7 @@ export function getAllowedGoogleOrigins(): Set<string> {
     GOOGLE_CLASSROOM_TOKEN_ORIGIN,
     GOOGLE_CLASSROOM_API_ORIGIN,
   ]);
-  if (!isProdLike() && process.env.LMS_ALLOW_TEST_ORIGINS === "true") {
+  if (!isPubliclyDeployed() && process.env.LMS_ALLOW_TEST_ORIGINS === "true") {
     for (const origin of configuredOrigins("LMS_TEST_ALLOWED_ORIGINS", true)) origins.add(origin);
   }
   return origins;
@@ -93,7 +93,7 @@ export function isPrivateOrReservedIp(address: string): boolean {
 
 function permitsPrivateTestOrigin(origin: string): boolean {
   return (
-    !isProdLike() &&
+    !isPubliclyDeployed() &&
     process.env.LMS_ALLOW_TEST_ORIGINS === "true" &&
     configuredOrigins("LMS_TEST_ALLOWED_ORIGINS", true).has(origin)
   );

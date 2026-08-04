@@ -32,7 +32,7 @@ import {
   CLIENT_URL,
   getCapturedMailinatorInbox,
 } from "../services/email";
-import { isProdLike } from "../lib/isProdLike";
+import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
 
 const ENABLE_IMPERSONATION = process.env.ENABLE_IMPERSONATION === "true";
 
@@ -339,7 +339,7 @@ async function safeBcryptCompare(plain: string, hash: string): Promise<boolean> 
 }
 
 
-if (!isProdLike()) {
+if (!isPubliclyDeployed()) {
   router.get("/__test-email", publicAuthLimiter, (req: Request, res: Response) => {
     const inbox = String(req.query.inbox || "").trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(inbox)) {
@@ -1140,7 +1140,7 @@ router.post("/set-graduation-goal", authenticate, async (req: Request, res: Resp
   }
 });
 
-if (!isProdLike() && ENABLE_IMPERSONATION) {
+if (!isPubliclyDeployed() && ENABLE_IMPERSONATION) {
   // POST /api/auth/dev/bypass-email-verification — DEV ONLY — mark current user's email as verified
   router.post("/dev/bypass-email-verification", authenticate, async (req: Request, res: Response) => {
     try {
@@ -1238,7 +1238,7 @@ if (!isProdLike() && ENABLE_IMPERSONATION) {
       res.status(500).json({ error: "Internal server error" });
     }
   });
-} else if (!isProdLike() && !ENABLE_IMPERSONATION) {
+} else if (!isPubliclyDeployed() && !ENABLE_IMPERSONATION) {
   console.warn("[Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.");
 }
 

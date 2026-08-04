@@ -22,3 +22,18 @@ export function isProdLike(): boolean {
     process.env.VERCEL_ENV === "production"
   );
 }
+
+/**
+ * True whenever this process is reachable at a real, non-local URL — a
+ * production deployment OR a Vercel preview deployment. Preview
+ * deployments are NOT production-like by isProdLike()'s definition (mock
+ * data, QA bypasses, etc. are intentionally allowed there), but they ARE
+ * externally reachable, often at a guessable/shared URL. Use this instead
+ * of isProdLike() to gate anything that must be impossible to reach from
+ * outside a developer's own machine — dev-only auth bypasses,
+ * impersonation, and similar — where "preview" must be treated the same
+ * as "production", not the same as "local dev".
+ */
+export function isPubliclyDeployed(): boolean {
+  return isProdLike() || process.env.VERCEL_ENV === "preview";
+}

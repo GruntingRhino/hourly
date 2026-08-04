@@ -1,4 +1,4 @@
-import { isProdLike } from "./isProdLike";
+import { isPubliclyDeployed } from "./isProdLike";
 
 function parseEmailAllowlist(raw: string | undefined): Set<string> {
   return new Set(
@@ -17,8 +17,12 @@ export function isInternalAdminUser(input: { email?: string | null; role?: strin
   const email = (input.email || "").trim().toLowerCase();
   if (email && INTERNAL_ADMIN_EMAILS.has(email)) return true;
 
-  // Local fallback so the internal queue is testable without production allowlist config.
-  if (!isProdLike() && input.role === "SCHOOL_ADMIN") return true;
+  // Local-only fallback so the internal queue is testable without allowlist config.
+  // isPubliclyDeployed (not isProdLike) so this never activates on a Vercel preview
+  // deployment — every SCHOOL_ADMIN account would otherwise silently gain internal-
+  // operator privileges (impersonation review-queue access, billing/internal routes)
+  // on any preview URL, not just genuinely local dev.
+  if (!isPubliclyDeployed() && input.role === "SCHOOL_ADMIN") return true;
 
   return false;
 }

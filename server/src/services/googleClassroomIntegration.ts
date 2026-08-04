@@ -19,7 +19,7 @@ import {
   normalizeSelectedExternalCourseIds,
 } from "../lib/lmsOutboundSecurity";
 import { getGoogleClassroomMockDataset, type GoogleClassroomMockDataset, type GoogleClassroomMockScenario } from "./googleClassroomMock";
-import { isProdLike } from "../lib/isProdLike";
+import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
 
 const GOOGLE_CLASSROOM_ENABLE_MOCK = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true" || !isProdLike();
 const GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS = Number(process.env.GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS || 15000);
@@ -601,7 +601,7 @@ async function markConnectionError(connectionId: string, actorId: string | null,
 
 async function normalizeGoogleTestOrigin(testOrigin?: string | null): Promise<string | null> {
   if (!testOrigin?.trim()) return null;
-  if (isProdLike()) throw new Error("Custom Google Classroom OAuth destinations are not allowed.");
+  if (isPubliclyDeployed()) throw new Error("Custom Google Classroom OAuth destinations are not allowed.");
   const parsed = new URL(testOrigin);
   await assertPublicApprovedUrl(parsed, getAllowedGoogleOrigins(), parsed.origin);
   return parsed.origin;
