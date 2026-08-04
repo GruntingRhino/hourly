@@ -232,16 +232,22 @@ model School {
   partnerRequestsReceived SchoolPartnerRequest[]       @relation("PartnerRequestTo")
 }
 
+enum SchoolPartnerRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model SchoolPartnerRequest {
-  id           String    @id @default(cuid())
+  id           String                     @id @default(cuid())
   fromSchoolId String
   toSchoolId   String
-  fromSchool   School    @relation("PartnerRequestFrom", fields: [fromSchoolId], references: [id])
-  toSchool     School    @relation("PartnerRequestTo", fields: [toSchoolId], references: [id])
-  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  fromSchool   School                     @relation("PartnerRequestFrom", fields: [fromSchoolId], references: [id])
+  toSchool     School                     @relation("PartnerRequestTo", fields: [toSchoolId], references: [id])
+  status       SchoolPartnerRequestStatus @default(PENDING)
   message      String?
   respondedAt  DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime                   @default(now())
 
   @@unique([fromSchoolId, toSchoolId])
 }
@@ -588,17 +594,24 @@ model BeneficiaryInvitation {
   createdAt     DateTime    @default(now())
 }
 
+enum BeneficiaryAdminInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 model BeneficiaryAdminInvitation {
-  id            String      @id @default(cuid())
+  id            String                           @id @default(cuid())
   beneficiaryId String
-  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  beneficiary   Beneficiary                      @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
   email         String
-  token         String      @unique
+  token         String                           @unique
   expiresAt     DateTime
-  status        String      @default("PENDING") // PENDING, ACCEPTED, REVOKED, EXPIRED
+  status        BeneficiaryAdminInvitationStatus @default(PENDING)
   invitedById   String
   acceptedAt    DateTime?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime                         @default(now())
 
   @@index([beneficiaryId, status])
   @@index([email, status])
@@ -949,12 +962,18 @@ model Signup {
 
 // ─── Saved/Bookmarked Opportunities ─────────────────────────────
 
+enum SavedOpportunityStatus {
+  SAVED
+  SKIPPED
+  DISCARDED
+}
+
 model SavedOpportunity {
-  id            String   @id @default(cuid())
+  id            String                 @id @default(cuid())
   userId        String
   opportunityId String
-  status        String   @default("SAVED") // SAVED, SKIPPED, DISCARDED
-  createdAt     DateTime @default(now())
+  status        SavedOpportunityStatus @default(SAVED)
+  createdAt     DateTime               @default(now())
 
   user        User        @relation(fields: [userId], references: [id])
   opportunity Opportunity @relation(fields: [opportunityId], references: [id])

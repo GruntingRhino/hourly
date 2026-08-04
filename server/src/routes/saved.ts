@@ -1,25 +1,36 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
+const savedStatusEnum = z.enum(["SAVED", "SKIPPED", "DISCARDED"]);
+
+const saveOpportunitySchema = z.object({
+  opportunityId: z.string().trim().min(1),
+  status: savedStatusEnum.optional(),
+});
+
 // POST /api/saved — save/skip/discard opportunity
 router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
-    const { opportunityId, status } = req.body; // SAVED, SKIPPED, DISCARDED
-    if (!opportunityId) return res.status(400).json({ error: "opportunityId is required" });
+    const parsed = saveOpportunitySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "opportunityId is required and status must be SAVED, SKIPPED, or DISCARDED" });
+    }
+    const { opportunityId, status } = parsed.data;
 
     const saved = await prisma.savedOpportunity.upsert({
       where: {
         userId_opportunityId: { userId: req.user!.userId, opportunityId },
       },
-      update: { status: status || "SAVED" },
+      update: { status: status ?? "SAVED" },
       create: {
         userId: req.user!.userId,
         opportunityId,
-        status: status || "SAVED",
+        status: status ?? "SAVED",
       },
     });
     res.json(saved);
@@ -32,9 +43,12 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
 // GET /api/saved — get saved opportunities
 router.get("/", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
+    const statusFilter = savedStatusEnum.optional().safeParse(req.query.status);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be SAVED, SKIPPED, or DISCARDED" });
+    }
     const where: any = { userId: req.user!.userId };
-    if (status) where.status = status;
+    if (statusFilter.data) where.status = statusFilter.data;
 
     const saved = await prisma.savedOpportunity.findMany({
       where,
