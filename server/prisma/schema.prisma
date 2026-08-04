@@ -318,14 +318,21 @@ model Cohort {
   @@index([schoolId])
 }
 
+enum StudentCohortMembershipSource {
+  MANUAL
+  INVITATION
+  CANVAS
+  GOOGLE_CLASSROOM
+}
+
 model StudentCohortMembership {
-  id        String   @id @default(cuid())
+  id        String                        @id @default(cuid())
   studentId String
   cohortId  String
-  source    String   @default("MANUAL") // MANUAL, INVITATION, CANVAS
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  source    StudentCohortMembershipSource @default(MANUAL)
+  isActive  Boolean                       @default(true)
+  createdAt DateTime                      @default(now())
+  updatedAt DateTime                      @updatedAt
 
   student User   @relation(fields: [studentId], references: [id])
   cohort  Cohort @relation(fields: [cohortId], references: [id])
