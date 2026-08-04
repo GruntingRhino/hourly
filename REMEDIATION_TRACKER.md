@@ -7,7 +7,7 @@ is the source of truth for **what's done vs. still open** — update it every
 time a session finishes a chunk of this work instead of re-deriving status
 from scratch.
 
-**Last updated:** 2026-08-04, commit `6585c30`.
+**Last updated:** 2026-08-04, commit `d585b5b`.
 
 **Session boundary note:** as of this commit, every issue independently
 identified and verified across `security_findings.md` (Findings 1–10) and
@@ -129,7 +129,7 @@ a fresh multi-file project, not a bug fix:
 | §12 Reports/metrics failure states | Reports must return `PARTIAL`/`UNAVAILABLE` rather than misleading zeros on partial data-source failure | 🟡 Core hours/progress data layer now propagates `dataState`/`failedSources` (see additional-issues table above), wired into `GET /api/reports/student`, `GET /api/reports/school`, and the per-student breakdown. Not yet audited: other report/export routes outside the hours-calculation path (CSV exports, org/beneficiary reports, billing views) |
 | §13 Email/messaging | Centralized HTML escaping (❓ partially — `security_findings.md` calls out unsanitized custom email HTML as a P2 item), transactional outbox (⬜ no outbox model found), bulk-messaging quotas (❓ not assessed) |
 | §14 Files/uploads | Object storage migration, quotas, malware scanning, streaming, safe `Content-Disposition` | ❓ Not assessed — `signatureStorage.test.ts`/`signatureUploadArchitecture.test.ts`/`uploadAuthorizationArchitecture.test.ts` suggest *some* upload-auth hardening exists, but object-storage migration and malware scanning look unaddressed |
-| §15 Client/server auth consistency | Single API client everywhere; no ad hoc `fetch` + manual token reads; HttpOnly cookie migration | ❓ Not assessed — bearer-token model still in use per `AuthProvider.tsx` |
+| §15 Client/server auth consistency | Single API client everywhere; no ad hoc `fetch` + manual token reads; HttpOnly cookie migration | 🟡 Fixed the 3 concrete bugs the goal names almost verbatim (commit `d585b5b`): `SchoolBilling.tsx` read the wrong localStorage key entirely (`"token"` instead of `"goodhours_token"`) so procurement-document downloads sent `Authorization: Bearer null` on every click — completely non-functional, now fixed via the existing `api.download()` helper. `CreateOpportunity.tsx`'s edit path redirected immediately regardless of write success (`keepalive` fetch + empty `.catch()`) — now awaits `api.put()` and only redirects on confirmed success. `OpportunityDetail.tsx` read the token directly from `localStorage` instead of the canonical `getAuthToken()`, breaking for session-only users — now uses the accessor. Full repo grep found no other ad hoc `fetch`/raw-localStorage-token patterns outside of legitimately-public unauthenticated flows (email verification, cancellation links). **Not done:** HttpOnly/Secure/SameSite cookie migration — bearer-token-in-storage model is still in use throughout `AuthProvider.tsx`; that's a much larger architectural change than a bug fix and wasn't attempted |
 | §16 Geocoding/directory search | Rate limits, TTL cache, pagination bounds, private-network blocking on geocoding endpoint | ✅ §16.1 done (auth required, bounded TTL cache, outbound timeout — see additional-issues table above; SSRF/private-network blocking doesn't apply, the geocode destination is a hardcoded constant, not caller-controlled). §16.2 partial: nearby-directory pagination is now validated (commit `3cbf01a`) but page size is still capped at 10000, not the goal's recommended 50–100 — left as-is because the client relies on getting all results in one page and has no pagination UI; changing the default would be a product/UX decision, not a bug fix. §16.3 not applicable — no background/state-wide geocoding enrichment job exists in the codebase to fix |
 | §17 Schema/DB integrity | Convert free-form status strings to enums, floating-point hours → integer minutes/Decimal, add constraints/indexes | ❓ Not assessed — spot check shows few `enum` blocks in schema beyond integration types; status fields likely still `String` |
 | §18 Legacy architecture consolidation | Single canonical model for grouping/opportunities/signups/attendance/hours — freeze/remove legacy dual implementations | ❓ Not assessed |
@@ -142,6 +142,7 @@ a fresh multi-file project, not a bug fix:
 - `cd server && npx tsc --noEmit` → clean
 - `cd client && npx tsc --noEmit` → clean
 - `cd server && npm test` → **275 pass / 0 fail / 1 skipped** (276 total). The 1 skip is infra-conditional (`RATE_LIMIT_TEST_DATABASE_URL` not set in this run) — verified separately against a real disposable Postgres DB with 0 skipped/0 failed
+- `cd client && npx eslint . --max-warnings 0` on the 3 files touched for §15 → clean (no project-wide client test runner exists — build/lint/typecheck are the available verification surface)
 - `cd client && npx vite build` → succeeds
 - `cd server && npx tsc` (full build) → succeeds
 - `.env.example` / `server/.env.example` → placeholders only, no real secrets
