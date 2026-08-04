@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
@@ -1214,7 +1215,7 @@ router.get("/attachments/:attachmentId", authenticate, async (req: Request, res:
       if (!approval) return res.status(403).json({ error: "Not authorized to access this file" });
     }
 
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(attachment.originalName)}"`);
+    res.setHeader("Content-Disposition", contentDisposition(attachment.originalName, { type: "inline" }));
     res.setHeader("Content-Type", attachment.mimeType);
     if (attachment.contentBytes) {
       res.send(Buffer.from(attachment.contentBytes));

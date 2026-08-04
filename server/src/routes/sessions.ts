@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { create as contentDisposition } from "content-disposition";
 import multer from "multer";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
@@ -346,9 +347,8 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
     }
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
 
-    const safeName = (session.signatureFileName ?? "signature").replace(/[\r\n"]/g, "_");
     res.setHeader("Content-Type", session.signatureFileMimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.setHeader("Content-Disposition", contentDisposition(session.signatureFileName ?? "signature"));
     res.send(Buffer.from(session.signatureFileBytes));
   } catch (err) {
     console.error("Signature download error:", err);

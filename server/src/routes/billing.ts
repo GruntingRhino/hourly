@@ -2,6 +2,7 @@ import fs from "fs";
 import crypto from "crypto";
 import multer from "multer";
 import { Router, Request, Response, NextFunction } from "express";
+import { create as contentDisposition } from "content-disposition";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
@@ -849,7 +850,7 @@ router.get("/invoice-requests/:requestId/artifacts/:artifactId", authenticate, a
 
     await requireBeneficiaryAdminOrInternalAdmin(req.user!.userId, artifact.invoiceRequest.beneficiaryId);
 
-    res.setHeader("Content-Disposition", `attachment; filename=\"${artifact.originalName}\"`);
+    res.setHeader("Content-Disposition", contentDisposition(artifact.originalName));
     res.setHeader("Content-Type", artifact.mimeType);
     if (artifact.contentBytes) {
       res.send(Buffer.from(artifact.contentBytes));

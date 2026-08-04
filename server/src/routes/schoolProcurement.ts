@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { create as contentDisposition } from "content-disposition";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
@@ -286,7 +287,7 @@ router.get("/:id/documents/:docId", authenticate, requireRole("SCHOOL_ADMIN"), a
     });
     if (!doc) return res.status(404).json({ error: "Document not found" });
 
-    res.setHeader("Content-Disposition", `attachment; filename="${doc.originalName}"`);
+    res.setHeader("Content-Disposition", contentDisposition(doc.originalName));
     res.setHeader("Content-Type", doc.mimeType);
     if (doc.contentBytes) {
       res.send(Buffer.from(doc.contentBytes));

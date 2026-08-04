@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import { csvCell } from "../lib/csv";
@@ -506,7 +507,7 @@ router.get("/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
     const filename = scope.isSchoolAdmin ? "school-cohorts.csv" : "assigned-cohorts.csv";
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDisposition(filename));
     res.send(csv);
   } catch (err) {
     console.error("Cohort export error:", err);

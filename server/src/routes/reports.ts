@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import prisma from "../lib/prisma";
 import { buildCsv } from "../lib/csv";
 import { authenticate } from "../middleware/auth";
@@ -489,7 +490,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
       ? buildCsv(rows)
       : '"Date","Opportunity","Organization","Hours","Status"';
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDisposition(filename));
     res.send(csv);
   } catch (err) {
     console.error("CSV export error:", err);

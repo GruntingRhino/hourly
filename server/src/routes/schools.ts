@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
@@ -2190,7 +2191,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     const label = (cohortLabel ?? school.name).replace(/[^a-z0-9]/gi, "_");
     const csv = buildCsv(rows);
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${label}-students.csv"`);
+    res.setHeader("Content-Disposition", contentDisposition(`${label}-students.csv`));
     res.send(csv);
   } catch (err) {
     console.error("School export error:", err);
@@ -2490,7 +2491,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       }
       const csv = buildCsv(rows);
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="at-risk-students.csv"`);
+      res.setHeader("Content-Disposition", contentDisposition("at-risk-students.csv"));
       return res.send(csv);
     }
 
