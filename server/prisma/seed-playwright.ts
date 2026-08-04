@@ -23,6 +23,7 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { schoolCreatedBeneficiaryPlan } from "../src/lib/schoolBeneficiaryPolicy";
+import { isProdLike } from "../src/lib/isProdLike";
 
 const prisma = new PrismaClient();
 
@@ -31,6 +32,17 @@ const SCHOOL_ADMIN_A_EMAIL = "abhay.sivaram+1@gmail.com";
 const LEGACY_SCHOOL_ADMIN_A_EMAIL = "school-admin@test.goodhours.app";
 
 async function main() {
+  // Non-destructive (upserts by email) so this doesn't need the same
+  // multi-condition guard as seed.ts's TRUNCATE — but it still creates
+  // privileged accounts with a fixed, publicly-visible password, so it must
+  // never run against anything production-like.
+  if (isProdLike()) {
+    throw new Error(
+      "[seed-playwright] Refusing to run: this looks like a production-like environment " +
+      "(APP_ENV/NODE_ENV/VERCEL_ENV). This script creates accounts with a fixed, known password."
+    );
+  }
+
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
 
   const existingAdminA = await prisma.user.findUnique({

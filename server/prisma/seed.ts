@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { schoolCreatedBeneficiaryPlan } from "../src/lib/schoolBeneficiaryPolicy";
+import { assertSafeToRunDestructiveSeed } from "../src/lib/destructiveSeedGuard";
 
 const prisma = new PrismaClient();
 
@@ -9,7 +10,14 @@ function generateInviteCode(): string {
   return crypto.randomBytes(4).toString("hex");
 }
 
+const SEED_PASSWORD = process.env.SEED_PASSWORD;
+if (!SEED_PASSWORD) {
+  throw new Error("[seed] SEED_PASSWORD env var is required — set it to the password test accounts should use.");
+}
+
 async function main() {
+  assertSafeToRunDestructiveSeed();
+
   const now = new Date();
   const plusDays = (days: number) => new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
@@ -32,7 +40,7 @@ async function main() {
   const schoolAdmin = await prisma.user.create({
     data: {
       email: "admin@lincoln.edu",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "Principal Johnson",
       role: "SCHOOL_ADMIN",
       emailVerified: true,
@@ -133,7 +141,7 @@ async function main() {
   const ben1User = await prisma.user.create({
     data: {
       email: "volunteer@greenearth.org",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "Sarah Mitchell",
       role: "BENEFICIARY_ADMIN",
       beneficiaryId: ben1.id,
@@ -144,7 +152,7 @@ async function main() {
   const ben2User = await prisma.user.create({
     data: {
       email: "staff@library.org",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "Mike Chen",
       role: "BENEFICIARY_ADMIN",
       beneficiaryId: ben2.id,
@@ -329,7 +337,7 @@ async function main() {
   const student1 = await prisma.user.create({
     data: {
       email: "john@student.edu",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "John Collander",
       role: "STUDENT",
       grade: "11th",
@@ -342,7 +350,7 @@ async function main() {
   const student2 = await prisma.user.create({
     data: {
       email: "jane@student.edu",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "Jane Davis",
       role: "STUDENT",
       grade: "12th",
@@ -355,7 +363,7 @@ async function main() {
   const student3 = await prisma.user.create({
     data: {
       email: "alex@student.edu",
-      passwordHash: await bcrypt.hash("password123", 12),
+      passwordHash: await bcrypt.hash(SEED_PASSWORD, 12),
       name: "Alex Rivera",
       role: "STUDENT",
       grade: "10th",
@@ -634,13 +642,13 @@ async function main() {
   });
 
   console.log("Seed complete!");
-  console.log("\nTest accounts:");
-  console.log("  Student:            john@student.edu / password123");
-  console.log("  Student:            jane@student.edu / password123");
-  console.log("  Student:            alex@student.edu / password123");
-  console.log("  Beneficiary Admin:  volunteer@greenearth.org / password123");
-  console.log("  Beneficiary Admin:  staff@library.org / password123");
-  console.log("  School Admin:       admin@lincoln.edu / password123");
+  console.log("\nTest accounts (password: value of SEED_PASSWORD):");
+  console.log("  Student:            john@student.edu");
+  console.log("  Student:            jane@student.edu");
+  console.log("  Student:            alex@student.edu");
+  console.log("  Beneficiary Admin:  volunteer@greenearth.org");
+  console.log("  Beneficiary Admin:  staff@library.org");
+  console.log("  School Admin:       admin@lincoln.edu");
   console.log(`\nClassroom invite codes:`);
   console.log(`  General: ${generalClassroom.inviteCode}`);
   console.log(`  AP Community Service: ${classroom2.inviteCode}`);
