@@ -3422,32 +3422,72 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: "records array is required" });
     }
+    const MAX_BATCH_SIZE = 200;
+    if (records.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({ error: `records cannot exceed ${MAX_BATCH_SIZE} per request` });
+    }
 
     const VALID = new Set(["ATTENDED", "NO_SHOW"]);
     const invalid = records.find((r) => !r.signupId || !VALID.has(r.attendance));
     if (invalid) {
       return res.status(400).json({ error: "Each record must have signupId and attendance (ATTENDED | NO_SHOW)" });
     }
-
     const signupIds = records.map((r) => r.signupId);
+    if (new Set(signupIds).size !== signupIds.length) {
+      return res.status(400).json({ error: "records contains duplicate signupId values" });
+    }
+
     const existing = await prisma.beneficiarySignup.findMany({
       where: { id: { in: signupIds }, slot: { opportunity: { id: req.params.oppId } } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    const validIds = new Set(existing.map((s) => s.id));
+    const existingById = new Map(existing.map((s) => [s.id, s]));
 
-    const updates = await Promise.all(
-      records
-        .filter((r) => validIds.has(r.signupId))
-        .map((r) =>
-          prisma.beneficiarySignup.update({
-            where: { id: r.signupId },
-            data: { attendance: r.attendance },
-          })
-        )
-    );
+    const applicable = records.filter((r) => {
+      const current = existingById.get(r.signupId);
+      // Cancelled/waitlisted signups never had confirmed attendance to
+      // record, and re-recording an already-recorded no-show is a no-op —
+      // skip rather than silently overwrite.
+      return current && current.status !== "CANCELLED" && current.status !== "WAITLISTED";
+    });
 
-    res.json({ updated: updates.length });
+    const updated = await runSerializableTransaction(async (tx) => {
+      const results = [];
+      for (const record of applicable) {
+        const current = existingById.get(record.signupId)!;
+        // Keep `status` in sync with `attendance` instead of letting them
+        // drift: a signup marked NO_SHOW here must actually carry
+        // status "NO_SHOW" so the hour-approval route's no-show override
+        // requirement applies to it too, not just no-shows recorded
+        // through the single-signup /no-show endpoint.
+        const result = await tx.beneficiarySignup.update({
+          where: { id: record.signupId },
+          data: {
+            attendance: record.attendance,
+            ...(record.attendance === "NO_SHOW" && current.status !== "NO_SHOW"
+              ? { status: "NO_SHOW", verificationStatus: "PENDING", totalHours: null, verifiedBy: null, verifiedAt: null }
+              : {}),
+          },
+        });
+        results.push(result);
+      }
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: "ATTENDANCE_BATCH_RECORDED",
+          actorId: req.user!.userId,
+          signupId: applicable[0]?.signupId ?? null,
+          details: JSON.stringify({
+            opportunityId: req.params.oppId,
+            recordCount: applicable.length,
+            attendedCount: applicable.filter((r) => r.attendance === "ATTENDED").length,
+            noShowCount: applicable.filter((r) => r.attendance === "NO_SHOW").length,
+          }),
+        },
+      });
+      return results;
+    });
+
+    res.json({ updated: updated.length });
   } catch (err) {
     console.error("Attendance record error:", err);
     res.status(500).json({ error: "Internal server error" });
