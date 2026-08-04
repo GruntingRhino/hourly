@@ -113,6 +113,15 @@ model User {
   ownedOrganizationInvoiceRequests     OrganizationInvoiceRequest[]  @relation("OrganizationInvoiceRequestOwner")
   organizationInvoiceAuditLogs         OrganizationInvoiceAuditLog[] @relation("OrganizationInvoiceAuditActor")
   uploadedOrganizationInvoiceArtifacts OrganizationInvoiceArtifact[] @relation("OrganizationInvoiceArtifactUploader")
+
+  // Foreign-key columns filtered on constantly for tenant/relationship scoping
+  // (school-scoped student/staff lookups, cohort membership, etc.) had no
+  // index — every such query was a sequential scan on User.
+  @@index([schoolId])
+  @@index([cohortId])
+  @@index([classroomId])
+  @@index([beneficiaryId])
+  @@index([organizationId])
 }
 
 model SchoolRegistrationIntent {
@@ -283,6 +292,8 @@ model Cohort {
   memberships        StudentCohortMembership[]
   invitations        StudentInvitation[]
   teacherAssignments CohortTeacherAssignment[]
+
+  @@index([schoolId])
 }
 
 model StudentCohortMembership {
@@ -641,6 +652,8 @@ model BeneficiaryOpportunity {
 
   timeSlots   BeneficiaryTimeSlot[]
   attachments BeneficiaryOpportunityAttachment[]
+
+  @@index([beneficiaryId])
 }
 
 // ─── Beneficiary Opportunity Attachments ──────────────────────────
@@ -677,6 +690,7 @@ model BeneficiaryTimeSlot {
   signups BeneficiarySignup[]
 
   @@index([date])
+  @@index([opportunityId])
 }
 
 // ─── Beneficiary Signups (new model) ────────────────────────────
