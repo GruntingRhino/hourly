@@ -178,9 +178,11 @@ const geocodeLimiter = createHybridRateLimit({
   maxPerUser: 60,
 });
 
-// Geocode endpoint — proxies Nominatim so the client never touches the external API directly
+// Geocode endpoint — proxies Nominatim so the client never touches the external API directly.
+// Authenticated: this was previously reachable by anonymous callers, turning it into an open
+// proxy that could burn the app's Nominatim rate-limit budget for every authenticated caller.
 // GET /api/geocode?address=123+Main+St,+Springfield,+IL
-app.get("/api/geocode", geocodeLimiter, async (req, res) => {
+app.get("/api/geocode", authenticate, geocodeLimiter, async (req, res) => {
   const address =
     typeof req.query.address === "string" ? req.query.address.trim() : "";
   if (!address) {
