@@ -1132,13 +1132,21 @@ model InterventionRecipient {
   @@index([studentId, createdAt])
 }
 
+enum InterventionCaseStatus {
+  OPEN
+  WAITING_ON_STUDENT
+  WAITING_ON_SCHOOL
+  MONITORING
+  RESOLVED
+}
+
 model InterventionCase {
-  id                  String    @id @default(cuid())
+  id                  String                 @id @default(cuid())
   schoolId            String
   studentId           String
   ownerId             String?
-  status              String    @default("OPEN")
-  priority            String    @default("MEDIUM")
+  status              InterventionCaseStatus @default(OPEN)
+  priority            String                 @default("MEDIUM")
   reason              String?
   summary             String?
   nextStepForStudent  String?
@@ -1149,8 +1157,8 @@ model InterventionCase {
   lastContactedAt     DateTime?
   lastStudentActionAt DateTime?
   resolvedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   school  School @relation(fields: [schoolId], references: [id])
   student User   @relation("InterventionStudentCase", fields: [studentId], references: [id])

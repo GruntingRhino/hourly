@@ -492,7 +492,7 @@ router.get("/interventions/cases", authenticate, requireRole("SCHOOL_ADMIN", "TE
   try {
     const query = z.object({
       studentId: z.string().optional(),
-      status: z.string().optional(),
+      status: z.enum(["OPEN", "WAITING_ON_STUDENT", "WAITING_ON_SCHOOL", "MONITORING", "RESOLVED"]).optional(),
       limit: z.coerce.number().int().min(1).max(100).optional(),
     }).parse(req.query);
 
