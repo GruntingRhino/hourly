@@ -1111,16 +1111,34 @@ model SavedOpportunity {
 
 // ─── Service Sessions (attendance records) ──────────────────────
 
+enum ServiceSessionStatus {
+  COMMITTED
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  PENDING_CHECKIN
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  WAITLISTED
+}
+
+enum ServiceSessionVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model ServiceSession {
-  id                 String    @id @default(cuid())
+  id                 String                           @id @default(cuid())
   userId             String
   schoolId           String?
   opportunityId      String
   checkInTime        DateTime?
   checkOutTime       DateTime?
   totalHours         Float?
-  status             String    @default("COMMITTED") // COMMITTED, PENDING_VERIFICATION, VERIFIED, REJECTED, PENDING_CHECKIN, CHECKED_IN, CHECKED_OUT
-  verificationStatus String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  status             ServiceSessionStatus             @default(COMMITTED)
+  verificationStatus ServiceSessionVerificationStatus @default(PENDING)
   verifiedBy         String?
   verifiedAt         DateTime?
   rejectionReason    String?
