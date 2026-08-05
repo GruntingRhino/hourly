@@ -447,32 +447,6 @@ async function googleClassroomFetch(url: string, init: RequestInit = {}, expecte
   }
 }
 
-async function listGoogleClassroomPages<T>(initialUrl: string, accessToken: string, collectionKey: string): Promise<T[]> {
-  const items: T[] = [];
-  let nextUrl = new URL(initialUrl);
-  const expectedOrigin = nextUrl.origin;
-
-  while (nextUrl) {
-    const response = await googleClassroomFetch(nextUrl.toString(), {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }, expectedOrigin);
-    if (!response.ok) {
-      const body = await response.json().catch(async () => ({ error: await response.text() }));
-      throw new Error(`Google Classroom API request failed (${response.status}): ${JSON.stringify(body).slice(0, 300)}`);
-    }
-    const page = await response.json() as GoogleClassroomApiPage<T>;
-    const values = page[collectionKey];
-    if (Array.isArray(values)) items.push(...values as T[]);
-    const nextPageToken = typeof page.nextPageToken === "string" ? page.nextPageToken : null;
-    if (!nextPageToken) break;
-    nextUrl.searchParams.set("pageToken", nextPageToken);
-  }
-
-  return items;
-}
-
 async function listGoogleClassroomPagesForConnection<T>(connection: any, initialUrl: string, collectionKey: string): Promise<T[]> {
   const items: T[] = [];
   let nextUrl = new URL(initialUrl);

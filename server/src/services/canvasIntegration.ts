@@ -440,29 +440,6 @@ async function canvasFetch(url: string, init: RequestInit = {}, expectedOrigin?:
   }
 }
 
-async function listCanvasPages<T>(initialUrl: string, accessToken: string): Promise<T[]> {
-  const items: T[] = [];
-  let nextUrl: string | null = initialUrl;
-  const expectedOrigin = new URL(initialUrl).origin;
-
-  while (nextUrl) {
-    const response = await canvasFetch(nextUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }, expectedOrigin);
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Canvas API request failed (${response.status}): ${body.slice(0, 300)}`);
-    }
-    const page = await response.json() as T[];
-    items.push(...page);
-    nextUrl = parseCanvasLinkHeader(response.headers.get("link"));
-  }
-
-  return items;
-}
-
 async function listCanvasPagesForConnection<T>(connection: any, initialUrl: string): Promise<T[]> {
   const items: T[] = [];
   let nextUrl: string | null = initialUrl;
