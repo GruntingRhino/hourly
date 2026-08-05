@@ -309,6 +309,18 @@ const sendMessageLimiter = createHybridRateLimit({
   maxPerUser: 20,
 });
 
+// 5 bulk sends per staff member per hour — each call can message an entire
+// school's student body (ALL_STUDENTS has no recipient cap), so this is
+// deliberately far stricter than the single-message limiter above; a
+// compromised or malicious staff account otherwise had no bound on how many
+// times it could blast the whole school.
+const bulkMessageLimiter = createHybridRateLimit({
+  namespace: "msg-bulk-send",
+  windowMs: 60 * 60 * 1000,
+  maxPerIp: 10,
+  maxPerUser: 5,
+});
+
 // GET /api/messages — get user's messages
 router.get("/", authenticate, async (req: Request, res: Response) => {
   try {
@@ -806,7 +818,7 @@ router.get("/interventions/history", authenticate, requireRole("SCHOOL_ADMIN", "
 });
 
 // POST /api/messages/bulk — school-wide announcements and mass reminders
-router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
+router.post("/bulk", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), bulkMessageLimiter, async (req: Request, res: Response) => {
   try {
     const body = z.object({
       audience: z.enum(["ALL_STUDENTS", "AT_RISK_STUDENTS", "COHORT_STUDENTS"]).optional(),
