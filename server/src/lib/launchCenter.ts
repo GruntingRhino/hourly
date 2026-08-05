@@ -443,6 +443,7 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
     prisma.user.findMany({
       where: {
         role: "STUDENT",
+        isTestAccount: false,
         OR: [
           { classroom: { schoolId } },
           { cohort: { schoolId } },

@@ -289,6 +289,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: school.id } },
             { cohort: { schoolId: school.id } },

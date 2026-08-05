@@ -90,6 +90,7 @@ async function getPendingReviewCount(schoolId: string): Promise<number> {
       where: {
         role: "STUDENT",
         schoolId,
+        isTestAccount: false,
       },
       select: { id: true },
     }).then((rows) =>
@@ -128,6 +129,7 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
     where: {
       role: "STUDENT",
       schoolId,
+      isTestAccount: false,
     },
     select: {
       id: true,

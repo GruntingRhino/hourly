@@ -1074,6 +1074,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: req.params.id } },
             { cohort: { schoolId: req.params.id } },
@@ -1572,6 +1573,7 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), a
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: req.params.id } },
             { cohort: { schoolId: req.params.id } },
