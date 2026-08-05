@@ -181,9 +181,25 @@ Full detail lives in this session's history; summary:
   `docs/qa/MANUAL_FOUNDER_CHECKLIST.md`, `docs/qa/TEST_PLAN.md`,
   `docs/qa/ROLE_PERMISSION_MATRIX.md`, `docs/qa/STRIPE_TEST_REPORT.md`,
   `docs/qa/DEPENDENCY_ADVISORY_EXCEPTIONS.md`,
-  `docs/qa/BACKUP_RESTORE_REPORT.md`, `docs/qa/REPOSITORY_AUDIT.md`,
-  `docs/qa/EDGE_CASE_REPORT.md` (superseded by FINAL_RELEASE_REPORT fixes
-  above).
+  `docs/qa/BACKUP_RESTORE_REPORT.md`, `docs/qa/REPOSITORY_AUDIT.md`.
+- **`docs/qa/EDGE_CASE_REPORT.md`**: previously marked "superseded by
+  FINAL_RELEASE_REPORT fixes" without individually re-checking each of its
+  5 numbered defects — **actually re-verified this session, one by one,
+  against current code**: DEFECT-001 (whitespace-only title) — fixed
+  (`z.string().trim().min(1)`). DEFECT-004 (race condition → 500 instead of
+  409/503) — fixed (`P2002`/`P2034` handled explicitly). DEFECT-005 (HTML
+  404 instead of JSON) — fixed (catch-all JSON 404 handler in `index.ts`).
+  DEFECT-002 (past dates accepted) and DEFECT-003 (end time before start
+  time accepted) were **only partially fixed** — both protections existed
+  for manually-entered time slots (`opportunityTimeSlotSchema`) but not for
+  the recurrence-rule path, which generates slots programmatically from a
+  never-validated `startDate` and had no `startTime < endTime` check at
+  all. **Fixed this session** (commit `a5ffdb5`): floored the recurring
+  series' generation start at today regardless of a past `startDate`, and
+  added the same `.superRefine()` ordering check to `recurrenceRuleSchema`
+  that manual slots already had. 2 regression tests. This is exactly the
+  kind of gap a one-line "superseded" summary can hide — worth remembering
+  for any future doc marked superseded without a fresh per-item check.
 
 ---
 
