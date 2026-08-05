@@ -16,6 +16,7 @@
  */
 
 import crypto from "crypto";
+import { isProdLike } from "./isProdLike";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12; // 96-bit IV recommended for GCM
@@ -24,10 +25,6 @@ const PREFIX = "enc:v1:";
 
 let _key: Buffer | null = null;
 let _warnedOnce = false;
-
-function isProdLike(): boolean {
-  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-}
 
 function getKey(): Buffer | null {
   if (_key) return _key;
