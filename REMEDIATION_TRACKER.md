@@ -140,8 +140,21 @@ Full detail lives in this session's history; summary:
   against a real disposable Postgres DB and confirming all 4 seeded VERIFIED
   sessions have a matching audit row.
 - **`docs/qa/ACCESSIBILITY_REPORT.md`**: contrast and label findings (V-01,
-  V-02, V-03, V-06) — fixed. V-04/V-05 (tab order, link-in-text-block) —
-  unclear without a real browser check, not independently verified.
+  V-02, V-03, V-06) — fixed (confirmed V-06 again this session: no
+  `bg-red-500` badge remains anywhere in `client/src`). **V-05 (Login tab
+  order) and V-04 (link-in-text-block on School Dashboard) — followed up
+  this session and confirmed fixed by direct code read** (no live browser
+  available, but both remediations are structurally verifiable from source):
+  V-05 — the logo `<Link>` on the login page already has `tabIndex={-1}`
+  and nothing else focusable sits between it and the email input, so the
+  first real Tab press lands on the email field as the report's
+  remediation option 3 intended. V-04 — audited every `<Link>` on School
+  Dashboard with action-colored text; the one genuinely inline-within-a-
+  sentence example ("No cohorts yet. **Create your first cohort** to get
+  started.") already has `underline underline-offset-2`; the remaining
+  action-colored links ("Manage →", "View All (N) →") are standalone
+  header-action links, not text embedded in a body-text block, so WCAG
+  1.4.1's use-of-color concern doesn't apply to them.
 - **`docs/qa/PERFORMANCE_REPORT.md`**: route-level code splitting — fixed
   (`React.lazy()` used throughout `App.tsx`).
 - **`docs/student-privacy-compliance.md`, `docs/canvas-production-readiness.md`,
