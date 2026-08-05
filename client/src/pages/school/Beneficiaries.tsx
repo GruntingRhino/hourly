@@ -146,7 +146,9 @@ export default function SchoolBeneficiaries() {
   const [creating, setCreating] = useState(false);
   const [csvData, setCsvData] = useState("");
   const [csvImporting, setCsvImporting] = useState(false);
+  const [csvPreviewing, setCsvPreviewing] = useState(false);
   const [csvResult, setCsvResult] = useState<{ added: number; failed: number; errors: string[] } | null>(null);
+  const [csvDryRunResult, setCsvDryRunResult] = useState<{ added: number; failed: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [proximityRadius, setProximityRadius] = useState(5);
@@ -348,9 +350,24 @@ const handleDrop = async (benId: string, name: string) => {
   const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setCsvDryRunResult(null);
     const reader = new FileReader();
     reader.onload = (ev) => setCsvData((ev.target?.result as string) || "");
     reader.readAsText(file);
+  };
+
+  const handleCsvPreview = async () => {
+    if (!csvData.trim()) return;
+    setCsvPreviewing(true);
+    setCsvDryRunResult(null);
+    try {
+      const result = await api.post<{ added: number; failed: number; errors: string[] }>("/beneficiaries/import-csv", { csvData, dryRun: true });
+      setCsvDryRunResult(result);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "CSV preview failed."));
+    } finally {
+      setCsvPreviewing(false);
+    }
   };
 
   const handleCsvImport = async () => {
@@ -360,6 +377,7 @@ const handleDrop = async (benId: string, name: string) => {
     try {
       const result = await api.post<{ added: number; failed: number; errors: string[] }>("/beneficiaries/import-csv", { csvData });
       setCsvResult(result);
+      setCsvDryRunResult(null);
       setCsvData("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
@@ -897,15 +915,37 @@ const handleDrop = async (benId: string, name: string) => {
               </div>
             )}
 
+            {csvDryRunResult && (
+              <div className={`mb-4 p-3 rounded border text-sm ${csvDryRunResult.failed > 0 ? "bg-[var(--wn-bg)] border-[var(--wn-b)]" : "bg-[var(--ok-bg)] border-[var(--ok-b)]"}`}>
+                <div className="font-medium mb-1">Preview — nothing has been imported yet.</div>
+                <div><strong>{csvDryRunResult.added}</strong> partners will be added, <strong>{csvDryRunResult.failed}</strong> will fail.</div>
+                {csvDryRunResult.errors.length > 0 && (
+                  <ul className="mt-2 text-xs text-[var(--er-t)] space-y-0.5">
+                    {csvDryRunResult.errors.slice(0, 8).map((entry, index) => <li key={index}>{entry}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
               <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFileUpload} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-white">
                 Choose CSV File
               </button>
-              {csvData && (
-                <button onClick={handleCsvImport} disabled={csvImporting} className="block px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
-                  {csvImporting ? "Importing..." : "Import Partners"}
+              {csvData && !csvDryRunResult && (
+                <button onClick={handleCsvPreview} disabled={csvPreviewing} className="block px-4 py-[7px] border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-white disabled:opacity-50">
+                  {csvPreviewing ? "Checking..." : "Preview Import"}
                 </button>
+              )}
+              {csvData && csvDryRunResult && (
+                <div className="flex gap-2">
+                  <button onClick={() => setCsvDryRunResult(null)} disabled={csvImporting} className="px-4 py-[7px] border border-[var(--border-s)] rounded-[2px] text-sm hover:bg-white disabled:opacity-50">
+                    Back
+                  </button>
+                  <button onClick={handleCsvImport} disabled={csvImporting || csvDryRunResult.added === 0} className="px-4 py-[7px] bg-[var(--action)] text-white rounded-[2px] text-sm hover:opacity-85 disabled:opacity-50">
+                    {csvImporting ? "Importing..." : `Confirm & Import ${csvDryRunResult.added} Partner${csvDryRunResult.added === 1 ? "" : "s"}`}
+                  </button>
+                </div>
               )}
             </div>
 

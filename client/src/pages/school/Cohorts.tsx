@@ -66,7 +66,9 @@ export default function SchoolCohorts() {
   const [publishToast, setPublishToast] = useState("");
   const [teacherCsvData, setTeacherCsvData] = useState("");
   const [teacherImporting, setTeacherImporting] = useState(false);
+  const [teacherPreviewing, setTeacherPreviewing] = useState(false);
   const [teacherImportResult, setTeacherImportResult] = useState<TeacherImportResult | null>(null);
+  const [teacherDryRunResult, setTeacherDryRunResult] = useState<TeacherImportResult | null>(null);
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
   const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionSummary[]>([]);
   const [revisionSubmissions, setRevisionSubmissions] = useState<SubmissionSummary[]>([]);
@@ -123,6 +125,21 @@ export default function SchoolCohorts() {
     }
   };
 
+  const handlePreviewTeacherImport = async () => {
+    if (!teacherCsvData.trim()) return;
+    setTeacherPreviewing(true);
+    setError("");
+    setTeacherDryRunResult(null);
+    try {
+      const result = await api.post<TeacherImportResult>("/cohorts/teachers/import", { csvData: teacherCsvData, dryRun: true });
+      setTeacherDryRunResult(result);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to preview teacher assignments."));
+    } finally {
+      setTeacherPreviewing(false);
+    }
+  };
+
   const handleTeacherImport = async () => {
     if (!teacherCsvData.trim()) return;
     setTeacherImporting(true);
@@ -130,6 +147,7 @@ export default function SchoolCohorts() {
     try {
       const result = await api.post<TeacherImportResult>("/cohorts/teachers/import", { csvData: teacherCsvData });
       setTeacherImportResult(result);
+      setTeacherDryRunResult(null);
       if ((result.errors ?? []).length === 0) {
         setTeacherCsvData("");
       }
@@ -213,21 +231,56 @@ export default function SchoolCohorts() {
           <div className="text-xs text-[var(--text-sec)] mb-3">Headers must be exactly <span className="font-mono">name,email,cohort</span>. Cohort must match the cohort name exactly.</div>
           <textarea
             value={teacherCsvData}
-            onChange={(e) => setTeacherCsvData(e.target.value)}
+            onChange={(e) => { setTeacherCsvData(e.target.value); setTeacherDryRunResult(null); }}
             rows={6}
             placeholder={"name,email,cohort\nJamie Smith,jamie@school.edu,PW Cohort B"}
             className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm font-mono"
           />
           <div className="mt-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleTeacherImport}
-              disabled={teacherImporting}
-              className="px-4 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
-            >
-              {teacherImporting ? "Importing..." : "Import Teacher Assignments"}
-            </button>
+            {!teacherDryRunResult && (
+              <button
+                type="button"
+                onClick={handlePreviewTeacherImport}
+                disabled={teacherPreviewing || !teacherCsvData.trim()}
+                className="px-4 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
+              >
+                {teacherPreviewing ? "Checking..." : "Preview Import"}
+              </button>
+            )}
+            {teacherDryRunResult && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTeacherDryRunResult(null)}
+                  disabled={teacherImporting}
+                  className="px-4 py-2 bg-[var(--surface)] border border-[var(--border-s)] rounded-[2px] text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTeacherImport}
+                  disabled={teacherImporting || (teacherDryRunResult.assigned === 0 && teacherDryRunResult.created === 0)}
+                  className="px-4 py-2 bg-[var(--action)] text-white rounded-[2px] text-sm font-medium hover:opacity-85 disabled:opacity-50"
+                >
+                  {teacherImporting ? "Importing..." : `Confirm & Assign ${teacherDryRunResult.assigned + teacherDryRunResult.created} Teacher${teacherDryRunResult.assigned + teacherDryRunResult.created === 1 ? "" : "s"}`}
+                </button>
+              </>
+            )}
           </div>
+          {teacherDryRunResult && (
+            <div className="mt-3 text-xs bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded p-3 space-y-1">
+              <div className="font-medium">Preview — nothing has been imported yet.</div>
+              <div>{teacherDryRunResult.assigned} existing teacher assignment{teacherDryRunResult.assigned === 1 ? "" : "s"} will be added.</div>
+              <div>{teacherDryRunResult.created} new teacher account{teacherDryRunResult.created === 1 ? "" : "s"} will be created and assigned.</div>
+              {teacherDryRunResult.skipped > 0 && <div>{teacherDryRunResult.skipped} row{teacherDryRunResult.skipped === 1 ? "" : "s"} will be skipped.</div>}
+              {teacherDryRunResult.errors.map((issue) => (
+                <div key={`${issue.row}-${issue.email || "unknown"}-${issue.cohort || "unknown"}`} className="text-[var(--er-t)]">
+                  Row {issue.row}{issue.email ? ` (${issue.email})` : ""}{issue.cohort ? ` · ${issue.cohort}` : ""}: {issue.reason}
+                </div>
+              ))}
+            </div>
+          )}
           {teacherImportResult && (
             <div className="mt-3 text-xs bg-[var(--surface-alt)] border border-[var(--border)] rounded p-3 space-y-1">
               <div>{teacherImportResult.assigned} existing teacher assignment{teacherImportResult.assigned === 1 ? "" : "s"} added.</div>
