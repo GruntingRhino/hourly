@@ -8,6 +8,7 @@ import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 
 import { isInternalAdminUser } from "../lib/internalAdmin";
+import { isPubliclyDeployed } from "../lib/isProdLike";
 import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
 import { extractDomainFromWebsite, isPersonalEmailDomain } from "../lib/signupEmailPolicy";
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
@@ -54,8 +55,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/school/register`;
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
 
@@ -66,7 +65,7 @@ const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
   .filter(Boolean);
 
 function isApprovedDomain(email: string): boolean {
-  if (!IS_PRODUCTION) return true;
+  if (!isPubliclyDeployed()) return true;
   if (APPROVED_DOMAINS.length === 0) return true;
   const domain = email.split("@")[1]?.toLowerCase() || "";
   return APPROVED_DOMAINS.some((allowed) =>
@@ -83,7 +82,7 @@ const OAUTH_STATE_COOKIE = "gh_oauth_state";
 const OAUTH_STATE_COOKIE_OPTS = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: IS_PRODUCTION,
+  secure: isPubliclyDeployed(),
   path: "/api/auth/google",
 };
 
@@ -311,7 +310,7 @@ router.get("/classify-domain", publicGoogleAuthLimiter, (req: Request, res: Resp
     return res.json({ status: "unknown", blocked: false });
   }
   // Personal emails are only blocked in production (unless feature flag overrides)
-  if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email)) {
+  if (isPubliclyDeployed() && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email)) {
     return res.json({ status: "personal", blocked: true });
   }
   if (isEduDomain(email)) {
@@ -367,7 +366,7 @@ router.get("/callback", publicGoogleAuthLimiter, (req: Request, res: Response) =
   res.redirect(target.toString());
 });
 
-if (!IS_PRODUCTION) {
+if (!isPubliclyDeployed()) {
   router.post("/dev-signin", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
     try {
       const { email, name, state } = strictObject({
@@ -583,7 +582,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     }
 
     // Block personal/consumer email providers on the contact email (production only, unless feature flag overrides)
-    if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(data.contactEmail)) {
+    if (isPubliclyDeployed() && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(data.contactEmail)) {
       return res.status(400).json({
         error: "Please use your school's official email address. Personal email providers like Gmail, Yahoo, and Outlook are not accepted.",
         code: "PERSONAL_EMAIL",
@@ -617,7 +616,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
       }
 
       const schoolDomain = dirEntry.emailDomain || (dirEntry.website ? extractDomainFromWebsite(dirEntry.website) : null);
-      if (schoolDomain && (IS_PRODUCTION || !ALLOW_PERSONAL_EMAIL_DOMAINS)) {
+      if (schoolDomain && (isPubliclyDeployed() || !ALLOW_PERSONAL_EMAIL_DOMAINS)) {
         try {
           assertExactSchoolDomain(registrationIntent.email, schoolDomain);
           assertExactSchoolDomain(data.contactEmail, schoolDomain);

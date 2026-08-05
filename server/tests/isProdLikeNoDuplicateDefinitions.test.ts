@@ -60,3 +60,39 @@ test("routes/internal.ts imports the canonical isProdLike instead of redefining 
   assert.match(source, /import\s*\{\s*isProdLike\s*\}\s*from\s*["']\.\.\/lib\/isProdLike["']/);
   assert.doesNotMatch(source, /function\s+isProdLike\s*\(/);
 });
+
+// Broader regression: the `function isProdLike(` regex above only catches
+// re-derivations that happen to share that exact function name. This
+// session found several more instances of the identical bug shape hiding
+// under different names — a local `const IS_PRODUCTION = NODE_ENV ===
+// "production" || VERCEL_ENV === "production"` in routes/googleAuth.ts
+// (missing APP_ENV — silently disabled the Google OAuth approved-domain
+// allowlist AND left the /dev-signin full-auth-bypass route registered on
+// an APP_ENV-only production deploy), another in index.ts (missing
+// APP_ENV AND VERCEL_ENV — leaked stack traces in error responses and
+// allowed any localhost Origin through CORS), a VERCEL_ENV-only check in
+// services/email.ts, and a duplicated-but-correct copy in
+// middleware/rateLimit.ts. Scans for the raw comparison pattern itself,
+// not any particular name, so the next occurrence can't dodge this check
+// by choosing a different variable/function name.
+test("no file other than lib/isProdLike.ts (and env.ts's deliberately stricter DB-safety variant) raw-compares NODE_ENV/VERCEL_ENV against \"production\"", () => {
+  const exempt = new Set([
+    CANONICAL_DEFINITION_FILE,
+    // env.ts's validateEnv()/isDevMode() intentionally add an extra
+    // `APP_ENV !== "development"` guard on top of the canonical check,
+    // used only for startup DB-safety validation — a deliberate stricter
+    // variant, not accidental drift. It also re-exports the canonical
+    // isProdLike for every other consumer.
+    path.join(serverSrcRoot, "lib/env.ts"),
+  ]);
+  const pattern = /(NODE_ENV|VERCEL_ENV)\s*===\s*["']production["']/;
+  const offenders: string[] = [];
+  for (const file of listSourceFiles(serverSrcRoot)) {
+    if (exempt.has(file)) continue;
+    const source = fs.readFileSync(file, "utf8");
+    if (pattern.test(source)) {
+      offenders.push(path.relative(serverSrcRoot, file));
+    }
+  }
+  assert.deepEqual(offenders, [], `these files raw-compare NODE_ENV/VERCEL_ENV instead of importing lib/isProdLike.ts: ${offenders.join(", ")}`);
+});

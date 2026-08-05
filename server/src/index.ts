@@ -67,7 +67,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
   next();
 });
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
 // Trust Vercel/reverse-proxy X-Forwarded-For so express-rate-limit
 // can identify real client IPs instead of always seeing the proxy IP.
 app.set("trust proxy", 1);
@@ -100,7 +99,7 @@ app.use(cors({
     ];
     if (
       EXPLICIT_ALLOWED_ORIGINS.includes(origin) ||
-      (!IS_PRODUCTION && isLocalDevOrigin(origin)) ||
+      (!isProdLike() && isLocalDevOrigin(origin)) ||
       PRODUCTION_GOODHOURS_ORIGINS.includes(origin)
     ) {
       return callback(null, true);
@@ -224,7 +223,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     path: req.path,
     status,
     message: err.message,
-    stack: IS_PRODUCTION ? undefined : err.stack,
+    stack: isProdLike() ? undefined : err.stack,
   }));
   res.status(status).json({ error: status < 500 ? err.message : "Internal server error" });
 });

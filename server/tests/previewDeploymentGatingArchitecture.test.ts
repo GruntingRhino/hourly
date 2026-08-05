@@ -48,3 +48,36 @@ test("the Google Classroom custom-OAuth-destination escape hatch is gated by isP
   const fnBody = source.slice(start, start + 400);
   assert.match(fnBody, /isPubliclyDeployed\(\)/);
 });
+
+// googleAuth.ts previously defined its own local `IS_PRODUCTION` constant
+// (NODE_ENV/VERCEL_ENV only, missing APP_ENV) instead of importing the
+// canonical check — on an APP_ENV-only production deploy this would have
+// left the fully-unauthenticated /dev-signin route (mints a real session
+// for any email/name with zero Google verification) registered and
+// reachable, and also silently disabled the Google OAuth approved-school-
+// domain allowlist entirely (isApprovedDomain() unconditionally returned
+// true). Both are now gated by the canonical isPubliclyDeployed(), which
+// is also correctly false-on-preview-true (stricter than isProdLike()) so
+// this can't be reachable on a public preview deployment either.
+test("googleAuth.ts does not locally redefine a production/deployment check", () => {
+  const source = read("src/routes/googleAuth.ts");
+  assert.doesNotMatch(source, /\bIS_PRODUCTION\b/);
+  assert.doesNotMatch(source, /NODE_ENV\s*===\s*["']production["']/);
+  assert.match(source, /import\s*\{\s*isPubliclyDeployed\s*\}\s*from\s*["']\.\.\/lib\/isProdLike["']/);
+});
+
+test("the Google /dev-signin auth-bypass route is gated by isPubliclyDeployed", () => {
+  const source = read("src/routes/googleAuth.ts");
+  const start = source.indexOf('router.post("/dev-signin"');
+  assert.ok(start > -1, "could not locate the /dev-signin route");
+  const guardWindow = source.slice(Math.max(0, start - 200), start);
+  assert.match(guardWindow, /if \(!isPubliclyDeployed\(\)\)/);
+});
+
+test("isApprovedDomain() enforces the school-domain allowlist based on isPubliclyDeployed, not a raw env comparison", () => {
+  const source = read("src/routes/googleAuth.ts");
+  const start = source.indexOf("function isApprovedDomain");
+  assert.ok(start > -1);
+  const fnBody = source.slice(start, start + 200);
+  assert.match(fnBody, /if \(!isPubliclyDeployed\(\)\) return true;/);
+});

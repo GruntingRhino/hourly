@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import crypto from "crypto";
+import { isProdLike } from "../lib/isProdLike";
 
 /**
  * HTML-escape a plain-text value before interpolating it into an email
@@ -156,7 +157,7 @@ function noteDevProviderSuppressed(err: any): void {
   });
 }
 
-if (process.env.VERCEL_ENV === "production") {
+if (isProdLike()) {
   if (!process.env.RESEND_API_KEY) {
     console.error("[email] Missing RESEND_API_KEY in production environment");
   }

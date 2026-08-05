@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { verifyToken } from "./auth";
+import { isProdLike } from "../lib/isProdLike";
 
 type Bucket = {
   count: number;
@@ -34,9 +35,7 @@ let lastDatabaseCleanupAt = 0;
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || "";
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
 const hasSharedStore = Boolean(upstashUrl && upstashToken);
-const shouldUseDatabaseStore =
-  !hasSharedStore &&
-  (process.env.APP_ENV === "production" || process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production");
+const shouldUseDatabaseStore = !hasSharedStore && isProdLike();
 
 if (hasSharedStore) {
   console.info("[RateLimit] Using Upstash Redis shared bucket store.");
