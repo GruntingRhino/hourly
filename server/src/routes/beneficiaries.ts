@@ -37,7 +37,7 @@ import { isDevMode } from "../lib/env";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
-import { slotDateTime } from "../lib/icsGenerator";
+import { slotDateTime, computeSlotTimestamps } from "../lib/icsGenerator";
 import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
 
 const schoolBeneficiaryApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "BLOCKED"]);
@@ -258,6 +258,7 @@ async function promoteNextWaitlisted(
     select: {
       date: true,
       startTime: true,
+      startsAt: true,
       opportunity: {
         select: {
           beneficiary: {
@@ -284,7 +285,9 @@ async function promoteNextWaitlisted(
   if (!slot) return null;
   const beneficiary = slot.opportunity.beneficiary;
   const tier = resolveBeneficiaryPlanTier(beneficiary, beneficiary.planTier === "PRO" ? "PRO" : "FREE");
-  const eventStartsAt = slotDateTime(slot.date, slot.startTime, beneficiary.timezone);
+  // §7 canonical event-time model: prefer the precomputed startsAt; a null
+  // value means this row predates the backfill.
+  const eventStartsAt = slot.startsAt ?? slotDateTime(slot.date, slot.startTime, beneficiary.timezone);
   const config = beneficiary.reminderConfig;
   if (!shouldAutoPromoteWaitlist({
     tier,
@@ -1762,7 +1765,10 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       return res.status(400).json({ error: "Category is required" });
     }
 
-    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
+    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string; startsAt: Date; endsAt: Date }[];
     let recurringGroupId: string | undefined;
 
     if (data.recurrenceRule) {
@@ -1780,15 +1786,19 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       if (generated.length === 0) {
         return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
       }
-      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId }));
+      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId, ...computeSlotTimestamps(s.date, s.startTime, s.endTime, beneficiaryTimezone) }));
     } else {
-      slotsToCreate = data.timeSlots!.map((ts) => ({
-        date: new Date(ts.date),
-        startTime: ts.startTime,
-        endTime: ts.endTime,
-        durationHours: ts.durationHours,
-        capacity: ts.capacity,
-      }));
+      slotsToCreate = data.timeSlots!.map((ts) => {
+        const date = new Date(ts.date);
+        return {
+          date,
+          startTime: ts.startTime,
+          endTime: ts.endTime,
+          durationHours: ts.durationHours,
+          capacity: ts.capacity,
+          ...computeSlotTimestamps(date, ts.startTime, ts.endTime, beneficiaryTimezone),
+        };
+      });
     }
 
     const opp = await prisma.beneficiaryOpportunity.create({
@@ -1906,6 +1916,8 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
 
     // Regenerate future slots when a recurrenceRule update is submitted.
     // Only deletes unbooked future slots (>24h); signed-up slots are preserved.
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
     if (data.recurrenceRule) {
       const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const anySlot = await prisma.beneficiaryTimeSlot.findFirst({
@@ -1926,7 +1938,12 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
       const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, new Date());
       if (generated.length > 0) {
         await prisma.beneficiaryTimeSlot.createMany({
-          data: generated.map((s) => ({ opportunityId: req.params.oppId, recurringGroupId, ...s })),
+          data: generated.map((s) => ({
+            opportunityId: req.params.oppId,
+            recurringGroupId,
+            ...s,
+            ...computeSlotTimestamps(s.date, s.startTime, s.endTime, beneficiaryTimezone),
+          })),
         });
       }
     }
@@ -1934,14 +1951,18 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
     // Add new manual slots if provided
     if (data.timeSlots && data.timeSlots.length > 0) {
       await prisma.beneficiaryTimeSlot.createMany({
-        data: data.timeSlots.map((ts) => ({
-          opportunityId: req.params.oppId,
-          date: new Date(ts.date),
-          startTime: ts.startTime,
-          endTime: ts.endTime,
-          durationHours: ts.durationHours,
-          capacity: ts.capacity,
-        })),
+        data: data.timeSlots.map((ts) => {
+          const date = new Date(ts.date);
+          return {
+            opportunityId: req.params.oppId,
+            date,
+            startTime: ts.startTime,
+            endTime: ts.endTime,
+            durationHours: ts.durationHours,
+            capacity: ts.capacity,
+            ...computeSlotTimestamps(date, ts.startTime, ts.endTime, beneficiaryTimezone),
+          };
+        }),
       });
     }
 
@@ -2306,12 +2327,16 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
     });
     const data = schema.parse(req.body);
 
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
     const originalDate = slot.date;
     const newDate = data.date ? new Date(data.date) : slot.date;
     const newStartTime = data.startTime ?? slot.startTime;
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const { startsAt: newStartsAt, endsAt: newEndsAt } = computeSlotTimestamps(newDate, newStartTime, newEndTime, beneficiaryTimezone);
     const updated = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
@@ -2330,6 +2355,8 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
           endTime: newEndTime,
           durationHours: newDuration,
           capacity: newCapacity,
+          startsAt: newStartsAt,
+          endsAt: newEndsAt,
         },
       });
     });
@@ -2367,12 +2394,16 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
         const newFsEndH = Math.floor(((newFsEMins % 1440) + 1440) % 1440 / 60);
         const newFsEndMin = ((newFsEMins % 1440) + 1440) % 1440 % 60;
 
+        const fsStart = `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`;
+        const fsEnd = `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`;
+
         await prisma.beneficiaryTimeSlot.update({
           where: { id: fs.id },
           data: {
             date: fsDate,
-            startTime: `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`,
-            endTime: `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`,
+            startTime: fsStart,
+            endTime: fsEnd,
+            ...computeSlotTimestamps(fsDate, fsStart, fsEnd, beneficiaryTimezone),
           },
         });
       }
@@ -2444,12 +2475,16 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
     });
     const data = schema.parse(req.body);
 
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: slot.opportunity.beneficiaryId }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
     const originalDate = slot.date;
     const newDate = data.date ? new Date(data.date) : slot.date;
     const newStartTime = data.startTime ?? slot.startTime;
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const { startsAt: newStartsAt, endsAt: newEndsAt } = computeSlotTimestamps(newDate, newStartTime, newEndTime, beneficiaryTimezone);
     const updated = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
@@ -2468,6 +2503,8 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
           endTime: newEndTime,
           durationHours: newDuration,
           capacity: newCapacity,
+          startsAt: newStartsAt,
+          endsAt: newEndsAt,
         },
       });
     });
@@ -2516,6 +2553,7 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
             startTime: fsStart,
             endTime: fsEnd,
             durationHours: calcDurationHours(fsStart, fsEnd) || fs.durationHours,
+            ...computeSlotTimestamps(fsDate, fsStart, fsEnd, beneficiaryTimezone),
           },
         });
       }

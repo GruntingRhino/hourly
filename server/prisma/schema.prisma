@@ -822,8 +822,18 @@ model BeneficiaryTimeSlot {
   opportunityId    String
   opportunity      BeneficiaryOpportunity @relation(fields: [opportunityId], references: [id])
   date             DateTime
-  startTime        String // "10:00 AM"
-  endTime          String // "2:00 PM"
+  startTime        String // wall-clock time, e.g. "14:00" or "10:00 AM" (parseTimeString accepts both)
+  endTime          String // wall-clock time, e.g. "14:00" or "10:00 AM" (parseTimeString accepts both)
+  // §7 canonical event-time model: startsAt/endsAt are the precomputed,
+  // DST-correct UTC instants derived from date+startTime/endTime+the
+  // owning Beneficiary's timezone (see lib/icsGenerator.ts's slotDateTime,
+  // the same conversion this replaces ad-hoc read-time calls to). Nullable
+  // during the migration window — every write path that sets
+  // date/startTime/endTime populates them; a null value means this row
+  // predates the backfill or was missed, and callers should fall back to
+  // computing via slotDateTime() rather than trust a stale value.
+  startsAt         DateTime?
+  endsAt           DateTime?
   durationHours    Float
   capacity         Int                    @default(10)
   recurringGroupId String? // links all slots in the same recurrence series
@@ -833,6 +843,7 @@ model BeneficiaryTimeSlot {
 
   @@index([date])
   @@index([opportunityId])
+  @@index([startsAt])
 }
 
 // ─── Beneficiary Signups (new model) ────────────────────────────

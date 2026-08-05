@@ -23,6 +23,8 @@ interface ReminderSignup {
     date: Date;
     startTime: string;
     endTime: string;
+    startsAt: Date | null;
+    endsAt: Date | null;
     opportunity: {
       id: string;
       title: string;
@@ -60,10 +62,12 @@ async function processReminder(
     ? "FREE_24H"
     : `PRO_CUSTOM_${minutesBefore}`;
 
-  const freshScheduledFor = new Date(
-    slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime()
-      - minutesBefore * 60 * 1000
-  );
+  // §7 canonical event-time model: prefer the precomputed startsAt (set by
+  // every slot write path) over recomputing it here; a null value means
+  // this row predates the backfill, so fall back to the same live
+  // slotDateTime() conversion this always used before.
+  const slotStartsAt = signup.slot.startsAt ?? slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone);
+  const freshScheduledFor = new Date(slotStartsAt.getTime() - minutesBefore * 60 * 1000);
 
   const existing = await prisma.orgEventReminderLog.findUnique({
     where: { signupId_reminderType: { signupId: signup.id, reminderType } },
@@ -99,8 +103,8 @@ async function processReminder(
   const ben = opp.beneficiary;
   const tierLimits = ORGANIZATION_TIER_LIMITS[tier];
 
-  const startDt = slotDateTime(signup.slot.date, signup.slot.startTime, ben.timezone);
-  const endDt = slotDateTime(signup.slot.date, signup.slot.endTime, ben.timezone);
+  const startDt = slotStartsAt;
+  const endDt = signup.slot.endsAt ?? slotDateTime(signup.slot.date, signup.slot.endTime, ben.timezone);
 
   const icsContent = generateICS({
     uid: `${signup.id}-${minutesBefore}`,

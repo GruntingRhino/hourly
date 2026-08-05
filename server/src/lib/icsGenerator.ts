@@ -87,11 +87,17 @@ export function parseTimeString(t: string): { hours: number; minutes: number } {
 export function slotDateTime(slotDate: Date, timeStr: string, timezone = "UTC"): Date {
   const { hours, minutes } = parseTimeString(timeStr);
 
-  // Get the calendar date string in the target timezone (e.g. "2025-09-15")
-  const localDateStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(slotDate);
+  // `slotDate` is a plain calendar date (no meaningful time-of-day) stored
+  // as a UTC-midnight Date — e.g. `new Date("2026-09-05")`. Read its
+  // calendar fields directly with the UTC getters. Do NOT re-derive the
+  // date by reformatting slotDate through the target timezone (the
+  // previous implementation's bug): UTC midnight, viewed in any timezone
+  // behind UTC (west of it — every US zone, and the only timezone this
+  // app's data has ever actually used, America/New_York), always lands on
+  // the *previous* calendar day, silently shifting every event a day
+  // early. Confirmed live in production: every existing Beneficiary row's
+  // timezone is the schema default, America/New_York.
+  const localDateStr = `${slotDate.getUTCFullYear()}-${String(slotDate.getUTCMonth() + 1).padStart(2, "0")}-${String(slotDate.getUTCDate()).padStart(2, "0")}`;
 
   const hh = String(hours).padStart(2, "0");
   const mm = String(minutes).padStart(2, "0");
@@ -113,4 +119,22 @@ export function slotDateTime(slotDate: Date, timeStr: string, timezone = "UTC"):
 
   // offsetMs = how many ms we need to ADD to the nominal UTC to get the true UTC moment
   return new Date(nominalUTC.getTime() + (nominalUTC.getTime() - tzDate.getTime()));
+}
+
+/**
+ * §7 canonical event-time model: compute the precomputed startsAt/endsAt
+ * pair every BeneficiaryTimeSlot write path should populate. Thin wrapper
+ * around slotDateTime so both the start and end conversion always happen
+ * together, from the same inputs, at every call site.
+ */
+export function computeSlotTimestamps(
+  date: Date,
+  startTime: string,
+  endTime: string,
+  timezone: string
+): { startsAt: Date; endsAt: Date } {
+  return {
+    startsAt: slotDateTime(date, startTime, timezone),
+    endsAt: slotDateTime(date, endTime, timezone),
+  };
 }
