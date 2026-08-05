@@ -107,16 +107,31 @@ test("POST /:id/documents allows an upload that stays within the quota", async (
     userFindFirst: prismaClient.user.findFirst,
     schoolFindUnique: prismaClient.school.findUnique,
     docAggregate: prismaClient.schoolProcurementDocument.aggregate,
-    docCreate: prismaClient.schoolProcurementDocument.create,
+    transaction: prismaClient.$transaction,
   };
   prismaClient.user.findUnique = async () => schoolAdmin;
   prismaClient.user.findFirst = async () => schoolAdmin;
   prismaClient.school.findUnique = async () => ({ billingRecord: { id: "billing-1" }, billingStatus: "ACTIVE" });
+  // The fast-path pre-check (outside the transaction).
   prismaClient.schoolProcurementDocument.aggregate = async () => ({ _sum: { fileSizeBytes: 1024 } });
   let createCalled = false;
-  prismaClient.schoolProcurementDocument.create = async ({ data }: any) => {
-    createCalled = true;
-    return { id: "doc-1", documentType: data.documentType, originalName: data.originalName };
+  // The route wraps the authoritative recheck + create in
+  // runSerializableTransaction(fn), which calls prisma.$transaction(fn, {...})
+  // — mock $transaction to hand the callback a fake tx client, matching the
+  // pattern used elsewhere in this test suite for other
+  // runSerializableTransaction-wrapped routes.
+  prismaClient.$transaction = async (fn: any) => {
+    const tx = {
+      $executeRaw: async () => undefined,
+      schoolProcurementDocument: {
+        aggregate: async () => ({ _sum: { fileSizeBytes: 1024 } }),
+        create: async ({ data }: any) => {
+          createCalled = true;
+          return { id: "doc-1", documentType: data.documentType, originalName: data.originalName };
+        },
+      },
+    };
+    return fn(tx);
   };
 
   try {
@@ -130,6 +145,50 @@ test("POST /:id/documents allows an upload that stays within the quota", async (
     prismaClient.user.findFirst = original.userFindFirst;
     prismaClient.school.findUnique = original.schoolFindUnique;
     prismaClient.schoolProcurementDocument.aggregate = original.docAggregate;
-    prismaClient.schoolProcurementDocument.create = original.docCreate;
+    prismaClient.$transaction = original.transaction;
+  }
+});
+
+test("POST /:id/documents rejects when a concurrent upload wins the race — the authoritative in-transaction recheck catches what the fast-path check missed", async () => {
+  const original = {
+    userFindUnique: prismaClient.user.findUnique,
+    userFindFirst: prismaClient.user.findFirst,
+    schoolFindUnique: prismaClient.school.findUnique,
+    docAggregate: prismaClient.schoolProcurementDocument.aggregate,
+    transaction: prismaClient.$transaction,
+  };
+  prismaClient.user.findUnique = async () => schoolAdmin;
+  prismaClient.user.findFirst = async () => schoolAdmin;
+  prismaClient.school.findUnique = async () => ({ billingRecord: { id: "billing-1" }, billingStatus: "ACTIVE" });
+  // Fast-path check sees room (199 MB used, ~1 MB upload).
+  prismaClient.schoolProcurementDocument.aggregate = async () => ({ _sum: { fileSizeBytes: 199 * 1024 * 1024 } });
+  let createCalled = false;
+  // But by the time the serialized transaction acquires the lock, a
+  // concurrent upload has already pushed usage over the cap.
+  prismaClient.$transaction = async (fn: any) => {
+    const tx = {
+      $executeRaw: async () => undefined,
+      schoolProcurementDocument: {
+        aggregate: async () => ({ _sum: { fileSizeBytes: 200 * 1024 * 1024 } }),
+        create: async () => { createCalled = true; throw new Error("should not be called"); },
+      },
+    };
+    return fn(tx);
+  };
+
+  try {
+    const app = express();
+    app.use(schoolProcurementRoutes);
+    const res = await uploadDocument(app, 1 * 1024 * 1024);
+    assert.equal(res.status, 413);
+    const body = await res.json();
+    assert.match(body.error, /Storage quota exceeded/);
+    assert.equal(createCalled, false);
+  } finally {
+    prismaClient.user.findUnique = original.userFindUnique;
+    prismaClient.user.findFirst = original.userFindFirst;
+    prismaClient.school.findUnique = original.schoolFindUnique;
+    prismaClient.schoolProcurementDocument.aggregate = original.docAggregate;
+    prismaClient.$transaction = original.transaction;
   }
 });

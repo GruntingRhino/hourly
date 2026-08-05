@@ -8,6 +8,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { calculateSchoolEstimate, BILLING_CONFIG } from "../lib/billingConfig";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
@@ -256,6 +257,10 @@ router.post("/:id/documents",
       if (!school) { fs.unlinkSync(req.file.path); return res.status(404).json({ error: "School not found" }); }
       if (!school.billingRecord) { fs.unlinkSync(req.file.path); return res.status(400).json({ error: "No active procurement record. Submit a quote request first." }); }
 
+      // Fast-path check for quick feedback; the authoritative,
+      // race-safe check happens inside the serialized transaction below —
+      // matches the same two-layer pattern already used for beneficiary
+      // attachment quotas (routes/beneficiaries.ts).
       const existingUsage = await prisma.schoolProcurementDocument.aggregate({
         where: { schoolId: req.params.id },
         _sum: { fileSizeBytes: true },
@@ -268,20 +273,44 @@ router.post("/:id/documents",
         return res.status(413).json({ error: `Storage quota exceeded. Used ${usedMB} MB of ${limitMB} MB.` });
       }
 
-      const doc = await prisma.schoolProcurementDocument.create({
-        data: {
-          billingRecord: { connect: { id: school.billingRecord.id } },
-          schoolId: req.params.id,
-          documentType,
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          storedPath: req.file.path,
-          fileSizeBytes: verifiedStat.size,
-          mimeType: detectedMime,
-          contentBytes: contentBytes as any,
-          uploadedByUserId: req.user!.userId,
-        },
-      });
+      let doc;
+      try {
+        doc = await runSerializableTransaction(async (tx) => {
+          // Serialize quota reservation per school — without this, two
+          // concurrent uploads could each pass the fast-path check above
+          // (both reading the same pre-upload usage) and both write,
+          // exceeding the cap.
+          await tx.$executeRaw`SELECT 1 FROM "School" WHERE id = ${req.params.id} FOR UPDATE`;
+          const authoritativeUsage = await tx.schoolProcurementDocument.aggregate({
+            where: { schoolId: req.params.id },
+            _sum: { fileSizeBytes: true },
+          });
+          const authoritativeUsedBytes = authoritativeUsage._sum.fileSizeBytes ?? 0;
+          if (authoritativeUsedBytes + verifiedStat.size > MAX_SCHOOL_PROCUREMENT_STORAGE_BYTES) {
+            const usedMB = (authoritativeUsedBytes / 1024 / 1024).toFixed(1);
+            const limitMB = (MAX_SCHOOL_PROCUREMENT_STORAGE_BYTES / 1024 / 1024).toFixed(0);
+            throw Object.assign(new Error(`Storage quota exceeded. Used ${usedMB} MB of ${limitMB} MB.`), { status: 413 });
+          }
+          return tx.schoolProcurementDocument.create({
+            data: {
+              billingRecord: { connect: { id: school.billingRecord!.id } },
+              schoolId: req.params.id,
+              documentType,
+              filename: req.file!.filename,
+              originalName: req.file!.originalname,
+              storedPath: req.file!.path,
+              fileSizeBytes: verifiedStat.size,
+              mimeType: detectedMime,
+              contentBytes: contentBytes as any,
+              uploadedByUserId: req.user!.userId,
+            },
+          });
+        });
+      } catch (err: any) {
+        try { fs.unlinkSync(req.file.path); } catch {}
+        if (err?.status === 413) return res.status(413).json({ error: err.message });
+        throw err;
+      }
 
       try { fs.unlinkSync(req.file.path); } catch {}
 
