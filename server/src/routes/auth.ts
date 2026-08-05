@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import prisma from "../lib/prisma";
 import { authenticate, signToken, signUserToken, verifyToken } from "../middleware/auth";
+import { setAuthCookie, clearAuthCookie } from "../lib/authCookies";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import { encryptField, decryptField } from "../lib/fieldEncryption";
 import {
@@ -630,6 +631,7 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
     }
 
     const token = signUserToken(user);
+    setAuthCookie(res, token, { persistent: true });
 
     const profile = await loadLoginProfile(user.id);
     const payload = buildLoginUserPayload(user, profile);
@@ -644,6 +646,39 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
       return res.status(400).json({ error: firstZodError(err) });
     }
     console.error("Login error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/logout — clears the HttpOnly session cookie. Client-side
+// storage (cached user profile) is cleared separately by the caller; an
+// HttpOnly cookie can only be cleared by the server.
+router.post("/logout", async (_req: Request, res: Response) => {
+  clearAuthCookie(res);
+  res.status(204).send();
+});
+
+const sessionPrefSchema = z.object({ persistent: z.boolean() });
+
+// POST /api/auth/session-pref — re-issues the session cookie with the
+// requested persistence ("remember me" vs. session-only), without
+// requiring the caller to log in again. Mirrors the client's session
+// preference toggle (see SessionPrefBanner.tsx).
+router.post("/session-pref", authenticate, async (req: Request, res: Response) => {
+  try {
+    const { persistent } = sessionPrefSchema.parse(req.body);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, email: true, role: true, tokenVersion: true },
+    });
+    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
+    setAuthCookie(res, signUserToken(user), { persistent });
+    res.status(204).send();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: firstZodError(err) });
+    }
+    console.error("Session pref error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -716,7 +751,9 @@ router.put("/password", authenticate, async (req: Request, res: Response) => {
       data: { passwordHash, tokenVersion: { increment: 1 } },
     });
 
-    res.json({ message: "Password changed successfully", token: signUserToken(updated) });
+    const refreshedToken = signUserToken(updated);
+    setAuthCookie(res, refreshedToken, { persistent: true });
+    res.json({ message: "Password changed successfully", token: refreshedToken });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: firstZodError(err) });
@@ -1192,6 +1229,9 @@ if (!isPubliclyDeployed() && ENABLE_IMPERSONATION) {
       }
 
       const token = signUserToken(target);
+      // Session-only cookie for impersonation — don't leave a long-lived
+      // cookie behind for a temporarily-assumed identity.
+      setAuthCookie(res, token, { persistent: false });
 
       const studentSchool = resolveSchoolFromUserAssociations(target);
       const schoolId = resolveSchoolIdFromUserAssociations(target);

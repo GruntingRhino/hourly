@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { signUserToken } from "../middleware/auth";
+import { setAuthCookie } from "../lib/authCookies";
 import { hashToken } from "../lib/tokenHash";
 import { ensureStudentCohortMembership } from "../lib/studentCohorts";
 import { createHybridRateLimit } from "../middleware/rateLimit";
@@ -152,6 +153,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
           });
         }
         const token = signUserToken(existing);
+        setAuthCookie(res, token, { persistent: true });
         return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, cohortId: existing.cohortId ?? inv.cohortId, schoolId: inv.cohort.schoolId } });
       }
       return res.status(409).json({ error: "An account with this email already exists with a different role." });
@@ -202,6 +204,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
     }
 
     const jwtToken = signUserToken(user);
+    setAuthCookie(res, jwtToken, { persistent: true });
 
     res.status(201).json({
       token: jwtToken,
@@ -270,6 +273,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
       const existingAcceptedUser = await prisma.user.findUnique({ where: { email: inv.sentTo } });
       if (existingAcceptedUser?.role === "BENEFICIARY_ADMIN") {
         const jwtToken = signUserToken(existingAcceptedUser);
+        setAuthCookie(res, jwtToken, { persistent: true });
         return res.json({
           token: jwtToken,
           user: {
@@ -345,6 +349,7 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
 
     const { user } = acceptance;
     const jwtToken = signUserToken(user);
+    setAuthCookie(res, jwtToken, { persistent: true });
 
     res.status(acceptance.created ? 201 : 200).json({
       token: jwtToken,
@@ -456,6 +461,7 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
       });
     });
     const jwtToken = signUserToken(user);
+    setAuthCookie(res, jwtToken, { persistent: true });
     res.status(201).json({
       token: jwtToken,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, beneficiaryId: user.beneficiaryId },

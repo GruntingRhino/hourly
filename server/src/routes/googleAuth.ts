@@ -9,6 +9,7 @@ import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations 
 
 import { isInternalAdminUser } from "../lib/internalAdmin";
 import { isPubliclyDeployed } from "../lib/isProdLike";
+import { setAuthCookie } from "../lib/authCookies";
 import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
 import { extractDomainFromWebsite, isPersonalEmailDomain } from "../lib/signupEmailPolicy";
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
@@ -296,6 +297,15 @@ async function handleGoogleIdentity(params: {
   };
 }
 
+function sendGoogleIdentityResult(
+  res: Response,
+  result: Awaited<ReturnType<typeof handleGoogleIdentity>>
+) {
+  const token = (result.body as { token?: string }).token;
+  if (token) setAuthCookie(res, token, { persistent: true });
+  return res.status(result.status).json(result.body);
+}
+
 // GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
 // Returns: { status: "personal" | "edu" | "custom", blocked: boolean }
 router.get("/classify-domain", publicGoogleAuthLimiter, (req: Request, res: Response) => {
@@ -384,7 +394,7 @@ if (!isPubliclyDeployed()) {
         persistGoogleId: false,
       });
 
-      return res.status(result.status).json(result.body);
+      return sendGoogleIdentityResult(res, result);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: firstZodError(err) });
@@ -475,7 +485,7 @@ router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Resp
       persistGoogleId: true,
     });
 
-    return res.status(result.status).json(result.body);
+    return sendGoogleIdentityResult(res, result);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Google auth callback error:", err);

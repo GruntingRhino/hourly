@@ -1,6 +1,7 @@
 import "./lib/env"; // Validate required env vars at startup
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { randomUUID } from "crypto";
 import prisma from "./lib/prisma";
@@ -110,6 +111,8 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+app.use(cookieParser());
 
 // Stripe webhook needs raw body for signature verification
 app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRoutes);
