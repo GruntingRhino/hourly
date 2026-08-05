@@ -161,7 +161,26 @@ Full detail lives in this session's history; summary:
   `APPROVE` row for every `ServiceSession` it seeds with `status: "VERIFIED"`
   (previously none did). Verified by running the seed script end-to-end
   against a real disposable Postgres DB and confirming all 4 seeded VERIFIED
-  sessions have a matching audit row.
+  sessions have a matching audit row. **This doc's own "Issues Requiring
+  Attention" section had 2 more items never individually cross-checked
+  here — verified this session**: Issue 2 (seeded `PENDING_CHECKIN` session
+  has non-null `totalHours`, representing estimated not actual hours) — the
+  report itself already confirms `/api/reports/student` correctly excludes
+  this from `approved[]`, so this is cosmetic seed-data hygiene, not a live
+  correctness bug; not fixed, genuinely low priority as the report says.
+  Issue 3 (CHECK constraint enforces only `checkOutTime`, not the report's
+  full "both `checkInTime` and `checkOutTime`" invariant) — **found to be a
+  real, exploitable gap in the constraint added earlier this session, fixed
+  this round** (commit `061c4f2`): strengthened the constraint to require
+  both fields, confirmed by direct raw-SQL insert that the exact invalid
+  state the report describes is now rejected. 2 regression tests connect to
+  the real (test) database directly, since a mocked Prisma client can't
+  verify a DB-level CHECK constraint. Also discovered while applying this:
+  neither real local database (`goodhours_qa_latest`,
+  `goodhours_local_disposable_accounts`) had even the original weaker
+  constraint — `prisma db push` never applies raw-SQL-only migration
+  content with no `schema.prisma` representation, so both now have the
+  constraint for the first time.
 - **`docs/qa/ACCESSIBILITY_REPORT.md`**: contrast and label findings (V-01,
   V-02, V-03, V-06) — fixed (confirmed V-06 again this session: no
   `bg-red-500` badge remains anywhere in `client/src`). **V-05 (Login tab
