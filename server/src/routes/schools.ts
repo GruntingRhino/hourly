@@ -63,6 +63,7 @@ async function buildCategoryCapWarningsForSchool(schoolId: string): Promise<Cate
   const students = await prisma.user.findMany({
     where: {
       role: "STUDENT",
+      isTestAccount: false,
       OR: [
         { schoolId },
         { cohort: { schoolId } },
@@ -2131,6 +2132,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     // Build where clause: optional cohort filter
     const whereClause: any = {
       role: "STUDENT",
+      isTestAccount: false,
     };
     if (cohortId) {
       whereClause.OR = [
@@ -2421,7 +2423,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       }
     }
 
-    const whereClause: any = { role: "STUDENT" };
+    const whereClause: any = { role: "STUDENT", isTestAccount: false };
     if (cohortId) {
       whereClause.OR = [
         { cohortId },

@@ -92,6 +92,7 @@ router.get(
       const students = await prisma.user.findMany({
         where: {
           role: "STUDENT",
+          isTestAccount: false,
           classroomId: { in: classrooms.map((classroom) => classroom.id) },
         },
         select: {

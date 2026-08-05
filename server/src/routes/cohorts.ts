@@ -343,6 +343,7 @@ async function loadCohortSummaries(scope: NonNullable<Awaited<ReturnType<typeof 
     students = await prisma.user.findMany({
       where: {
         role: "STUDENT",
+        isTestAccount: false,
         ...(scope.isSchoolAdmin
           ? {
               OR: [
@@ -846,6 +847,7 @@ router.get("/:id", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (
     const cohortStudents = await prisma.user.findMany({
       where: {
         role: "STUDENT",
+        isTestAccount: false,
         OR: [
           { cohortId: cohort.id },
           { cohortMemberships: { some: { isActive: true, cohortId: cohort.id } } },
