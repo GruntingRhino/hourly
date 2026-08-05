@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api, getErrorMessage } from "../../lib/api";
-import { setAuthSession } from "../../lib/authSession";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -295,9 +294,9 @@ export default function OrgSettings() {
     }
     setChangingPassword(true);
     try {
-      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
-      // Changing the password revokes all previous tokens — adopt the fresh one
-      if (result?.token) setAuthSession(result.token);
+      await api.put("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens; the server
+      // already refreshed the HttpOnly session cookie on this same response.
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");

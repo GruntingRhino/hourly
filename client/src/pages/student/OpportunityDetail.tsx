@@ -1,7 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../lib/api";
-import { getAuthToken } from "../../lib/authSession";
 import SignaturePad from "../../components/SignaturePad";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -204,15 +203,13 @@ export default function OpportunityDetail() {
         const formData = new FormData();
         formData.append("signatureFile", signatureFile!);
         formData.append("signatureType", "FILE");
-        // Uses the canonical token accessor (not a raw localStorage read) so
-        // this keeps working for session-only users, whose token lives in
-        // sessionStorage instead. A raw fetch (rather than api.post) is kept
-        // deliberately here to preserve the non-JSON error-body handling
-        // below for Multer-level file-type rejections.
-        const token = getAuthToken();
+        // A raw fetch (rather than api.post) is kept deliberately here to
+        // preserve the non-JSON error-body handling below for Multer-level
+        // file-type rejections. Auth travels via the HttpOnly session
+        // cookie, sent automatically for this same-origin request.
         const res = await fetch(`/api/sessions/${mySession.id}/submit-verification`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "same-origin",
           body: formData,
         });
         if (!res.ok) {

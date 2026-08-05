@@ -1,5 +1,3 @@
-import { getAuthToken } from "./authSession";
-
 const API_BASE = "/api";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -32,16 +30,12 @@ function getTimeoutMs(): number {
 }
 
 async function fetchWithAuth(path: string, options?: RequestInit): Promise<Response> {
-  const token = getAuthToken();
   const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(options?.headers as Record<string, string>),
   };
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
-  }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const controller = new AbortController();
@@ -52,6 +46,10 @@ async function fetchWithAuth(path: string, options?: RequestInit): Promise<Respo
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
+      // Auth now travels via the HttpOnly session cookie, sent
+      // automatically for same-origin requests — explicit for clarity
+      // since this is the mechanism the whole auth flow now depends on.
+      credentials: "same-origin",
       signal: controller.signal,
     });
   } catch (err: unknown) {

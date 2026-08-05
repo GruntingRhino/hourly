@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api, getErrorMessage } from "../../lib/api";
-import { setAuthSession } from "../../lib/authSession";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -234,9 +233,9 @@ export default function StudentSettings() {
     }
     setChangingPassword(true);
     try {
-      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
-      // Changing the password revokes all previous tokens — adopt the fresh one
-      if (result?.token) setAuthSession(result.token);
+      await api.put("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens; the server
+      // already refreshed the HttpOnly session cookie on this same response.
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");
