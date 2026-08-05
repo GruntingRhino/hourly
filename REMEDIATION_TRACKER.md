@@ -147,11 +147,17 @@ Full detail lives in this session's history; summary:
 - **`docs/student-privacy-compliance.md`, `docs/canvas-production-readiness.md`,
   `integration_failures.md`, `qa_results.md`** (all Canvas-era, 2026-05-10/11):
   mostly marked resolved in the docs themselves and spot-checked as such.
-  One unclear thread: a few profile-display reads (`googleAuth.ts:178`,
-  `invitations.ts:213`, `auth.ts:327`) still read `user.cohortId` directly
-  instead of the full `StudentCohortMembership` set — appears to be
-  display-only, not an access-control path, but worth a closer look if
-  reports/access paths get audited further.
+  **Followed up this session — no bug found.** The `user.cohortId` reads at
+  `googleAuth.ts:178` and `auth.ts:324` sit alongside a separate `cohorts:
+  serializeCohorts(user.cohortMemberships)` field in the same response
+  object — both the single primary-cohort FK and the full multi-membership
+  list are returned together, so nothing is lost. `invitations.ts:213` is
+  the JWT-issuance response for a brand-new user immediately after
+  `ensureStudentCohortMembership({ forcePrimary: true, ... })` was called
+  for their one and only membership — `cohortId` is accurate by
+  construction at that point, and this response is a minimal signup
+  bootstrap payload, not the full profile (the client re-fetches via
+  `/api/auth/me`, which returns the full `cohorts` array). No fix needed.
 - **`tests/qa-results.md`** (6000+ lines, repeated run history): skimmed, no
   new distinct issues found beyond the above. Some flaky-looking historical
   failures (school-settings tab/URL sync, nearby-directory partnership flow)
