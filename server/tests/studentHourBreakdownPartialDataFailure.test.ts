@@ -129,3 +129,89 @@ test("GET /:id/students/:studentId/hour-breakdown returns COMPLETE dataState whe
     prismaClient.serviceSession.findMany = original.sessionFindMany;
   }
 });
+
+// §9 canonical service-hour ledger: surfaced in this same response as a
+// read-only audit trail (ledgerEntries), alongside — not instead of — the
+// existing per-source records and totals.
+test("GET /:id/students/:studentId/hour-breakdown includes ledgerEntries without affecting totals", async () => {
+  const original = {
+    userFindUnique: prismaClient.user.findUnique,
+    userFindMany: prismaClient.user.findMany,
+    dataAccessLogCreate: prismaClient.dataAccessLog.create,
+    benSignupFindMany: prismaClient.beneficiarySignup.findMany,
+    selfSubFindMany: prismaClient.selfSubmittedRequest.findMany,
+    sessionFindMany: prismaClient.serviceSession.findMany,
+    ledgerFindMany: prismaClient.serviceHourLedgerEntry.findMany,
+  };
+  baseMocks();
+  prismaClient.beneficiarySignup.findMany = async () => [];
+  prismaClient.selfSubmittedRequest.findMany = async () => [];
+  prismaClient.serviceSession.findMany = async () => [];
+  const approvedAt = new Date("2026-01-15T12:00:00Z");
+  prismaClient.serviceHourLedgerEntry.findMany = async () => [{
+    id: "ledger-1",
+    sourceType: "SELF_SUBMITTED",
+    sourceId: "submission-1",
+    category: "environment",
+    approvedMinutes: 150,
+    approvedAt,
+    approver: { id: "approver-1", name: "Approving Admin" },
+  }];
+  try {
+    const app = express();
+    app.use("/", schoolRoutes);
+    const res = await requestAsAdmin(app);
+    assert.equal(res.status, 200);
+    const body = await res.json() as any;
+    assert.equal(body.totals.reconciliation.dataState, "COMPLETE");
+    assert.equal(body.ledgerEntries.length, 1);
+    assert.equal(body.ledgerEntries[0].sourceType, "SELF_SUBMITTED");
+    assert.equal(body.ledgerEntries[0].approvedHours, 2.5);
+    assert.equal(body.ledgerEntries[0].approverName, "Approving Admin");
+  } finally {
+    prismaClient.user.findUnique = original.userFindUnique;
+    prismaClient.user.findMany = original.userFindMany;
+    prismaClient.dataAccessLog.create = original.dataAccessLogCreate;
+    prismaClient.beneficiarySignup.findMany = original.benSignupFindMany;
+    prismaClient.selfSubmittedRequest.findMany = original.selfSubFindMany;
+    prismaClient.serviceSession.findMany = original.sessionFindMany;
+    prismaClient.serviceHourLedgerEntry.findMany = original.ledgerFindMany;
+  }
+});
+
+test("GET /:id/students/:studentId/hour-breakdown degrades to PARTIAL (not 500) when the ledger lookup fails", async () => {
+  const original = {
+    userFindUnique: prismaClient.user.findUnique,
+    userFindMany: prismaClient.user.findMany,
+    dataAccessLogCreate: prismaClient.dataAccessLog.create,
+    benSignupFindMany: prismaClient.beneficiarySignup.findMany,
+    selfSubFindMany: prismaClient.selfSubmittedRequest.findMany,
+    sessionFindMany: prismaClient.serviceSession.findMany,
+    ledgerFindMany: prismaClient.serviceHourLedgerEntry.findMany,
+  };
+  baseMocks();
+  prismaClient.beneficiarySignup.findMany = async () => [];
+  prismaClient.selfSubmittedRequest.findMany = async () => [];
+  prismaClient.serviceSession.findMany = async () => [];
+  prismaClient.serviceHourLedgerEntry.findMany = async () => { throw new Error("transient DB error"); };
+  try {
+    const app = express();
+    app.use("/", schoolRoutes);
+    const res = await requestAsAdmin(app);
+    assert.equal(res.status, 200);
+    const body = await res.json() as any;
+    assert.equal(body.totals.reconciliation.dataState, "PARTIAL");
+    assert.ok(body.totals.reconciliation.failedSources.includes("service hour ledger"));
+    assert.deepEqual(body.ledgerEntries, []);
+    // The ledger being unavailable must not affect the real totals.
+    assert.equal(typeof body.totals.approved, "number");
+  } finally {
+    prismaClient.user.findUnique = original.userFindUnique;
+    prismaClient.user.findMany = original.userFindMany;
+    prismaClient.dataAccessLog.create = original.dataAccessLogCreate;
+    prismaClient.beneficiarySignup.findMany = original.benSignupFindMany;
+    prismaClient.selfSubmittedRequest.findMany = original.selfSubFindMany;
+    prismaClient.serviceSession.findMany = original.sessionFindMany;
+    prismaClient.serviceHourLedgerEntry.findMany = original.ledgerFindMany;
+  }
+});

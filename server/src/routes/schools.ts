@@ -1307,7 +1307,7 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
     // (e.g. the legacy ServiceSession lookup) would 500 the whole page even
     // though the other two sources, and the already-computed totals, are
     // fine.
-    const [beneficiarySignupsResult, selfSubmissionsResult, legacySessionsResult, totalsMapResult] = await Promise.allSettled([
+    const [beneficiarySignupsResult, selfSubmissionsResult, legacySessionsResult, totalsMapResult, ledgerEntriesResult] = await Promise.allSettled([
       prisma.beneficiarySignup.findMany({
         where: { studentId: student.id, schoolId: req.params.id },
         include: {
@@ -1341,6 +1341,17 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         orderBy: [{ createdAt: "desc" }],
       }),
       calculateStudentHours([student.id], req.params.id),
+      // §9 canonical service-hour ledger: surfaced here as a read-only
+      // audit trail alongside the existing per-source records — this does
+      // NOT feed into `approved`/`pending` below, which are still computed
+      // exactly as before from calculateStudentHours(). The ledger only
+      // captures approvals made after it was introduced, so it will be
+      // incomplete for older records; that's expected and not a bug.
+      prisma.serviceHourLedgerEntry.findMany({
+        where: { studentId: student.id, schoolId: req.params.id },
+        orderBy: [{ createdAt: "desc" }],
+        include: { approver: { select: { id: true, name: true } } },
+      }),
     ]);
 
     const recordsFailedSources: string[] = [];
@@ -1360,10 +1371,15 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
       recordsFailedSources.push("computed totals");
       console.error("Student hour breakdown: calculateStudentHours failed", totalsMapResult.reason);
     }
+    if (ledgerEntriesResult.status === "rejected") {
+      recordsFailedSources.push("service hour ledger");
+      console.error("Student hour breakdown: serviceHourLedgerEntry lookup failed", ledgerEntriesResult.reason);
+    }
 
     const beneficiarySignups = beneficiarySignupsResult.status === "fulfilled" ? beneficiarySignupsResult.value : [];
     const selfSubmissions = selfSubmissionsResult.status === "fulfilled" ? selfSubmissionsResult.value : [];
     const legacySessions = legacySessionsResult.status === "fulfilled" ? legacySessionsResult.value : [];
+    const ledgerEntries = ledgerEntriesResult.status === "fulfilled" ? ledgerEntriesResult.value : [];
     const totalsMap = totalsMapResult.status === "fulfilled"
       ? totalsMapResult.value
       : Object.assign(new Map(), { dataState: "PARTIAL" as const, failedSources: ["computed totals"] });
@@ -1543,6 +1559,19 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         selfSubmission: selfSubmissionRecords,
         legacy: legacyRecords,
       },
+      // §9 canonical service-hour ledger: read-only audit trail, does not
+      // feed into totals above. Only covers approvals made after the
+      // ledger was introduced — absence of an entry for an older record is
+      // expected, not an error.
+      ledgerEntries: ledgerEntries.map((entry) => ({
+        id: entry.id,
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        category: entry.category,
+        approvedHours: roundHours(entry.approvedMinutes / 60),
+        approverName: entry.approver.name,
+        approvedAt: entry.approvedAt,
+      })),
     });
   } catch (err) {
     console.error("Student hour breakdown error:", err);
