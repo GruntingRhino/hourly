@@ -185,8 +185,10 @@ export default function CohortDetail() {
   const [csvData, setCsvData] = useState("");
   const [includeHouseColumn, setIncludeHouseColumn] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [savingHouseField, setSavingHouseField] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [dryRunResult, setDryRunResult] = useState<ImportResult | null>(null);
   const [importIssues, setImportIssues] = useState<ImportIssue[]>([]);
   const [importErrorMessage, setImportErrorMessage] = useState("");
   const [importStep, setImportStep] = useState<ImportStep>("upload");
@@ -251,9 +253,30 @@ export default function CohortDetail() {
     setCsvPreviewRows([]);
     setColumnMapping({});
     setImportResult(null);
+    setDryRunResult(null);
     setImportIssues([]);
     setImportErrorMessage("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePreviewImport = async () => {
+    if (!csvData.trim()) return;
+    setPreviewing(true);
+    setDryRunResult(null);
+    setImportErrorMessage("");
+    try {
+      const result = await api.post<ImportResult>(`/cohorts/${id}/import`, { csvData, columnMapping, dryRun: true });
+      setDryRunResult(result);
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.body && typeof err.body === "object") {
+        const body = err.body as { error?: string; errors?: ImportIssue[] };
+        setImportErrorMessage(body.error || getErrorMessage(err, "Preview failed."));
+      } else {
+        setImportErrorMessage(getErrorMessage(err, "Preview failed."));
+      }
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   const handleImport = async () => {
@@ -266,6 +289,7 @@ export default function CohortDetail() {
       const result = await api.post<ImportResult>(`/cohorts/${id}/import`, { csvData, columnMapping });
       setImportResult(result);
       setImportIssues(result.errors ?? []);
+      setDryRunResult(null);
       if ((result.errors ?? []).length === 0) {
         handleBackToUpload();
       }
@@ -1013,7 +1037,7 @@ export default function CohortDetail() {
                             <td className="px-3 py-2">
                               <select
                                 value={columnMapping[header] ?? "skip"}
-                                onChange={(e) => setColumnMapping((prev) => ({ ...prev, [header]: e.target.value as FieldTarget }))}
+                                onChange={(e) => { setColumnMapping((prev) => ({ ...prev, [header]: e.target.value as FieldTarget })); setDryRunResult(null); }}
                                 className="text-xs border border-[var(--border-s)] rounded px-2 py-1 w-full bg-[var(--surface)]"
                               >
                                 {FIELD_ORDER.map((f) => <option key={f} value={f}>{FIELD_LABELS[f]}</option>)}
@@ -1060,13 +1084,53 @@ export default function CohortDetail() {
                   </div>
                 )}
 
-                <button
-                  onClick={handleImport}
-                  disabled={importing || mappingErrors.length > 0}
-                  className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13px] font-medium text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50"
-                >
-                  {importing ? "Importing..." : "Import Students"}
-                </button>
+                {dryRunResult && (
+                  <div className={`mb-4 p-3 rounded text-sm border ${dryRunResult.errors?.length ? "bg-[var(--wn-bg)] border-[var(--wn-b)]" : "bg-[var(--ok-bg)] border-[var(--ok-b)]"}`}>
+                    <div>
+                      Preview: <strong>{dryRunResult.added}</strong> will be added, <strong>{dryRunResult.skipped}</strong> will be skipped.
+                      {dryRunResult.preview && <span className="text-[var(--text-sec)]"> ({dryRunResult.preview.totalRows} rows)</span>}
+                      {" "}Nothing has been imported yet.
+                    </div>
+                    {dryRunResult.errors?.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-amber-900">
+                        {dryRunResult.errors.slice(0, 10).map((e) => (
+                          <li key={`${e.row}-${e.email ?? "x"}`}>Row {e.row}{e.email ? ` (${e.email})` : ""}: {e.reason}</li>
+                        ))}
+                        {dryRunResult.errors.length > 10 && <li className="text-[var(--wn-t)]">…and {dryRunResult.errors.length - 10} more</li>}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {!dryRunResult && (
+                    <button
+                      onClick={handlePreviewImport}
+                      disabled={previewing || mappingErrors.length > 0}
+                      className="h-[34px] px-4 border border-[var(--border-s)] rounded-[2px] text-[13.5px] font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                    >
+                      {previewing ? "Checking..." : "Preview Import"}
+                    </button>
+                  )}
+                  {dryRunResult && (
+                    <>
+                      <button
+                        onClick={() => setDryRunResult(null)}
+                        disabled={importing}
+                        className="h-[34px] px-4 border border-[var(--border-s)] rounded-[2px] text-[13.5px] font-medium hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={handleImport}
+                        disabled={importing || dryRunResult.added === 0}
+                        className="h-[34px] px-4 bg-[var(--action)] text-white rounded-[2px] text-[13.5px] font-medium hover:opacity-85 disabled:opacity-50"
+                      >
+                        {importing ? "Importing..." : `Confirm & Import ${dryRunResult.added} Student${dryRunResult.added === 1 ? "" : "s"}`}
+                      </button>
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
