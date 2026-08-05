@@ -168,6 +168,43 @@ enum SchoolOwnershipStatus {
   REJECTED
 }
 
+enum SchoolVerificationStandard {
+  STANDARD
+  BENEFICIARY_REQUIRED
+}
+
+// Manually-operated procurement pipeline — most values here are set
+// directly by ops/sales, not written by any app route (only NONE,
+// QUOTE_REQUESTED, and ACTIVE are). Value set confirmed against the
+// client's SchoolBillingStatus union (SchoolBilling.tsx), which the UI
+// treats as authoritative for every stage.
+enum SchoolBillingStatus {
+  NONE
+  QUOTE_REQUESTED
+  QUOTE_IN_REVIEW
+  QUOTE_SENT
+  PRIVACY_REVIEW
+  SECURITY_REVIEW
+  CONTRACT_REVIEW
+  AWAITING_SIGNATURE
+  AWAITING_PURCHASE_ORDER
+  PURCHASE_ORDER_RECEIVED
+  INVOICED
+  PAYMENT_PENDING
+  ACTIVE
+  PAST_DUE
+  EXPIRED
+  DECLINED
+}
+
+enum SchoolAccessStatus {
+  PROCUREMENT
+  PILOT
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
 model School {
   id                            String                @id @default(cuid())
   name                          String
@@ -198,7 +235,7 @@ model School {
   ownershipTransferExpires      DateTime?
   ownershipTransferTargetUserId String?
   requiredHours                 Float                 @default(40)
-  verificationStandard          String                @default("STANDARD")
+  verificationStandard          SchoolVerificationStandard @default(STANDARD)
   serviceStartDate              DateTime?
   serviceEndDate                DateTime?
   allowSelfSubmission           Boolean               @default(true)
@@ -215,8 +252,8 @@ model School {
   launchMonitoringConfig        String?
   zipCodes                      String? // JSON array of zip codes (service area)
   // Billing / procurement
-  billingStatus                 String                @default("NONE")
-  accessStatus                  String                @default("PROCUREMENT")
+  billingStatus                 SchoolBillingStatus   @default(NONE)
+  accessStatus                  SchoolAccessStatus    @default(PROCUREMENT)
   pilotExpiresAt                DateTime?
   createdAt                     DateTime              @default(now())
   updatedAt                     DateTime              @updatedAt
