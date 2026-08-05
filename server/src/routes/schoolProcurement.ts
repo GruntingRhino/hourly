@@ -16,6 +16,12 @@ import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 const PROC_UPLOAD_DIR = resolveWritableUploadDir("school-procurement");
 
 const MAX_DOC_SIZE = 20 * 1024 * 1024; // 20 MB
+// §14 storage quotas: procurement documents have no per-org/tier concept
+// the way beneficiary attachments do (lib/orgTierGates.ts's FREE/PRO
+// limits) — this is a flat cap per school, purely to bound unlimited
+// storage growth (files persist as a Postgres Bytes column, not on disk;
+// see contentBytes below), not a monetized feature limit.
+const MAX_SCHOOL_PROCUREMENT_STORAGE_BYTES = 200 * 1024 * 1024; // 200 MB
 
 const procUpload = multer({
   storage: multer.diskStorage({
@@ -249,6 +255,18 @@ router.post("/:id/documents",
       });
       if (!school) { fs.unlinkSync(req.file.path); return res.status(404).json({ error: "School not found" }); }
       if (!school.billingRecord) { fs.unlinkSync(req.file.path); return res.status(400).json({ error: "No active procurement record. Submit a quote request first." }); }
+
+      const existingUsage = await prisma.schoolProcurementDocument.aggregate({
+        where: { schoolId: req.params.id },
+        _sum: { fileSizeBytes: true },
+      });
+      const usedBytes = existingUsage._sum.fileSizeBytes ?? 0;
+      if (usedBytes + verifiedStat.size > MAX_SCHOOL_PROCUREMENT_STORAGE_BYTES) {
+        fs.unlinkSync(req.file.path);
+        const usedMB = (usedBytes / 1024 / 1024).toFixed(1);
+        const limitMB = (MAX_SCHOOL_PROCUREMENT_STORAGE_BYTES / 1024 / 1024).toFixed(0);
+        return res.status(413).json({ error: `Storage quota exceeded. Used ${usedMB} MB of ${limitMB} MB.` });
+      }
 
       const doc = await prisma.schoolProcurementDocument.create({
         data: {
