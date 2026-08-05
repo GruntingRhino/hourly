@@ -66,14 +66,25 @@ export function canAccessCohort(scope: StaffAccessScope, cohortId: string): bool
 }
 
 export function buildCohortScopedStudentWhere(scope: StaffAccessScope): Record<string, unknown> {
+  // isTestAccount is documented on the schema ("hidden from all lists") but
+  // was never actually excluded anywhere — Canvas/Google Classroom
+  // integration test flows write it, but no query filtered it back out, so
+  // QA/Playwright fixture students would appear mixed into real staff-facing
+  // rosters, reports, and messaging audiences. This is the central
+  // cohort-scoping helper every staff-facing "list students" query in
+  // routes/{cohorts,reports,messages,selfSubmissions,schools,sessions}.ts
+  // already builds its where clause from, so excluding it here is the
+  // single highest-coverage fix for the documented intent.
   if (scope.isSchoolAdmin) {
     return {
       schoolId: scope.schoolId,
+      isTestAccount: false,
     };
   }
 
   return {
     schoolId: scope.schoolId,
+    isTestAccount: false,
     OR: [
       { cohortId: { in: scope.assignedCohortIds } },
       { cohortMemberships: { some: { isActive: true, cohortId: { in: scope.assignedCohortIds } } } },

@@ -21,13 +21,22 @@ const teacherScope: StaffAccessScope = {
 test("school staff student scopes require the canonical student school", () => {
   assert.deepEqual(buildCohortScopedStudentWhere(adminScope), {
     schoolId: "school-a",
+    isTestAccount: false,
   });
 
   assert.deepEqual(buildCohortScopedStudentWhere(teacherScope), {
     schoolId: "school-a",
+    isTestAccount: false,
     OR: [
       { cohortId: { in: ["cohort-a"] } },
       { cohortMemberships: { some: { isActive: true, cohortId: { in: ["cohort-a"] } } } },
     ],
   });
+});
+
+test("school staff student scopes exclude Playwright/QA test accounts from staff-facing lists", () => {
+  const adminWhere = buildCohortScopedStudentWhere(adminScope);
+  const teacherWhere = buildCohortScopedStudentWhere(teacherScope);
+  assert.equal(adminWhere.isTestAccount, false);
+  assert.equal(teacherWhere.isTestAccount, false);
 });
