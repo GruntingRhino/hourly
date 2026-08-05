@@ -222,12 +222,35 @@ Full detail lives in this session's history; summary:
   failures (school-settings tab/URL sync, nearby-directory partnership flow)
   look structurally fine in current code — most likely test timing, not a
   live bug, but unconfirmed without an actual browser run.
-- **Skipped as pure paperwork/checklists, no code findings**:
-  `docs/qa/PRODUCTION_CHECKLIST.md`, `docs/qa/PILOT_PLAN.md`,
-  `docs/qa/MANUAL_FOUNDER_CHECKLIST.md`, `docs/qa/TEST_PLAN.md`,
-  `docs/qa/ROLE_PERMISSION_MATRIX.md`, `docs/qa/STRIPE_TEST_REPORT.md`,
+- **Skipped as pure paperwork/checklists, no code findings** — this session
+  actually read each in full (not just skimmed) to confirm that
+  classification rather than assume it: `docs/qa/PRODUCTION_CHECKLIST.md`,
+  `docs/qa/PILOT_PLAN.md`, `docs/qa/MANUAL_FOUNDER_CHECKLIST.md`,
+  `docs/qa/TEST_PLAN.md`, `docs/qa/STRIPE_TEST_REPORT.md`,
   `docs/qa/DEPENDENCY_ADVISORY_EXCEPTIONS.md`,
-  `docs/qa/BACKUP_RESTORE_REPORT.md`, `docs/qa/REPOSITORY_AUDIT.md`.
+  `docs/qa/BACKUP_RESTORE_REPORT.md`, `docs/qa/REPOSITORY_AUDIT.md` (737
+  lines — full API/schema/route inventory, confirmed no embedded findings,
+  only cross-references). `docs/qa/ROLE_PERMISSION_MATRIX.md` (318 lines)
+  is also a pure inventory, but its line 310 claim ("Student names are
+  pseudonymized ... unless `school.ferpaBeneficiaryPiiEnabled = true`")
+  is **stale/inaccurate** — re-confirmed via a full repo grep that
+  `isBeneficiaryPiiEnabled()` is still never called anywhere, so the flag
+  doesn't actually gate anything; behavior is unconditionally
+  pseudonymized for beneficiary admins regardless of the flag. This is the
+  same already-tracked orphaned-feature finding (see the `❓` row above),
+  not a new bug — the doc's claim is just describing intended-but-
+  never-wired behavior, and the actual (unconditional) behavior remains
+  the safe default. **Also verified this session**: the upload cleanup
+  background job (`lib/uploadCleanup.ts`) and its interaction with the
+  SHA-256 attachment-dedup logic in `beneficiaries.ts` — both the
+  scheduled cleanup (`cleanCancelledOpportunityAttachments`) and the
+  `DELETE .../attachments/:id` route correctly check `remaining === 0`
+  (no other `BeneficiaryOpportunityAttachment` row still references the
+  same deduplicated filename) before unlinking a physical disk file, and
+  correctly skip the disk-unlink entirely once `contentBytes` (the
+  current, non-disk storage path) is populated. No bug found; this is a
+  real side-effecting job (permanently deletes files) so worth having
+  actually traced rather than assumed safe.
 - **`docs/qa/EDGE_CASE_REPORT.md`**: previously marked "superseded by
   FINAL_RELEASE_REPORT fixes" without individually re-checking each of its
   5 numbered defects — **actually re-verified this session, one by one,
