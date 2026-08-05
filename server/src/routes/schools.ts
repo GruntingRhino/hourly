@@ -1297,7 +1297,15 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
     const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, student.id) : false;
     if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
 
-    const [beneficiarySignups, selfSubmissions, legacySessions, totalsMap] = await Promise.all([
+    // Promise.allSettled (not Promise.all): this powers a school admin's
+    // per-student hour-breakdown view. calculateStudentHours already
+    // degrades gracefully on its own internal partial failures (see
+    // `totalsMap.dataState` below) — the three raw record-list queries
+    // must do the same, otherwise a transient failure in just one of them
+    // (e.g. the legacy ServiceSession lookup) would 500 the whole page even
+    // though the other two sources, and the already-computed totals, are
+    // fine.
+    const [beneficiarySignupsResult, selfSubmissionsResult, legacySessionsResult, totalsMapResult] = await Promise.allSettled([
       prisma.beneficiarySignup.findMany({
         where: { studentId: student.id, schoolId: req.params.id },
         include: {
@@ -1332,6 +1340,31 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
       }),
       calculateStudentHours([student.id], req.params.id),
     ]);
+
+    const recordsFailedSources: string[] = [];
+    if (beneficiarySignupsResult.status === "rejected") {
+      recordsFailedSources.push("beneficiary signups");
+      console.error("Student hour breakdown: beneficiarySignup lookup failed", beneficiarySignupsResult.reason);
+    }
+    if (selfSubmissionsResult.status === "rejected") {
+      recordsFailedSources.push("self-submitted hours");
+      console.error("Student hour breakdown: selfSubmittedRequest lookup failed", selfSubmissionsResult.reason);
+    }
+    if (legacySessionsResult.status === "rejected") {
+      recordsFailedSources.push("legacy sessions");
+      console.error("Student hour breakdown: serviceSession lookup failed", legacySessionsResult.reason);
+    }
+    if (totalsMapResult.status === "rejected") {
+      recordsFailedSources.push("computed totals");
+      console.error("Student hour breakdown: calculateStudentHours failed", totalsMapResult.reason);
+    }
+
+    const beneficiarySignups = beneficiarySignupsResult.status === "fulfilled" ? beneficiarySignupsResult.value : [];
+    const selfSubmissions = selfSubmissionsResult.status === "fulfilled" ? selfSubmissionsResult.value : [];
+    const legacySessions = legacySessionsResult.status === "fulfilled" ? legacySessionsResult.value : [];
+    const totalsMap = totalsMapResult.status === "fulfilled"
+      ? totalsMapResult.value
+      : Object.assign(new Map(), { dataState: "PARTIAL" as const, failedSources: ["computed totals"] });
 
     const actorIds = [
       ...beneficiarySignups.flatMap((signup) => signup.auditLogs.map((entry) => entry.actorId)),
@@ -1494,8 +1527,13 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
           // COMPLETE unless one or more underlying hour sources failed to load —
           // in that case expectedApproved/expectedPending (and any resulting
           // "reconciled: false") should not be treated as a confirmed discrepancy.
-          dataState: totalsMap.dataState,
-          ...(totalsMap.dataState === "PARTIAL" ? { failedSources: totalsMap.failedSources } : {}),
+          // Combines calculateStudentHours' own internal partial-failure
+          // tracking with failures of the three raw record-list queries
+          // this route runs directly.
+          dataState: (totalsMap.dataState === "PARTIAL" || recordsFailedSources.length) ? "PARTIAL" as const : "COMPLETE" as const,
+          ...((totalsMap.dataState === "PARTIAL" || recordsFailedSources.length)
+            ? { failedSources: [...new Set([...(totalsMap.dataState === "PARTIAL" ? totalsMap.failedSources : []), ...recordsFailedSources])] }
+            : {}),
         },
       },
       records: {
