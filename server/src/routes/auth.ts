@@ -95,18 +95,6 @@ function signupRateLimitChannel(req: Request): string {
   return "direct";
 }
 
-function isInteractiveSignupRequest(req: Request): boolean {
-  const fetchSite = (req.get("sec-fetch-site") || "").trim().toLowerCase();
-  const fetchMode = (req.get("sec-fetch-mode") || "").trim().toLowerCase();
-  const origin = (req.get("origin") || "").trim().toLowerCase();
-  const referer = (req.get("referer") || "").trim().toLowerCase();
-
-  if (fetchSite === "same-origin" || fetchSite === "same-site") return true;
-  if (fetchMode === "cors" && (origin.includes("localhost:5173") || origin.includes("goodhours.app"))) return true;
-  if (referer.includes("/signup")) return true;
-  return false;
-}
-
 async function precheckDuplicateSignupEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const raw = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
