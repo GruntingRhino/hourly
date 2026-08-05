@@ -7,6 +7,7 @@ import { requireRole } from "../middleware/rbac";
 import { resolveEffectiveRules, checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { assertStudentAccessibleToStaff, buildCohortScopedStudentWhere, getStaffAccessScope } from "../lib/cohortAccess";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
 import {
   sendSelfSubmissionApprovedEmail,
   sendSelfSubmissionRejectedEmail,
@@ -328,6 +329,16 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
           ...(overrideCap ? { capOverride: true } : {}),
         }),
       },
+    });
+
+    await recordServiceHourLedgerEntry({
+      studentId: submission.studentId,
+      schoolId: submission.schoolId,
+      sourceType: "SELF_SUBMITTED",
+      sourceId: submission.id,
+      category: submission.category,
+      approvedHours: hours,
+      approverId: req.user!.userId,
     });
 
     // Notify student

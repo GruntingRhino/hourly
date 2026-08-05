@@ -135,6 +135,8 @@ model User {
   ownedOrganizationInvoiceRequests     OrganizationInvoiceRequest[]  @relation("OrganizationInvoiceRequestOwner")
   organizationInvoiceAuditLogs         OrganizationInvoiceAuditLog[] @relation("OrganizationInvoiceAuditActor")
   uploadedOrganizationInvoiceArtifacts OrganizationInvoiceArtifact[] @relation("OrganizationInvoiceArtifactUploader")
+  serviceHourLedgerEntries             ServiceHourLedgerEntry[]      @relation("ServiceHourLedgerStudent")
+  approvedServiceHourLedgerEntries     ServiceHourLedgerEntry[]      @relation("ServiceHourLedgerApprover")
 
   // Foreign-key columns filtered on constantly for tenant/relationship scoping
   // (school-scoped student/staff lookups, cohort membership, etc.) had no
@@ -279,6 +281,7 @@ model School {
   quoteRequests           SchoolQuoteRequest[]
   partnerRequestsSent     SchoolPartnerRequest[]       @relation("PartnerRequestFrom")
   partnerRequestsReceived SchoolPartnerRequest[]       @relation("PartnerRequestTo")
+  serviceHourLedgerEntries ServiceHourLedgerEntry[]
 }
 
 enum SchoolPartnerRequestStatus {
@@ -1228,6 +1231,46 @@ model AuditLog {
 
   @@index([action, createdAt])
   @@index([sessionId, createdAt])
+}
+
+// ─── Service Hour Ledger (§9) ──────────────────────────────────────
+//
+// Scoped as an additive, append-only record of every hour-approval event
+// across all three hour sources, dual-written alongside the existing
+// approve routes without changing what they write to those source tables
+// or what lib/hoursCalculator.ts reads from. This is NOT yet the system
+// of record — calculateStudentHours() still aggregates BeneficiarySignup/
+// SelfSubmittedRequest/ServiceSession directly, exactly as before — this
+// table exists so a genuine "single ledger" migration has real data to
+// migrate onto later, without that later step being a from-scratch
+// backfill. Append-only by design (every approval, including a later
+// adjustment/re-approval of the same source record, inserts a new row —
+// never updates one in place), matching this codebase's other audit-log
+// tables (AuditLog, BeneficiaryAuditLog).
+enum ServiceHourLedgerSourceType {
+  BENEFICIARY_SIGNUP
+  SELF_SUBMITTED
+  SERVICE_SESSION
+}
+
+model ServiceHourLedgerEntry {
+  id              String                      @id @default(cuid())
+  studentId       String
+  student         User                        @relation("ServiceHourLedgerStudent", fields: [studentId], references: [id])
+  schoolId        String?
+  school          School?                     @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  sourceType      ServiceHourLedgerSourceType
+  sourceId        String // id of the originating BeneficiarySignup/SelfSubmittedRequest/ServiceSession row
+  category        String?
+  approvedMinutes Int
+  approverId      String
+  approver        User                        @relation("ServiceHourLedgerApprover", fields: [approverId], references: [id])
+  approvedAt      DateTime                    @default(now())
+  createdAt       DateTime                    @default(now())
+
+  @@index([studentId])
+  @@index([schoolId])
+  @@index([sourceType, sourceId])
 }
 
 // ─── Data Access Log (FERPA compliance — read-access trail) ─────

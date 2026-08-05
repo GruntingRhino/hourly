@@ -38,6 +38,7 @@ import { createHybridRateLimit } from "../middleware/rateLimit";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
 import { slotDateTime, computeSlotTimestamps } from "../lib/icsGenerator";
+import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
 import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
 
 const schoolBeneficiaryApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "BLOCKED"]);
@@ -2835,6 +2836,16 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
           ...(signup.status === "NO_SHOW" ? { noShowOverride: true, noShowOverrideReason } : {}),
         }),
       },
+    });
+
+    await recordServiceHourLedgerEntry({
+      studentId: signup.studentId,
+      schoolId: signup.schoolId,
+      sourceType: "BENEFICIARY_SIGNUP",
+      sourceId: signup.id,
+      category: signup.slot.opportunity.category,
+      approvedHours: hours,
+      approverId: req.user!.userId,
     });
 
     await notifyBeneficiarySignupReviewChange({

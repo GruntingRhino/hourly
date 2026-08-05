@@ -7,6 +7,7 @@ import { sendHourApprovedEmail } from "../services/email";
 import { resolveEffectiveRules } from "../lib/schoolRules";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 import { assertStudentAccessibleToStaff, getStaffAccessScope } from "../lib/cohortAccess";
+import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
 
 const router = Router();
 
@@ -82,6 +83,16 @@ router.post("/:sessionId/approve", authenticate, requireRole("ORG_ADMIN", "SCHOO
         sessionId: session.id,
         details: JSON.stringify({ approvedHours: hours, originalHours: session.totalHours }),
       },
+    });
+
+    await recordServiceHourLedgerEntry({
+      studentId: session.userId,
+      schoolId: session.schoolId,
+      sourceType: "SERVICE_SESSION",
+      sourceId: session.id,
+      category: null, // legacy Opportunity model has no category field
+      approvedHours: hours,
+      approverId: req.user!.userId,
     });
 
     // Notify student
