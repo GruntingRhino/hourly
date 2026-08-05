@@ -415,7 +415,12 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     if (type === "student" || req.user!.role === "STUDENT") {
       const userId = req.user!.userId;
 
-      const [sessions, benSignups, selfSubs] = await Promise.all([
+      // Promise.allSettled (not Promise.all): this export is a student's
+      // official hours record — if one of the three independent sources
+      // has a transient failure, the other two should still be exported
+      // rather than the whole request 500ing, but the export must say so
+      // rather than silently presenting an incomplete record as complete.
+      const [sessionsResult, benSignupsResult, selfSubsResult] = await Promise.allSettled([
         prisma.serviceSession.findMany({
           where: { userId, verificationStatus: "APPROVED" },
           include: { opportunity: { include: { organization: { select: { name: true } } } } },
@@ -440,12 +445,33 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
         }),
       ]);
 
+      const failedSources: string[] = [];
+      if (sessionsResult.status === "rejected") {
+        failedSources.push("organization-verified hours");
+        console.error("CSV export: serviceSession lookup failed", sessionsResult.reason);
+      }
+      if (benSignupsResult.status === "rejected") {
+        failedSources.push("beneficiary-verified hours");
+        console.error("CSV export: beneficiarySignup lookup failed", benSignupsResult.reason);
+      }
+      if (selfSubsResult.status === "rejected") {
+        failedSources.push("self-submitted hours");
+        console.error("CSV export: selfSubmittedRequest lookup failed", selfSubsResult.reason);
+      }
+      const sessions = sessionsResult.status === "fulfilled" ? sessionsResult.value : [];
+      const benSignups = benSignupsResult.status === "fulfilled" ? benSignupsResult.value : [];
+      const selfSubs = selfSubsResult.status === "fulfilled" ? selfSubsResult.value : [];
+
       await logDataAccess({
         actorId: userId,
         action: "EXPORT_CSV",
         targetType: "student",
         targetId: userId,
-        details: { type: "student", sessionCount: sessions.length + benSignups.length + selfSubs.length },
+        details: {
+          type: "student",
+          sessionCount: sessions.length + benSignups.length + selfSubs.length,
+          ...(failedSources.length ? { partial: true, failedSources } : {}),
+        },
       });
 
       // Combine all sources into uniform rows, sorted by date
@@ -479,9 +505,20 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
 
       allRows.sort((a, b) => a.date.localeCompare(b.date));
 
+      // All three sources failing would otherwise produce an empty CSV
+      // indistinguishable from a genuinely zero-hours student — refuse to
+      // export a record that isn't known to be complete rather than
+      // silently claiming zero hours.
+      if (failedSources.length === 3) {
+        return res.status(503).json({ error: "Unable to retrieve your hours right now. Please try again shortly." });
+      }
+
       rows.push(["Date", "Opportunity", "Organization", "Hours", "Status"]);
       for (const r of allRows) {
         rows.push([r.date, r.activity, r.organization, String(r.hours), "APPROVED"]);
+      }
+      if (failedSources.length > 0) {
+        rows.push([`WARNING: this export is incomplete — could not retrieve ${failedSources.join(", ")}. Please try again shortly.`, "", "", "", ""]);
       }
       filename = "my-service-hours.csv";
     }
