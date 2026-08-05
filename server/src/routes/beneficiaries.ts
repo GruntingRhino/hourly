@@ -1075,7 +1075,12 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
 // POST /api/beneficiaries/import-csv — bulk import community partners
 router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, dryRun } = z.object({
+      csvData: z.string().min(1),
+      // §10 staged imports: preview added/failed counts and per-row errors
+      // without creating any Beneficiary or SchoolBeneficiaryApproval row.
+      dryRun: z.boolean().optional().default(false),
+    }).parse(req.body);
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
@@ -1099,40 +1104,42 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
       }
       try {
         const visibility = (row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE";
-        const ben = await prisma.beneficiary.create({
-          data: {
-            name,
-            category: (row.category || "").trim() || null,
-            email: (row.contact_email || row.email)?.trim() || null,
-            phone: (row.phone || row.phone_number)?.trim() || null,
-            website: row.website?.trim() || null,
-            address: row.address?.trim() || null,
-            city: row.city?.trim() || null,
-            state: row.state?.trim() || null,
-            zip: (row.zip || row.zip_code)?.trim() || null,
-            description: row.description?.trim() || null,
-            visibility,
-            status: "ACTIVE",
-            createdBySchoolId: user.schoolId,
-            ...schoolCreatedBeneficiaryPlan(visibility),
-          },
-        });
-        const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
-        await prisma.schoolBeneficiaryApproval.create({
-          data: {
-            schoolId: user.schoolId!,
-            beneficiaryId: ben.id,
-            status: approvalStatus,
-            ...(approvalStatus === "APPROVED" ? { approvedAt: new Date() } : {}),
-          },
-        });
+        if (!dryRun) {
+          const ben = await prisma.beneficiary.create({
+            data: {
+              name,
+              category: (row.category || "").trim() || null,
+              email: (row.contact_email || row.email)?.trim() || null,
+              phone: (row.phone || row.phone_number)?.trim() || null,
+              website: row.website?.trim() || null,
+              address: row.address?.trim() || null,
+              city: row.city?.trim() || null,
+              state: row.state?.trim() || null,
+              zip: (row.zip || row.zip_code)?.trim() || null,
+              description: row.description?.trim() || null,
+              visibility,
+              status: "ACTIVE",
+              createdBySchoolId: user.schoolId,
+              ...schoolCreatedBeneficiaryPlan(visibility),
+            },
+          });
+          const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
+          await prisma.schoolBeneficiaryApproval.create({
+            data: {
+              schoolId: user.schoolId!,
+              beneficiaryId: ben.id,
+              status: approvalStatus,
+              ...(approvalStatus === "APPROVED" ? { approvedAt: new Date() } : {}),
+            },
+          });
+        }
         results.added++;
       } catch (err: any) {
         results.errors.push(`Row ${i + 2}: ${err.message || "failed to create"}`);
         results.failed++;
       }
     }
-    res.json(results);
+    res.json({ ...results, dryRun });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import CSV error:", err);

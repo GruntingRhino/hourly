@@ -96,6 +96,9 @@ async function findOrCreateTeacherForCohort(params: {
   actorEmail: string;
   name: string;
   email: string;
+  /** §10 staged imports: determine the outcome without writing anything
+   * (no user create/update, no assignment row, no email). */
+  dryRun?: boolean;
 }): Promise<
   | { status: "assigned-existing" | "created-and-assigned"; teacherId: string; teacherEmail: string; teacherName: string }
   | { status: "already-assigned"; reason: string }
@@ -137,13 +140,21 @@ async function findOrCreateTeacherForCohort(params: {
     }
 
     const newName = params.name.trim();
+    const resolvedName = newName || existing.name;
+    if (params.dryRun) {
+      return {
+        status: "assigned-existing",
+        teacherId: existing.id,
+        teacherEmail: existing.email,
+        teacherName: resolvedName,
+      };
+    }
     if (newName && newName !== existing.name) {
       await prisma.user.update({ where: { id: existing.id }, data: { name: newName } });
     }
     await prisma.cohortTeacherAssignment.create({
       data: { cohortId: params.cohortId, teacherId: existing.id },
     });
-    const resolvedName = newName || existing.name;
     sendTeacherAssignmentEmail(existing.email, resolvedName, params.cohortName, schoolName).catch((err) => {
       console.error("[cohort teacher] Failed to send assignment notification email:", err);
     });
@@ -152,6 +163,15 @@ async function findOrCreateTeacherForCohort(params: {
       teacherId: existing.id,
       teacherEmail: existing.email,
       teacherName: resolvedName,
+    };
+  }
+
+  if (params.dryRun) {
+    return {
+      status: "created-and-assigned",
+      teacherId: "dry-run",
+      teacherEmail: email,
+      teacherName: params.name.trim(),
     };
   }
 
@@ -677,7 +697,10 @@ router.post("/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), async
     });
     if (!actor) return res.status(404).json({ error: "User not found" });
 
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, dryRun } = z.object({
+      csvData: z.string().min(1),
+      dryRun: z.boolean().optional().default(false),
+    }).parse(req.body);
     let headerRow: string[];
     try {
       const parsedHeader = parse(csvData, {
@@ -757,6 +780,7 @@ router.post("/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), async
         actorEmail: actor.email,
         name,
         email,
+        dryRun,
       });
 
       if (action.status === "assigned-existing") {
@@ -778,7 +802,7 @@ router.post("/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), async
       }
     }
 
-    res.json(result);
+    res.json({ ...result, dryRun });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import school cohort teachers error:", err);
@@ -1011,9 +1035,15 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
     if (cohort.schoolId !== scope?.schoolId) return res.status(403).json({ error: "Not your school's cohort" });
     if (scope && !canAccessCohort(scope, cohort.id)) return res.status(403).json({ error: "You do not control this cohort" });
 
-    const { csvData, columnMapping: rawColumnMapping } = z.object({
+    const { csvData, columnMapping: rawColumnMapping, dryRun } = z.object({
       csvData: z.string().min(1),
       columnMapping: z.record(z.string()).optional(),
+      // §10 staged imports: preview exactly what would happen (rows
+      // added/skipped/errored) without creating any invitation, sending
+      // any email, consuming the invite-rate-limit budget, or publishing
+      // the cohort. The client calls once with dryRun: true to preview,
+      // then again with it omitted/false to actually commit.
+      dryRun: z.boolean().optional().default(false),
     }).parse(req.body);
 
     // Parse header row
@@ -1089,6 +1119,18 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       errors: [] as ImportCsvIssue[],
     };
 
+    // Dry-run budget simulation: mirrors consumeCohortInviteBudget's own
+    // "count AuditLog rows in the last hour" logic, but purely in memory —
+    // a dry run must never write the AuditLog row that real budget
+    // consumption uses, since that would burn real rate-limit budget for a
+    // preview that isn't actually sending anything.
+    let simulatedBudgetUsed = dryRun ? await getCohortInviteUsage(cohort.id) : 0;
+    // Tracks emails this CSV would newly invite, so two rows sharing the
+    // same new email are dedup'd the same way the real commit path already
+    // handles it (the second row's real studentInvitation.findUnique would
+    // find the first row's just-created invitation).
+    const wouldInviteEmails = new Set<string>();
+
     for (const [index, row] of records.entries()) {
       const rowNumber = index + 2;
       const email = ((row[emailCol] ?? "") as string).trim().toLowerCase();
@@ -1119,24 +1161,40 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       const existing = await prisma.studentInvitation.findUnique({
         where: { cohortId_email: { cohortId: cohort.id, email } },
       });
-      if (existing) {
+      if (existing || (dryRun && wouldInviteEmails.has(email))) {
         results.errors.push({ row: rowNumber, email, reason: "Invitation already exists for this cohort" });
         results.skipped++;
         continue;
       }
-      const budget = await consumeCohortInviteBudget({
-        actorId: req.user!.userId,
-        cohortId: cohort.id,
-        cohortName: cohort.name,
-        email,
-        source: "IMPORT",
-      });
+
+      let budget: Awaited<ReturnType<typeof consumeCohortInviteBudget>>;
+      if (dryRun) {
+        budget = simulatedBudgetUsed >= COHORT_INVITE_LIMIT_PER_HOUR
+          ? { allowed: false, used: simulatedBudgetUsed, remaining: 0, message: getCohortInviteLimitMessage(cohort.name) }
+          : { allowed: true, used: simulatedBudgetUsed + 1, remaining: COHORT_INVITE_LIMIT_PER_HOUR - (simulatedBudgetUsed + 1) };
+      } else {
+        budget = await consumeCohortInviteBudget({
+          actorId: req.user!.userId,
+          cohortId: cohort.id,
+          cohortName: cohort.name,
+          email,
+          source: "IMPORT",
+        });
+      }
       if (!budget.allowed) {
         const reason = "message" in budget ? budget.message : getCohortInviteLimitMessage(cohort.name);
         results.errors.push({ row: rowNumber, email, reason });
         results.skipped++;
         continue;
       }
+
+      if (dryRun) {
+        simulatedBudgetUsed++;
+        wouldInviteEmails.add(email);
+        results.added++;
+        continue;
+      }
+
       const token = generateToken();
       const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72h
       await prisma.studentInvitation.create({
@@ -1159,17 +1217,20 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       results.added++;
     }
 
-    await prisma.cohort.update({
-      where: { id: cohort.id },
-      data: {
-        status: "PUBLISHED",
-        publishedAt: cohort.publishedAt ?? new Date(),
-        ...(usesHouseField ? { usesHouseField: true } : {}),
-      },
-    });
+    if (!dryRun) {
+      await prisma.cohort.update({
+        where: { id: cohort.id },
+        data: {
+          status: "PUBLISHED",
+          publishedAt: cohort.publishedAt ?? new Date(),
+          ...(usesHouseField ? { usesHouseField: true } : {}),
+        },
+      });
+    }
 
     res.json({
-      message: "Import complete",
+      message: dryRun ? "Preview complete — nothing has been imported yet" : "Import complete",
+      dryRun,
       ...results,
       preview: {
         totalRows: records.length,
@@ -1178,7 +1239,7 @@ router.post("/:id/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"),
       },
       inviteLimit: {
         perHour: COHORT_INVITE_LIMIT_PER_HOUR,
-        usedLastHour: await getCohortInviteUsage(cohort.id),
+        usedLastHour: dryRun ? simulatedBudgetUsed : await getCohortInviteUsage(cohort.id),
       },
     });
   } catch (err) {
@@ -1412,7 +1473,10 @@ router.post("/:id/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), a
     });
     if (!actor) return res.status(404).json({ error: "User not found" });
 
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, dryRun } = z.object({
+      csvData: z.string().min(1),
+      dryRun: z.boolean().optional().default(false),
+    }).parse(req.body);
     let headerRow: string[];
     try {
       const parsedHeader = parse(csvData, {
@@ -1468,6 +1532,7 @@ router.post("/:id/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), a
         actorEmail: actor.email,
         name,
         email,
+        dryRun,
       });
       if (action.status === "assigned-existing") {
         result.assigned++;
@@ -1487,7 +1552,7 @@ router.post("/:id/teachers/import", authenticate, requireRole("SCHOOL_ADMIN"), a
       result.skipped++;
     }
 
-    res.json(result);
+    res.json({ ...result, dryRun });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import cohort teachers error:", err);
