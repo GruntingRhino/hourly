@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import { requireRole, blockFrozenLegacyOrgAdminWrite } from "../middleware/rbac";
 import * as zipcodes from "zipcodes";
 import * as geolib from "geolib";
 import { geocodeAddress } from "../lib/geocode";
@@ -193,7 +193,7 @@ router.get("/:id", authenticate, requireRole("STUDENT"), async (req: Request, re
 });
 
 // POST /api/opportunities — create (org only)
-router.post("/", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.post("/", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const data = createSchema.parse(req.body);
 
@@ -260,7 +260,7 @@ router.post("/", authenticate, requireRole("ORG_ADMIN"), async (req: Request, re
 });
 
 // PUT /api/opportunities/:id — edit (org only)
-router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.put("/:id", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
     if (!opp) return res.status(404).json({ error: "Opportunity not found" });
@@ -334,7 +334,7 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
 });
 
 // POST /api/opportunities/:id/cancel — cancel (org only)
-router.post("/:id/cancel", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/cancel", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
     if (!opp) return res.status(404).json({ error: "Opportunity not found" });
@@ -372,7 +372,7 @@ router.post("/:id/cancel", authenticate, requireRole("ORG_ADMIN"), async (req: R
 });
 
 // POST /api/opportunities/:id/announce — send announcement to all confirmed signups (org only)
-router.post("/:id/announce", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/announce", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
     if (!opp) return res.status(404).json({ error: "Opportunity not found" });

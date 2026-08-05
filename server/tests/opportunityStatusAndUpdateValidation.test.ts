@@ -87,53 +87,45 @@ test("GET /api/opportunities accepts a valid status query filter", async () => {
   }
 });
 
-test("PUT /api/opportunities/:id strips fields outside the edit whitelist instead of mass-assigning them", async () => {
+// §18 legacy model consolidation (later session) froze every ORG_ADMIN
+// write route on this file, including this one, at the API layer — so the
+// mass-assignment whitelist this test used to exercise below is no longer
+// reachable via HTTP at all (blockFrozenLegacyOrgAdminWrite runs first and
+// never calls next()). The whitelist logic itself is left in the route
+// body as harmless defense-in-depth rather than removed, in case the
+// freeze is ever lifted, but this test now documents and asserts the
+// current, actual behavior: the route returns 410 before ever touching
+// the database or the whitelist logic.
+test("PUT /api/opportunities/:id is frozen for ORG_ADMIN (legacy write, §18)", async () => {
   const original = {
     userFindUnique: prismaClient.user.findUnique,
     oppFindUnique: prismaClient.opportunity.findUnique,
     transaction: prismaClient.$transaction,
   };
+  let transactionCalled = false;
   prismaClient.user.findUnique = async ({ where }: any) => (where.id === orgAdmin.id ? orgAdmin : null);
   prismaClient.opportunity.findUnique = async () => ({
     id: "opp-1",
     organizationId: orgAdmin.organizationId,
     address: null,
   });
-  const observedUpdateData: Array<Record<string, unknown>> = [];
-  // runSerializableTransaction (src/lib/serializableTransaction.ts) calls
-  // prisma.$transaction(fn, { isolationLevel: "Serializable" }); stub it to
-  // hand the route's callback a fake tx client so we can capture the exact
-  // `data` object it passes to opportunity.update.
-  prismaClient.$transaction = async (fn: any) => {
-    const tx = {
-      $executeRaw: async () => undefined,
-      signup: { count: async () => 0 },
-      opportunity: {
-        update: async ({ data }: any) => {
-          observedUpdateData.push(data);
-          return { id: "opp-1", ...data };
-        },
-      },
-    };
-    return fn(tx);
+  prismaClient.$transaction = async () => {
+    transactionCalled = true;
+    throw new Error("should never be reached — the freeze runs before this");
   };
   try {
     const app = express();
     app.use(express.json());
     app.use("/", opportunityRoutes);
-    // organizationId and status are not part of createSchema's field
-    // whitelist, so a caller sending them in the PUT body must not be able
-    // to move the opportunity to another org or force its status.
     const res = await requestAs(app, "PUT", "/opp-1", {
       organizationId: "someone-elses-org",
       status: "COMPLETED",
       title: "Renamed",
     });
-    assert.equal(res.status, 200);
-    assert.equal(observedUpdateData.length, 1);
-    assert.equal(observedUpdateData[0].organizationId, undefined);
-    assert.equal(observedUpdateData[0].status, undefined);
-    assert.equal(observedUpdateData[0].title, "Renamed");
+    assert.equal(res.status, 410);
+    const body = await res.json();
+    assert.equal(body.code, "LEGACY_ORG_ADMIN_FROZEN");
+    assert.equal(transactionCalled, false);
   } finally {
     prismaClient.user.findUnique = original.userFindUnique;
     prismaClient.opportunity.findUnique = original.oppFindUnique;
