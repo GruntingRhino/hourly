@@ -1626,7 +1626,15 @@ const recurrenceRuleSchema = z.discriminatedUnion("type", [
     capacity: z.number().int().positive(),
     monthsAhead: z.number().int().min(1).max(12),
   }),
-]);
+]).superRefine((rule, ctx) => {
+  // Manually-entered time slots (opportunityTimeSlotSchema below) already
+  // reject startTime >= endTime; recurrence rules generate slots
+  // programmatically and were missing the same check, so a recurring
+  // series could be created with every occurrence logically backwards.
+  if (rule.startTime >= rule.endTime) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endTime"], message: "End time must be after start time." });
+  }
+});
 
 const opportunityTimeSlotSchema = z.object({
   date: z.string().min(1, "Choose a date for each time slot.").refine((d) => {
@@ -1752,7 +1760,15 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
 
     if (data.recurrenceRule) {
       recurringGroupId = crypto.randomUUID();
-      const fromDate = new Date(data.startDate);
+      // Manually-entered time slots (opportunityTimeSlotSchema) already
+      // reject a past date; startDate here has no such check, and
+      // generateRecurringSlots uses it verbatim as its floor — a past
+      // startDate would otherwise generate a whole recurring series dated
+      // in the past. Floor at today the same way the non-recurring path
+      // effectively is by its own per-slot validation.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const fromDate = new Date(Math.max(new Date(data.startDate).getTime(), today.getTime()));
       const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, fromDate);
       if (generated.length === 0) {
         return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
