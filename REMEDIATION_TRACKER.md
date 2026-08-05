@@ -126,9 +126,32 @@ Full detail lives in this session's history; summary:
 - **`docs/qa/FINAL_RELEASE_REPORT.md`** (2026-06-29): SEC-001 (Stripe fields
   leaked via beneficiary GET), SEC-002/003 (dupes of SECURITY_AUDIT
   FINDING-001/002), SEC-005 (Stripe webhook replay), SEC-006 (attachment
-  download auth), DEFECT-001..005 (input validation, race conditions, JSON
-  404s) — all fixed. SEC-004/SEC-009 are dupes of the two SECURITY_AUDIT
-  items above, both now confirmed fixed.
+  download auth) — fixed. DEFECT-001..005 — see the corrected
+  `EDGE_CASE_REPORT.md` entry below (2 of the 5 turned out only partially
+  fixed, now fully fixed as of commit `a5ffdb5`). SEC-004/SEC-009 are dupes
+  of the two SECURITY_AUDIT items above, both confirmed fixed. **The
+  report's own "Remaining Open Findings (Non-Blocking)" section — SEC-007
+  through SEC-010, never previously individually cross-checked in this
+  tracker — verified this session, one by one**: SEC-007 (no JWT
+  revocation mechanism) — fixed, `User.tokenVersion` is bumped on password
+  change/reset and checked on every request (`middleware/auth.ts`),
+  exactly the remediation the report itself suggests. SEC-008
+  (`/__test-email` reachable without auth in non-prod) — fixed, and more
+  robustly than the report's suggested fix: the route is not registered at
+  all (not just auth-gated) whenever `isPubliclyDeployed()` is true,
+  confirmed by reading the `if (!isPubliclyDeployed()) { router.get(...) }`
+  wrapper in `auth.ts`. SEC-009 — already covered above (dupe). SEC-010
+  (no server-side MIME sniffing on uploads) — still true, but remains
+  legitimately accepted-risk exactly as the report itself already argued:
+  confirmed uploaded files are still stored under a UUID filename with no
+  extension (`crypto.randomUUID()` in both `beneficiaries.ts` and
+  `schoolProcurement.ts`'s multer storage config), so an uploaded file
+  cannot be executed regardless of its claimed MIME type. The report's
+  "Launch Blockers" and "Post-Pilot" tables are otherwise operational/
+  infrastructure items (API keys, production DB provisioning, HTTPS,
+  backups, Stripe activation) with no code-level fix possible — items #9
+  (color contrast) and #12 (SEC-007–010) are the only two with a code
+  component, and both are now resolved as documented above.
 - **`docs/qa/DATA_INTEGRITY_REPORT.md`** (2026-06-29): missing VERIFIED/
   checkOutTime constraint — **corrected 2026-08-04: already fixed** (migration
   `20260804153210_service_session_verified_requires_checkout`, see additional-
