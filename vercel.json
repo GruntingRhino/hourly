@@ -23,8 +23,7 @@
   ],
   "crons": [
     { "path": "/api/internal/reminders/run", "schedule": "0 8 * * *" },
-    { "path": "/api/internal/upload-cleanup/run", "schedule": "0 9 * * *" },
-    { "path": "/api/internal/event-reminders/run", "schedule": "*/15 * * * *" }
+    { "path": "/api/internal/upload-cleanup/run", "schedule": "0 9 * * *" }
   ],
   "functions": {
     "api/index.ts": {
