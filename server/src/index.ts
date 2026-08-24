@@ -89,6 +89,14 @@ const EXPLICIT_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:5173", "http://localhost:3000"];
 
+// Staging deployment origins (hourly-dev Vercel project). These are the stable,
+// first-party domains of the staging environment and must always be allowed so
+// browser sessions on staging can call its own API.
+const STAGING_ORIGINS = [
+  "https://hourly-dev.vercel.app",
+  "https://hourly-dev-gruntingrhinos-projects.vercel.app",
+];
+
 function isLocalDevOrigin(origin: string): boolean {
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
@@ -105,6 +113,7 @@ app.use(cors({
     ];
     if (
       EXPLICIT_ALLOWED_ORIGINS.includes(origin) ||
+      STAGING_ORIGINS.includes(origin) ||
       (!IS_PRODUCTION && isLocalDevOrigin(origin)) ||
       PRODUCTION_GOODHOURS_ORIGINS.includes(origin)
     ) {
