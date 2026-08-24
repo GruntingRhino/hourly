@@ -21,12 +21,14 @@ const OPTIONAL = [
   "ALLOWED_ORIGINS",         // comma-separated list of allowed CORS origins
   "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
   "CRON_SECRET",            // shared secret for scheduled internal jobs (e.g. Vercel cron)
+  "QR_ATTENDANCE_SECRET",   // optional separate HMAC secret for event attendance QR tokens
   "APP_ENV",                // "production" | "development" — set explicitly per Vercel project
   "DEV_DATABASE_URL",       // explicit development-only database URL; overrides DATABASE_URL when APP_ENV=development
   "ALLOW_SHARED_DEV_DATABASE", // set true only if you intentionally want dev to use a shared remote database
   "CANVAS_CLIENT_ID",
   "CANVAS_CLIENT_SECRET",
   "CANVAS_CALLBACK_URL",
+  "CANVAS_ALLOWED_HOSTS", // comma-separated production Canvas tenant host allowlist
   "CANVAS_ENABLE_MOCK",
   "CANVAS_REQUEST_TIMEOUT_MS",
   "CANVAS_PAGE_SIZE",
@@ -39,6 +41,7 @@ const OPTIONAL = [
   "GOOGLE_CLASSROOM_API_BASE_URL",
   "GOOGLE_CLASSROOM_AUTH_BASE_URL",
   "GOOGLE_CLASSROOM_TOKEN_BASE_URL",
+  "GOOGLE_CLASSROOM_ALLOWED_HOSTS",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
 ] as const;
@@ -151,6 +154,10 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
       }
       if (!/^https:\/\//i.test(process.env.GOOGLE_CLASSROOM_CALLBACK_URL)) {
         console.error("❌ GOOGLE_CLASSROOM_CALLBACK_URL must use HTTPS in production.");
+        process.exit(1);
+      }
+      if (!process.env.GOOGLE_CLASSROOM_ALLOWED_HOSTS?.trim()) {
+        console.error("❌ GOOGLE_CLASSROOM_ALLOWED_HOSTS is required in production when Google Classroom OAuth is configured.");
         process.exit(1);
       }
     }

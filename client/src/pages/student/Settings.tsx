@@ -5,7 +5,7 @@ import { setAuthSession } from "../../lib/authSession";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-type Tab = "profile" | "classroom" | "security" | "notifications" | "privacy";
+type Tab = "profile" | "matching" | "classroom" | "security" | "notifications" | "privacy";
 
 interface StudentNotificationPreferences {
   hourApproval?: { email?: boolean; inApp?: boolean };
@@ -21,6 +21,7 @@ interface Session {
   verificationStatus: string;
   opportunity: { title: string; date: string };
 }
+interface StudentMatchingPreference { optedIn: boolean; interestTags: string[]; timezone: string; availability: Array<{ weekday: number; start: string; end: string }>; }
 
 export default function StudentSettings() {
   const { user, logout, refreshUser } = useAuth();
@@ -32,6 +33,8 @@ export default function StudentSettings() {
   const [grade, setGrade] = useState(user?.grade || "");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatarUrl || null);
   const [signupCount, setSignupCount] = useState<number | null>(null);
+  const [matching, setMatching] = useState<StudentMatchingPreference>({ optedIn: false, interestTags: [], timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, availability: [] });
+  const [approvedTags, setApprovedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -99,7 +102,19 @@ export default function StudentSettings() {
   useEffect(() => {
     // Load signup count
     api.get<unknown[]>("/signups/my").then((s) => setSignupCount(s.length)).catch(() => {});
+    api.get<{ preference: { optedIn: boolean; interestTags: string; timezone: string; availability: StudentMatchingPreference["availability"] } | null; approvedTags: string[] }>("/student-preferences").then((result) => {
+      setApprovedTags(result.approvedTags);
+      if (result.preference) {
+        let tags: string[] = [];
+        try { const parsed = JSON.parse(result.preference.interestTags); if (Array.isArray(parsed)) tags = parsed.filter((tag): tag is string => typeof tag === "string"); } catch { /* use empty */ }
+        setMatching({ optedIn: result.preference.optedIn, interestTags: tags, timezone: result.preference.timezone, availability: result.preference.availability });
+      }
+    }).catch(() => {});
   }, []);
+
+  const saveMatching = async () => {
+    try { await api.put("/student-preferences", matching); setMessage("Matching preferences saved."); setIsError(false); } catch (err: unknown) { setMessage(getErrorMessage(err, "Failed to save matching preferences.")); setIsError(true); }
+  };
 
   useEffect(() => {
     notifPrefsRef.current = notifPrefs;
@@ -317,7 +332,7 @@ export default function StudentSettings() {
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-6">
-        {(["profile", "classroom", "security", "notifications", "privacy"] as Tab[]).map((t) => (
+        {(["profile", "matching", "classroom", "security", "notifications", "privacy"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -484,6 +499,18 @@ export default function StudentSettings() {
               Log Out
             </button>
           </div>
+        </div>
+      )}
+
+      {tab === "matching" && (
+        <div className="border rounded-[3px] p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h3 className="font-semibold mb-2" style={{ color: "var(--text)" }}>Opportunity matching</h3>
+          <p className="text-[13px] mb-4" style={{ color: "var(--text-sec)" }}>Opt in to school-approved interest ranking and filter opportunities by your local availability.</p>
+          <label className="flex items-center gap-2 text-[13px] mb-4" style={{ color: "var(--text)" }}><input type="checkbox" checked={matching.optedIn} onChange={(e) => setMatching({ ...matching, optedIn: e.target.checked })} /> Use interest matching</label>
+          <div className="text-[12px] mb-2" style={{ color: "var(--text-sec)" }}>Approved interests</div>
+          <div className="flex flex-wrap gap-2 mb-4">{approvedTags.map((tag) => <label key={tag} className="text-[12px]" style={{ color: "var(--text)" }}><input type="checkbox" checked={matching.interestTags.includes(tag)} onChange={(e) => setMatching({ ...matching, interestTags: e.target.checked ? [...matching.interestTags, tag] : matching.interestTags.filter((item) => item !== tag) })} /> {tag}</label>)}</div>
+          <label className="block text-[12px] mb-4" style={{ color: "var(--text-sec)" }}>Timezone<input className="mt-1 w-full border rounded p-2 text-[13px]" value={matching.timezone} onChange={(e) => setMatching({ ...matching, timezone: e.target.value })} /></label>
+          <button onClick={() => void saveMatching()} className="px-3 py-2 rounded text-white text-[13px]" style={{ background: "var(--navy)" }}>Save matching preferences</button>
         </div>
       )}
 

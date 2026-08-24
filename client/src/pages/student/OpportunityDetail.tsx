@@ -67,6 +67,7 @@ export default function OpportunityDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [qrToken, setQrToken] = useState("");
   const [showVerifyForm, setShowVerifyForm] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState<"DRAWN" | "FILE">("DRAWN");
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -165,6 +166,14 @@ export default function OpportunityDetail() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleQrCheckIn = async () => {
+    if (!qrToken.trim()) return;
+    setActionLoading(true); setActionError("");
+    try { await api.post("/sessions/qr-checkin", { token: qrToken.trim() }); setQrToken(""); await loadData(); }
+    catch (err: unknown) { setActionError(getErrorMessage(err, "Invalid or expired attendance QR token")); }
+    finally { setActionLoading(false); }
   };
 
   const handleCheckOut = async () => {
@@ -420,6 +429,10 @@ export default function OpportunityDetail() {
                 >
                   {actionLoading ? "Checking in..." : "Check In"}
                 </button>
+              )}
+
+              {mySession?.status === "PENDING_CHECKIN" && (
+                <div className="mt-3 flex gap-2"><input value={qrToken} onChange={(e) => setQrToken(e.target.value)} placeholder="Paste attendance QR token" className="flex-1 border rounded px-3 py-2 text-sm" aria-label="Attendance QR token" /><button onClick={handleQrCheckIn} disabled={actionLoading || !qrToken.trim()} className="px-3 py-2 bg-[var(--action)] text-white rounded text-sm disabled:opacity-50">Use QR</button></div>
               )}
 
               {mySession?.status === "CHECKED_IN" && (

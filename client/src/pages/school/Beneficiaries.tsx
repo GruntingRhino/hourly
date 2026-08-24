@@ -146,7 +146,7 @@ export default function SchoolBeneficiaries() {
   const [creating, setCreating] = useState(false);
   const [csvData, setCsvData] = useState("");
   const [csvImporting, setCsvImporting] = useState(false);
-  const [csvResult, setCsvResult] = useState<{ added: number; failed: number; errors: string[] } | null>(null);
+  const [csvResult, setCsvResult] = useState<{ batchId: string; added: number; failed: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [proximityRadius, setProximityRadius] = useState(5);
@@ -358,7 +358,7 @@ const handleDrop = async (benId: string, name: string) => {
     setCsvImporting(true);
     setCsvResult(null);
     try {
-      const result = await api.post<{ added: number; failed: number; errors: string[] }>("/beneficiaries/import-csv", { csvData });
+      const result = await api.post<{ batchId: string; added: number; failed: number; errors: string[] }>("/beneficiaries/import-csv", { csvData });
       setCsvResult(result);
       setCsvData("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -369,6 +369,12 @@ const handleDrop = async (benId: string, name: string) => {
     } finally {
       setCsvImporting(false);
     }
+  };
+
+  const handleCsvRollback = async () => {
+    if (!csvResult?.batchId || !window.confirm("Rollback the partners created by this import?")) return;
+    try { await api.post(`/beneficiaries/import-csv/${csvResult.batchId}/rollback`); setCsvResult(null); await load(); showToast("Import rolled back."); }
+    catch (err: unknown) { setError(getErrorMessage(err, "Rollback failed.")); }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -894,6 +900,7 @@ const handleDrop = async (benId: string, name: string) => {
                     {csvResult.errors.slice(0, 8).map((entry, index) => <li key={index}>{entry}</li>)}
                   </ul>
                 )}
+                {csvResult.batchId && <button onClick={handleCsvRollback} className="mt-3 px-3 py-1.5 border border-[var(--er-b)] text-[var(--er-t)] rounded text-xs">Rollback this import</button>}
               </div>
             )}
 

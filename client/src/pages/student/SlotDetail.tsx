@@ -38,6 +38,7 @@ interface SignupResponse {
   status: string;
   verificationStatus?: string;
 }
+interface SignupQuestion { id: string; label: string; type: "TEXT" | "NUMBER" | "BOOLEAN" | "DATE"; required: boolean; }
 
 interface SlotLocationState {
   slot?: SlotFull;
@@ -54,6 +55,8 @@ export default function SlotDetail() {
   const [signingUp, setSigningUp] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [actionOk, setActionOk] = useState(false);
+  const [questions, setQuestions] = useState<SignupQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     if (!slot) {
@@ -63,11 +66,13 @@ export default function SlotDetail() {
     }
   }, [id, slot]);
 
+  useEffect(() => { if (id) api.get<SignupQuestion[]>(`/beneficiaries/slots/${id}/questions`).then(setQuestions).catch(() => setQuestions([])); }, [id]);
+
   const handleSignup = async () => {
     setSigningUp(true);
     setActionMsg("");
     try {
-      const created = await api.post<SignupResponse>(`/beneficiaries/slots/${id}/signup`, {});
+      const created = await api.post<SignupResponse>(`/beneficiaries/slots/${id}/signup`, { answers });
       setSlot((prev) =>
         prev
           ? {
@@ -190,6 +195,7 @@ export default function SlotDetail() {
         </div>
 
         <div className="border-t border-[var(--border)] pt-4">
+          {!isSignedUp && questions.length > 0 && <div className="mb-4 space-y-3"><h3 className="text-sm font-semibold">Signup questions</h3>{questions.map((question) => <label key={question.id} className="block text-sm">{question.label}{question.required ? " *" : ""}<input required={question.required} type={question.type === "NUMBER" ? "number" : question.type === "DATE" ? "date" : "text"} className="mt-1 w-full border rounded p-2" onChange={(e) => setAnswers({ ...answers, [question.id]: question.type === "NUMBER" ? Number(e.target.value) : e.target.value })} /></label>)}</div>}
           {actionMsg && (
             <div
               className={`mb-3 p-3 rounded-[2px] text-sm ${

@@ -1,0 +1,4 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { applyImport, previewImport, rollbackImport } from "../src/lib/csvImportRollback";
+test("CSV import preview deduplicates and rollback restores before-state", () => { const existing = [{ key: "a@example.com", values: { name: "A" } }]; const incoming = [{ key: "a@example.com", values: { name: "A2" } }, { key: "b@example.com", values: { name: "B" } }, { key: "B@example.com", values: { name: "duplicate" } }]; const preview = previewImport(existing, incoming); assert.equal(preview.creates.length, 1); assert.equal(preview.updates.length, 1); assert.equal(preview.duplicates.length, 1); const batch = applyImport("batch", existing, incoming); assert.equal(batch.after.length, 2); assert.deepEqual(rollbackImport(batch), existing); });

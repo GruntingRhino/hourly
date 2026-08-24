@@ -22,6 +22,7 @@ import cohortRoutes from "./routes/cohorts";
 import beneficiaryRoutes from "./routes/beneficiaries";
 import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
+import studentPreferenceRoutes from "./routes/studentPreferences";
 import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
@@ -161,6 +162,7 @@ app.use("/api/cohorts", cohortRoutes);
 app.use("/api/beneficiaries", beneficiaryRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/self-submissions", selfSubmissionRoutes);
+app.use("/api/student-preferences", studentPreferenceRoutes);
 app.use("/api/classrooms", classroomRoutes);
 
 // Legacy routes (kept for backward compat)

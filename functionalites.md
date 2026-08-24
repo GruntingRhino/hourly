@@ -1,0 +1,46 @@
+- [x] Canvas integration: Yes—already built, but secure and finish it before enabling it for schools.
+- [ ] Google Classroom integration: Yes—already built, but harden the security and test it with a real sandbox.
+- [x] Canvas LTI: No need now; build it only when a paying school specifically requires embedded Canvas access.
+- [x] Google SSO: Yes—already present, but school claiming and account verification must be secured.
+- [x] Microsoft SSO: Yes, later; add it after Google authentication is stable.
+- [x] Clever/ClassLink: Yes, later; prioritize whichever one an actual district prospect requires.
+- [x] GPS geofencing: No; it adds sensitive location data, adoption friction, spoofing disputes, and weak proof of actual volunteering.
+- [x] In-app signatures: Optional; keep supervisor signatures for external submissions, but do not use student signatures as primary proof.
+- [x] Photo or media proof: Optional only; never require selfies, and use evidence uploads only when the school requests them.
+- [x] QR attendance: Yes—high priority because it provides low-friction event check-in without collecting precise location.
+- [x] Organization attendance roster: Yes—high priority and should remain the primary verification method.
+- [x] Dynamic milestones: Yes—mostly already present, but improve them only after the hour ledger is accurate.
+- [x] Category minimums and maximums: Yes; schools need configurable rules for different service categories.
+- [x] Conditional custom fields: Yes, later; make them school-controlled rather than allowing unrestricted organization questions.
+- [x] Reflection essays: Optional; add them only for schools that include reflections in their service requirements.
+- [x] Service resume: Yes—high priority, but generate it from the complete canonical hour ledger.
+- [x] Verified service transcript: Yes—high priority and more valuable than a decorative resume because schools can certify it.
+- [x] Public leaderboards: No; they create privacy, equity, and hour-inflation problems.
+- [x] Volunteer streaks: No; volunteering is not naturally a daily habit and streaks create bad incentives.
+- [x] Private progress badges: Yes, low priority; use them only for personal milestones, not competition.
+- [x] School-wide aggregate goals: Yes, optional; display collective progress without ranking individual students.
+- [x] Opportunity marketplace: Yes—already central to GoodHours and should be improved rather than rebuilt.
+- [x] Student interest matching: Yes—high priority because it makes opportunity discovery materially better.
+- [x] Availability filtering: Yes—high priority so students see opportunities they can realistically attend.
+- [x] Distance filtering: Yes—already partially present and should remain optional rather than requiring student GPS.
+- [x] Organization reliability metrics: Yes; rank using response time, attendance accuracy, cancellation history, and verification speed.
+- [x] Paid priority placement: No; remove it completely because schools should control rankings based on relevance and quality.
+- [x] Pro Partner badge in student rankings: No; remove it if it implies paid preference or better placement.
+- [x] Waitlist automation: Yes—valuable for organizations and appropriate for the Pro tier.
+- [x] Automated reminders: Yes—valuable, but fix the scheduling architecture before relying on them.
+- [x] Recurring opportunities: Yes—valuable for organizations and appropriate for Pro.
+- [x] Multiple organization administrators: Yes—appropriate for Pro and necessary for larger nonprofits.
+- [x] Custom signup questions: Yes, but only within school-approved templates and privacy restrictions.
+- [x] Waivers and document collection: Yes, later; add secure storage, scanning, expiration, and school controls first.
+- [x] Advanced organization analytics: Yes—appropriate for Pro once there is enough platform activity to make the data useful.
+- [x] CSV exports: Yes—appropriate for both schools and Pro organizations.
+- [x] Kiosk attendance mode: Yes, later; build it after QR attendance is stable.
+- [x] Offline mode: Low priority; consider it only after organizations demonstrate unreliable connectivity at events.
+- [x] Mobile app: No immediate need; first make the responsive PWA reliable and installable.
+- [x] Aspen integration: Later; start with robust CSV import and build direct integration only when tied to a school sale.
+- [x] CSV import preview and rollback: Yes—high priority because imports must be safe, deduplicated, and reversible.
+- [x] Generic rules engine: No; use a limited set of typed school rules instead of an unmaintainable no-code system.
+- [x] School-approved supervisor email verification: Yes—for volunteering completed outside the GoodHours marketplace.
+- [x] Continuous student location tracking: No under any circumstance; it is unnecessary and creates severe privacy risk.
+- [x] Mandatory organization adoption: No; retain school-managed opportunities as a fallback while incentivizing frequent partners to join.
+- [x] More feature development immediately: No; finish security, tenant isolation, ledger integrity, and legacy-system consolidation first.

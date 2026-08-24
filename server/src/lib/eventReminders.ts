@@ -60,18 +60,17 @@ async function processReminder(
     ? "FREE_24H"
     : `PRO_CUSTOM_${minutesBefore}`;
 
-  // Idempotency: skip if already sent or in progress
+  const now = new Date();
   const existing = await prisma.orgEventReminderLog.findUnique({
     where: { signupId_reminderType: { signupId: signup.id, reminderType } },
   });
-  if (existing && existing.deliveryStatus !== "FAILED") return;
+  if (existing?.deliveryStatus === "SENT" || (existing?.leasedUntil && existing.leasedUntil > now)) return;
 
-  // Create or update the log record (PENDING → we own this slot)
+  const leaseUntil = new Date(now.getTime() + EVENT_REMINDER_LEASE_MS);
   const log = existing
-    ? await prisma.orgEventReminderLog.update({
-        where: { id: existing.id },
-        data: { deliveryStatus: "PENDING", failureReason: null },
-      })
+    ? (await prisma.orgEventReminderLog.updateMany({ where: { id: existing.id, deliveryStatus: { in: ["PENDING", "FAILED"] }, attempts: { lt: 3 }, OR: [{ leasedUntil: null }, { leasedUntil: { lte: now } }] }, data: { deliveryStatus: "PENDING", leasedUntil: leaseUntil, attempts: { increment: 1 }, failureReason: null } })).count > 0
+      ? await prisma.orgEventReminderLog.findUniqueOrThrow({ where: { id: existing.id } })
+      : null
     : await prisma.orgEventReminderLog.create({
         data: {
           signupId: signup.id,
@@ -80,8 +79,11 @@ async function processReminder(
           reminderType,
           scheduledFor: new Date(slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime() - minutesBefore * 60 * 1000),
           deliveryStatus: "PENDING",
+          leasedUntil: leaseUntil,
+          attempts: 1,
         },
       });
+  if (!log) return;
 
   const opp = signup.slot.opportunity;
   const ben = opp.beneficiary;
@@ -136,13 +138,14 @@ async function processReminder(
 
     await prisma.orgEventReminderLog.update({
       where: { id: log.id },
-      data: { deliveryStatus: "SENT", sentAt: new Date() },
+      data: { deliveryStatus: "SENT", sentAt: new Date(), leasedUntil: null },
     });
   } catch (err) {
     await prisma.orgEventReminderLog.update({
       where: { id: log.id },
       data: {
         deliveryStatus: "FAILED",
+        leasedUntil: null,
         failureReason: String((err as any)?.message ?? err).slice(0, 500),
       },
     });

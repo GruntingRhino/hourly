@@ -56,11 +56,11 @@ test("required-form follow-ups, advanced content, and branding are filtered by t
   assert.match(reminderWorker, /tierLimits\.customEmailBranding/);
 });
 
-test("featured placement uses server-derived effective tier as a small tie-break", () => {
-  assert.match(listingPolicy, /resolveBeneficiaryPlanTier/);
+test("featured placement does not use paid tier as a ranking preference", () => {
+  assert.doesNotMatch(listingPolicy, /resolveBeneficiaryPlanTier/);
   assert.match(listingPolicy, /dateDifference/);
   assert.match(listingPolicy, /timeDifference/);
-  assert.match(listingPolicy, /hasPriorityListing/);
+  assert.match(listingPolicy, /return 0/);
 });
 
 test("advanced waitlist controls affect automatic promotion and manual approval is Pro-gated", () => {

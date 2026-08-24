@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "set -a && . ../.environmentalvariables && . .env && set +a && tsx watch src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "build": "tsc",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:billing": "node --import tsx --test tests/billing.test.ts tests/stripeWebhookProcessor.test.ts tests/stripeWebhookArchitecture.test.ts tests/stripeSubscriptionPolicy.test.ts tests/stripeCheckoutConcurrencyArchitecture.test.ts",

@@ -22,9 +22,9 @@ test("priority listing never outranks an earlier opportunity", () => {
   assert.ok(compareAvailableSlots(earlierFree, laterPro) < 0);
 });
 
-test("Pro receives the featured-placement tie-break when opportunities are equally relevant", () => {
+test("paid tier does not affect equally relevant opportunity ordering", () => {
   const free = slot({ planTier: "FREE" });
   const pro = slot({ planTier: "PRO" });
-  assert.ok(compareAvailableSlots(pro, free) < 0);
-  assert.ok(compareAvailableSlots(free, pro) > 0);
+  assert.equal(compareAvailableSlots(pro, free), 0);
+  assert.equal(compareAvailableSlots(free, pro), 0);
 });

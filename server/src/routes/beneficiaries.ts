@@ -14,7 +14,7 @@ import { canRemoveBeneficiaryAdmin } from "../lib/beneficiaryAdminPolicy";
 import { resolveBeneficiaryPlanTier, schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, CLIENT_URL } from "../services/email";
+import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, sendVerificationEmail, CLIENT_URL } from "../services/email";
 import {
   getOrgTier,
   getOrgTierLimits,
@@ -30,6 +30,11 @@ import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKe
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 import { compareAvailableSlots } from "../lib/opportunityListingPolicy";
+import { calculateReliability } from "../lib/reliabilityMetrics";
+import { consumeSupervisorVerificationToken, createSupervisorVerificationToken } from "../lib/supervisorVerification";
+import { validateSignupAnswers, validateSignupTemplate, type SignupQuestion } from "../lib/signupQuestions";
+import { isOpportunityAvailable } from "../lib/availabilityFilter";
+import { rankInterestMatches } from "../lib/interestMatching";
 import { toLegacyAvailableSlot } from "../lib/legacyOpportunityAvailability";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
@@ -979,7 +984,7 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
     const now = new Date();
     const startOfTodayUtc = new Date(now);
     startOfTodayUtc.setUTCHours(0, 0, 0, 0);
-    const [slots, blockedCategoryKeys, legacyOpportunities] = await Promise.all([
+    const [slots, blockedCategoryKeys, legacyOpportunities, preference] = await Promise.all([
       prisma.beneficiaryTimeSlot.findMany({
       where: {
         date: { gte: startOfTodayUtc },
@@ -1013,11 +1018,14 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
             orderBy: [{ date: "asc" }, { startTime: "asc" }],
           })
         : Promise.resolve([]),
+      prisma.studentPreference.findUnique({ where: { studentId: req.user!.userId }, include: { availability: true } }),
     ]);
     const beneficiarySlots = slots.filter((slot) => {
       if (getSlotStartAt(slot.date, slot.startTime) < now) return false;
       const categoryKey = normalizeCategoryKey(slot.opportunity.category);
-      return !blockedCategoryKeys.has(categoryKey);
+      if (blockedCategoryKeys.has(categoryKey)) return false;
+      if (preference?.availability.length && !isOpportunityAvailable({ start: getSlotStartAt(slot.date, slot.startTime), end: getSlotEndAt(slot.date, slot.endTime), timezone: preference.timezone, windows: preference.availability })) return false;
+      return true;
     });
     const legacySlots = legacyOpportunities
       .filter((opportunity) => getSlotStartAt(opportunity.date, opportunity.startTime) >= now)
@@ -1025,7 +1033,8 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
         ...opportunity,
         confirmedSignupCount: opportunity._count.signups,
       }));
-    const rankedSlots = [...beneficiarySlots, ...legacySlots].sort(compareAvailableSlots);
+    const baseSlots = [...beneficiarySlots, ...legacySlots].sort(compareAvailableSlots);
+    const rankedSlots = preference?.optedIn ? rankInterestMatches({ optedIn: true, approvedTags: (() => { try { const parsed = JSON.parse(preference.interestTags); return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === "string") : []; } catch { return []; } })() }, baseSlots.map((slot: any) => ({ id: slot.id, tags: [slot.opportunity?.category, ...(slot.opportunity?.tags ? JSON.parse(slot.opportunity.tags) : [])].filter(Boolean), slot }))).map((item: any) => item.slot) : baseSlots;
     res.json(rankedSlots.map((slot: any) => {
       const beneficiary = slot.opportunity?.beneficiary;
       if (!beneficiary || !("hasSchoolComplimentaryPro" in beneficiary)) return slot;
@@ -1071,7 +1080,10 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
     if (records.length === 0) return res.status(400).json({ error: "CSV has no data rows" });
     if (records.length > 500) return res.status(400).json({ error: "CSV exceeds 500 row limit" });
 
-    const results = { added: 0, failed: 0, errors: [] as string[] };
+    const before = await prisma.beneficiary.findMany({ where: { createdBySchoolId: user.schoolId }, select: { id: true, name: true, email: true, phone: true, category: true } });
+    const batch = await prisma.beneficiaryImportBatch.create({ data: { schoolId: user.schoolId, createdBy: req.user!.userId, rawCsv: csvData, beforeSnapshot: JSON.stringify(before) } });
+    const createdIds: string[] = [];
+    const results = { batchId: batch.id, added: 0, failed: 0, errors: [] as string[] };
     for (let i = 0; i < records.length; i++) {
       const row = records[i];
       const name = (row.organization_name || row.name || "").trim();
@@ -1101,6 +1113,7 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
           },
         });
         const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
+        createdIds.push(ben.id);
         await prisma.schoolBeneficiaryApproval.create({
           data: {
             schoolId: user.schoolId!,
@@ -1115,12 +1128,31 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
         results.failed++;
       }
     }
+    await prisma.beneficiaryImportBatch.update({ where: { id: batch.id }, data: { afterSnapshot: JSON.stringify(createdIds), status: "APPLIED", appliedAt: new Date() } });
     res.json(results);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import CSV error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+router.post("/import-csv/:batchId/rollback", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+    const batch = user?.schoolId ? await prisma.beneficiaryImportBatch.findFirst({ where: { id: req.params.batchId, schoolId: user.schoolId, status: "APPLIED" } }) : null;
+    if (!batch) return res.status(404).json({ error: "Import batch not found or already rolled back" });
+    const ids = JSON.parse(batch.afterSnapshot) as unknown;
+    if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) return res.status(409).json({ error: "Import snapshot is invalid" });
+    const linked = await prisma.beneficiaryOpportunity.count({ where: { beneficiaryId: { in: ids as string[] } } });
+    if (linked > 0) return res.status(409).json({ error: "Cannot rollback import records already used by opportunities" });
+    await prisma.$transaction([
+      prisma.schoolBeneficiaryApproval.deleteMany({ where: { beneficiaryId: { in: ids as string[] }, schoolId: user!.schoolId! } }),
+      prisma.beneficiary.deleteMany({ where: { id: { in: ids as string[] }, createdBySchoolId: user!.schoolId! } }),
+      prisma.beneficiaryImportBatch.update({ where: { id: batch.id }, data: { status: "ROLLED_BACK", rolledBackAt: new Date() } }),
+    ]);
+    return res.json({ rolledBack: ids.length, batchId: batch.id });
+  } catch (err) { console.error("Rollback import error:", err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // GET /api/beneficiaries/slots/:slotId — get full slot details for student detail view
@@ -2493,6 +2525,23 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
   }
 });
 
+router.post("/signup-question-templates", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+    if (!user?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
+    const questions = validateSignupTemplate(z.array(z.object({ id: z.string().min(1).max(64), label: z.string().min(1).max(200), type: z.enum(["TEXT", "NUMBER", "BOOLEAN", "DATE"]), required: z.boolean() })).max(10).parse(req.body.questions) as SignupQuestion[]);
+    await prisma.signupQuestionTemplate.updateMany({ where: { schoolId: user.schoolId }, data: { active: false } });
+    const created = await prisma.$transaction(questions.map((question) => prisma.signupQuestionTemplate.create({ data: { schoolId: user.schoolId!, label: question.label, type: question.type, required: question.required, createdBy: req.user!.userId } })));
+    return res.status(201).json(created);
+  } catch (err) { if (err instanceof z.ZodError || err instanceof Error) return res.status(400).json({ error: "Invalid signup question template" }); return res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.get("/slots/:slotId/questions", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  const schoolId = await resolveStudentSchoolId(req.user!.userId);
+  if (!schoolId) return res.status(403).json({ error: "Not enrolled in a school" });
+  return res.json(await prisma.signupQuestionTemplate.findMany({ where: { schoolId, active: true }, orderBy: { createdAt: "asc" } }));
+});
+
 // POST /api/beneficiaries/slots/:slotId/signup — student signs up for a time slot
 router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -2539,6 +2588,10 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
       });
     }
 
+    const templates = await prisma.signupQuestionTemplate.findMany({ where: { schoolId: studentSchoolId, active: true }, orderBy: { createdAt: "asc" } });
+    let validatedAnswers: Record<string, unknown> = {};
+    try { validatedAnswers = validateSignupAnswers(templates.map((question) => ({ id: question.id, label: question.label, type: question.type as SignupQuestion["type"], required: question.required })), (req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, unknown>); } catch (answerError) { return res.status(400).json({ error: answerError instanceof Error ? answerError.message : "Invalid signup answers" }); }
+
     const result = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${slot.id} FOR UPDATE`;
 
@@ -2566,6 +2619,10 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
           cancellationToken: crypto.randomUUID(),
         },
       });
+
+      if (Object.keys(validatedAnswers).length) {
+        await tx.beneficiarySignupAnswer.createMany({ data: Object.entries(validatedAnswers).map(([questionId, value]) => ({ signupId: signup.id, questionId, value: JSON.stringify(value) })) });
+      }
 
       await tx.beneficiaryAuditLog.create({
         data: {
@@ -3821,6 +3878,90 @@ router.delete("/:id/admin-invitations/:invitationId", authenticate, requireRole(
   if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") return res.status(403).json({ error: "Owner access required" });
   await prisma.beneficiaryAdminInvitation.updateMany({ where: { id: req.params.invitationId, beneficiaryId: req.params.id, status: "PENDING" }, data: { status: "REVOKED" } });
   res.json({ ok: true });
+});
+
+router.get("/:id/reliability", authenticate, async (req: Request, res: Response) => {
+  try {
+    const beneficiary = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!beneficiary) return res.status(404).json({ error: "Organization not found" });
+    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { role: true, schoolId: true, beneficiaryId: true } });
+    const manages = actor?.beneficiaryId === beneficiary.id && actor.role === "BENEFICIARY_ADMIN";
+    const schoolAccess = actor?.schoolId ? await prisma.schoolBeneficiaryApproval.findFirst({ where: { schoolId: actor.schoolId, beneficiaryId: beneficiary.id, status: "APPROVED" } }) : null;
+    if (!manages && !schoolAccess) return res.status(403).json({ error: "Not authorized to view this reliability metric" });
+    const events = await prisma.organizationReliabilityEvent.findMany({ where: { beneficiaryId: beneficiary.id }, orderBy: { occurredAt: "desc" }, take: 500 });
+    return res.json(calculateReliability(events.map((event) => ({ at: event.occurredAt, responseMinutes: event.responseMinutes ?? undefined, attendanceAccurate: event.attendanceAccurate ?? undefined, cancelled: event.cancelled ?? undefined, verificationMinutes: event.verificationMinutes ?? undefined })), { now: new Date(), windowDays: 90, minimumSamples: 5 }));
+  } catch (err) { console.error("Reliability metric error:", err); return res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/:id/reliability-events", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const input = z.object({ occurredAt: z.string().datetime(), responseMinutes: z.number().min(0).max(100000).optional(), attendanceAccurate: z.boolean().optional(), cancelled: z.boolean().optional(), verificationMinutes: z.number().min(0).max(100000).optional() }).parse(req.body);
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not authorized to record reliability events" });
+    const event = await prisma.organizationReliabilityEvent.create({ data: { beneficiaryId: req.params.id, occurredAt: new Date(input.occurredAt), responseMinutes: input.responseMinutes, attendanceAccurate: input.attendanceAccurate, cancelled: input.cancelled, verificationMinutes: input.verificationMinutes, createdBy: req.user!.userId } });
+    return res.status(201).json(event);
+  } catch (err) { if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors }); console.error("Reliability event error:", err); return res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/:id/signups/:signupId/supervisor-verification", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
+    const input = z.object({ supervisorEmail: z.string().email().max(320) }).parse(req.body);
+    const signup = await prisma.beneficiarySignup.findUnique({ where: { id: req.params.signupId }, include: { slot: { include: { opportunity: { select: { beneficiaryId: true } } } } } });
+    if (!signup || signup.slot.opportunity.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Signup not found" });
+    const schoolId = await resolveStudentSchoolId(signup.studentId);
+    if (!schoolId) return res.status(400).json({ error: "Student is not associated with a school" });
+    const school = await prisma.school.findUnique({ where: { id: schoolId }, include: { verifiedDomains: { select: { domain: true } } } });
+    const domains = [school?.domain ?? "", ...(school?.verifiedDomains ?? []).map((item) => item.domain)].flatMap((value) => value.split(",")).map((value) => value.trim().toLowerCase()).filter(Boolean);
+    const emailDomain = input.supervisorEmail.split("@")[1]?.toLowerCase();
+    if (!emailDomain || !domains.includes(emailDomain)) return res.status(403).json({ error: "Supervisor email must use an authorized school domain" });
+    const verificationId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const token = createSupervisorVerificationToken({ verificationId, serviceRecordId: signup.id, supervisorEmail: input.supervisorEmail, expiresAt, secret: process.env.JWT_SECRET ?? "" });
+    await prisma.supervisorVerification.upsert({ where: { signupId: signup.id }, create: { id: verificationId, signupId: signup.id, schoolId, supervisorEmail: input.supervisorEmail.toLowerCase(), tokenHash: hashToken(token), expiresAt }, update: { id: verificationId, schoolId, supervisorEmail: input.supervisorEmail.toLowerCase(), tokenHash: hashToken(token), expiresAt, usedAt: null } });
+    await sendVerificationEmail(input.supervisorEmail, `${CLIENT_URL}/supervisor-verify?token=${encodeURIComponent(token)}`);
+    return res.status(201).json({ verificationId, expiresAt });
+  } catch (err) { if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors }); console.error("Create supervisor verification error:", err); return res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/supervisor-verification/:token/consume", async (req: Request, res: Response) => {
+  try {
+    const email = z.string().email().parse(req.body?.supervisorEmail).toLowerCase();
+    const verification = await prisma.supervisorVerification.findUnique({ where: { tokenHash: hashToken(req.params.token) }, include: { school: { include: { verifiedDomains: { select: { domain: true } } } }, signup: true } });
+    if (!verification) return res.status(400).json({ error: "Verification link is invalid or expired" });
+
+    const domains = [verification.school.domain ?? "", ...verification.school.verifiedDomains.map((item) => item.domain)]
+      .flatMap((value) => value.split(","))
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    const payload = consumeSupervisorVerificationToken(req.params.token, {
+      secret: process.env.JWT_SECRET ?? "",
+      authorizedDomains: domains,
+      consumedIds: new Set(),
+    });
+    if (payload.verificationId !== verification.id || payload.serviceRecordId !== verification.signupId) {
+      return res.status(400).json({ error: "Verification link is invalid or expired" });
+    }
+    if (verification.usedAt || verification.expiresAt <= new Date()) return res.status(400).json({ error: "Verification link is expired or already used" });
+    if (verification.supervisorEmail !== email || payload.supervisorEmail !== email) return res.status(403).json({ error: "Supervisor email does not match" });
+    if (!domains.includes(email.split("@")[1]?.toLowerCase() ?? "")) return res.status(403).json({ error: "Supervisor email domain is not authorized" });
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.supervisorVerification.updateMany({
+        where: { id: verification.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (claimed.count !== 1) throw new Error("SUPERVISOR_VERIFICATION_ALREADY_CONSUMED");
+      await tx.beneficiarySignup.update({ where: { id: verification.signupId }, data: { verificationStatus: "APPROVED", verifiedBy: email, verifiedAt: now } });
+      await tx.beneficiaryAuditLog.create({ data: { action: "SUPERVISOR_VERIFIED", actorId: verification.signup.studentId, signupId: verification.signupId, details: JSON.stringify({ supervisorEmail: email }) } });
+    });
+    return res.json({ verified: true, serviceRecordId: verification.signupId });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: "A valid supervisor email is required" });
+    if (err instanceof Error && err.message === "SUPERVISOR_VERIFICATION_ALREADY_CONSUMED") return res.status(400).json({ error: "Verification link is expired or already used" });
+    if (err instanceof Error && ["Invalid verification token", "Expired or replayed verification token", "Supervisor email domain is not authorized"].includes(err.message)) return res.status(400).json({ error: "Verification link is invalid or expired" });
+    console.error("Consume supervisor verification error:", err); return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

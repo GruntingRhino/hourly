@@ -1,11 +1,10 @@
 import crypto from "crypto";
+import net from "net";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { decryptField, encryptField } from "../lib/fieldEncryption";
+import { decryptField, encryptField, isEncrypted } from "../lib/fieldEncryption";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { deactivateStudentCohortMembership, ensureStudentCohortMembership } from "../lib/studentCohorts";
 import { getGoogleClassroomMockDataset, type GoogleClassroomMockDataset, type GoogleClassroomMockScenario } from "./googleClassroomMock";
@@ -15,7 +14,6 @@ const IS_PROD_LIKE =
 const GOOGLE_CLASSROOM_ENABLE_MOCK = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true" || !IS_PROD_LIKE;
 const GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS = Number(process.env.GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS || 15000);
 const GOOGLE_CLASSROOM_PAGE_SIZE = Math.max(1, Math.min(100, Number(process.env.GOOGLE_CLASSROOM_PAGE_SIZE || 100)));
-const JWT_SECRET = process.env.JWT_SECRET as string;
 const CLIENT_URL = process.env.CLIENT_URL || process.env.APP_URL || "http://127.0.0.1:5173";
 const GOOGLE_CLASSROOM_CLIENT_ID = process.env.GOOGLE_CLASSROOM_CLIENT_ID || "";
 const GOOGLE_CLASSROOM_CLIENT_SECRET = process.env.GOOGLE_CLASSROOM_CLIENT_SECRET || "";
@@ -23,6 +21,10 @@ const GOOGLE_CLASSROOM_CALLBACK_URL = process.env.GOOGLE_CLASSROOM_CALLBACK_URL 
 const GOOGLE_CLASSROOM_API_BASE_URL = (process.env.GOOGLE_CLASSROOM_API_BASE_URL || "https://classroom.googleapis.com").replace(/\/+$/, "");
 const GOOGLE_CLASSROOM_AUTH_BASE_URL = (process.env.GOOGLE_CLASSROOM_AUTH_BASE_URL || "https://accounts.google.com").replace(/\/+$/, "");
 const GOOGLE_CLASSROOM_TOKEN_BASE_URL = (process.env.GOOGLE_CLASSROOM_TOKEN_BASE_URL || "https://oauth2.googleapis.com").replace(/\/+$/, "");
+const GOOGLE_CLASSROOM_ALLOWED_HOSTS = (process.env.GOOGLE_CLASSROOM_ALLOWED_HOSTS || "")
+  .split(",")
+  .map((host) => host.trim().toLowerCase())
+  .filter(Boolean);
 
 const googleClassroomConnectSchema = z.discriminatedUnion("mode", [
   z.object({
@@ -55,13 +57,6 @@ type GoogleClassroomCredentials = {
   scope: string | null;
 };
 
-type GoogleClassroomStatePayload = {
-  purpose: "googleClassroom-oauth";
-  schoolId: string;
-  actorId: string;
-  baseUrl: string | null;
-  displayName: string;
-};
 
 type GoogleClassroomSyncDataset = {
   scenario: string;
@@ -211,8 +206,26 @@ function normalizeGoogleClassroomBaseUrl(baseUrl: string): string {
   const normalized = baseUrl.trim().replace(/\/+$/, "");
   if (!normalized) throw new Error("Google Classroom base URL is required.");
   const parsed = new URL(normalized);
+  const hostname = parsed.hostname.toLowerCase();
+  const host = hostname.replace(/^\[|\]$/g, "");
+  const ipVersion = net.isIP(host);
+  const privateOrLocal = host === "localhost" || host.endsWith(".localhost") || host === "ip6-localhost"
+    || (ipVersion === 4 && (() => {
+      const octets = host.split(".").map(Number);
+      return octets[0] === 0 || octets[0] === 10 || octets[0] === 127
+        || (octets[0] === 169 && octets[1] === 254)
+        || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+        || (octets[0] === 192 && octets[1] === 168);
+    })())
+    || (ipVersion === 6 && (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe8") || host.startsWith("fe9") || host.startsWith("fea") || host.startsWith("feb")));
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash || privateOrLocal) {
+    throw new Error("Google Classroom base URL must be a public HTTP(S) tenant URL without credentials or query parameters.");
+  }
   if (IS_PROD_LIKE && parsed.protocol !== "https:") {
     throw new Error("Google Classroom base URL must use HTTPS in production-like environments.");
+  }
+  if (IS_PROD_LIKE && !GOOGLE_CLASSROOM_ALLOWED_HOSTS.some((allowedHost) => hostname === allowedHost || hostname.endsWith(`.${allowedHost}`))) {
+    throw new Error("Google Classroom base URL is not on the configured production tenant allowlist.");
   }
   return normalized;
 }
@@ -284,17 +297,6 @@ function safeConnectionResponse(connection: any) {
   };
 }
 
-function buildGoogleClassroomStateToken(payload: GoogleClassroomStatePayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
-}
-
-function verifyGoogleClassroomStateToken(token: string): GoogleClassroomStatePayload {
-  const payload = verifyToken<GoogleClassroomStatePayload>(token);
-  if (payload.purpose !== "googleClassroom-oauth") {
-    throw new Error("Invalid Google Classroom OAuth state.");
-  }
-  return payload;
-}
 
 function getGoogleClassroomCapabilities() {
   return {
@@ -789,7 +791,7 @@ async function ensureTeacherUser(params: {
       role: "TEACHER",
       schoolId: params.schoolId,
       emailVerified: true,
-      isTestAccount: true,
+      isTestAccount: false,
     },
   });
   return created.id;
@@ -1091,7 +1093,7 @@ async function runGoogleClassroomSync(params: {
       const mappedUser = userMappingByExternalId.get(student.id);
       if (mappedUser?.localType === "User") {
         existingStudent = await prisma.user.findFirst({
-          where: { id: mappedUser.localId, role: "STUDENT" },
+          where: { id: mappedUser.localId, role: "STUDENT", schoolId: params.schoolId },
           select: { id: true, cohortId: true, schoolId: true },
         });
       }
@@ -1371,12 +1373,16 @@ export async function getGoogleClassroomOAuthUrlForSchool(params: {
   assertOAuthConfigured();
   const normalizedBaseUrl = params.baseUrl?.trim() ? normalizeGoogleClassroomBaseUrl(params.baseUrl) : null;
   const displayName = params.displayName?.trim() || "Google Classroom";
-  const state = buildGoogleClassroomStateToken({
-    purpose: "googleClassroom-oauth",
-    schoolId: params.schoolId,
-    actorId: params.actorId,
-    baseUrl: normalizedBaseUrl,
-    displayName,
+  const state = generateToken();
+  await prisma.googleClassroomOAuthState.create({
+    data: {
+      stateHash: hashToken(state),
+      schoolId: params.schoolId,
+      actorId: params.actorId,
+      baseUrl: normalizedBaseUrl,
+      displayName,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    },
   });
   const scope = encodeURIComponent([
     "openid",
@@ -1392,6 +1398,31 @@ export async function getGoogleClassroomOAuthUrlForSchool(params: {
   return { url };
 }
 
+async function consumeGoogleClassroomOAuthState(rawState: string) {
+  const stateHash = hashToken(rawState);
+  const consumedAt = new Date();
+  const consumed = await prisma.googleClassroomOAuthState.updateMany({
+    where: {
+      stateHash,
+      consumedAt: null,
+      expiresAt: { gt: consumedAt },
+    },
+    data: { consumedAt },
+  });
+  if (consumed.count !== 1) throw new Error("Invalid or expired Google Classroom OAuth state.");
+  return prisma.googleClassroomOAuthState.findUniqueOrThrow({ where: { stateHash } });
+}
+
+async function assertGoogleClassroomOAuthActor(state: { actorId: string; schoolId: string }): Promise<void> {
+  const actor = await prisma.user.findUnique({
+    where: { id: state.actorId },
+    select: { role: true, status: true, schoolId: true },
+  });
+  if (!actor || actor.status !== "ACTIVE" || actor.role !== "SCHOOL_ADMIN" || actor.schoolId !== state.schoolId) {
+    throw new Error("Google Classroom OAuth authorization is no longer valid.");
+  }
+}
+
 export async function handleGoogleClassroomOAuthCallback(params: {
   code?: string;
   state?: string;
@@ -1400,7 +1431,7 @@ export async function handleGoogleClassroomOAuthCallback(params: {
   if (params.error) {
     const target = new URL("/settings", CLIENT_URL);
     target.searchParams.set("tab", "integrations");
-    target.searchParams.set("googleClassroomError", params.error);
+    target.searchParams.set("googleClassroomError", "google_authorization_denied");
     return target.toString();
   }
   if (!params.code || !params.state) {
@@ -1411,9 +1442,13 @@ export async function handleGoogleClassroomOAuthCallback(params: {
   }
 
   try {
-    const state = verifyGoogleClassroomStateToken(params.state);
+    const state = await consumeGoogleClassroomOAuthState(params.state);
+    await assertGoogleClassroomOAuthActor(state);
     const token = await exchangeAuthorizationCode(params.code, state.baseUrl);
     const encryptedCredentials = serializeCredentials(token);
+    if (!isEncrypted(encryptedCredentials)) {
+      throw new Error("Google Classroom OAuth credentials were not encrypted.");
+    }
     await prisma.integrationConnection.upsert({
       where: { provider_schoolId: { provider: "GOOGLE_CLASSROOM", schoolId: state.schoolId } },
       update: {
@@ -1454,11 +1489,10 @@ export async function handleGoogleClassroomOAuthCallback(params: {
     target.searchParams.set("tab", "integrations");
     target.searchParams.set("googleClassroom", "connected");
     return target.toString();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "googleClassroom_oauth_failed";
+  } catch {
     const target = new URL("/settings", CLIENT_URL);
     target.searchParams.set("tab", "integrations");
-    target.searchParams.set("googleClassroomError", message.slice(0, 180));
+    target.searchParams.set("googleClassroomError", "googleClassroom_oauth_failed");
     return target.toString();
   }
 }

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { buildCsv } from "../lib/csv";
 import { authenticate } from "../middleware/auth";
+import { requireRole } from "../middleware/rbac";
 import {
   buildRequestAuditMetadata,
   logDataAccess,
@@ -20,6 +21,10 @@ import {
   getStaffAccessScope,
 } from "../lib/cohortAccess";
 import { createHybridRateLimit } from "../middleware/rateLimit";
+import { deriveMilestones, parseMilestoneThresholds } from "../lib/dynamicMilestones";
+import { buildCanonicalLedger, buildServiceResume, LedgerInput } from "../lib/canonicalLedger";
+import { syncStudentCanonicalLedger } from "../lib/canonicalLedgerStore";
+import crypto from "node:crypto";
 
 const router = Router();
 
@@ -39,6 +44,71 @@ const parentProgressLimiter = createHybridRateLimit({
 });
 
 const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
+
+// GET /api/reports/student/milestones — progress derived from the hour ledger
+router.get("/student/milestones", authenticate, async (req: Request, res: Response) => {
+  try {
+    const studentId = typeof req.query.studentId === "string" ? req.query.studentId : req.user!.userId;
+    if (studentId !== req.user!.userId && !SCHOOL_ROLES.includes(req.user!.role)) {
+      return res.status(403).json({ error: "Cannot view this report" });
+    }
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      include: { school: true, cohort: true },
+    });
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    const school = student.school;
+    const requiredHours = student.cohort?.requiredHours ?? school?.requiredHours ?? 40;
+    const thresholds = parseMilestoneThresholds(student.cohort?.milestoneThresholds ?? school?.milestoneThresholds);
+    const hours = (await calculateStudentHours([studentId])).get(studentId) ?? { approved: 0, pending: 0 };
+    return res.json({ ...deriveMilestones({ approvedHours: hours.approved, requiredHours, thresholds }), pendingHours: hours.pending });
+  } catch (err) {
+    console.error("Student milestones error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/student/resume — verified service history from the durable canonical ledger
+router.get("/student/resume", authenticate, async (req: Request, res: Response) => {
+  try {
+    const studentId = typeof req.query.studentId === "string" ? req.query.studentId : req.user!.userId;
+    if (studentId !== req.user!.userId) return res.status(403).json({ error: "Cannot view this resume" });
+    const entries = await syncStudentCanonicalLedger(studentId);
+    return res.json({ totalHours: Math.round(entries.reduce((sum, entry) => sum + entry.hours, 0) * 100) / 100, activities: entries.map(({ serviceDate, organizationName, description, hours, source }) => ({ date: serviceDate, organizationName, description, hours, source })) });
+  } catch (err) {
+    console.error("Student resume error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/student/transcript", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
+  try {
+    const entries = await syncStudentCanonicalLedger(req.user!.userId);
+    const student = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+    if (!student?.schoolId) return res.status(403).json({ error: "Student is not associated with a school" });
+    const serialized = JSON.stringify({ studentId: req.user!.userId, schoolId: student.schoolId, entries });
+    const created = await prisma.verifiedTranscriptSnapshot.create({ data: { studentId: req.user!.userId, schoolId: student.schoolId, snapshot: serialized, ledgerHash: crypto.createHash("sha256").update(serialized).digest("hex") } });
+    return res.status(201).json(created);
+  } catch (err) {
+    console.error("Create transcript snapshot error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/transcripts/:id/certify", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const snapshot = await prisma.verifiedTranscriptSnapshot.findUnique({ where: { id: req.params.id } });
+    if (!snapshot) return res.status(404).json({ error: "Transcript snapshot not found" });
+    const admin = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
+    if (!admin?.schoolId || admin.schoolId !== snapshot.schoolId) return res.status(403).json({ error: "Transcript is outside your school" });
+    if (snapshot.status === "CERTIFIED") return res.status(409).json({ error: "Transcript is already certified" });
+    if (crypto.createHash("sha256").update(snapshot.snapshot).digest("hex") !== snapshot.ledgerHash) return res.status(409).json({ error: "Transcript snapshot integrity check failed" });
+    return res.json(await prisma.verifiedTranscriptSnapshot.update({ where: { id: snapshot.id }, data: { status: "CERTIFIED", certifiedBy: req.user!.userId, certifiedAt: new Date() } }));
+  } catch (err) {
+    console.error("Certify transcript error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 function buildSchoolReportAuditDetails(params: {
   req: Request;

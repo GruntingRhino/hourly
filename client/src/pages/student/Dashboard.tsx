@@ -81,6 +81,11 @@ interface RecentActivityItem {
   status: string;
 }
 
+interface ResumeSummary {
+  totalHours: number;
+  activities: Array<{ date: string; organizationName: string; description: string; hours: number; source: string }>;
+}
+
 function parseJsonDetails(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -269,6 +274,8 @@ export default function StudentDashboard() {
   const [selfSubs, setSelfSubs] = useState<SelfSubmission[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [hourTotals, setHourTotals] = useState<HourTotals | null>(null);
+  const [resume, setResume] = useState<ResumeSummary | null>(null);
+  const [transcriptMessage, setTranscriptMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -297,7 +304,7 @@ export default function StudentDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [s, ss, slots, report, studentSessions] = await Promise.all([
+      const [s, ss, slots, report, studentSessions, resumeSummary] = await Promise.all([
         api.get<Signup[]>("/beneficiaries/my-signups"),
         api.get<SelfSubmission[]>("/self-submissions").catch(() => [] as SelfSubmission[]),
         api.get<AvailableSlot[]>("/beneficiaries/available-slots").catch(() => [] as AvailableSlot[]),
@@ -319,12 +326,14 @@ export default function StudentDashboard() {
             endTime: string;
           };
         }>>("/sessions/my").catch(() => []),
+        api.get<ResumeSummary>("/reports/student/resume").catch(() => null),
       ]);
       setSignups(s);
       setSelfSubs(ss);
       setAvailableSlots(slots);
       setHourTotals(report);
       setSessions(studentSessions);
+      setResume(resumeSummary);
     } catch {
       setError("Failed to load dashboard. Please refresh the page.");
     } finally {
@@ -354,6 +363,11 @@ export default function StudentDashboard() {
     } catch (err: unknown) {
       alert(getErrorMessage(err, `Failed to ${action === "checkin" ? "check in" : "check out"}.`));
     }
+  };
+
+  const handleCreateTranscript = async () => {
+    try { const snapshot = await api.post<{ id: string; status: string }>("/reports/student/transcript", {}); setTranscriptMessage(`Transcript snapshot ${snapshot.status.toLowerCase()} (${snapshot.id.slice(0, 8)}…).`); }
+    catch (err: unknown) { setTranscriptMessage(getErrorMessage(err, "Could not create transcript snapshot.")); }
   };
 
   const handleVerificationSubmit = async () => {
@@ -561,6 +575,17 @@ export default function StudentDashboard() {
         <div className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--in-b)] text-[13px]" style={{ background: "var(--in-bg)", color: "var(--in-t)" }}>
           Cohort: <strong>{user.cohort.name}</strong>
           {user.cohort.requiredHours && <span className="ml-2">Goal: {user.cohort.requiredHours}h</span>}
+        </div>
+      )}
+
+      {resume && (
+        <div className="mb-6 border border-[var(--border)] rounded-[3px] p-4" style={{ background: "var(--surface)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[14px] font-semibold" style={{ color: "var(--text)" }}>Verified service resume</h2>
+            <span className="text-[13px] font-semibold" style={{ color: "var(--action)" }}>{resume.totalHours.toFixed(1)}h</span>
+          </div>
+          <div className="text-[12px]" style={{ color: "var(--text-faint)" }}>{resume.activities.length} verified service record{resume.activities.length === 1 ? "" : "s"} from the canonical ledger.</div>
+          <div className="mt-3 flex items-center gap-3"><button onClick={handleCreateTranscript} className="px-3 py-2 rounded border border-[var(--border)] text-xs">Create transcript snapshot</button>{transcriptMessage && <span className="text-xs" style={{ color: "var(--text-sec)" }}>{transcriptMessage}</span>}</div>
         </div>
       )}
 
