@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "build": "tsc",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "pretest": "bash scripts/ensure-test-db.sh",
+    "test": "node --env-file-if-exists=.env.test --import tsx --test tests/*.test.ts",
     "test:billing": "node --import tsx --test tests/billing.test.ts tests/stripeWebhookProcessor.test.ts tests/stripeWebhookArchitecture.test.ts tests/stripeSubscriptionPolicy.test.ts tests/stripeCheckoutConcurrencyArchitecture.test.ts",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
