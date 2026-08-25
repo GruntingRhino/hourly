@@ -141,9 +141,19 @@ async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimi
 
 async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
   scheduleDatabaseBucketCleanup(Date.now());
+
+  // Fixed windows are aligned to the epoch, exactly like the in-memory store,
+  // so every process agrees on when the current window ends no matter which
+  // process created the bucket row. Storing and returning this same boundary
+  // keeps Retry-After honest (previously every request after the first in a
+  // window reported a full window of remaining time).
+  const now = Date.now();
+  const windowId = Math.floor(now / windowMs);
+  const windowEnd = new Date((windowId + 1) * windowMs);
+
   const rows = await prisma.$queryRawUnsafe(
     `INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "createdAt", "updatedAt")
-     VALUES ($1, 1, NOW() + ($2 * INTERVAL '1 millisecond'), NOW(), NOW())
+     VALUES ($1, 1, $2, NOW(), NOW())
      ON CONFLICT ("key") DO UPDATE
      SET
        "count" = CASE
@@ -151,14 +161,14 @@ async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLi
          ELSE "RateLimitBucket"."count" + 1
        END,
        "resetAt" = CASE
-         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN NOW() + ($2 * INTERVAL '1 millisecond')
+         WHEN "RateLimitBucket"."resetAt" <= NOW() THEN $2
          ELSE "RateLimitBucket"."resetAt"
        END,
        "updatedAt" = NOW()
-     RETURNING "count", "resetAt"`,
+     RETURNING "count"`,
     key,
-    windowMs
-  ) as Array<{ count: number; resetAt: Date }>;
+    windowEnd
+  ) as Array<{ count: number }>;
 
   const row = rows[0];
   if (!row) {
@@ -167,10 +177,10 @@ async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLi
 
   return {
     count: Number(row.count),
-    // PostgreSQL's timestamp-without-time-zone values are session-local. Keep
-    // the response header based on this process clock rather than reserializing
-    // a database timestamp through the driver's timezone conversion.
-    resetAt: Date.now() + windowMs,
+    // The epoch-aligned boundary computed from this process clock — never
+    // reserialize the database's timestamp-without-time-zone value through
+    // the driver's session-timezone conversion.
+    resetAt: (windowId + 1) * windowMs,
   };
 }
 
@@ -234,19 +244,34 @@ function buildRateLimitResponse(res: Response, message: string, retryAfterMs: nu
  * skipSuccessfulRequests or skipFailedRequests is active and the response
  * status doesn't match the filter (i.e., the request shouldn't have counted).
  *
- * For in-memory buckets this is synchronous. For PostgreSQL/Upstash it fires
- * and forgets — a slight over-count is acceptable; this only fires on the
- * "undo" path so under-count is impossible.
+ * In-memory buckets decrement synchronously. For the PostgreSQL store we run
+ * a guarded decrement ("count" > 0, so under-count is impossible) and the
+ * middleware awaits it inside the wrapped res.end — otherwise the release
+ * would silently do nothing on the durable path and successful logins would
+ * erode auth quotas.
  */
-function releaseBucket(key: string, windowMs: number) {
+function releaseInMemoryBucket(key: string, windowMs: number) {
   const now = Date.now();
   const bucket = buckets.get(key);
   if (bucket && bucket.resetAt > now && bucket.count > 0) {
     bucket.count -= 1;
   }
-  // For shared stores (PostgreSQL/Upstash) we accept eventual consistency.
-  // A best-effort HTTP DELETE is possible but not worth the latency on the
-  // response path — the window resets soon anyway.
+}
+
+async function releaseSharedBuckets(keys: string[]) {
+  await Promise.all(
+    keys.map((key) =>
+      prisma
+        .$executeRawUnsafe(
+          `UPDATE "RateLimitBucket" SET "count" = "count" - 1, "updatedAt" = NOW()
+           WHERE "key" = $1 AND "count" > 0`,
+          key
+        )
+        .catch(() => {
+          // Best-effort release: over-count is the safe failure mode.
+        })
+    )
+  );
 }
 
 function isErrorResponse(statusCode: number): boolean {
@@ -354,7 +379,7 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
           ? `${options.namespace}:key:${hashKey(rateLimitKey)}`
           : null;
 
-        (res as any).end = function (this: Response, ...args: any[]) {
+        (res as any).end = async function (this: Response, ...args: any[]) {
           const statusCode = this.statusCode || 200;
           const isError = isErrorResponse(statusCode);
 
@@ -363,13 +388,21 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
             (options.skipSuccessfulRequests && !isError) ||
             (options.skipFailedRequests && isError);
 
-          if (shouldRelease) {
-            releaseBucket(ipKey, options.windowMs);
-            if (userKey) releaseBucket(userKey, options.windowMs);
-            if (keyBucketKey) releaseBucket(keyBucketKey, options.windowMs);
+          try {
+            if (shouldRelease) {
+              releaseInMemoryBucket(ipKey, options.windowMs);
+              if (userKey) releaseInMemoryBucket(userKey, options.windowMs);
+              if (keyBucketKey) releaseInMemoryBucket(keyBucketKey, options.windowMs);
+              const sharedKeys = [ipKey, userKey, keyBucketKey].filter(
+                (k): k is string => typeof k === "string"
+              );
+              if (sharedKeys.length > 0) {
+                await releaseSharedBuckets(sharedKeys);
+              }
+            }
+          } finally {
+            return originalEnd.apply(this, args as any);
           }
-
-          return originalEnd.apply(this, args as any);
         };
       }
 

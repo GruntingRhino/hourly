@@ -74,20 +74,27 @@ test("email send limiter blocks suspicious bursts from one IP across recipients"
 
   const blocked = await invoke(limiter, request("203.0.113.7", "student-10@example.edu"));
   assert.equal(blocked.status, 429);
-  assert.deepEqual(blocked.body, {
-    error: "Too many email requests from this IP. Please try again later.",
-    code: "RATE_LIMITED",
-    retryAfterSeconds: 900,
-  });
+  assert.equal((blocked.body as Record<string, unknown>).error, "Too many email requests from this IP. Please try again later.");
+  assert.equal((blocked.body as Record<string, unknown>).code, "RATE_LIMITED");
+  // Fixed windows are epoch-aligned, so the honest Retry-After is the time
+  // left until the current 15-minute boundary — anywhere in (0, 900].
+  const burstRetryAfterSeconds = (blocked.body as { retryAfterSeconds: number }).retryAfterSeconds;
+  assert.ok(burstRetryAfterSeconds >= 1 && burstRetryAfterSeconds <= 900);
 });
 
 test("email send limiter shares suspicious-IP detection across email workflows", async () => {
+  // Both workflows must share ONE suspicious-IP namespace (that is the point
+  // of this test) but scoped to this run: buckets are durable in PostgreSQL,
+  // so the fixed default namespace would leak counts across runs.
+  const sharedSuspiciousNamespace = `email-shared-suspicious-${Date.now()}-${Math.random()}`;
   const firstWorkflow = createEmailSendRateLimit({
     namespace: `email-first-workflow-${Date.now()}-${Math.random()}`,
+    suspiciousIpNamespace: sharedSuspiciousNamespace,
     recipientKey: (req: Request) => req.body.email,
   });
   const secondWorkflow = createEmailSendRateLimit({
     namespace: `email-second-workflow-${Date.now()}-${Math.random()}`,
+    suspiciousIpNamespace: sharedSuspiciousNamespace,
     recipientKey: (req: Request) => req.body.email,
   });
 
