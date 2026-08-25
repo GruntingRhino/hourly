@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
@@ -14,7 +15,7 @@ import { canRemoveBeneficiaryAdmin } from "../lib/beneficiaryAdminPolicy";
 import { resolveBeneficiaryPlanTier, schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, sendVerificationEmail, CLIENT_URL } from "../services/email";
+import { sendBeneficiaryInvitationEmail, sendBeneficiaryAdminInvitationEmail, CLIENT_URL } from "../services/email";
 import {
   getOrgTier,
   getOrgTierLimits,
@@ -30,19 +31,18 @@ import { checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKe
 import { resolveStudentSchoolId, logDataAccess } from "../lib/dataAccessLog";
 import { resolveOpportunityCategory } from "../lib/opportunityCategories";
 import { compareAvailableSlots } from "../lib/opportunityListingPolicy";
-import { calculateReliability } from "../lib/reliabilityMetrics";
-import { consumeSupervisorVerificationToken, createSupervisorVerificationToken } from "../lib/supervisorVerification";
-import { validateSignupAnswers, validateSignupTemplate, type SignupQuestion } from "../lib/signupQuestions";
-import { isOpportunityAvailable } from "../lib/availabilityFilter";
-import { rankInterestMatches } from "../lib/interestMatching";
 import { toLegacyAvailableSlot } from "../lib/legacyOpportunityAvailability";
 import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
 import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
-import { slotDateTime } from "../lib/icsGenerator";
+import { slotDateTime, computeSlotTimestamps } from "../lib/icsGenerator";
+import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
 import { parseReminderConfigInput, parseStoredReminders } from "../lib/reminderConfigPolicy";
+
+const schoolBeneficiaryApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "BLOCKED"]);
+const beneficiarySignupVerificationStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED"]);
 
 const UPLOAD_DIR = resolveWritableUploadDir("beneficiary-attachments");
 
@@ -259,6 +259,7 @@ async function promoteNextWaitlisted(
     select: {
       date: true,
       startTime: true,
+      startsAt: true,
       opportunity: {
         select: {
           beneficiary: {
@@ -285,7 +286,9 @@ async function promoteNextWaitlisted(
   if (!slot) return null;
   const beneficiary = slot.opportunity.beneficiary;
   const tier = resolveBeneficiaryPlanTier(beneficiary, beneficiary.planTier === "PRO" ? "PRO" : "FREE");
-  const eventStartsAt = slotDateTime(slot.date, slot.startTime, beneficiary.timezone);
+  // §7 canonical event-time model: prefer the precomputed startsAt; a null
+  // value means this row predates the backfill.
+  const eventStartsAt = slot.startsAt ?? slotDateTime(slot.date, slot.startTime, beneficiary.timezone);
   const config = beneficiary.reminderConfig;
   if (!shouldAutoPromoteWaitlist({
     tier,
@@ -465,12 +468,18 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     if (!schoolId) return res.json([]);
 
     const search = req.query.search as string | undefined;
-    const status = req.query.status as string | undefined; // APPROVED, PENDING, ALL
+    const rawStatus = req.query.status;
+    const statusFilter = schoolBeneficiaryApprovalStatusEnum
+      .optional()
+      .safeParse(rawStatus === "ALL" ? undefined : rawStatus);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be PENDING, APPROVED, REJECTED, BLOCKED, or ALL" });
+    }
 
     const approvals = await prisma.schoolBeneficiaryApproval.findMany({
       where: {
         schoolId,
-        status: usesPublicBeneficiaryDto ? "APPROVED" : (status && status !== "ALL" ? status : undefined),
+        status: usesPublicBeneficiaryDto ? "APPROVED" : statusFilter.data,
       },
       select: {
         id: true,
@@ -529,13 +538,20 @@ router.get("/directory/nearby", authenticate, requireRole("SCHOOL_ADMIN", "TEACH
     const lng = parseFloat(req.query.lng as string);
     const radius = Math.min(parseFloat((req.query.radius as string) || "10"), 50);
     const category = req.query.category as string | undefined;
-    const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = parseInt((req.query.limit as string) || "10000", 10);
-    const offset = (page - 1) * limit;
+    const page = req.query.page !== undefined ? parseInt(req.query.page as string, 10) : 1;
+    const limit = req.query.limit !== undefined ? parseInt(req.query.limit as string, 10) : 10000;
 
     if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ error: "lat and lng query params required" });
     }
+    // page/limit are interpolated directly into the raw SQL LIMIT/OFFSET clause below
+    // (not passed as bound params), so an invalid value must be rejected here rather
+    // than silently coerced — a NaN or negative value would otherwise reach the query
+    // as malformed SQL text.
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 10000) {
+      return res.status(400).json({ error: "page must be a positive integer and limit must be between 1 and 10000" });
+    }
+    const offset = (page - 1) * limit;
 
     const q = (req.query.q as string | undefined)?.trim() || undefined;
 
@@ -984,7 +1000,7 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
     const now = new Date();
     const startOfTodayUtc = new Date(now);
     startOfTodayUtc.setUTCHours(0, 0, 0, 0);
-    const [slots, blockedCategoryKeys, legacyOpportunities, preference] = await Promise.all([
+    const [slots, blockedCategoryKeys, legacyOpportunities] = await Promise.all([
       prisma.beneficiaryTimeSlot.findMany({
       where: {
         date: { gte: startOfTodayUtc },
@@ -1018,14 +1034,11 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
             orderBy: [{ date: "asc" }, { startTime: "asc" }],
           })
         : Promise.resolve([]),
-      prisma.studentPreference.findUnique({ where: { studentId: req.user!.userId }, include: { availability: true } }),
     ]);
     const beneficiarySlots = slots.filter((slot) => {
       if (getSlotStartAt(slot.date, slot.startTime) < now) return false;
       const categoryKey = normalizeCategoryKey(slot.opportunity.category);
-      if (blockedCategoryKeys.has(categoryKey)) return false;
-      if (preference?.availability.length && !isOpportunityAvailable({ start: getSlotStartAt(slot.date, slot.startTime), end: getSlotEndAt(slot.date, slot.endTime), timezone: preference.timezone, windows: preference.availability })) return false;
-      return true;
+      return !blockedCategoryKeys.has(categoryKey);
     });
     const legacySlots = legacyOpportunities
       .filter((opportunity) => getSlotStartAt(opportunity.date, opportunity.startTime) >= now)
@@ -1033,8 +1046,7 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
         ...opportunity,
         confirmedSignupCount: opportunity._count.signups,
       }));
-    const baseSlots = [...beneficiarySlots, ...legacySlots].sort(compareAvailableSlots);
-    const rankedSlots = preference?.optedIn ? rankInterestMatches({ optedIn: true, approvedTags: (() => { try { const parsed = JSON.parse(preference.interestTags); return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === "string") : []; } catch { return []; } })() }, baseSlots.map((slot: any) => ({ id: slot.id, tags: [slot.opportunity?.category, ...(slot.opportunity?.tags ? JSON.parse(slot.opportunity.tags) : [])].filter(Boolean), slot }))).map((item: any) => item.slot) : baseSlots;
+    const rankedSlots = [...beneficiarySlots, ...legacySlots].sort(compareAvailableSlots);
     res.json(rankedSlots.map((slot: any) => {
       const beneficiary = slot.opportunity?.beneficiary;
       if (!beneficiary || !("hasSchoolComplimentaryPro" in beneficiary)) return slot;
@@ -1067,7 +1079,12 @@ router.get("/available-slots", authenticate, requireRole("STUDENT"), async (req:
 // POST /api/beneficiaries/import-csv — bulk import community partners
 router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, dryRun } = z.object({
+      csvData: z.string().min(1),
+      // §10 staged imports: preview added/failed counts and per-row errors
+      // without creating any Beneficiary or SchoolBeneficiaryApproval row.
+      dryRun: z.boolean().optional().default(false),
+    }).parse(req.body);
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
 
@@ -1080,10 +1097,7 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
     if (records.length === 0) return res.status(400).json({ error: "CSV has no data rows" });
     if (records.length > 500) return res.status(400).json({ error: "CSV exceeds 500 row limit" });
 
-    const before = await prisma.beneficiary.findMany({ where: { createdBySchoolId: user.schoolId }, select: { id: true, name: true, email: true, phone: true, category: true } });
-    const batch = await prisma.beneficiaryImportBatch.create({ data: { schoolId: user.schoolId, createdBy: req.user!.userId, rawCsv: csvData, beforeSnapshot: JSON.stringify(before) } });
-    const createdIds: string[] = [];
-    const results = { batchId: batch.id, added: 0, failed: 0, errors: [] as string[] };
+    const results = { added: 0, failed: 0, errors: [] as string[] };
     for (let i = 0; i < records.length; i++) {
       const row = records[i];
       const name = (row.organization_name || row.name || "").trim();
@@ -1094,65 +1108,47 @@ router.post("/import-csv", authenticate, requireRole("SCHOOL_ADMIN"), async (req
       }
       try {
         const visibility = (row.visibility || "").trim().toUpperCase() === "PUBLIC" ? "PUBLIC" : "PRIVATE";
-        const ben = await prisma.beneficiary.create({
-          data: {
-            name,
-            category: (row.category || "").trim() || null,
-            email: (row.contact_email || row.email)?.trim() || null,
-            phone: (row.phone || row.phone_number)?.trim() || null,
-            website: row.website?.trim() || null,
-            address: row.address?.trim() || null,
-            city: row.city?.trim() || null,
-            state: row.state?.trim() || null,
-            zip: (row.zip || row.zip_code)?.trim() || null,
-            description: row.description?.trim() || null,
-            visibility,
-            status: "ACTIVE",
-            createdBySchoolId: user.schoolId,
-            ...schoolCreatedBeneficiaryPlan(visibility),
-          },
-        });
-        const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
-        createdIds.push(ben.id);
-        await prisma.schoolBeneficiaryApproval.create({
-          data: {
-            schoolId: user.schoolId!,
-            beneficiaryId: ben.id,
-            status: approvalStatus,
-            ...(approvalStatus === "APPROVED" ? { approvedAt: new Date() } : {}),
-          },
-        });
+        if (!dryRun) {
+          const ben = await prisma.beneficiary.create({
+            data: {
+              name,
+              category: (row.category || "").trim() || null,
+              email: (row.contact_email || row.email)?.trim() || null,
+              phone: (row.phone || row.phone_number)?.trim() || null,
+              website: row.website?.trim() || null,
+              address: row.address?.trim() || null,
+              city: row.city?.trim() || null,
+              state: row.state?.trim() || null,
+              zip: (row.zip || row.zip_code)?.trim() || null,
+              description: row.description?.trim() || null,
+              visibility,
+              status: "ACTIVE",
+              createdBySchoolId: user.schoolId,
+              ...schoolCreatedBeneficiaryPlan(visibility),
+            },
+          });
+          const approvalStatus = (row.approved || "").toLowerCase() === "true" ? "APPROVED" : "PENDING";
+          await prisma.schoolBeneficiaryApproval.create({
+            data: {
+              schoolId: user.schoolId!,
+              beneficiaryId: ben.id,
+              status: approvalStatus,
+              ...(approvalStatus === "APPROVED" ? { approvedAt: new Date() } : {}),
+            },
+          });
+        }
         results.added++;
       } catch (err: any) {
         results.errors.push(`Row ${i + 2}: ${err.message || "failed to create"}`);
         results.failed++;
       }
     }
-    await prisma.beneficiaryImportBatch.update({ where: { id: batch.id }, data: { afterSnapshot: JSON.stringify(createdIds), status: "APPLIED", appliedAt: new Date() } });
-    res.json(results);
+    res.json({ ...results, dryRun });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Import CSV error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-});
-
-router.post("/import-csv/:batchId/rollback", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
-    const batch = user?.schoolId ? await prisma.beneficiaryImportBatch.findFirst({ where: { id: req.params.batchId, schoolId: user.schoolId, status: "APPLIED" } }) : null;
-    if (!batch) return res.status(404).json({ error: "Import batch not found or already rolled back" });
-    const ids = JSON.parse(batch.afterSnapshot) as unknown;
-    if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) return res.status(409).json({ error: "Import snapshot is invalid" });
-    const linked = await prisma.beneficiaryOpportunity.count({ where: { beneficiaryId: { in: ids as string[] } } });
-    if (linked > 0) return res.status(409).json({ error: "Cannot rollback import records already used by opportunities" });
-    await prisma.$transaction([
-      prisma.schoolBeneficiaryApproval.deleteMany({ where: { beneficiaryId: { in: ids as string[] }, schoolId: user!.schoolId! } }),
-      prisma.beneficiary.deleteMany({ where: { id: { in: ids as string[] }, createdBySchoolId: user!.schoolId! } }),
-      prisma.beneficiaryImportBatch.update({ where: { id: batch.id }, data: { status: "ROLLED_BACK", rolledBackAt: new Date() } }),
-    ]);
-    return res.json({ rolledBack: ids.length, batchId: batch.id });
-  } catch (err) { console.error("Rollback import error:", err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // GET /api/beneficiaries/slots/:slotId — get full slot details for student detail view
@@ -1239,7 +1235,7 @@ router.get("/attachments/:attachmentId", authenticate, async (req: Request, res:
       if (!approval) return res.status(403).json({ error: "Not authorized to access this file" });
     }
 
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(attachment.originalName)}"`);
+    res.setHeader("Content-Disposition", contentDisposition(attachment.originalName, { type: "inline" }));
     res.setHeader("Content-Type", attachment.mimeType);
     if (attachment.contentBytes) {
       res.send(Buffer.from(attachment.contentBytes));
@@ -1641,7 +1637,15 @@ const recurrenceRuleSchema = z.discriminatedUnion("type", [
     capacity: z.number().int().positive(),
     monthsAhead: z.number().int().min(1).max(12),
   }),
-]);
+]).superRefine((rule, ctx) => {
+  // Manually-entered time slots (opportunityTimeSlotSchema below) already
+  // reject startTime >= endTime; recurrence rules generate slots
+  // programmatically and were missing the same check, so a recurring
+  // series could be created with every occurrence logically backwards.
+  if (rule.startTime >= rule.endTime) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endTime"], message: "End time must be after start time." });
+  }
+});
 
 const opportunityTimeSlotSchema = z.object({
   date: z.string().min(1, "Choose a date for each time slot.").refine((d) => {
@@ -1762,25 +1766,40 @@ router.post("/:id/opportunities", authenticate, requireRole("BENEFICIARY_ADMIN",
       return res.status(400).json({ error: "Category is required" });
     }
 
-    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string }[];
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
+    let slotsToCreate: { date: Date; startTime: string; endTime: string; durationHours: number; capacity: number; recurringGroupId?: string; startsAt: Date; endsAt: Date }[];
     let recurringGroupId: string | undefined;
 
     if (data.recurrenceRule) {
       recurringGroupId = crypto.randomUUID();
-      const fromDate = new Date(data.startDate);
+      // Manually-entered time slots (opportunityTimeSlotSchema) already
+      // reject a past date; startDate here has no such check, and
+      // generateRecurringSlots uses it verbatim as its floor — a past
+      // startDate would otherwise generate a whole recurring series dated
+      // in the past. Floor at today the same way the non-recurring path
+      // effectively is by its own per-slot validation.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const fromDate = new Date(Math.max(new Date(data.startDate).getTime(), today.getTime()));
       const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, fromDate);
       if (generated.length === 0) {
         return res.status(400).json({ error: "Recurrence rule produced no slots for the given start date and months ahead" });
       }
-      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId }));
+      slotsToCreate = generated.map((s) => ({ ...s, recurringGroupId, ...computeSlotTimestamps(s.date, s.startTime, s.endTime, beneficiaryTimezone) }));
     } else {
-      slotsToCreate = data.timeSlots!.map((ts) => ({
-        date: new Date(ts.date),
-        startTime: ts.startTime,
-        endTime: ts.endTime,
-        durationHours: ts.durationHours,
-        capacity: ts.capacity,
-      }));
+      slotsToCreate = data.timeSlots!.map((ts) => {
+        const date = new Date(ts.date);
+        return {
+          date,
+          startTime: ts.startTime,
+          endTime: ts.endTime,
+          durationHours: ts.durationHours,
+          capacity: ts.capacity,
+          ...computeSlotTimestamps(date, ts.startTime, ts.endTime, beneficiaryTimezone),
+        };
+      });
     }
 
     const opp = await prisma.beneficiaryOpportunity.create({
@@ -1898,6 +1917,8 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
 
     // Regenerate future slots when a recurrenceRule update is submitted.
     // Only deletes unbooked future slots (>24h); signed-up slots are preserved.
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
     if (data.recurrenceRule) {
       const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const anySlot = await prisma.beneficiaryTimeSlot.findFirst({
@@ -1918,7 +1939,12 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
       const generated = generateRecurringSlots(data.recurrenceRule as RecurrenceRule, new Date());
       if (generated.length > 0) {
         await prisma.beneficiaryTimeSlot.createMany({
-          data: generated.map((s) => ({ opportunityId: req.params.oppId, recurringGroupId, ...s })),
+          data: generated.map((s) => ({
+            opportunityId: req.params.oppId,
+            recurringGroupId,
+            ...s,
+            ...computeSlotTimestamps(s.date, s.startTime, s.endTime, beneficiaryTimezone),
+          })),
         });
       }
     }
@@ -1926,14 +1952,18 @@ router.patch("/:id/opportunities/:oppId", authenticate, requireRole("BENEFICIARY
     // Add new manual slots if provided
     if (data.timeSlots && data.timeSlots.length > 0) {
       await prisma.beneficiaryTimeSlot.createMany({
-        data: data.timeSlots.map((ts) => ({
-          opportunityId: req.params.oppId,
-          date: new Date(ts.date),
-          startTime: ts.startTime,
-          endTime: ts.endTime,
-          durationHours: ts.durationHours,
-          capacity: ts.capacity,
-        })),
+        data: data.timeSlots.map((ts) => {
+          const date = new Date(ts.date);
+          return {
+            opportunityId: req.params.oppId,
+            date,
+            startTime: ts.startTime,
+            endTime: ts.endTime,
+            durationHours: ts.durationHours,
+            capacity: ts.capacity,
+            ...computeSlotTimestamps(date, ts.startTime, ts.endTime, beneficiaryTimezone),
+          };
+        }),
       });
     }
 
@@ -2298,12 +2328,16 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
     });
     const data = schema.parse(req.body);
 
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
     const originalDate = slot.date;
     const newDate = data.date ? new Date(data.date) : slot.date;
     const newStartTime = data.startTime ?? slot.startTime;
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const { startsAt: newStartsAt, endsAt: newEndsAt } = computeSlotTimestamps(newDate, newStartTime, newEndTime, beneficiaryTimezone);
     const updated = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
@@ -2322,6 +2356,8 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
           endTime: newEndTime,
           durationHours: newDuration,
           capacity: newCapacity,
+          startsAt: newStartsAt,
+          endsAt: newEndsAt,
         },
       });
     });
@@ -2359,12 +2395,16 @@ router.patch("/:id/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN"
         const newFsEndH = Math.floor(((newFsEMins % 1440) + 1440) % 1440 / 60);
         const newFsEndMin = ((newFsEMins % 1440) + 1440) % 1440 % 60;
 
+        const fsStart = `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`;
+        const fsEnd = `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`;
+
         await prisma.beneficiaryTimeSlot.update({
           where: { id: fs.id },
           data: {
             date: fsDate,
-            startTime: `${String(newFsStartH).padStart(2, "0")}:${String(newFsStartMin).padStart(2, "0")}`,
-            endTime: `${String(newFsEndH).padStart(2, "0")}:${String(newFsEndMin).padStart(2, "0")}`,
+            startTime: fsStart,
+            endTime: fsEnd,
+            ...computeSlotTimestamps(fsDate, fsStart, fsEnd, beneficiaryTimezone),
           },
         });
       }
@@ -2436,12 +2476,16 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
     });
     const data = schema.parse(req.body);
 
+    const timezoneRecord = await prisma.beneficiary.findUnique({ where: { id: slot.opportunity.beneficiaryId }, select: { timezone: true } });
+    const beneficiaryTimezone = timezoneRecord?.timezone || "UTC";
+
     const originalDate = slot.date;
     const newDate = data.date ? new Date(data.date) : slot.date;
     const newStartTime = data.startTime ?? slot.startTime;
     const newEndTime = data.endTime ?? slot.endTime;
     const newCapacity = data.capacity ?? slot.capacity;
     const newDuration = calcDurationHours(newStartTime, newEndTime) || slot.durationHours;
+    const { startsAt: newStartsAt, endsAt: newEndsAt } = computeSlotTimestamps(newDate, newStartTime, newEndTime, beneficiaryTimezone);
     const updated = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${req.params.slotId} FOR UPDATE`;
 
@@ -2460,6 +2504,8 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
           endTime: newEndTime,
           durationHours: newDuration,
           capacity: newCapacity,
+          startsAt: newStartsAt,
+          endsAt: newEndsAt,
         },
       });
     });
@@ -2508,6 +2554,7 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
             startTime: fsStart,
             endTime: fsEnd,
             durationHours: calcDurationHours(fsStart, fsEnd) || fs.durationHours,
+            ...computeSlotTimestamps(fsDate, fsStart, fsEnd, beneficiaryTimezone),
           },
         });
       }
@@ -2525,23 +2572,6 @@ router.patch("/slots/:slotId", authenticate, requireRole("BENEFICIARY_ADMIN", "S
   }
 });
 
-router.post("/signup-question-templates", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { schoolId: true } });
-    if (!user?.schoolId) return res.status(403).json({ error: "Not associated with a school" });
-    const questions = validateSignupTemplate(z.array(z.object({ id: z.string().min(1).max(64), label: z.string().min(1).max(200), type: z.enum(["TEXT", "NUMBER", "BOOLEAN", "DATE"]), required: z.boolean() })).max(10).parse(req.body.questions) as SignupQuestion[]);
-    await prisma.signupQuestionTemplate.updateMany({ where: { schoolId: user.schoolId }, data: { active: false } });
-    const created = await prisma.$transaction(questions.map((question) => prisma.signupQuestionTemplate.create({ data: { schoolId: user.schoolId!, label: question.label, type: question.type, required: question.required, createdBy: req.user!.userId } })));
-    return res.status(201).json(created);
-  } catch (err) { if (err instanceof z.ZodError || err instanceof Error) return res.status(400).json({ error: "Invalid signup question template" }); return res.status(500).json({ error: "Internal server error" }); }
-});
-
-router.get("/slots/:slotId/questions", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
-  const schoolId = await resolveStudentSchoolId(req.user!.userId);
-  if (!schoolId) return res.status(403).json({ error: "Not enrolled in a school" });
-  return res.json(await prisma.signupQuestionTemplate.findMany({ where: { schoolId, active: true }, orderBy: { createdAt: "asc" } }));
-});
-
 // POST /api/beneficiaries/slots/:slotId/signup — student signs up for a time slot
 router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
   try {
@@ -2554,8 +2584,12 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
     if (slot.opportunity.status !== "ACTIVE") return res.status(400).json({ error: "This opportunity is no longer active" });
 
-    // Resolve the student's school
-    const studentSchoolId = await resolveStudentSchoolId(req.user!.userId);
+    // Use the canonical owning school; cohort/classroom associations cannot establish tenancy.
+    const student = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    const studentSchoolId = student?.schoolId ?? null;
     if (!studentSchoolId) {
       return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }
@@ -2588,10 +2622,6 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
       });
     }
 
-    const templates = await prisma.signupQuestionTemplate.findMany({ where: { schoolId: studentSchoolId, active: true }, orderBy: { createdAt: "asc" } });
-    let validatedAnswers: Record<string, unknown> = {};
-    try { validatedAnswers = validateSignupAnswers(templates.map((question) => ({ id: question.id, label: question.label, type: question.type as SignupQuestion["type"], required: question.required })), (req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {}) as Record<string, unknown>); } catch (answerError) { return res.status(400).json({ error: answerError instanceof Error ? answerError.message : "Invalid signup answers" }); }
-
     const result = await runSerializableTransaction(async (tx) => {
       await tx.$executeRaw`SELECT 1 FROM "BeneficiaryTimeSlot" WHERE id = ${slot.id} FOR UPDATE`;
 
@@ -2615,14 +2645,11 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
         data: {
           slotId: slot.id,
           studentId: req.user!.userId,
+          schoolId: studentSchoolId,
           status,
           cancellationToken: crypto.randomUUID(),
         },
       });
-
-      if (Object.keys(validatedAnswers).length) {
-        await tx.beneficiarySignupAnswer.createMany({ data: Object.entries(validatedAnswers).map(([questionId, value]) => ({ signupId: signup.id, questionId, value: JSON.stringify(value) })) });
-      }
 
       await tx.beneficiaryAuditLog.create({
         data: {
@@ -2664,11 +2691,14 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
   try {
     if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
 
-    const statusFilter = req.query.status as string | undefined;
+    const statusFilter = beneficiarySignupVerificationStatusEnum.optional().safeParse(req.query.status);
+    if (!statusFilter.success) {
+      return res.status(400).json({ error: "status must be PENDING, APPROVED, or REJECTED" });
+    }
     const signups = await prisma.beneficiarySignup.findMany({
       where: {
         slot: { opportunity: { beneficiaryId: req.params.id } },
-        ...(statusFilter ? { verificationStatus: statusFilter } : {}),
+        ...(statusFilter.data ? { verificationStatus: statusFilter.data } : {}),
       },
       include: {
         slot: {
@@ -2689,14 +2719,16 @@ router.get("/:id/signups", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOO
       : [];
     const studentMap = new Map(students.map((student) => [student.id, student.name]));
 
-    // FERPA disclosure log: beneficiary admin accessed student signup list
-    logDataAccess({
+    // FERPA disclosure log: beneficiary admin accessed student signup list.
+    // Awaited (not fire-and-forget) so a failed audit write aborts the
+    // response instead of silently releasing student data with no trail.
+    await logDataAccess({
       actorId: req.user!.userId,
       action: "VIEW_BENEFICIARY_SIGNUPS",
       targetType: "beneficiary",
       targetId: req.params.id,
       details: { studentCount: signups.length, statusFilter: statusFilter ?? "all" },
-    }).catch(() => {});
+    });
 
     const result = signups.map((s) => ({
       ...s,
@@ -2732,10 +2764,27 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
       return res.status(400).json({ error: "Hour approval is only available after the time slot has ended" });
     }
 
-    const { approvedHours, overrideCap } = z.object({
+    const { approvedHours, overrideCap, overrideNoShow, noShowOverrideReason } = z.object({
       approvedHours: z.number().positive().optional(),
       overrideCap: z.boolean().optional(),
+      overrideNoShow: z.boolean().optional(),
+      noShowOverrideReason: z.string().trim().min(1).max(1000).optional(),
     }).parse(req.body);
+
+    // A NO_SHOW signup must not silently receive approved hours — that would
+    // both grant credit the student never earned and erase the no-show
+    // record (the update below resets status back to CONFIRMED). Require an
+    // explicit override flag and a documented reason, matching the same
+    // elevated-confirmation pattern already used for overrideCap.
+    if (signup.status === "NO_SHOW") {
+      if (!overrideNoShow || !noShowOverrideReason) {
+        return res.status(400).json({
+          error: "This signup is marked as a no-show. Pass overrideNoShow: true and noShowOverrideReason to approve hours anyway.",
+          noShowOverrideRequired: true,
+        });
+      }
+    }
+
     if (approvedHours !== undefined && approvedHours > signup.slot.durationHours) {
       return res.status(400).json({ error: `approvedHours cannot exceed the slot duration of ${signup.slot.durationHours}h` });
     }
@@ -2774,7 +2823,9 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
+        action: signup.status === "NO_SHOW"
+          ? "NO_SHOW_OVERRIDE_APPROVED"
+          : signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
         actorId: req.user!.userId,
         signupId: signup.id,
         details: JSON.stringify({
@@ -2782,8 +2833,19 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
           approvedHours: hours,
           originalHours: signup.slot.durationHours,
           ...(overrideCap ? { capOverride: true } : {}),
+          ...(signup.status === "NO_SHOW" ? { noShowOverride: true, noShowOverrideReason } : {}),
         }),
       },
+    });
+
+    await recordServiceHourLedgerEntry({
+      studentId: signup.studentId,
+      schoolId: signup.schoolId,
+      sourceType: "BENEFICIARY_SIGNUP",
+      sourceId: signup.id,
+      category: signup.slot.opportunity.category,
+      approvedHours: hours,
+      approverId: req.user!.userId,
     });
 
     await notifyBeneficiarySignupReviewChange({
@@ -3291,8 +3353,51 @@ router.post("/signups/:signupId/cancel", authenticate, requireRole("STUDENT"), a
   }
 });
 
-// GET /api/beneficiaries/cancel/:token — public one-click cancellation link (no auth required)
+// GET /api/beneficiaries/cancel/:token — read-only confirmation lookup (no auth required).
+// Never mutates state: email scanners, link previewers, and crawlers must not be able to
+// cancel a signup merely by requesting the link.
 router.get("/cancel/:token", async (req: Request, res: Response) => {
+  try {
+    const signup = await prisma.beneficiarySignup.findUnique({
+      where: { cancellationToken: req.params.token },
+      select: {
+        status: true,
+        verificationStatus: true,
+        slot: {
+          select: {
+            date: true,
+            startTime: true,
+            endTime: true,
+            opportunity: { select: { title: true } },
+          },
+        },
+      },
+    });
+
+    if (!signup) return res.status(404).json({ error: "Cancellation link not found or already used." });
+    if (signup.status === "CANCELLED") {
+      return res.json({ requiresConfirmation: false, alreadyCancelled: true, opportunityTitle: signup.slot.opportunity.title });
+    }
+    if (signup.verificationStatus === "APPROVED") {
+      return res.status(400).json({ error: "Cannot cancel an already-approved signup." });
+    }
+
+    res.json({
+      requiresConfirmation: true,
+      opportunityTitle: signup.slot.opportunity.title,
+      date: signup.slot.date,
+      startTime: signup.slot.startTime,
+      endTime: signup.slot.endTime,
+    });
+  } catch (err) {
+    console.error("Cancel link lookup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/beneficiaries/cancel/:token — explicit, one-time confirmation that consumes
+// the cancellation token and performs the mutation (no auth required; the token is the capability).
+router.post("/cancel/:token", async (req: Request, res: Response) => {
   try {
     const signup = await prisma.beneficiarySignup.findUnique({
       where: { cancellationToken: req.params.token },
@@ -3337,7 +3442,9 @@ router.get("/cancel/:token", async (req: Request, res: Response) => {
           action: "SIGNUP_CANCELLED",
           actorId: signup.studentId,
           signupId: signup.id,
-          details: JSON.stringify({ source: "one_click_cancel", previousStatus: signup.status }),
+          // Possession of the bearer link proves the cancellation capability, not that
+          // the student personally submitted the request — record that distinction.
+          details: JSON.stringify({ source: "one_click_cancel", actorType: "CANCELLATION_CAPABILITY", previousStatus: signup.status }),
         },
       });
 
@@ -3394,37 +3501,92 @@ router.post("/:id/opportunities/:oppId/attendance", authenticate, requireRole("B
       return res.status(404).json({ error: "Opportunity not found" });
     }
 
-    // Expect body: { records: Array<{ signupId: string; attendance: "ATTENDED" | "NO_SHOW" }> }
-    const { records } = req.body as { records?: Array<{ signupId: string; attendance: string }> };
-    if (!Array.isArray(records) || records.length === 0) {
-      return res.status(400).json({ error: "records array is required" });
+    const MAX_BATCH_SIZE = 200;
+    const bulkAttendanceSchema = z.object({
+      records: z.array(z.object({
+        signupId: z.string().min(1),
+        attendance: z.enum(["ATTENDED", "NO_SHOW"]),
+      })).min(1).max(MAX_BATCH_SIZE),
+      earlyOverride: z.boolean().optional(),
+      earlyOverrideReason: z.string().trim().min(1).max(1000).optional(),
+    });
+    const parsedBody = bulkAttendanceSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: "records array is required; each record must have signupId and attendance (ATTENDED | NO_SHOW), max 200 per request" });
     }
-
-    const VALID = new Set(["ATTENDED", "NO_SHOW"]);
-    const invalid = records.find((r) => !r.signupId || !VALID.has(r.attendance));
-    if (invalid) {
-      return res.status(400).json({ error: "Each record must have signupId and attendance (ATTENDED | NO_SHOW)" });
-    }
-
+    const { records, earlyOverride, earlyOverrideReason } = parsedBody.data;
     const signupIds = records.map((r) => r.signupId);
+    if (new Set(signupIds).size !== signupIds.length) {
+      return res.status(400).json({ error: "records contains duplicate signupId values" });
+    }
+
     const existing = await prisma.beneficiarySignup.findMany({
       where: { id: { in: signupIds }, slot: { opportunity: { id: req.params.oppId } } },
-      select: { id: true },
+      select: { id: true, status: true, slot: { select: { date: true, endTime: true } } },
     });
-    const validIds = new Set(existing.map((s) => s.id));
+    const existingById = new Map(existing.map((s) => [s.id, s]));
 
-    const updates = await Promise.all(
-      records
-        .filter((r) => validIds.has(r.signupId))
-        .map((r) =>
-          prisma.beneficiarySignup.update({
-            where: { id: r.signupId },
-            data: { attendance: r.attendance },
-          })
-        )
-    );
+    const applicable = records.filter((r) => {
+      const current = existingById.get(r.signupId);
+      // Cancelled/waitlisted signups never had confirmed attendance to
+      // record, and re-recording an already-recorded no-show is a no-op —
+      // skip rather than silently overwrite.
+      return current && current.status !== "CANCELLED" && current.status !== "WAITLISTED";
+    });
 
-    res.json({ updated: updates.length });
+    // No-show normally requires the event to have ended, same as the
+    // single-signup /no-show route — an explicit override is required to
+    // mark it early.
+    const hasEarlyNoShow = applicable.some((r) => {
+      if (r.attendance !== "NO_SHOW") return false;
+      const slot = existingById.get(r.signupId)!.slot;
+      return getSlotEndAt(slot.date, slot.endTime) > new Date();
+    });
+    if (hasEarlyNoShow && (!earlyOverride || !earlyOverrideReason)) {
+      return res.status(400).json({
+        error: "One or more no-show records are for events that haven't ended yet. Pass earlyOverride: true and earlyOverrideReason to mark them early.",
+        earlyOverrideRequired: true,
+      });
+    }
+
+    const updated = await runSerializableTransaction(async (tx) => {
+      const results = [];
+      for (const record of applicable) {
+        const current = existingById.get(record.signupId)!;
+        // Keep `status` in sync with `attendance` instead of letting them
+        // drift: a signup marked NO_SHOW here must actually carry
+        // status "NO_SHOW" so the hour-approval route's no-show override
+        // requirement applies to it too, not just no-shows recorded
+        // through the single-signup /no-show endpoint.
+        const result = await tx.beneficiarySignup.update({
+          where: { id: record.signupId },
+          data: {
+            attendance: record.attendance,
+            ...(record.attendance === "NO_SHOW" && current.status !== "NO_SHOW"
+              ? { status: "NO_SHOW", verificationStatus: "PENDING", totalHours: null, verifiedBy: null, verifiedAt: null }
+              : {}),
+          },
+        });
+        results.push(result);
+      }
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: hasEarlyNoShow ? "ATTENDANCE_BATCH_RECORDED_EARLY_OVERRIDE" : "ATTENDANCE_BATCH_RECORDED",
+          actorId: req.user!.userId,
+          signupId: applicable[0]?.signupId ?? null,
+          details: JSON.stringify({
+            opportunityId: req.params.oppId,
+            recordCount: applicable.length,
+            attendedCount: applicable.filter((r) => r.attendance === "ATTENDED").length,
+            noShowCount: applicable.filter((r) => r.attendance === "NO_SHOW").length,
+            ...(hasEarlyNoShow ? { earlyOverride: true, earlyOverrideReason } : {}),
+          }),
+        },
+      });
+      return results;
+    });
+
+    res.json({ updated: updated.length });
   } catch (err) {
     console.error("Attendance record error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -3694,6 +3856,19 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
     if (signup.status === "CANCELLED") return res.status(400).json({ error: "Cannot mark a cancelled signup as no-show" });
     if (signup.status === "WAITLISTED") return res.status(400).json({ error: "Waitlisted signups cannot be marked as no-show" });
     if (signup.status === "NO_SHOW") return res.status(400).json({ error: "Student is already marked as a no-show" });
+
+    const { earlyOverride, earlyOverrideReason } = z.object({
+      earlyOverride: z.boolean().optional(),
+      earlyOverrideReason: z.string().trim().min(1).max(1000).optional(),
+    }).parse(req.body ?? {});
+    const eventHasEnded = getSlotEndAt(signup.slot.date, signup.slot.endTime) <= new Date();
+    if (!eventHasEnded && (!earlyOverride || !earlyOverrideReason)) {
+      return res.status(400).json({
+        error: "No-show can normally only be marked after the event has ended. Pass earlyOverride: true and earlyOverrideReason to mark it early.",
+        earlyOverrideRequired: true,
+      });
+    }
+
     const fromStatus = getBeneficiarySignupDisplayStatus(signup);
 
     const updated = await prisma.beneficiarySignup.update({
@@ -3713,10 +3888,14 @@ router.post("/signups/:signupId/no-show", authenticate, requireRole("BENEFICIARY
 
     await prisma.beneficiaryAuditLog.create({
       data: {
-        action: "NO_SHOW",
+        action: eventHasEnded ? "NO_SHOW" : "NO_SHOW_EARLY_OVERRIDE",
         actorId: req.user!.userId,
         signupId: signup.id,
-        details: JSON.stringify({ studentId: signup.studentId, previousStatus: fromStatus }),
+        details: JSON.stringify({
+          studentId: signup.studentId,
+          previousStatus: fromStatus,
+          ...(!eventHasEnded ? { earlyOverride: true, earlyOverrideReason } : {}),
+        }),
       },
     });
 
@@ -3878,90 +4057,6 @@ router.delete("/:id/admin-invitations/:invitationId", authenticate, requireRole(
   if (actor?.beneficiaryId !== req.params.id || actor.beneficiaryAdminRole !== "OWNER") return res.status(403).json({ error: "Owner access required" });
   await prisma.beneficiaryAdminInvitation.updateMany({ where: { id: req.params.invitationId, beneficiaryId: req.params.id, status: "PENDING" }, data: { status: "REVOKED" } });
   res.json({ ok: true });
-});
-
-router.get("/:id/reliability", authenticate, async (req: Request, res: Response) => {
-  try {
-    const beneficiary = await prisma.beneficiary.findUnique({ where: { id: req.params.id }, select: { id: true } });
-    if (!beneficiary) return res.status(404).json({ error: "Organization not found" });
-    const actor = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { role: true, schoolId: true, beneficiaryId: true } });
-    const manages = actor?.beneficiaryId === beneficiary.id && actor.role === "BENEFICIARY_ADMIN";
-    const schoolAccess = actor?.schoolId ? await prisma.schoolBeneficiaryApproval.findFirst({ where: { schoolId: actor.schoolId, beneficiaryId: beneficiary.id, status: "APPROVED" } }) : null;
-    if (!manages && !schoolAccess) return res.status(403).json({ error: "Not authorized to view this reliability metric" });
-    const events = await prisma.organizationReliabilityEvent.findMany({ where: { beneficiaryId: beneficiary.id }, orderBy: { occurredAt: "desc" }, take: 500 });
-    return res.json(calculateReliability(events.map((event) => ({ at: event.occurredAt, responseMinutes: event.responseMinutes ?? undefined, attendanceAccurate: event.attendanceAccurate ?? undefined, cancelled: event.cancelled ?? undefined, verificationMinutes: event.verificationMinutes ?? undefined })), { now: new Date(), windowDays: 90, minimumSamples: 5 }));
-  } catch (err) { console.error("Reliability metric error:", err); return res.status(500).json({ error: "Internal server error" }); }
-});
-
-router.post("/:id/reliability-events", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
-  try {
-    const input = z.object({ occurredAt: z.string().datetime(), responseMinutes: z.number().min(0).max(100000).optional(), attendanceAccurate: z.boolean().optional(), cancelled: z.boolean().optional(), verificationMinutes: z.number().min(0).max(100000).optional() }).parse(req.body);
-    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not authorized to record reliability events" });
-    const event = await prisma.organizationReliabilityEvent.create({ data: { beneficiaryId: req.params.id, occurredAt: new Date(input.occurredAt), responseMinutes: input.responseMinutes, attendanceAccurate: input.attendanceAccurate, cancelled: input.cancelled, verificationMinutes: input.verificationMinutes, createdBy: req.user!.userId } });
-    return res.status(201).json(event);
-  } catch (err) { if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors }); console.error("Reliability event error:", err); return res.status(500).json({ error: "Internal server error" }); }
-});
-
-router.post("/:id/signups/:signupId/supervisor-verification", authenticate, requireRole("BENEFICIARY_ADMIN", "SCHOOL_ADMIN"), async (req: Request, res: Response) => {
-  try {
-    if (!await canManageBeneficiary(req.user!.userId, req.params.id)) return res.status(403).json({ error: "Not your beneficiary" });
-    const input = z.object({ supervisorEmail: z.string().email().max(320) }).parse(req.body);
-    const signup = await prisma.beneficiarySignup.findUnique({ where: { id: req.params.signupId }, include: { slot: { include: { opportunity: { select: { beneficiaryId: true } } } } } });
-    if (!signup || signup.slot.opportunity.beneficiaryId !== req.params.id) return res.status(404).json({ error: "Signup not found" });
-    const schoolId = await resolveStudentSchoolId(signup.studentId);
-    if (!schoolId) return res.status(400).json({ error: "Student is not associated with a school" });
-    const school = await prisma.school.findUnique({ where: { id: schoolId }, include: { verifiedDomains: { select: { domain: true } } } });
-    const domains = [school?.domain ?? "", ...(school?.verifiedDomains ?? []).map((item) => item.domain)].flatMap((value) => value.split(",")).map((value) => value.trim().toLowerCase()).filter(Boolean);
-    const emailDomain = input.supervisorEmail.split("@")[1]?.toLowerCase();
-    if (!emailDomain || !domains.includes(emailDomain)) return res.status(403).json({ error: "Supervisor email must use an authorized school domain" });
-    const verificationId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const token = createSupervisorVerificationToken({ verificationId, serviceRecordId: signup.id, supervisorEmail: input.supervisorEmail, expiresAt, secret: process.env.JWT_SECRET ?? "" });
-    await prisma.supervisorVerification.upsert({ where: { signupId: signup.id }, create: { id: verificationId, signupId: signup.id, schoolId, supervisorEmail: input.supervisorEmail.toLowerCase(), tokenHash: hashToken(token), expiresAt }, update: { id: verificationId, schoolId, supervisorEmail: input.supervisorEmail.toLowerCase(), tokenHash: hashToken(token), expiresAt, usedAt: null } });
-    await sendVerificationEmail(input.supervisorEmail, `${CLIENT_URL}/supervisor-verify?token=${encodeURIComponent(token)}`);
-    return res.status(201).json({ verificationId, expiresAt });
-  } catch (err) { if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors }); console.error("Create supervisor verification error:", err); return res.status(500).json({ error: "Internal server error" }); }
-});
-
-router.post("/supervisor-verification/:token/consume", async (req: Request, res: Response) => {
-  try {
-    const email = z.string().email().parse(req.body?.supervisorEmail).toLowerCase();
-    const verification = await prisma.supervisorVerification.findUnique({ where: { tokenHash: hashToken(req.params.token) }, include: { school: { include: { verifiedDomains: { select: { domain: true } } } }, signup: true } });
-    if (!verification) return res.status(400).json({ error: "Verification link is invalid or expired" });
-
-    const domains = [verification.school.domain ?? "", ...verification.school.verifiedDomains.map((item) => item.domain)]
-      .flatMap((value) => value.split(","))
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean);
-    const payload = consumeSupervisorVerificationToken(req.params.token, {
-      secret: process.env.JWT_SECRET ?? "",
-      authorizedDomains: domains,
-      consumedIds: new Set(),
-    });
-    if (payload.verificationId !== verification.id || payload.serviceRecordId !== verification.signupId) {
-      return res.status(400).json({ error: "Verification link is invalid or expired" });
-    }
-    if (verification.usedAt || verification.expiresAt <= new Date()) return res.status(400).json({ error: "Verification link is expired or already used" });
-    if (verification.supervisorEmail !== email || payload.supervisorEmail !== email) return res.status(403).json({ error: "Supervisor email does not match" });
-    if (!domains.includes(email.split("@")[1]?.toLowerCase() ?? "")) return res.status(403).json({ error: "Supervisor email domain is not authorized" });
-
-    const now = new Date();
-    await prisma.$transaction(async (tx) => {
-      const claimed = await tx.supervisorVerification.updateMany({
-        where: { id: verification.id, usedAt: null, expiresAt: { gt: now } },
-        data: { usedAt: now },
-      });
-      if (claimed.count !== 1) throw new Error("SUPERVISOR_VERIFICATION_ALREADY_CONSUMED");
-      await tx.beneficiarySignup.update({ where: { id: verification.signupId }, data: { verificationStatus: "APPROVED", verifiedBy: email, verifiedAt: now } });
-      await tx.beneficiaryAuditLog.create({ data: { action: "SUPERVISOR_VERIFIED", actorId: verification.signup.studentId, signupId: verification.signupId, details: JSON.stringify({ supervisorEmail: email }) } });
-    });
-    return res.json({ verified: true, serviceRecordId: verification.signupId });
-  } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: "A valid supervisor email is required" });
-    if (err instanceof Error && err.message === "SUPERVISOR_VERIFICATION_ALREADY_CONSUMED") return res.status(400).json({ error: "Verification link is expired or already used" });
-    if (err instanceof Error && ["Invalid verification token", "Expired or replayed verification token", "Supervisor email domain is not authorized"].includes(err.message)) return res.status(400).json({ error: "Verification link is invalid or expired" });
-    console.error("Consume supervisor verification error:", err); return res.status(500).json({ error: "Internal server error" });
-  }
 });
 
 export default router;

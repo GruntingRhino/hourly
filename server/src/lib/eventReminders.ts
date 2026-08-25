@@ -23,6 +23,8 @@ interface ReminderSignup {
     date: Date;
     startTime: string;
     endTime: string;
+    startsAt: Date | null;
+    endsAt: Date | null;
     opportunity: {
       id: string;
       title: string;
@@ -60,37 +62,49 @@ async function processReminder(
     ? "FREE_24H"
     : `PRO_CUSTOM_${minutesBefore}`;
 
-  const now = new Date();
+  // §7 canonical event-time model: prefer the precomputed startsAt (set by
+  // every slot write path) over recomputing it here; a null value means
+  // this row predates the backfill, so fall back to the same live
+  // slotDateTime() conversion this always used before.
+  const slotStartsAt = signup.slot.startsAt ?? slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone);
+  const freshScheduledFor = new Date(slotStartsAt.getTime() - minutesBefore * 60 * 1000);
+
   const existing = await prisma.orgEventReminderLog.findUnique({
     where: { signupId_reminderType: { signupId: signup.id, reminderType } },
   });
-  if (existing?.deliveryStatus === "SENT" || (existing?.leasedUntil && existing.leasedUntil > now)) return;
 
-  const leaseUntil = new Date(now.getTime() + EVENT_REMINDER_LEASE_MS);
+  // A log keyed only by signupId+reminderType would otherwise silently
+  // suppress a replacement reminder after the event's date/time changes:
+  // "SENT" for the old schedule reads as "already handled" even though the
+  // student has never been notified about the new time. Comparing the
+  // stored scheduledFor against what the current slot data computes to
+  // detects that the old log is stale and must not gate a resend.
+  const isStaleForRescheduledEvent = !!existing && existing.scheduledFor.getTime() !== freshScheduledFor.getTime();
+  if (existing && existing.deliveryStatus !== "FAILED" && !isStaleForRescheduledEvent) return;
+
+  // Create or update the log record (PENDING → we own this slot)
   const log = existing
-    ? (await prisma.orgEventReminderLog.updateMany({ where: { id: existing.id, deliveryStatus: { in: ["PENDING", "FAILED"] }, attempts: { lt: 3 }, OR: [{ leasedUntil: null }, { leasedUntil: { lte: now } }] }, data: { deliveryStatus: "PENDING", leasedUntil: leaseUntil, attempts: { increment: 1 }, failureReason: null } })).count > 0
-      ? await prisma.orgEventReminderLog.findUniqueOrThrow({ where: { id: existing.id } })
-      : null
+    ? await prisma.orgEventReminderLog.update({
+        where: { id: existing.id },
+        data: { deliveryStatus: "PENDING", failureReason: null, scheduledFor: freshScheduledFor },
+      })
     : await prisma.orgEventReminderLog.create({
         data: {
           signupId: signup.id,
           beneficiaryId: signup.slot.opportunity.beneficiaryId,
           opportunityId: signup.slot.opportunity.id,
           reminderType,
-          scheduledFor: new Date(slotDateTime(signup.slot.date, signup.slot.startTime, signup.slot.opportunity.beneficiary.timezone).getTime() - minutesBefore * 60 * 1000),
+          scheduledFor: freshScheduledFor,
           deliveryStatus: "PENDING",
-          leasedUntil: leaseUntil,
-          attempts: 1,
         },
       });
-  if (!log) return;
 
   const opp = signup.slot.opportunity;
   const ben = opp.beneficiary;
   const tierLimits = ORGANIZATION_TIER_LIMITS[tier];
 
-  const startDt = slotDateTime(signup.slot.date, signup.slot.startTime, ben.timezone);
-  const endDt = slotDateTime(signup.slot.date, signup.slot.endTime, ben.timezone);
+  const startDt = slotStartsAt;
+  const endDt = signup.slot.endsAt ?? slotDateTime(signup.slot.date, signup.slot.endTime, ben.timezone);
 
   const icsContent = generateICS({
     uid: `${signup.id}-${minutesBefore}`,
@@ -138,14 +152,13 @@ async function processReminder(
 
     await prisma.orgEventReminderLog.update({
       where: { id: log.id },
-      data: { deliveryStatus: "SENT", sentAt: new Date(), leasedUntil: null },
+      data: { deliveryStatus: "SENT", sentAt: new Date() },
     });
   } catch (err) {
     await prisma.orgEventReminderLog.update({
       where: { id: log.id },
       data: {
         deliveryStatus: "FAILED",
-        leasedUntil: null,
         failureReason: String((err as any)?.message ?? err).slice(0, 500),
       },
     });

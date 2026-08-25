@@ -1,40 +1,54 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { api, ApiError } from "../lib/api";
-import { clearAuthSession, markAuthSyncOptOut, getAuthToken, getCachedUser, registerAuthSessionResponder, requestAuthSession, setAuthSession } from "../lib/authSession";
+import { clearAuthSession, getCachedUser, setCachedUser } from "../lib/authSession";
 import { AuthContext } from "./authContext";
 import type { User, SignupData, SignupResult } from "./authTypes";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getCachedUser<User>());
-  const [loading, setLoading] = useState(() => Boolean(getAuthToken() && !getCachedUser<User>()));
+  // The session cookie is HttpOnly — this app has no way to check for its
+  // presence without asking the server, so a real GET /auth/me call always
+  // runs on mount. If a cached user exists we still render it immediately
+  // (optimistic — matches the previous token-based UX, avoiding a loading
+  // flash on repeat visits) while that confirmation happens in the
+  // background; otherwise we show the loading state until it resolves.
+  const [loading, setLoading] = useState(() => !getCachedUser<User>());
 
   const refreshUser = useCallback(async () => {
     try {
       const data = await api.get<User>("/auth/me");
       setUser(data);
-      const token = getAuthToken();
-      if (token) setAuthSession(token, data);
+      setCachedUser(data);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearAuthSession(); setUser(null); }
     }
   }, []);
 
   useEffect(() => {
-    const unregister = registerAuthSessionResponder<User>(() => ({ token: getAuthToken(), user: getCachedUser<User>() }));
     void (async () => {
-      let token = getAuthToken();
-      if (!token) { const synced = await requestAuthSession<User>(); if (synced?.token) { setAuthSession(synced.token, synced.user); token = synced.token; if (synced.user) setUser(synced.user); } }
-      if (token) await refreshUser();
+      await refreshUser();
       setLoading(false);
     })();
-    return unregister;
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => { const data = await api.post<{ token: string; user: User }>("/auth/login", { email, password }); setAuthSession(data.token, data.user); setUser(data.user); }, []);
-  const loginWithToken = useCallback((token: string, u: User) => { setAuthSession(token, u); setUser(u); }, []);
-  const signup = useCallback(async (signupData: SignupData): Promise<SignupResult> => { const data = await api.post<SignupResult>("/auth/signup", signupData); setAuthSession(data.token, data.user); setUser(data.user); return data; }, []);
-  const logout = useCallback(() => { markAuthSyncOptOut(); clearAuthSession(); setUser(null); }, []);
+  const login = useCallback(async (email: string, password: string) => {
+    const data = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
+    setCachedUser(data.user);
+    setUser(data.user);
+  }, []);
+  const loginWithToken = useCallback((_token: string, u: User) => { setCachedUser(u); setUser(u); }, []);
+  const signup = useCallback(async (signupData: SignupData): Promise<SignupResult> => api.post<SignupResult>("/auth/signup", signupData), []);
+  const logout = useCallback(() => {
+    void api.post("/auth/logout").catch(() => {
+      // Best-effort — even if this fails, clearing the cached user below
+      // logs the client out visually; the cookie (if it survives) will
+      // simply fail the next authenticate() call once it's genuinely
+      // invalid, or the user can log out again.
+    });
+    clearAuthSession();
+    setUser(null);
+  }, []);
 
   return <AuthContext.Provider value={{ user, loading, login, loginWithToken, signup, logout, refreshUser }}>{children}</AuthContext.Provider>;
 }

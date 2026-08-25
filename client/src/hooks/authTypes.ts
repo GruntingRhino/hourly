@@ -31,6 +31,6 @@ export interface User {
 }
 
 export interface SignupData { email: string; password: string; name: string; role: string; schoolName?: string; schoolDomain?: string; directorySchoolId?: string }
-export interface SignupResult { token: string; user: User; requiresEmailVerification?: boolean }
+export interface SignupResult { email: string; requiresEmailVerification: true; requiresSchoolOwnershipReview: true }
 export interface AuthContextType { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<void>; loginWithToken: (token: string, user: User) => void; signup: (data: SignupData) => Promise<SignupResult>; logout: () => void; refreshUser: () => Promise<void> }
 export type AuthChildren = { children: ReactNode };

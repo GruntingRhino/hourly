@@ -8,12 +8,9 @@ import { verifyGithubActionsOidcToken } from "../lib/githubActionsOidc";
 import { getCanvasOperationalStatus } from "../services/canvasIntegration";
 import { getGoogleClassroomOperationalStatus } from "../services/googleClassroomIntegration";
 import { firstZodError, optionalTrimmedString, strictObject } from "../lib/validation";
+import { isProdLike } from "../lib/isProdLike";
 
 const router = Router();
-
-function isProdLike(): boolean {
-  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-}
 
 function hasValidCronSecret(req: Request): boolean {
   const secret = process.env.CRON_SECRET;

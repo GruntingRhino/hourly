@@ -7,6 +7,7 @@ import { requireRole } from "../middleware/rbac";
 import { resolveEffectiveRules, checkCategoryCap, getBlockedCategoryKeysForStudent, normalizeCategoryKey } from "../lib/schoolRules";
 import { assertStudentAccessibleToStaff, buildCohortScopedStudentWhere, getStaffAccessScope } from "../lib/cohortAccess";
 import { resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
 import {
   sendSelfSubmissionApprovedEmail,
   sendSelfSubmissionRejectedEmail,
@@ -15,6 +16,8 @@ import {
 } from "../services/email";
 
 const router = Router();
+
+const selfSubmittedRequestStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED", "REVISION_REQUESTED", "CANCELLED"]);
 
 // POST /api/self-submissions — student submits self-selected volunteering
 router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
@@ -107,7 +110,13 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
 // POST /api/self-submissions/import — school admin bulk-imports pre-approved prior hours
 router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const { csvData } = z.object({ csvData: z.string().min(1) }).parse(req.body);
+    const { csvData, dryRun } = z.object({
+      csvData: z.string().min(1),
+      // §10 staged imports: preview imported/skipped counts and per-row
+      // errors without creating any SelfSubmittedRequest row or the
+      // BULK_HOURS_IMPORT audit log entry.
+      dryRun: z.boolean().optional().default(false),
+    }).parse(req.body);
 
     const scope = await getStaffAccessScope(req.user!.userId);
     if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
@@ -133,6 +142,7 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
     const studentByEmail = new Map<string, (typeof schoolStudents)[number]>(schoolStudents.map((s) => [s.email.toLowerCase(), s]));
 
     const createdIds: string[] = [];
+    let wouldImportCount = 0;
     const skipped: { row: number; email: string; reason: string }[] = [];
 
     for (let i = 0; i < records.length; i++) {
@@ -163,6 +173,11 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
         skipped.push({ row: rowNum, email, reason: "Student not found in your school" }); continue;
       }
 
+      if (dryRun) {
+        wouldImportCount++;
+        continue;
+      }
+
       const schoolId = (await resolveStudentSchoolId(student.id)) ?? scope.schoolId;
 
       const submission = await prisma.selfSubmittedRequest.create({
@@ -182,19 +197,21 @@ router.post("/import", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asy
       createdIds.push(submission.id);
     }
 
-    await prisma.auditLog.create({
-      data: {
-        action: "BULK_HOURS_IMPORT",
-        actorId: scope.userId,
-        details: JSON.stringify({
-          imported: createdIds.length,
-          skipped: skipped.length,
-          schoolId: scope.schoolId,
-        }),
-      },
-    });
+    if (!dryRun) {
+      await prisma.auditLog.create({
+        data: {
+          action: "BULK_HOURS_IMPORT",
+          actorId: scope.userId,
+          details: JSON.stringify({
+            imported: createdIds.length,
+            skipped: skipped.length,
+            schoolId: scope.schoolId,
+          }),
+        },
+      });
+    }
 
-    res.json({ imported: createdIds.length, skipped });
+    res.json({ imported: dryRun ? wouldImportCount : createdIds.length, skipped, dryRun });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "Validation failed", details: err.errors });
     console.error("Bulk import error:", err);
@@ -221,7 +238,10 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
     if (["SCHOOL_ADMIN", "TEACHER"].includes(user.role)) {
       const scope = await getStaffAccessScope(req.user!.userId);
       if (!scope?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
-      const statusFilter = req.query.status as string | undefined;
+      const statusFilter = selfSubmittedRequestStatusEnum.optional().safeParse(req.query.status);
+      if (!statusFilter.success) {
+        return res.status(400).json({ error: "status must be PENDING, APPROVED, REJECTED, REVISION_REQUESTED, or CANCELLED" });
+      }
       const submissions = await prisma.selfSubmittedRequest.findMany({
         where: {
           schoolId: scope.schoolId,
@@ -233,7 +253,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
               ],
             },
           }),
-          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(statusFilter.data ? { status: statusFilter.data } : {}),
         },
         include: {
           student: { select: { id: true, name: true, email: true, cohortId: true } },
@@ -309,6 +329,16 @@ router.post("/:id/approve", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
           ...(overrideCap ? { capOverride: true } : {}),
         }),
       },
+    });
+
+    await recordServiceHourLedgerEntry({
+      studentId: submission.studentId,
+      schoolId: submission.schoolId,
+      sourceType: "SELF_SUBMITTED",
+      sourceId: submission.id,
+      category: submission.category,
+      approvedHours: hours,
+      approverId: req.user!.userId,
     });
 
     // Notify student

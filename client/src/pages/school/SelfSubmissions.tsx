@@ -45,7 +45,9 @@ export default function SchoolSelfSubmissions() {
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [dryRunResult, setDryRunResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState("");
 
   const load = useCallback(async () => {
@@ -116,6 +118,21 @@ export default function SchoolSelfSubmissions() {
     }
   };
 
+  const handlePreviewImport = async () => {
+    if (!csvText.trim()) { setImportError("Paste your CSV data first."); return; }
+    setPreviewing(true);
+    setImportError("");
+    setDryRunResult(null);
+    try {
+      const result = await api.post<ImportResult>("/self-submissions/import", { csvData: csvText, dryRun: true });
+      setDryRunResult(result);
+    } catch (err: unknown) {
+      setImportError(getErrorMessage(err, "Preview failed."));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const handleImport = async () => {
     if (!csvText.trim()) { setImportError("Paste your CSV data first."); return; }
     setImporting(true);
@@ -124,6 +141,7 @@ export default function SchoolSelfSubmissions() {
     try {
       const result = await api.post<ImportResult>("/self-submissions/import", { csvData: csvText });
       setImportResult(result);
+      setDryRunResult(null);
       setCsvText("");
       if (result.imported > 0) void load();
     } catch (err: unknown) {
@@ -177,7 +195,7 @@ export default function SchoolSelfSubmissions() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => { setShowImport((v) => !v); setImportResult(null); setImportError(""); }}
+            onClick={() => { setShowImport((v) => !v); setImportResult(null); setDryRunResult(null); setImportError(""); }}
             className="px-3 py-1.5 text-xs border border-[var(--in-b)] rounded hover:bg-[var(--in-bg)] text-[var(--action)] font-medium"
           >
             {showImport ? "Close Import" : "Import Prior Hours"}
@@ -227,7 +245,7 @@ export default function SchoolSelfSubmissions() {
 
           <textarea
             value={csvText}
-            onChange={(e) => setCsvText(e.target.value)}
+            onChange={(e) => { setCsvText(e.target.value); setDryRunResult(null); }}
             rows={6}
             placeholder={"student_email,organization_name,date,hours,description,category\njohn@student.edu,City Food Bank,2024-11-15,3,Sorted donations,community"}
             className="w-full px-3 py-2 border border-[var(--in-b)] rounded text-sm font-mono bg-[var(--surface)] focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -235,6 +253,26 @@ export default function SchoolSelfSubmissions() {
 
           {importError && (
             <div className="mt-2 text-xs text-[var(--er-t)] bg-[var(--er-bg)] border border-[var(--er-b)] rounded px-3 py-2">{importError}</div>
+          )}
+
+          {dryRunResult && (
+            <div className="mt-2 space-y-1">
+              <div className="text-xs text-[var(--ok-t)] bg-[var(--ok-bg)] border border-[var(--ok-b)] rounded px-3 py-2">
+                <div className="font-medium mb-1">Preview — nothing has been imported yet.</div>
+                {dryRunResult.imported} row{dryRunResult.imported !== 1 ? "s" : ""} will be imported.
+                {dryRunResult.skipped.length > 0 && ` ${dryRunResult.skipped.length} will be skipped.`}
+              </div>
+              {dryRunResult.skipped.length > 0 && (
+                <div className="text-xs bg-[var(--wn-bg)] border border-[var(--wn-b)] rounded px-3 py-2 space-y-0.5">
+                  <div className="font-medium text-[var(--wn-t)] mb-1">Rows that will be skipped:</div>
+                  {dryRunResult.skipped.map((s) => (
+                    <div key={s.row} className="text-[var(--wn-t)]">
+                      Row {s.row}{s.email ? ` (${s.email})` : ""}: {s.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {importResult && (
@@ -257,17 +295,39 @@ export default function SchoolSelfSubmissions() {
           )}
 
           <div className="mt-3 flex gap-2">
+            {!dryRunResult && (
+              <button
+                type="button"
+                onClick={handlePreviewImport}
+                disabled={previewing || !csvText.trim()}
+                className="px-4 py-1.5 border border-[var(--border-s)] text-[var(--text)] rounded text-sm hover:bg-[var(--surface-alt)] disabled:opacity-50"
+              >
+                {previewing ? "Checking..." : "Preview"}
+              </button>
+            )}
+            {dryRunResult && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDryRunResult(null)}
+                  disabled={importing}
+                  className="px-4 py-1.5 border border-[var(--border-s)] text-[var(--text-sec)] rounded text-sm hover:bg-[var(--surface-alt)] disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={importing || dryRunResult.imported === 0}
+                  className="px-4 py-1.5 bg-[var(--action)] text-white rounded text-sm hover:bg-[var(--action)] disabled:opacity-50"
+                >
+                  {importing ? "Importing..." : `Confirm & Import ${dryRunResult.imported} Row${dryRunResult.imported === 1 ? "" : "s"}`}
+                </button>
+              </>
+            )}
             <button
               type="button"
-              onClick={handleImport}
-              disabled={importing || !csvText.trim()}
-              className="px-4 py-1.5 bg-[var(--action)] text-white rounded text-sm hover:bg-[var(--action)] disabled:opacity-50"
-            >
-              {importing ? "Importing..." : "Import"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setCsvText(""); setImportResult(null); setImportError(""); }}
+              onClick={() => { setCsvText(""); setImportResult(null); setDryRunResult(null); setImportError(""); }}
               className="px-4 py-1.5 border border-[var(--border-s)] text-[var(--text-sec)] rounded text-sm hover:bg-[var(--surface-alt)]"
             >
               Clear

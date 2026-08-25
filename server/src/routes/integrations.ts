@@ -7,6 +7,7 @@ import {
   applyCanvasSyncForSchool,
   connectCanvasForSchool,
   disconnectCanvasForSchool,
+  getCanvasCoursesForSchool,
   getCanvasErrorsForSchool,
   getCanvasOAuthUrlForSchool,
   getCanvasOperationalStatus,
@@ -18,6 +19,7 @@ import {
   applyGoogleClassroomSyncForSchool,
   connectGoogleClassroomForSchool,
   disconnectGoogleClassroomForSchool,
+  getGoogleClassroomCoursesForSchool,
   getGoogleClassroomErrorsForSchool,
   getGoogleClassroomOAuthUrlForSchool,
   getGoogleClassroomOperationalStatus,
@@ -27,6 +29,17 @@ import {
 } from "../services/googleClassroomIntegration";
 
 const router = Router();
+
+function integrationErrorStatus(err: unknown): number {
+  if (typeof err === "object" && err && "status" in err) {
+    const status = Number((err as { status: unknown }).status);
+    if (Number.isInteger(status) && status >= 400 && status <= 599) return status;
+  }
+  const message = err instanceof Error ? err.message : "";
+  if (/not connected/i.test(message)) return 400;
+  if (/production-like environments/i.test(message)) return 403;
+  return 500;
+}
 
 async function getSchoolIdForAdmin(req: Request, res: Response): Promise<string | null> {
   const user = await prisma.user.findUnique({
@@ -131,6 +144,17 @@ router.get("/canvas/errors", authenticate, requireRole("SCHOOL_ADMIN"), async (r
   }
 });
 
+router.get("/canvas/courses", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const schoolId = await getSchoolIdForAdmin(req, res);
+    if (!schoolId) return;
+    res.json(await getCanvasCoursesForSchool(schoolId));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    res.status(/not connected/i.test(message) ? 400 : 500).json({ error: message });
+  }
+});
+
 router.post("/canvas/preview", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const schoolId = await getSchoolIdForAdmin(req, res);
@@ -138,12 +162,12 @@ router.post("/canvas/preview", authenticate, requireRole("SCHOOL_ADMIN"), async 
     const result = await previewCanvasSyncForSchool({
       schoolId,
       actorId: req.user!.userId,
+      selectedExternalCourseIds: req.body?.selectedExternalCourseIds,
     });
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
-    const status = /not connected/i.test(message) ? 400 : /production-like environments/i.test(message) ? 403 : 500;
-    res.status(status).json({ error: message });
+    res.status(integrationErrorStatus(err)).json({ error: message });
   }
 });
 
@@ -154,12 +178,12 @@ router.post("/canvas/apply", authenticate, requireRole("SCHOOL_ADMIN"), async (r
     const result = await applyCanvasSyncForSchool({
       schoolId,
       actorId: req.user!.userId,
+      selectedExternalCourseIds: req.body?.selectedExternalCourseIds,
     });
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
-    const status = /not connected/i.test(message) ? 400 : /production-like environments/i.test(message) ? 403 : 500;
-    res.status(status).json({ error: message });
+    res.status(integrationErrorStatus(err)).json({ error: message });
   }
 });
 
@@ -199,12 +223,12 @@ router.get("/googleClassroom/oauth/url", authenticate, requireRole("SCHOOL_ADMIN
   try {
     const schoolId = await getSchoolIdForAdmin(req, res);
     if (!schoolId) return;
-    const baseUrl = typeof req.query.baseUrl === "string" ? req.query.baseUrl.trim() : undefined;
+    const testOrigin = typeof req.query.testOrigin === "string" ? req.query.testOrigin.trim() : undefined;
     const displayName = typeof req.query.displayName === "string" ? req.query.displayName : undefined;
     const result = await getGoogleClassroomOAuthUrlForSchool({
       schoolId,
       actorId: req.user!.userId,
-      baseUrl,
+      testOrigin,
       displayName,
     });
     res.json(result);
@@ -265,6 +289,17 @@ router.get("/googleClassroom/errors", authenticate, requireRole("SCHOOL_ADMIN"),
   }
 });
 
+router.get("/googleClassroom/courses", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const schoolId = await getSchoolIdForAdmin(req, res);
+    if (!schoolId) return;
+    res.json(await getGoogleClassroomCoursesForSchool(schoolId));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    res.status(/not connected/i.test(message) ? 400 : 500).json({ error: message });
+  }
+});
+
 router.post("/googleClassroom/preview", authenticate, requireRole("SCHOOL_ADMIN"), async (req: Request, res: Response) => {
   try {
     const schoolId = await getSchoolIdForAdmin(req, res);
@@ -272,12 +307,12 @@ router.post("/googleClassroom/preview", authenticate, requireRole("SCHOOL_ADMIN"
     const result = await previewGoogleClassroomSyncForSchool({
       schoolId,
       actorId: req.user!.userId,
+      selectedExternalCourseIds: req.body?.selectedExternalCourseIds,
     });
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
-    const status = /not connected/i.test(message) ? 400 : /production-like environments/i.test(message) ? 403 : 500;
-    res.status(status).json({ error: message });
+    res.status(integrationErrorStatus(err)).json({ error: message });
   }
 });
 
@@ -288,12 +323,12 @@ router.post("/googleClassroom/apply", authenticate, requireRole("SCHOOL_ADMIN"),
     const result = await applyGoogleClassroomSyncForSchool({
       schoolId,
       actorId: req.user!.userId,
+      selectedExternalCourseIds: req.body?.selectedExternalCourseIds,
     });
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
-    const status = /not connected/i.test(message) ? 400 : /production-like environments/i.test(message) ? 403 : 500;
-    res.status(status).json({ error: message });
+    res.status(integrationErrorStatus(err)).json({ error: message });
   }
 });
 

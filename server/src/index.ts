@@ -1,6 +1,7 @@
 import "./lib/env"; // Validate required env vars at startup
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { randomUUID } from "crypto";
 import prisma from "./lib/prisma";
@@ -22,7 +23,6 @@ import cohortRoutes from "./routes/cohorts";
 import beneficiaryRoutes from "./routes/beneficiaries";
 import invitationRoutes from "./routes/invitations";
 import selfSubmissionRoutes from "./routes/selfSubmissions";
-import studentPreferenceRoutes from "./routes/studentPreferences";
 import classroomRoutes from "./routes/classrooms";
 import internalRoutes from "./routes/internal";
 import integrationRoutes from "./routes/integrations";
@@ -35,6 +35,7 @@ import { startUploadCleanupJob } from "./lib/uploadCleanup";
 import { maybeRunEventReminderCycle, startEventReminderScheduler } from "./lib/eventReminders";
 import { authenticate } from "./middleware/auth";
 import { createHybridRateLimit } from "./middleware/rateLimit";
+import { isProdLike } from "./lib/isProdLike";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -67,12 +68,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
   next();
 });
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const IS_PROD_LIKE =
-  process.env.APP_ENV === "production" ||
-  process.env.NODE_ENV === "production" ||
-  process.env.VERCEL_ENV === "production";
-
 // Trust Vercel/reverse-proxy X-Forwarded-For so express-rate-limit
 // can identify real client IPs instead of always seeing the proxy IP.
 app.set("trust proxy", 1);
@@ -114,7 +109,7 @@ app.use(cors({
     if (
       EXPLICIT_ALLOWED_ORIGINS.includes(origin) ||
       STAGING_ORIGINS.includes(origin) ||
-      (!IS_PRODUCTION && isLocalDevOrigin(origin)) ||
+      (!isProdLike() && isLocalDevOrigin(origin)) ||
       PRODUCTION_GOODHOURS_ORIGINS.includes(origin)
     ) {
       return callback(null, true);
@@ -125,6 +120,8 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+app.use(cookieParser());
 
 // Stripe webhook needs raw body for signature verification
 app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRoutes);
@@ -153,7 +150,7 @@ app.use(
     windowMs: 5 * 60 * 1000,
     maxPerIp: 300,
     maxPerUser: 600,
-    skip: (req) => !IS_PROD_LIKE || req.path === "/health",
+    skip: (req) => !isProdLike() || req.path === "/health",
   })
 );
 
@@ -171,7 +168,6 @@ app.use("/api/cohorts", cohortRoutes);
 app.use("/api/beneficiaries", beneficiaryRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/self-submissions", selfSubmissionRoutes);
-app.use("/api/student-preferences", studentPreferenceRoutes);
 app.use("/api/classrooms", classroomRoutes);
 
 // Legacy routes (kept for backward compat)
@@ -193,9 +189,11 @@ const geocodeLimiter = createHybridRateLimit({
   maxPerUser: 60,
 });
 
-// Geocode endpoint — proxies Nominatim so the client never touches the external API directly
+// Geocode endpoint — proxies Nominatim so the client never touches the external API directly.
+// Authenticated: this was previously reachable by anonymous callers, turning it into an open
+// proxy that could burn the app's Nominatim rate-limit budget for every authenticated caller.
 // GET /api/geocode?address=123+Main+St,+Springfield,+IL
-app.get("/api/geocode", geocodeLimiter, async (req, res) => {
+app.get("/api/geocode", authenticate, geocodeLimiter, async (req, res) => {
   const address =
     typeof req.query.address === "string" ? req.query.address.trim() : "";
   if (!address) {
@@ -237,7 +235,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     path: req.path,
     status,
     message: err.message,
-    stack: IS_PRODUCTION ? undefined : err.stack,
+    stack: isProdLike() ? undefined : err.stack,
   }));
   res.status(status).json({ error: status < 500 ? err.message : "Internal server error" });
 });

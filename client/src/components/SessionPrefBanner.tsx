@@ -10,7 +10,7 @@ export default function SessionPrefBanner({ onDismiss }: Props) {
 
   function choose(pref: "persistent" | "session") {
     setLeaving(true);
-    setSessionPref(pref);
+    void setSessionPref(pref);
     setTimeout(onDismiss, 300);
   }
 

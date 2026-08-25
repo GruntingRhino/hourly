@@ -25,8 +25,8 @@ interface SchoolEntry {
 }
 
 interface RegistrationResponse {
-  token: string;
-  user: import("../../hooks/useAuth").User;
+  token?: string;
+  user?: import("../../hooks/useAuth").User;
   requiresSchoolRegistration?: boolean;
   registrationToken: string;
   name: string;
@@ -125,20 +125,6 @@ export default function SchoolRegister() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const completeGoogleRegistration = useCallback(async (regToken: string, schoolName: string, directorySchoolId?: string) => {
-    setSubmitting(true);
-    setError("");
-    try {
-      const payload: RegistrationPayload = { registrationToken: regToken, schoolName };
-      if (directorySchoolId) payload.directorySchoolId = directorySchoolId;
-      const result = await api.post<RegistrationResponse>("/auth/google/complete-registration", payload);
-      loginWithToken(result.token, result.user);
-      navigate("/dashboard");
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, "Registration failed. Please try again."));
-      setSubmitting(false);
-    }
-  }, [loginWithToken, navigate]);
 
   const handleOAuthCallback = useCallback(async (code: string) => {
     // state is "<flow>.<nonce>" — the nonce is the server's OAuth CSRF token
@@ -148,7 +134,7 @@ export default function SchoolRegister() {
         ? `?state=${encodeURIComponent(searchParams.get("state")!)}`
         : "";
       const result = await api.post<RegistrationResponse>(`/auth/google/callback${stateSuffix}`, { code });
-      if (result.token && !result.requiresSchoolRegistration) {
+      if (result.token && result.user && !result.requiresSchoolRegistration) {
         loginWithToken(result.token, result.user);
         navigate("/dashboard");
         return;
@@ -161,11 +147,13 @@ export default function SchoolRegister() {
         setRegistrationToken(result.registrationToken);
         setUserName(result.name);
 
-        // If there's exactly one unclaimed domain match, auto-register immediately
+        // A domain match is only a suggestion; it does not establish authority.
         const suggestions: SchoolEntry[] = result.domainSuggestions || [];
         if (suggestions.length === 1 && !suggestions[0].claimed) {
           const school = suggestions[0];
-          await completeGoogleRegistration(result.registrationToken, school.name, school.id);
+          setSelectedSchool(school);
+          setContactEmail(result.email || "");
+          setStep("contact");
           return;
         }
 
@@ -178,7 +166,7 @@ export default function SchoolRegister() {
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Google sign-in failed. Please try again."));
     }
-  }, [completeGoogleRegistration, loginWithToken, navigate, searchParams]);
+  }, [loginWithToken, navigate, searchParams]);
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -195,7 +183,7 @@ export default function SchoolRegister() {
         name: devGoogleName.trim() || undefined,
       });
 
-      if (result.token && !result.requiresSchoolRegistration) {
+      if (result.token && result.user && !result.requiresSchoolRegistration) {
         loginWithToken(result.token, result.user);
         navigate("/dashboard");
         return;
@@ -208,7 +196,9 @@ export default function SchoolRegister() {
         const suggestions: SchoolEntry[] = result.domainSuggestions || [];
         if (suggestions.length === 1 && !suggestions[0].claimed) {
           const school = suggestions[0];
-          await completeGoogleRegistration(result.registrationToken, school.name, school.id);
+          setSelectedSchool(school);
+          setContactEmail(result.email || "");
+          setStep("contact");
           return;
         }
 
@@ -275,13 +265,8 @@ export default function SchoolRegister() {
     } else {
       setAlreadyClaimed(null);
       setError("");
-      if (signupMode === "google") {
-        void completeGoogleRegistration(registrationToken, school.name, school.id);
-      } else {
-        setSelectedSchool(school);
-        if (signupMode !== "email") setContactEmail("");
-        setStep("contact");
-      }
+      setSelectedSchool(school);
+      setStep("contact");
     }
   };
 
@@ -308,12 +293,7 @@ export default function SchoolRegister() {
     setSelectedSchool(null);
     setAlreadyClaimed(null);
     setError("");
-    if (signupMode === "google") {
-      void completeGoogleRegistration(registrationToken, customSchoolName.trim());
-    } else {
-      if (signupMode !== "email") setContactEmail("");
-      setStep("contact");
-    }
+    setStep("contact");
   };
 
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -325,7 +305,7 @@ export default function SchoolRegister() {
 
       if (signupMode === "email") {
         // Email/password path: create account immediately, then redirect to verify email
-        const result = await signup({
+        await signup({
           email: contactEmail || emailCollectEmail,
           password: emailCollectPassword,
           name: emailCollectName,
@@ -333,8 +313,9 @@ export default function SchoolRegister() {
           schoolName,
           directorySchoolId: selectedSchool?.id,
         });
-        loginWithToken(result.token, result.user);
-        navigate("/email-verification-required");
+        navigate("/email-verification-required", {
+          state: { email: contactEmail || emailCollectEmail },
+        });
       } else {
         // Google OAuth path: send magic link to complete registration
         const payload: RegistrationPayload & { contactEmail: string } = {

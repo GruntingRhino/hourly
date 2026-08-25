@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import { requireRole, blockFrozenLegacyOrgAdminWrite } from "../middleware/rbac";
 import { sendOrgApprovalRequestEmail } from "../services/email";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 import { strictObject, optionalTrimmedString } from "../lib/validation";
@@ -85,7 +85,7 @@ const updateOrgSchema = strictObject({
   zipCodes: z.array(z.string().trim().regex(/^\d{5}$/, "Invalid ZIP code")).max(50).optional(),
 });
 
-router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.put("/:id", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const data = updateOrgSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
@@ -114,7 +114,7 @@ router.put("/:id", authenticate, requireRole("ORG_ADMIN"), async (req: Request, 
 });
 
 // POST /api/organizations/:id/request-school/:schoolId — request to be added to school's approved list
-router.post("/:id/request-school/:schoolId", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/request-school/:schoolId", authenticate, requireRole("ORG_ADMIN"), blockFrozenLegacyOrgAdminWrite, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (user?.organizationId !== req.params.id) {

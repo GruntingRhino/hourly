@@ -80,28 +80,23 @@ async function getPendingReviewCount(schoolId: string): Promise<number> {
     }),
     prisma.serviceSession.count({
       where: {
+        schoolId,
         status: "PENDING_VERIFICATION",
         verificationStatus: "PENDING",
-        user: {
-          OR: [
-            { classroom: { schoolId } },
-            { cohort: { schoolId } },
-          ],
-        },
+        user: { schoolId },
       },
     }),
     prisma.user.findMany({
       where: {
         role: "STUDENT",
-        OR: [
-          { classroom: { schoolId } },
-          { cohort: { schoolId } },
-        ],
+        schoolId,
+        isTestAccount: false,
       },
       select: { id: true },
     }).then((rows) =>
       prisma.beneficiarySignup.count({
         where: {
+          schoolId,
           verificationStatus: "PENDING",
           status: "CONFIRMED",
           studentId: { in: rows.map((r) => r.id) },
@@ -133,11 +128,8 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
   const students = await prisma.user.findMany({
     where: {
       role: "STUDENT",
-      OR: [
-        { classroom: { schoolId } },
-        { cohort: { schoolId } },
-        { cohortMemberships: { some: { isActive: true, cohort: { schoolId } } } },
-      ],
+      schoolId,
+      isTestAccount: false,
     },
     select: {
       id: true,
@@ -175,6 +167,7 @@ async function runSchoolReminderCycle(schoolId: string): Promise<ReminderSummary
   });
 
   const progress = await buildStudentProgressRecords(students, {
+    schoolId: school.id,
     requiredHours: school.requiredHours,
     serviceStartDate: school.serviceStartDate,
     serviceEndDate: school.serviceEndDate,

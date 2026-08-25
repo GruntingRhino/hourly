@@ -2,6 +2,8 @@ import { createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { verifyToken } from "./auth";
+import { isProdLike } from "../lib/isProdLike";
+import { AUTH_COOKIE_NAME } from "../lib/authCookies";
 
 type Bucket = {
   count: number;
@@ -34,9 +36,7 @@ let lastDatabaseCleanupAt = 0;
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || "";
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
 const hasSharedStore = Boolean(upstashUrl && upstashToken);
-const shouldUseDatabaseStore =
-  !hasSharedStore &&
-  (process.env.APP_ENV === "production" || process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production");
+const shouldUseDatabaseStore = !hasSharedStore && isProdLike();
 
 if (hasSharedStore) {
   console.info("[RateLimit] Using Upstash Redis shared bucket store.");
@@ -213,10 +213,15 @@ function getClientIp(req: Request): string {
 function getAuthenticatedUserId(req: Request): string | null {
   if (req.user?.userId) return req.user.userId;
 
+  // This runs both after authenticate() (where req.user is already set,
+  // above) and before it — e.g. the baseline /api rate limiter, which sees
+  // requests before any route-specific authenticate() middleware runs — so
+  // it needs its own token extraction, same fallback order as
+  // middleware/auth.ts: cookie first, then the Authorization header for
+  // any client not yet switched to cookie-based auth.
+  const cookieToken = (req as unknown as { cookies?: Record<string, string> }).cookies?.[AUTH_COOKIE_NAME];
   const authHeader = req.get("authorization") || "";
-  if (!authHeader.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice("Bearer ".length).trim();
+  const token = cookieToken || (authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "");
   if (!token) return null;
 
   try {

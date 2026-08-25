@@ -1,26 +1,19 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { create as contentDisposition } from "content-disposition";
 import multer from "multer";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
-import { logDataAccess, resolveStudentSchoolId } from "../lib/dataAccessLog";
+import { logDataAccess } from "../lib/dataAccessLog";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
 import { detectSignatureMime } from "../lib/signatureStorage";
-import { runSerializableTransaction } from "../lib/serializableTransaction";
 import {
-  createAttendanceQrToken,
-  hashAttendanceQrToken,
-  parseAttendanceQrToken,
-} from "../lib/attendanceQr";
+  assertStudentAccessibleToStaff,
+  buildCohortScopedStudentWhere,
+  getStaffAccessScope,
+} from "../lib/cohortAccess";
 
 const router = Router();
-
-const DEFAULT_QR_TTL_MINUTES = 30;
-const MAX_QR_TTL_MINUTES = 120;
-
-function attendanceQrSecret(): string {
-  return process.env.QR_ATTENDANCE_SECRET || process.env.JWT_SECRET || "";
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -61,108 +54,6 @@ async function authorizeVerificationSubmission(req: Request, res: Response, next
     return next(err);
   }
 }
-
-// POST /api/sessions/opportunities/:opportunityId/qr-token — organization creates a short-lived event check-in token
-router.post("/opportunities/:opportunityId/qr-token", authenticate, requireRole("ORG_ADMIN"), async (req: Request, res: Response) => {
-  try {
-    const actor = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { organizationId: true },
-    });
-    const opportunity = await prisma.opportunity.findUnique({
-      where: { id: req.params.opportunityId },
-      select: { id: true, organizationId: true, title: true },
-    });
-    if (!opportunity) return res.status(404).json({ error: "Opportunity not found" });
-    if (!actor?.organizationId || actor.organizationId !== opportunity.organizationId) {
-      return res.status(403).json({ error: "You do not manage this opportunity" });
-    }
-
-    const requestedMinutes = req.body?.expiresInMinutes;
-    const expiresInMinutes = requestedMinutes == null ? DEFAULT_QR_TTL_MINUTES : Number(requestedMinutes);
-    if (!Number.isInteger(expiresInMinutes) || expiresInMinutes < 1 || expiresInMinutes > MAX_QR_TTL_MINUTES) {
-      return res.status(400).json({ error: `expiresInMinutes must be an integer from 1 to ${MAX_QR_TTL_MINUTES}` });
-    }
-
-    const secret = attendanceQrSecret();
-    if (!secret) return res.status(503).json({ error: "Attendance QR is not configured" });
-
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-    const tokenId = crypto.randomUUID();
-    const token = createAttendanceQrToken({
-      tokenId,
-      opportunityId: opportunity.id,
-      expiresAt,
-      secret,
-    });
-    await prisma.attendanceQrToken.create({
-      data: {
-        id: tokenId,
-        opportunityId: opportunity.id,
-        createdById: req.user!.userId,
-        tokenHash: hashAttendanceQrToken(token),
-        expiresAt,
-      },
-    });
-
-    return res.status(201).json({ token, opportunityId: opportunity.id, opportunityTitle: opportunity.title, expiresAt });
-  } catch (err) {
-    console.error("Create attendance QR token error:", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /api/sessions/qr-checkin — student redeems an event QR token once
-router.post("/qr-checkin", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
-  try {
-    const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
-    const parsed = parseAttendanceQrToken(token, attendanceQrSecret());
-    if (!parsed) return res.status(400).json({ error: "Invalid or expired attendance QR token" });
-
-    const tokenRecord = await prisma.attendanceQrToken.findUnique({ where: { tokenHash: hashAttendanceQrToken(token) } });
-    if (!tokenRecord || tokenRecord.id !== parsed.tokenId || tokenRecord.opportunityId !== parsed.opportunityId) {
-      return res.status(400).json({ error: "Invalid attendance QR token" });
-    }
-    if (tokenRecord.revokedAt || tokenRecord.expiresAt <= new Date()) {
-      return res.status(400).json({ error: "Attendance QR token has expired" });
-    }
-
-    const result = await runSerializableTransaction(async (tx) => {
-      const session = await tx.serviceSession.findUnique({
-        where: { userId_opportunityId: { userId: req.user!.userId, opportunityId: parsed.opportunityId } },
-      });
-      if (!session) return { kind: "error" as const, status: 403, body: { error: "You are not signed up for this opportunity" } };
-      if (session.status !== "PENDING_CHECKIN" && session.status !== "COMMITTED") {
-        return { kind: "error" as const, status: 409, body: { error: "This session cannot be checked in" } };
-      }
-
-      const now = new Date();
-      const updated = await tx.serviceSession.update({
-        where: { id: session.id },
-        data: { checkInTime: now, status: "CHECKED_IN" },
-      });
-      await tx.attendanceQrRedemption.create({
-        data: { tokenId: tokenRecord.id, studentId: req.user!.userId, sessionId: session.id, checkedInAt: now },
-      });
-      await tx.auditLog.create({
-        data: {
-          action: "CHECK_IN",
-          actorId: req.user!.userId,
-          sessionId: session.id,
-          details: JSON.stringify({ method: "QR", tokenId: tokenRecord.id, time: now.toISOString() }),
-        },
-      });
-      return { kind: "success" as const, updated };
-    });
-
-    if (result.kind === "error") return res.status(result.status).json(result.body);
-    return res.json(result.updated);
-  } catch (err: any) {
-    if (err?.code === "P2002") return res.status(409).json({ error: "This attendance QR token was already used" });
-    console.error("QR check-in error:", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 // POST /api/sessions/:id/checkin — student checks in
 router.post("/:id/checkin", authenticate, requireRole("STUDENT"), async (req: Request, res: Response) => {
@@ -426,6 +317,7 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
       where: { id: req.params.id },
       select: {
         userId: true,
+        schoolId: true,
         signatureFileName: true,
         signatureFileBytes: true,
         signatureFileMimeType: true,
@@ -440,16 +332,23 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
       where: { id: req.user!.userId },
       select: { role: true, organizationId: true },
     });
-    const allowed = actor?.role === "STUDENT"
-      ? session.userId === req.user!.userId
-      : actor?.role === "ORG_ADMIN"
-        ? actor.organizationId === session.opportunity.organizationId
-        : (await resolveStudentSchoolId(session.userId)) === (await resolveStudentSchoolId(req.user!.userId));
+    let allowed = false;
+    if (actor?.role === "STUDENT") {
+      allowed = session.userId === req.user!.userId;
+    } else if (actor?.role === "ORG_ADMIN") {
+      allowed = actor.organizationId === session.opportunity.organizationId;
+    } else if (actor?.role === "SCHOOL_ADMIN" || actor?.role === "TEACHER") {
+      const scope = await getStaffAccessScope(req.user!.userId);
+      allowed = Boolean(
+        scope &&
+        session.schoolId === scope.schoolId &&
+        await assertStudentAccessibleToStaff(scope, session.userId)
+      );
+    }
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
 
-    const safeName = (session.signatureFileName ?? "signature").replace(/[\r\n"]/g, "_");
     res.setHeader("Content-Type", session.signatureFileMimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.setHeader("Content-Disposition", contentDisposition(session.signatureFileName ?? "signature"));
     res.send(Buffer.from(session.signatureFileBytes));
   } catch (err) {
     console.error("Signature download error:", err);
@@ -460,28 +359,22 @@ router.get("/:id/signature-file", authenticate, requireRole("STUDENT", "SCHOOL_A
 // GET /api/sessions/school — school sees all student sessions
 router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
-    if (!user?.schoolId) return res.status(400).json({ error: "Not associated with a school" });
+    const scope = await getStaffAccessScope(req.user!.userId);
+    if (!scope) return res.status(403).json({ error: "No school access" });
 
     const { studentId, verificationStatus } = req.query;
 
-    // If viewing a specific student, verify they belong to this school first
     if (studentId) {
-      const studentSchoolId = await resolveStudentSchoolId(studentId as string);
-      if (studentSchoolId !== user.schoolId) {
-        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      const allowed = await assertStudentAccessibleToStaff(scope, studentId as string);
+      if (!allowed) {
+        return res.status(404).json({ error: "Student not found" });
       }
     }
 
-    // Scope to students in this school — include both legacy classroom and new cohort students
-    const schoolScope = {
-      OR: [
-        { classroom: { schoolId: user.schoolId } },
-        { cohort: { schoolId: user.schoolId } },
-        { cohortMemberships: { some: { isActive: true, cohort: { schoolId: user.schoolId } } } },
-      ],
+    const where: any = {
+      schoolId: scope.schoolId,
+      user: buildCohortScopedStudentWhere(scope),
     };
-    const where: any = { user: schoolScope };
     if (studentId) where.userId = studentId;
     if (verificationStatus) where.verificationStatus = verificationStatus;
 
@@ -500,8 +393,8 @@ router.get("/school", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), asyn
       actorId: req.user!.userId,
       action: "VIEW_SESSIONS",
       targetType: studentId ? "student" : "school",
-      targetId: (studentId as string | undefined) ?? user.schoolId,
-      schoolId: user.schoolId,
+      targetId: (studentId as string | undefined) ?? scope.schoolId,
+      schoolId: scope.schoolId,
       details: { sessionCount: sessions.length },
     });
 

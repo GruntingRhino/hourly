@@ -4,7 +4,6 @@ import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { buildAnonymousVolunteerLabel } from "../lib/privacy";
-import { resolveStudentSchoolId } from "../lib/dataAccessLog";
 
 const router = Router();
 
@@ -15,7 +14,11 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
     if (!opportunityId) {
       return res.status(400).json({ error: "opportunityId is required" });
     }
-    const schoolId = await resolveStudentSchoolId(req.user!.userId);
+    const student = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { schoolId: true },
+    });
+    const schoolId = student?.schoolId ?? null;
     if (!schoolId) {
       return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }
@@ -57,6 +60,7 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
         await tx.serviceSession.updateMany({
           where: { userId: req.user!.userId, opportunityId },
           data: {
+            schoolId,
             status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
             totalHours: opp.durationHours,
             verificationStatus: "PENDING",
@@ -81,6 +85,7 @@ router.post("/", authenticate, requireRole("STUDENT"), async (req: Request, res:
       await tx.serviceSession.create({
         data: {
           userId: req.user!.userId,
+          schoolId,
           opportunityId,
           status: status === "CONFIRMED" ? "PENDING_CHECKIN" : "WAITLISTED",
           totalHours: opp.durationHours,

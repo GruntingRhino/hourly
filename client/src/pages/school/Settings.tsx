@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { api, getErrorMessage } from "../../lib/api";
-import { setAuthSession } from "../../lib/authSession";
 import { CollapsibleList } from "../../components/CollapsibleList";
 import { OPPORTUNITY_CATEGORY_OPTIONS } from "../../lib/opportunityCategories";
 import { SchoolBilling } from "./SchoolBilling";
@@ -96,6 +95,19 @@ interface IntegrationConnectionStatus {
   lastSyncStatus: "COMPLETED" | "PARTIAL_FAILED" | "FAILED" | "RUNNING" | null;
   scenario: string;
   mode: "MOCK" | "OAUTH";
+  selectedExternalCourseIds?: string[];
+}
+
+interface IntegrationCourse {
+  id: string;
+  name: string;
+  section?: string | null;
+  workflowState?: string;
+}
+
+interface IntegrationCoursesResponse {
+  courses: IntegrationCourse[];
+  selectedExternalCourseIds: string[];
 }
 
 interface IntegrationSyncCounts {
@@ -321,6 +333,8 @@ export default function SchoolSettings() {
   });
   const [canvasIsError, setCanvasIsError] = useState(() => Boolean(new URLSearchParams(window.location.search).get("canvasError")));
   const [canvasPreview, setCanvasPreview] = useState<IntegrationSyncSummary | null>(null);
+  const [canvasCourses, setCanvasCourses] = useState<IntegrationCourse[]>([]);
+  const [canvasSelectedCourseIds, setCanvasSelectedCourseIds] = useState<string[]>([]);
   const [googleClassroomStatus, setGoogleClassroomStatus] = useState<IntegrationStatusResponse | null>(null);
   const [googleClassroomErrors, setGoogleClassroomErrors] = useState<IntegrationSyncErrorEntry[]>([]);
   const [googleClassroomScenario, setGoogleClassroomScenario] = useState<"default" | "renamed" | "archived" | "deleted" | "student_removed">("default");
@@ -333,6 +347,8 @@ export default function SchoolSettings() {
   });
   const [googleClassroomIsError, setGoogleClassroomIsError] = useState(() => Boolean(new URLSearchParams(window.location.search).get("googleClassroomError")));
   const [googleClassroomPreview, setGoogleClassroomPreview] = useState<IntegrationSyncSummary | null>(null);
+  const [googleClassroomCourses, setGoogleClassroomCourses] = useState<IntegrationCourse[]>([]);
+  const [googleClassroomSelectedCourseIds, setGoogleClassroomSelectedCourseIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -405,10 +421,12 @@ export default function SchoolSettings() {
     Promise.all([
       api.get<IntegrationStatusResponse>("/integrations/canvas/status"),
       api.get<IntegrationSyncErrorEntry[]>("/integrations/canvas/errors"),
+      api.get<IntegrationCoursesResponse>("/integrations/canvas/courses").catch(() => ({ courses: [], selectedExternalCourseIds: [] })),
       api.get<IntegrationStatusResponse>("/integrations/googleClassroom/status"),
       api.get<IntegrationSyncErrorEntry[]>("/integrations/googleClassroom/errors"),
+      api.get<IntegrationCoursesResponse>("/integrations/googleClassroom/courses").catch(() => ({ courses: [], selectedExternalCourseIds: [] })),
     ])
-      .then(([canvas, canvasErrs, classroom, classroomErrs]) => {
+      .then(([canvas, canvasErrs, canvasCourseData, classroom, classroomErrs, classroomCourseData]) => {
         setCanvasStatus(canvas);
         setCanvasErrors(canvasErrs);
         setCanvasScenario(
@@ -418,6 +436,8 @@ export default function SchoolSettings() {
         );
         setCanvasConnectMode(canvas.connection?.mode ?? (canvas.capabilities?.mockAllowed === false ? "OAUTH" : "MOCK"));
         setCanvasBaseUrl(canvas.connection?.baseUrl ?? "https://canvas.mock.local");
+        setCanvasCourses(canvasCourseData.courses);
+        setCanvasSelectedCourseIds(canvasCourseData.selectedExternalCourseIds);
         setGoogleClassroomStatus(classroom);
         setGoogleClassroomErrors(classroomErrs);
         setGoogleClassroomScenario(
@@ -427,6 +447,8 @@ export default function SchoolSettings() {
         );
         setGoogleClassroomConnectMode(classroom.connection?.mode ?? (classroom.capabilities?.mockAllowed === false ? "OAUTH" : "MOCK"));
         setGoogleClassroomBaseUrl(classroom.connection?.baseUrl ?? "https://classroom.googleapis.com");
+        setGoogleClassroomCourses(classroomCourseData.courses);
+        setGoogleClassroomSelectedCourseIds(classroomCourseData.selectedExternalCourseIds);
       })
       .catch((err: unknown) => {
         const errorMessage = getErrorMessage(err, "Failed to load integration status");
@@ -460,9 +482,10 @@ export default function SchoolSettings() {
   }, [searchParams, setSearchParams, tab]);
 
   const reloadCanvasState = async () => {
-    const [status, errors] = await Promise.all([
+    const [status, errors, courseData] = await Promise.all([
       api.get<IntegrationStatusResponse>("/integrations/canvas/status"),
       api.get<IntegrationSyncErrorEntry[]>("/integrations/canvas/errors"),
+      api.get<IntegrationCoursesResponse>("/integrations/canvas/courses").catch(() => ({ courses: [], selectedExternalCourseIds: [] })),
     ]);
     setCanvasStatus(status);
     setCanvasErrors(errors);
@@ -473,12 +496,15 @@ export default function SchoolSettings() {
     );
     setCanvasConnectMode(status.connection?.mode ?? (status.capabilities?.mockAllowed === false ? "OAUTH" : canvasConnectMode));
     setCanvasBaseUrl(status.connection?.baseUrl ?? canvasBaseUrl);
+    setCanvasCourses(courseData.courses);
+    setCanvasSelectedCourseIds(courseData.selectedExternalCourseIds);
   };
 
   const reloadGoogleClassroomState = async () => {
-    const [status, errors] = await Promise.all([
+    const [status, errors, courseData] = await Promise.all([
       api.get<IntegrationStatusResponse>("/integrations/googleClassroom/status"),
       api.get<IntegrationSyncErrorEntry[]>("/integrations/googleClassroom/errors"),
+      api.get<IntegrationCoursesResponse>("/integrations/googleClassroom/courses").catch(() => ({ courses: [], selectedExternalCourseIds: [] })),
     ]);
     setGoogleClassroomStatus(status);
     setGoogleClassroomErrors(errors);
@@ -489,6 +515,8 @@ export default function SchoolSettings() {
     );
     setGoogleClassroomConnectMode(status.connection?.mode ?? (status.capabilities?.mockAllowed === false ? "OAUTH" : googleClassroomConnectMode));
     setGoogleClassroomBaseUrl(status.connection?.baseUrl ?? googleClassroomBaseUrl);
+    setGoogleClassroomCourses(courseData.courses);
+    setGoogleClassroomSelectedCourseIds(courseData.selectedExternalCourseIds);
   };
 
   const handleCanvasConnect = async () => {
@@ -542,7 +570,9 @@ export default function SchoolSettings() {
     setCanvasMessage("");
     setCanvasIsError(false);
     try {
-      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/preview");
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/preview", {
+        selectedExternalCourseIds: canvasSelectedCourseIds,
+      });
       setCanvasPreview(result.summary);
       setCanvasMessage("Canvas preview complete.");
       await reloadCanvasState();
@@ -559,7 +589,9 @@ export default function SchoolSettings() {
     setCanvasMessage("");
     setCanvasIsError(false);
     try {
-      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/apply");
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/canvas/apply", {
+        selectedExternalCourseIds: canvasSelectedCourseIds,
+      });
       setCanvasPreview(result.summary);
       setCanvasMessage("Canvas sync applied.");
       await reloadCanvasState();
@@ -578,7 +610,7 @@ export default function SchoolSettings() {
     try {
       if (googleClassroomConnectMode === "OAUTH") {
         const result = await api.get<{ url: string }>(
-          `/integrations/googleClassroom/oauth/url?baseUrl=${encodeURIComponent(googleClassroomBaseUrl)}&displayName=${encodeURIComponent("Google Classroom")}`
+          `/integrations/googleClassroom/oauth/url?displayName=${encodeURIComponent("Google Classroom")}`
         );
         window.location.assign(result.url);
         return;
@@ -622,7 +654,9 @@ export default function SchoolSettings() {
     setGoogleClassroomMessage("");
     setGoogleClassroomIsError(false);
     try {
-      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/preview");
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/preview", {
+        selectedExternalCourseIds: googleClassroomSelectedCourseIds,
+      });
       setGoogleClassroomPreview(result.summary);
       setGoogleClassroomMessage("Google Classroom preview complete.");
       await reloadGoogleClassroomState();
@@ -639,7 +673,9 @@ export default function SchoolSettings() {
     setGoogleClassroomMessage("");
     setGoogleClassroomIsError(false);
     try {
-      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/apply");
+      const result = await api.post<{ summary: IntegrationSyncSummary }>("/integrations/googleClassroom/apply", {
+        selectedExternalCourseIds: googleClassroomSelectedCourseIds,
+      });
       setGoogleClassroomPreview(result.summary);
       setGoogleClassroomMessage("Google Classroom sync applied.");
       await reloadGoogleClassroomState();
@@ -815,9 +851,9 @@ export default function SchoolSettings() {
     }
     setChangingPassword(true);
     try {
-      const result = await api.put<{ token?: string }>("/auth/password", { currentPassword, newPassword });
-      // Changing the password revokes all previous tokens — adopt the fresh one
-      if (result?.token) setAuthSession(result.token);
+      await api.put("/auth/password", { currentPassword, newPassword });
+      // Changing the password revokes all previous tokens; the server
+      // already refreshed the HttpOnly session cookie on this same response.
       setPasswordMessage("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");
@@ -1833,6 +1869,34 @@ export default function SchoolSettings() {
             </div>
           </div>
 
+          {canvasStatus?.connection && (
+            <fieldset className="mb-6 rounded-[3px] border border-[var(--border)] p-4">
+              <legend className="px-1 text-sm font-medium text-[var(--text)]">Courses approved for GoodHours sync</legend>
+              <p className="mb-3 text-xs text-[var(--text-sec)]">Roster identities are retrieved only for courses selected here.</p>
+              {canvasCourses.length === 0 ? (
+                <p className="text-sm text-[var(--text-sec)]">No accessible Canvas courses were found.</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {canvasCourses.map((course) => (
+                    <label key={course.id} className="flex items-start gap-2 rounded border border-[var(--border)] p-2 text-sm">
+                      <input
+                        data-testid={`canvas-course-${course.id}`}
+                        type="checkbox"
+                        checked={canvasSelectedCourseIds.includes(course.id)}
+                        onChange={(event) => setCanvasSelectedCourseIds((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, course.id])]
+                            : current.filter((id) => id !== course.id)
+                        )}
+                      />
+                      <span>{course.name}{course.section ? ` · ${course.section}` : ""}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          )}
+
           <div className="flex flex-wrap gap-2 mb-6">
             <button
               data-testid="canvas-connect"
@@ -1856,7 +1920,7 @@ export default function SchoolSettings() {
               data-testid="canvas-preview"
               type="button"
               onClick={handleCanvasPreview}
-              disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
+              disabled={canvasBusyAction !== "" || !canvasStatus?.connection || canvasSelectedCourseIds.length === 0}
               className="px-4 py-2 border border-[var(--in-b)] text-[var(--action)] rounded-[2px] text-sm font-medium hover:bg-[var(--in-bg)] disabled:opacity-50"
             >
               {canvasBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
@@ -1865,7 +1929,7 @@ export default function SchoolSettings() {
               data-testid="canvas-apply"
               type="button"
               onClick={handleCanvasApply}
-              disabled={canvasBusyAction !== "" || !canvasStatus?.connection}
+              disabled={canvasBusyAction !== "" || !canvasStatus?.connection || canvasSelectedCourseIds.length === 0}
               className="px-4 py-2 bg-[var(--ok-t)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {canvasBusyAction === "apply" ? "Applying..." : "Apply Sync"}
@@ -2018,17 +2082,19 @@ export default function SchoolSettings() {
                 <option value="OAUTH">Real OAuth</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text)] mb-1">Google Classroom Base URL</label>
-              <input
-                data-testid="google-classroom-base-url"
-                type="url"
-                value={googleClassroomBaseUrl}
-                onChange={(e) => setGoogleClassroomBaseUrl(e.target.value)}
-                className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
-                placeholder="https://classroom.googleapis.com"
-              />
-            </div>
+            {googleClassroomConnectMode === "MOCK" && (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Mock Base URL</label>
+                <input
+                  data-testid="google-classroom-base-url"
+                  type="url"
+                  value={googleClassroomBaseUrl}
+                  onChange={(e) => setGoogleClassroomBaseUrl(e.target.value)}
+                  className="w-full h-[34px] px-3 text-[13.5px] border border-[var(--border-s)] rounded-[2px] focus:outline-none focus:border-[var(--action)] bg-[var(--surface)] text-sm"
+                  placeholder="https://google-classroom.mock.local"
+                />
+              </div>
+            )}
             <div className="rounded-[3px] border border-[var(--border)] bg-[var(--surface-alt)] p-4 text-sm text-[var(--text-sec)]">
               <div><strong>Connection:</strong> {googleClassroomStatus?.connection?.displayName ?? "Not connected"}</div>
               <div><strong>Base URL:</strong> {googleClassroomStatus?.connection?.baseUrl ?? "N/A"}</div>
@@ -2042,6 +2108,34 @@ export default function SchoolSettings() {
               <div><strong>Token Refresh Failures (24h):</strong> {googleClassroomStatus?.ops?.tokenRefreshFailures24h ?? 0}</div>
             </div>
           </div>
+
+          {googleClassroomStatus?.connection && (
+            <fieldset className="mb-6 rounded-[3px] border border-[var(--border)] p-4">
+              <legend className="px-1 text-sm font-medium text-[var(--text)]">Courses approved for GoodHours sync</legend>
+              <p className="mb-3 text-xs text-[var(--text-sec)]">Roster identities are retrieved only for courses selected here.</p>
+              {googleClassroomCourses.length === 0 ? (
+                <p className="text-sm text-[var(--text-sec)]">No accessible Google Classroom courses were found.</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {googleClassroomCourses.map((course) => (
+                    <label key={course.id} className="flex items-start gap-2 rounded border border-[var(--border)] p-2 text-sm">
+                      <input
+                        data-testid={`google-classroom-course-${course.id}`}
+                        type="checkbox"
+                        checked={googleClassroomSelectedCourseIds.includes(course.id)}
+                        onChange={(event) => setGoogleClassroomSelectedCourseIds((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, course.id])]
+                            : current.filter((id) => id !== course.id)
+                        )}
+                      />
+                      <span>{course.name}{course.section ? ` · ${course.section}` : ""}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          )}
 
           <div className="flex flex-wrap gap-2 mb-6">
             <button
@@ -2066,7 +2160,7 @@ export default function SchoolSettings() {
               data-testid="google-classroom-preview"
               type="button"
               onClick={handleGoogleClassroomPreview}
-              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
+              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection || googleClassroomSelectedCourseIds.length === 0}
               className="px-4 py-2 border border-[var(--in-b)] text-[var(--action)] rounded-[2px] text-sm font-medium hover:bg-[var(--in-bg)] disabled:opacity-50"
             >
               {googleClassroomBusyAction === "preview" ? "Previewing..." : "Preview Sync"}
@@ -2075,7 +2169,7 @@ export default function SchoolSettings() {
               data-testid="google-classroom-apply"
               type="button"
               onClick={handleGoogleClassroomApply}
-              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection}
+              disabled={googleClassroomBusyAction !== "" || !googleClassroomStatus?.connection || googleClassroomSelectedCourseIds.length === 0}
               className="px-4 py-2 bg-[var(--ok-t)] text-white rounded-[2px] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {googleClassroomBusyAction === "apply" ? "Applying..." : "Apply Sync"}

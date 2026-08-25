@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
@@ -22,8 +23,10 @@ import {
 import { getCategoryCapStatusesForStudent, resolveEffectiveRules } from "../lib/schoolRules";
 import { safeSchoolSelect } from "../lib/schoolSelect";
 import { geocodeAddress } from "../lib/geocode";
-import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/studentProgress";
 import { calculateStudentHours } from "../lib/hoursCalculator";
+import { isInternalAdminUser } from "../lib/internalAdmin";
+import { reviewSchoolOwnership } from "../lib/schoolActivation";
 import {
   assertStudentAccessibleToStaff,
   buildCohortScopedStudentWhere,
@@ -37,12 +40,15 @@ import {
   normalizeRollbackPlanConfig,
   normalizeSupportProcessConfig,
 } from "../lib/launchCenter";
+import { isProdLike } from "../lib/isProdLike";
 
 const router = Router();
 
-const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 const REQUIRED_CATEGORY_CAP = "Community Service";
+const schoolOwnershipReviewSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().trim().min(1).max(2000).optional(),
+}).strict();
 
 type CategoryCapWarning = {
   studentId: string;
@@ -57,6 +63,7 @@ async function buildCategoryCapWarningsForSchool(schoolId: string): Promise<Cate
   const students = await prisma.user.findMany({
     where: {
       role: "STUDENT",
+      isTestAccount: false,
       OR: [
         { schoolId },
         { cohort: { schoolId } },
@@ -167,7 +174,7 @@ function buildStaffStudentAuditDetails(params: {
   scopeType: "school" | "cohort_selection" | "assigned_cohorts";
   assignedCohorts?: string[];
   filters?: Record<string, unknown>;
-  students: Array<{ name: string; email: string }>;
+  students: Array<{ id: string }>;
 }) {
   return {
     accessKind: params.accessKind,
@@ -207,6 +214,41 @@ async function runOwnershipTransfer(params: {
     });
   });
 }
+
+// POST /api/schools/ownership-reviews/:schoolId — every initial school claim
+// requires an independently allowlisted GoodHours operator.
+router.post("/ownership-reviews/:schoolId", authenticate, async (req: Request, res: Response) => {
+  try {
+    const actor = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, email: true, role: true },
+    });
+    if (!actor || !isInternalAdminUser(actor)) {
+      return res.status(403).json({ error: "Internal school-ownership reviewer required" });
+    }
+
+    const input = schoolOwnershipReviewSchema.parse(req.body);
+    const reviewed = await reviewSchoolOwnership({
+      schoolId: req.params.schoolId,
+      reviewerId: actor.id,
+      decision: input.decision,
+      note: input.note,
+    });
+    return res.json({ school: reviewed });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0]?.message || "Invalid review" });
+    }
+    const status = typeof err === "object" && err && "status" in err
+      ? Number((err as { status: unknown }).status)
+      : 500;
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({ error: err instanceof Error ? err.message : "Review failed" });
+    }
+    console.error("School ownership review error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // GET /api/schools — public search (for orgs to find schools)
 router.get("/", authenticate, async (req: Request, res: Response) => {
@@ -1032,6 +1074,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: req.params.id } },
             { cohort: { schoolId: req.params.id } },
@@ -1081,6 +1124,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
     const accessibleCohorts = scope ? await getAccessibleTeacherCohorts(scope) : [];
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -1117,7 +1161,7 @@ router.get("/:id/students", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER")
           ? school.name
           : accessibleCohorts.map((cohort) => cohort.name).join(", "),
         assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 
@@ -1255,9 +1299,17 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
     const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, student.id) : false;
     if (!studentAllowed) return res.status(403).json({ error: "Student is not enrolled in a cohort you control" });
 
-    const [beneficiarySignups, selfSubmissions, legacySessions, totalsMap] = await Promise.all([
+    // Promise.allSettled (not Promise.all): this powers a school admin's
+    // per-student hour-breakdown view. calculateStudentHours already
+    // degrades gracefully on its own internal partial failures (see
+    // `totalsMap.dataState` below) — the three raw record-list queries
+    // must do the same, otherwise a transient failure in just one of them
+    // (e.g. the legacy ServiceSession lookup) would 500 the whole page even
+    // though the other two sources, and the already-computed totals, are
+    // fine.
+    const [beneficiarySignupsResult, selfSubmissionsResult, legacySessionsResult, totalsMapResult, ledgerEntriesResult] = await Promise.allSettled([
       prisma.beneficiarySignup.findMany({
-        where: { studentId: student.id },
+        where: { studentId: student.id, schoolId: req.params.id },
         include: {
           slot: {
             include: {
@@ -1273,11 +1325,11 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         orderBy: [{ slot: { date: "desc" } }, { createdAt: "desc" }],
       }),
       prisma.selfSubmittedRequest.findMany({
-        where: { studentId: student.id },
+        where: { studentId: student.id, schoolId: req.params.id },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       }),
       prisma.serviceSession.findMany({
-        where: { userId: student.id },
+        where: { userId: student.id, schoolId: req.params.id },
         include: {
           opportunity: {
             include: {
@@ -1288,8 +1340,49 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         },
         orderBy: [{ createdAt: "desc" }],
       }),
-      calculateStudentHours([student.id]),
+      calculateStudentHours([student.id], req.params.id),
+      // §9 canonical service-hour ledger: surfaced here as a read-only
+      // audit trail alongside the existing per-source records — this does
+      // NOT feed into `approved`/`pending` below, which are still computed
+      // exactly as before from calculateStudentHours(). The ledger only
+      // captures approvals made after it was introduced, so it will be
+      // incomplete for older records; that's expected and not a bug.
+      prisma.serviceHourLedgerEntry.findMany({
+        where: { studentId: student.id, schoolId: req.params.id },
+        orderBy: [{ createdAt: "desc" }],
+        include: { approver: { select: { id: true, name: true } } },
+      }),
     ]);
+
+    const recordsFailedSources: string[] = [];
+    if (beneficiarySignupsResult.status === "rejected") {
+      recordsFailedSources.push("beneficiary signups");
+      console.error("Student hour breakdown: beneficiarySignup lookup failed", beneficiarySignupsResult.reason);
+    }
+    if (selfSubmissionsResult.status === "rejected") {
+      recordsFailedSources.push("self-submitted hours");
+      console.error("Student hour breakdown: selfSubmittedRequest lookup failed", selfSubmissionsResult.reason);
+    }
+    if (legacySessionsResult.status === "rejected") {
+      recordsFailedSources.push("legacy sessions");
+      console.error("Student hour breakdown: serviceSession lookup failed", legacySessionsResult.reason);
+    }
+    if (totalsMapResult.status === "rejected") {
+      recordsFailedSources.push("computed totals");
+      console.error("Student hour breakdown: calculateStudentHours failed", totalsMapResult.reason);
+    }
+    if (ledgerEntriesResult.status === "rejected") {
+      recordsFailedSources.push("service hour ledger");
+      console.error("Student hour breakdown: serviceHourLedgerEntry lookup failed", ledgerEntriesResult.reason);
+    }
+
+    const beneficiarySignups = beneficiarySignupsResult.status === "fulfilled" ? beneficiarySignupsResult.value : [];
+    const selfSubmissions = selfSubmissionsResult.status === "fulfilled" ? selfSubmissionsResult.value : [];
+    const legacySessions = legacySessionsResult.status === "fulfilled" ? legacySessionsResult.value : [];
+    const ledgerEntries = ledgerEntriesResult.status === "fulfilled" ? ledgerEntriesResult.value : [];
+    const totalsMap = totalsMapResult.status === "fulfilled"
+      ? totalsMapResult.value
+      : Object.assign(new Map(), { dataState: "PARTIAL" as const, failedSources: ["computed totals"] });
 
     const actorIds = [
       ...beneficiarySignups.flatMap((signup) => signup.auditLogs.map((entry) => entry.actorId)),
@@ -1449,6 +1542,16 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
           expectedApproved: roundHours(expectedTotals.approved),
           expectedPending: roundHours(expectedTotals.pending),
           reconciled: approved === roundHours(expectedTotals.approved) && pending === roundHours(expectedTotals.pending),
+          // COMPLETE unless one or more underlying hour sources failed to load —
+          // in that case expectedApproved/expectedPending (and any resulting
+          // "reconciled: false") should not be treated as a confirmed discrepancy.
+          // Combines calculateStudentHours' own internal partial-failure
+          // tracking with failures of the three raw record-list queries
+          // this route runs directly.
+          dataState: (totalsMap.dataState === "PARTIAL" || recordsFailedSources.length) ? "PARTIAL" as const : "COMPLETE" as const,
+          ...((totalsMap.dataState === "PARTIAL" || recordsFailedSources.length)
+            ? { failedSources: [...new Set([...(totalsMap.dataState === "PARTIAL" ? totalsMap.failedSources : []), ...recordsFailedSources])] }
+            : {}),
         },
       },
       records: {
@@ -1456,6 +1559,19 @@ router.get("/:id/students/:studentId/hour-breakdown", authenticate, requireRole(
         selfSubmission: selfSubmissionRecords,
         legacy: legacyRecords,
       },
+      // §9 canonical service-hour ledger: read-only audit trail, does not
+      // feed into totals above. Only covers approvals made after the
+      // ledger was introduced — absence of an entry for an older record is
+      // expected, not an error.
+      ledgerEntries: ledgerEntries.map((entry) => ({
+        id: entry.id,
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        category: entry.category,
+        approvedHours: roundHours(entry.approvedMinutes / 60),
+        approverName: entry.approver.name,
+        approvedAt: entry.approvedAt,
+      })),
     });
   } catch (err) {
     console.error("Student hour breakdown error:", err);
@@ -1486,6 +1602,7 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), a
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: req.params.id } },
             { cohort: { schoolId: req.params.id } },
@@ -1528,6 +1645,7 @@ router.get("/:id/stats", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), a
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -1789,7 +1907,7 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
         },
       }),
       prisma.school.findUnique({ where: { id: req.params.id }, select: { requiredHours: true } }),
-      calculateStudentHours(studentIds),
+      calculateStudentHours(studentIds, req.params.id),
     ]);
 
     const result = students.map((s) => {
@@ -1911,7 +2029,7 @@ router.post("/:id/staff", authenticate, requireRole("SCHOOL_ADMIN"), async (req:
       role: teacher.role,
     };
     // Only expose temp password outside production (dev/staging only)
-    if (!IS_PROD_LIKE) {
+    if (!isProdLike()) {
       responseBody.tempPassword = tempPassword;
     }
     res.status(201).json(responseBody);
@@ -2045,6 +2163,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     // Build where clause: optional cohort filter
     const whereClause: any = {
       role: "STUDENT",
+      isTestAccount: false,
     };
     if (cohortId) {
       whereClause.OR = [
@@ -2087,6 +2206,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: req.params.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -2116,7 +2236,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
             : accessibleCohorts.map((cohort) => cohort.name).join(", ")),
         assignedCohorts: scope?.isSchoolAdmin ? [] : accessibleCohorts.map((cohort) => cohort.name),
         filters: cohortLabel ? { cohort: cohortLabel } : {},
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 
@@ -2142,7 +2262,7 @@ router.get("/:id/export", authenticate, requireRole("SCHOOL_ADMIN", "TEACHER"), 
     const label = (cohortLabel ?? school.name).replace(/[^a-z0-9]/gi, "_");
     const csv = buildCsv(rows);
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${label}-students.csv"`);
+    res.setHeader("Content-Disposition", contentDisposition(`${label}-students.csv`));
     res.send(csv);
   } catch (err) {
     console.error("School export error:", err);
@@ -2334,7 +2454,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       }
     }
 
-    const whereClause: any = { role: "STUDENT" };
+    const whereClause: any = { role: "STUDENT", isTestAccount: false };
     if (cohortId) {
       whereClause.OR = [
         { cohortId },
@@ -2374,9 +2494,10 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       orderBy: { name: "asc" },
     });
 
-    let progress: Awaited<ReturnType<typeof buildStudentProgressRecords>> = [];
+    let progress: StudentProgressRecord[] = [];
     try {
       progress = await buildStudentProgressRecords(students, {
+        schoolId: req.params.id,
         requiredHours: school.requiredHours,
         serviceStartDate: school.serviceStartDate,
         serviceEndDate: school.serviceEndDate,
@@ -2441,7 +2562,7 @@ router.get("/:id/students/at-risk", authenticate, requireRole("SCHOOL_ADMIN", "T
       }
       const csv = buildCsv(rows);
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="at-risk-students.csv"`);
+      res.setHeader("Content-Disposition", contentDisposition("at-risk-students.csv"));
       return res.send(csv);
     }
 

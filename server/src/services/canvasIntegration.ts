@@ -1,27 +1,31 @@
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
-import net from "net";
 import prisma from "../lib/prisma";
-import { decryptField, encryptField, isEncrypted } from "../lib/fieldEncryption";
+import { decryptField, encryptField } from "../lib/fieldEncryption";
 import { logDataAccess } from "../lib/dataAccessLog";
 import { deactivateStudentCohortMembership, ensureStudentCohortMembership } from "../lib/studentCohorts";
+import {
+  assertKnownCourseSelection,
+  fetchApprovedLmsUrl,
+  getApprovedCanvasOrigins,
+  normalizeApprovedCanvasOrigin,
+  normalizeSelectedExternalCourseIds,
+} from "../lib/lmsOutboundSecurity";
 import { getCanvasMockDataset, type CanvasMockDataset, type CanvasMockScenario } from "./canvasMock";
+import { isProdLike } from "../lib/isProdLike";
 
-const IS_PROD_LIKE =
-  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
-const CANVAS_ENABLE_MOCK = process.env.CANVAS_ENABLE_MOCK === "true" || !IS_PROD_LIKE;
+const CANVAS_ENABLE_MOCK = process.env.CANVAS_ENABLE_MOCK === "true" || !isProdLike();
 const CANVAS_REQUEST_TIMEOUT_MS = Number(process.env.CANVAS_REQUEST_TIMEOUT_MS || 15000);
 const CANVAS_PAGE_SIZE = Math.max(1, Math.min(100, Number(process.env.CANVAS_PAGE_SIZE || 100)));
+const JWT_SECRET = process.env.JWT_SECRET as string;
 const CLIENT_URL = process.env.CLIENT_URL || process.env.APP_URL || "http://127.0.0.1:5173";
 const CANVAS_CLIENT_ID = process.env.CANVAS_CLIENT_ID || "";
 const CANVAS_CLIENT_SECRET = process.env.CANVAS_CLIENT_SECRET || "";
 const CANVAS_CALLBACK_URL = process.env.CANVAS_CALLBACK_URL || "http://localhost:3001/api/integrations/canvas/oauth/callback";
-const CANVAS_ALLOWED_HOSTS = (process.env.CANVAS_ALLOWED_HOSTS || "")
-  .split(",")
-  .map((host) => host.trim().toLowerCase())
-  .filter(Boolean);
 
 const canvasConnectSchema = z.discriminatedUnion("mode", [
   z.object({
@@ -29,21 +33,23 @@ const canvasConnectSchema = z.discriminatedUnion("mode", [
     baseUrl: z.string().url().optional(),
     displayName: z.string().min(1).max(255).optional(),
     mockScenario: z.enum(["default", "renamed", "archived", "deleted", "student_removed"]).optional(),
-  }),
+  }).strict(),
   z.object({
     mode: z.literal("OAUTH"),
     baseUrl: z.string().url(),
     displayName: z.string().min(1).max(255).optional(),
-  }),
+  }).strict(),
 ]);
 
 type CanvasConnectionConfig =
   | {
       mode: "MOCK";
       mockScenario: CanvasMockScenario;
+      selectedExternalCourseIds: string[];
     }
   | {
       mode: "OAUTH";
+      selectedExternalCourseIds: string[];
     };
 
 type CanvasCredentials = {
@@ -54,6 +60,13 @@ type CanvasCredentials = {
   scope: string | null;
 };
 
+type CanvasStatePayload = {
+  purpose: "canvas-oauth";
+  schoolId: string;
+  actorId: string;
+  baseUrl: string;
+  displayName: string;
+};
 
 type CanvasSyncDataset = {
   scenario: string;
@@ -175,10 +188,6 @@ function assertOAuthConfigured(): void {
   if (!CANVAS_CLIENT_ID || !CANVAS_CLIENT_SECRET || !CANVAS_CALLBACK_URL) {
     throw new Error("Canvas OAuth is not configured. Set CANVAS_CLIENT_ID, CANVAS_CLIENT_SECRET, and CANVAS_CALLBACK_URL.");
   }
-  const encryptionKey = process.env.FIELD_ENCRYPTION_KEY || "";
-  if (encryptionKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(encryptionKey)) {
-    throw new Error("Canvas OAuth requires FIELD_ENCRYPTION_KEY so provider credentials are encrypted at rest.");
-  }
 }
 
 function assertMockAllowed(): void {
@@ -191,47 +200,21 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function isPrivateOrLocalHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host === "ip6-localhost") return true;
-  const ipVersion = net.isIP(host);
-  if (ipVersion === 4) {
-    const octets = host.split(".").map(Number);
-    return octets[0] === 0 || octets[0] === 10 || octets[0] === 127
-      || (octets[0] === 169 && octets[1] === 254)
-      || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
-      || (octets[0] === 192 && octets[1] === 168);
-  }
-  return ipVersion === 6 && (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe8") || host.startsWith("fe9") || host.startsWith("fea") || host.startsWith("feb"));
-}
-
-export function normalizeCanvasBaseUrl(baseUrl: string): string {
-  const normalized = baseUrl.trim().replace(/\/+$/, "");
-  if (!normalized) throw new Error("Canvas base URL is required.");
-  const parsed = new URL(normalized);
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash || isPrivateOrLocalHost(parsed.hostname)) {
-    throw new Error("Canvas base URL must be a public HTTP(S) tenant URL without credentials or query parameters.");
-  }
-  if (IS_PROD_LIKE && parsed.protocol !== "https:") {
-    throw new Error("Canvas base URL must use HTTPS in production-like environments.");
-  }
-  if (IS_PROD_LIKE && !CANVAS_ALLOWED_HOSTS.some((allowedHost) => parsed.hostname.toLowerCase() === allowedHost || parsed.hostname.toLowerCase().endsWith(`.${allowedHost}`))) {
-    throw new Error("Canvas base URL is not on the configured production tenant allowlist.");
-  }
-  return normalized;
-}
-
 function parseConnectionConfig(raw: string | null): CanvasConnectionConfig {
-  if (!raw) return { mode: "MOCK", mockScenario: "default" };
+  if (!raw) return { mode: "MOCK", mockScenario: "default", selectedExternalCourseIds: [] };
   try {
-    const parsed = JSON.parse(raw) as { mode?: "MOCK" | "OAUTH"; mockScenario?: CanvasMockScenario };
-    if (parsed.mode === "OAUTH") return { mode: "OAUTH" };
+    const parsed = JSON.parse(raw) as { mode?: "MOCK" | "OAUTH"; mockScenario?: CanvasMockScenario; selectedExternalCourseIds?: unknown };
+    const selectedExternalCourseIds = Array.isArray(parsed.selectedExternalCourseIds)
+      ? parsed.selectedExternalCourseIds.filter((value): value is string => typeof value === "string")
+      : [];
+    if (parsed.mode === "OAUTH") return { mode: "OAUTH", selectedExternalCourseIds };
     return {
       mode: "MOCK",
       mockScenario: parsed.mockScenario ?? "default",
+      selectedExternalCourseIds,
     };
   } catch {
-    return { mode: "MOCK", mockScenario: "default" };
+    return { mode: "MOCK", mockScenario: "default", selectedExternalCourseIds: [] };
   }
 }
 
@@ -285,9 +268,21 @@ function safeConnectionResponse(connection: any) {
     lastSyncStatus: connection.lastSyncStatus,
     scenario: config.mode === "MOCK" ? config.mockScenario : "oauth",
     mode: config.mode,
+    selectedExternalCourseIds: config.selectedExternalCourseIds,
   };
 }
 
+function buildCanvasStateToken(payload: CanvasStatePayload): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
+}
+
+function verifyCanvasStateToken(token: string): CanvasStatePayload {
+  const payload = verifyToken<CanvasStatePayload>(token);
+  if (payload.purpose !== "canvas-oauth") {
+    throw new Error("Invalid Canvas OAuth state.");
+  }
+  return payload;
+}
 
 function parseCanvasLinkHeader(linkHeader: string | null): string | null {
   if (!linkHeader) return null;
@@ -417,16 +412,22 @@ export async function getCanvasOperationalStatus(params?: { schoolId?: string })
   };
 }
 
-async function canvasFetch(url: string, init: RequestInit = {}): Promise<Response> {
+async function canvasFetch(url: string, init: RequestInit = {}, expectedOrigin?: string): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CANVAS_REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        ...(init.headers ?? {}),
+    const origin = expectedOrigin ?? new URL(url).origin;
+    return await fetchApprovedLmsUrl({
+      url,
+      approvedOrigins: getApprovedCanvasOrigins(),
+      expectedOrigin: origin,
+      init: {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          ...(init.headers ?? {}),
+        },
       },
     });
   } catch (error) {
@@ -439,40 +440,19 @@ async function canvasFetch(url: string, init: RequestInit = {}): Promise<Respons
   }
 }
 
-async function listCanvasPages<T>(initialUrl: string, accessToken: string): Promise<T[]> {
-  const items: T[] = [];
-  let nextUrl: string | null = initialUrl;
-
-  while (nextUrl) {
-    const response = await canvasFetch(nextUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Canvas API request failed (${response.status}): ${body.slice(0, 300)}`);
-    }
-    const page = await response.json() as T[];
-    items.push(...page);
-    nextUrl = parseCanvasLinkHeader(response.headers.get("link"));
-  }
-
-  return items;
-}
-
 async function listCanvasPagesForConnection<T>(connection: any, initialUrl: string): Promise<T[]> {
   const items: T[] = [];
   let nextUrl: string | null = initialUrl;
   let credentials = await ensureLiveAccessToken(connection);
   let refreshRetried = false;
+  const expectedOrigin = await normalizeApprovedCanvasOrigin(connection.baseUrl);
 
   while (nextUrl) {
     const response = await canvasFetch(nextUrl, {
       headers: {
         Authorization: `Bearer ${credentials.accessToken}`,
       },
-    });
+    }, expectedOrigin);
 
     if ((response.status === 401 || response.status === 403) && !refreshRetried) {
       refreshRetried = true;
@@ -587,7 +567,8 @@ async function markConnectionError(connectionId: string, actorId: string | null,
 
 async function exchangeAuthorizationCode(baseUrl: string, code: string): Promise<CanvasOAuthTokenResponse> {
   assertOAuthConfigured();
-  const tokenUrl = `${normalizeCanvasBaseUrl(baseUrl)}/login/oauth2/token`;
+  const approvedOrigin = await normalizeApprovedCanvasOrigin(baseUrl);
+  const tokenUrl = `${approvedOrigin}/login/oauth2/token`;
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: CANVAS_CLIENT_ID,
@@ -600,7 +581,7 @@ async function exchangeAuthorizationCode(baseUrl: string, code: string): Promise
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
-  });
+  }, approvedOrigin);
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(`Canvas OAuth token exchange failed: ${errorBody.slice(0, 300)}`);
@@ -615,8 +596,9 @@ async function refreshOAuthCredentials(connection: any): Promise<CanvasCredentia
     throw new Error("Canvas credentials are missing a refresh token.");
   }
   assertOAuthConfigured();
+  const approvedOrigin = await normalizeApprovedCanvasOrigin(connection.baseUrl);
 
-  const response = await canvasFetch(`${normalizeCanvasBaseUrl(connection.baseUrl)}/login/oauth2/token`, {
+  const response = await canvasFetch(`${approvedOrigin}/login/oauth2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -625,7 +607,7 @@ async function refreshOAuthCredentials(connection: any): Promise<CanvasCredentia
       client_secret: CANVAS_CLIENT_SECRET,
       refresh_token: credentials.refreshToken,
     }),
-  });
+  }, approvedOrigin);
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -655,14 +637,15 @@ async function ensureLiveAccessToken(connection: any): Promise<CanvasCredentials
   return refreshOAuthCredentials(connection);
 }
 
-async function fetchCanvasOAuthDataset(connection: any): Promise<CanvasSyncDataset> {
-  const baseUrl = normalizeCanvasBaseUrl(connection.baseUrl);
+async function fetchCanvasOAuthDataset(connection: any, selectedExternalCourseIds: string[]): Promise<CanvasSyncDataset> {
+  const baseUrl = await normalizeApprovedCanvasOrigin(connection.baseUrl);
 
   try {
-    const courses = await listCanvasPagesForConnection<CanvasApiCourse>(
+    const availableCourses = await listCanvasPagesForConnection<CanvasApiCourse>(
       connection,
       `${baseUrl}/api/v1/courses?per_page=${CANVAS_PAGE_SIZE}&state[]=available&state[]=completed&state[]=unpublished`
     );
+    const courses = assertKnownCourseSelection(availableCourses, selectedExternalCourseIds);
 
     const sectionRows: CanvasSyncDataset["sections"] = [];
     const userById = new Map<string, CanvasSyncDataset["users"][number]>();
@@ -746,17 +729,51 @@ async function fetchCanvasOAuthDataset(connection: any): Promise<CanvasSyncDatas
   }
 }
 
-async function getCanvasDataset(connection: any): Promise<CanvasSyncDataset> {
+async function getCanvasDataset(connection: any, selectedExternalCourseIds: string[]): Promise<CanvasSyncDataset> {
   const config = parseConnectionConfig(connection.config);
   if (config.mode === "MOCK") {
-    return getCanvasMockDataset(config.mockScenario) as CanvasMockDataset as CanvasSyncDataset;
+    const dataset = getCanvasMockDataset(config.mockScenario) as CanvasMockDataset as CanvasSyncDataset;
+    const courses = assertKnownCourseSelection(dataset.courses, selectedExternalCourseIds);
+    const courseIds = new Set(courses.map((course) => course.id));
+    const sections = dataset.sections.filter((section) => courseIds.has(section.courseId));
+    const sectionIds = new Set(sections.map((section) => section.id));
+    const enrollments = dataset.enrollments.filter((enrollment) => sectionIds.has(enrollment.sectionId));
+    const userIds = new Set(enrollments.map((enrollment) => enrollment.userId));
+    return {
+      ...dataset,
+      courses,
+      sections,
+      enrollments,
+      users: dataset.users.filter((user) => userIds.has(user.id)),
+    };
   }
-  return fetchCanvasOAuthDataset(connection);
+  return fetchCanvasOAuthDataset(connection, selectedExternalCourseIds);
+}
+
+async function listCanvasCourseMetadata(connection: any): Promise<CanvasSyncDataset["courses"]> {
+  const config = parseConnectionConfig(connection.config);
+  if (config.mode === "MOCK") {
+    const dataset = getCanvasMockDataset(config.mockScenario) as CanvasMockDataset as CanvasSyncDataset;
+    return dataset.courses;
+  }
+  const baseUrl = await normalizeApprovedCanvasOrigin(connection.baseUrl);
+  const courses = await listCanvasPagesForConnection<CanvasApiCourse>(
+    connection,
+    `${baseUrl}/api/v1/courses?per_page=${CANVAS_PAGE_SIZE}&state[]=available&state[]=completed&state[]=unpublished`,
+  );
+  return courses.map((course) => ({
+    id: String(course.id),
+    name: course.name,
+    workflowState: course.workflow_state === "deleted"
+      ? "deleted"
+      : course.workflow_state === "completed"
+        ? "completed"
+        : "available",
+  }));
 }
 
 async function ensureTeacherUser(params: {
   schoolId: string;
-  mode: "PREVIEW" | "APPLY";
   name: string;
   email: string;
   errors: SyncErrorInput[];
@@ -778,8 +795,6 @@ async function ensureTeacherUser(params: {
     return existing.id;
   }
 
-  if (params.mode === "PREVIEW") return null;
-
   const passwordHash = await bcrypt.hash(crypto.randomBytes(18).toString("base64url"), 8);
   const created = await prisma.user.create({
     data: {
@@ -789,7 +804,7 @@ async function ensureTeacherUser(params: {
       role: "TEACHER",
       schoolId: params.schoolId,
       emailVerified: true,
-      isTestAccount: false,
+      isTestAccount: true,
     },
   });
   return created.id;
@@ -875,14 +890,17 @@ async function runCanvasSync(params: {
   schoolId: string;
   actorId: string;
   mode: "PREVIEW" | "APPLY";
+  selectedExternalCourseIds?: unknown;
 }): Promise<{ connection: any; job: any; summary: SyncSummary }> {
   const connection = await getConnectionForSchool(params.schoolId);
-  if (!connection || connection.status !== "CONNECTED") {
+  if (!connection || !["CONNECTED", "ERROR"].includes(connection.status)) {
     throw new Error("Canvas is not connected for this school.");
   }
 
-  const dataset = await getCanvasDataset(connection);
-  const plans = buildSectionPlans(dataset).sort((a, b) => a.cohortName.localeCompare(b.cohortName));
+  const config = parseConnectionConfig(connection.config);
+  const selectedExternalCourseIds = normalizeSelectedExternalCourseIds(
+    params.selectedExternalCourseIds ?? config.selectedExternalCourseIds,
+  );
   const job = await prisma.integrationSyncJob.create({
     data: {
       connectionId: connection.id,
@@ -893,7 +911,30 @@ async function runCanvasSync(params: {
       status: "RUNNING",
     },
   });
-
+  let dataset: CanvasSyncDataset;
+  try {
+    dataset = await getCanvasDataset(connection, selectedExternalCourseIds);
+  } catch (error) {
+    await prisma.integrationSyncJob.update({
+      where: { id: job.id },
+      data: {
+        status: "FAILED",
+        summary: JSON.stringify({ stage: "PROVIDER_DATASET", error: "Canvas provider request failed" }),
+        finishedAt: new Date(),
+      },
+    });
+    throw error;
+  }
+  if (params.mode === "APPLY") {
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        config: JSON.stringify({ ...config, selectedExternalCourseIds }),
+        updatedById: params.actorId,
+      },
+    });
+  }
+  const plans = buildSectionPlans(dataset).sort((a, b) => a.cohortName.localeCompare(b.cohortName));
   const summary: SyncSummary = {
     provider: "CANVAS",
     mode: params.mode,
@@ -919,13 +960,13 @@ async function runCanvasSync(params: {
 
   const [sectionMappings, enrollmentMappings, userMappings] = await Promise.all([
     prisma.integrationExternalMapping.findMany({
-      where: { connectionId: connection.id, schoolId: params.schoolId, externalType: "SECTION" },
+      where: { connectionId: connection.id, externalType: "SECTION" },
     }),
     prisma.integrationExternalMapping.findMany({
-      where: { connectionId: connection.id, schoolId: params.schoolId, externalType: "ENROLLMENT" },
+      where: { connectionId: connection.id, externalType: "ENROLLMENT" },
     }),
     prisma.integrationExternalMapping.findMany({
-      where: { connectionId: connection.id, schoolId: params.schoolId, externalType: "USER" },
+      where: { connectionId: connection.id, externalType: "USER" },
     }),
   ]);
 
@@ -1017,19 +1058,12 @@ async function runCanvasSync(params: {
     for (const teacher of plan.teacherUsers) {
       const teacherId = await ensureTeacherUser({
         schoolId: params.schoolId,
-        mode: params.mode,
         name: teacher.name,
         email: teacher.email,
         errors,
         summary,
       });
-      if (!teacherId) {
-        if (params.mode === "PREVIEW") {
-          summary.counts.teacherAssignmentsCreated++;
-          summary.operations.push({ type: "teacher-assignment", target: `${teacher.email} -> ${plan.cohortName}`, action: "assign" });
-        }
-        continue;
-      }
+      if (!teacherId) continue;
 
       const exists = await prisma.cohortTeacherAssignment.findUnique({
         where: { cohortId_teacherId: { cohortId: targetCohortId, teacherId } },
@@ -1105,9 +1139,9 @@ async function runCanvasSync(params: {
       if (!existingStudent) {
         existingStudent = await prisma.user.findFirst({
           where: {
-            email: normalizedEmail,
+            email: student.email,
             role: "STUDENT",
-            OR: [{ schoolId: params.schoolId }, { cohort: { schoolId: params.schoolId } }],
+            schoolId: params.schoolId,
           },
           select: { id: true, cohortId: true, schoolId: true },
         });
@@ -1188,7 +1222,7 @@ async function runCanvasSync(params: {
       }
 
       const existingInvitation = await prisma.studentInvitation.findUnique({
-        where: { cohortId_email: { cohortId: targetCohortId, email: normalizedEmail } },
+        where: { cohortId_email: { cohortId: targetCohortId, email: student.email } },
       });
 
       if (existingInvitation) {
@@ -1376,18 +1410,14 @@ export async function getCanvasOAuthUrlForSchool(params: {
   displayName?: string;
 }) {
   assertOAuthConfigured();
-  const normalizedBaseUrl = normalizeCanvasBaseUrl(params.baseUrl);
+  const normalizedBaseUrl = await normalizeApprovedCanvasOrigin(params.baseUrl);
   const displayName = params.displayName?.trim() || "Canvas";
-  const state = generateToken();
-  await prisma.canvasOAuthState.create({
-    data: {
-      stateHash: hashToken(state),
-      schoolId: params.schoolId,
-      actorId: params.actorId,
-      baseUrl: normalizedBaseUrl,
-      displayName,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-    },
+  const state = buildCanvasStateToken({
+    purpose: "canvas-oauth",
+    schoolId: params.schoolId,
+    actorId: params.actorId,
+    baseUrl: normalizedBaseUrl,
+    displayName,
   });
   const scope = encodeURIComponent(
     "url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments"
@@ -1399,31 +1429,6 @@ export async function getCanvasOAuthUrlForSchool(params: {
   return { url };
 }
 
-async function consumeCanvasOAuthState(rawState: string) {
-  const stateHash = hashToken(rawState);
-  const consumedAt = new Date();
-  const consumed = await prisma.canvasOAuthState.updateMany({
-    where: {
-      stateHash,
-      consumedAt: null,
-      expiresAt: { gt: consumedAt },
-    },
-    data: { consumedAt },
-  });
-  if (consumed.count !== 1) throw new Error("Invalid or expired Canvas OAuth state.");
-  return prisma.canvasOAuthState.findUniqueOrThrow({ where: { stateHash } });
-}
-
-async function assertCanvasOAuthActor(state: { actorId: string; schoolId: string }): Promise<void> {
-  const actor = await prisma.user.findUnique({
-    where: { id: state.actorId },
-    select: { role: true, status: true, schoolId: true },
-  });
-  if (!actor || actor.status !== "ACTIVE" || actor.role !== "SCHOOL_ADMIN" || actor.schoolId !== state.schoolId) {
-    throw new Error("Canvas OAuth authorization is no longer valid.");
-  }
-}
-
 export async function handleCanvasOAuthCallback(params: {
   code?: string;
   state?: string;
@@ -1432,7 +1437,7 @@ export async function handleCanvasOAuthCallback(params: {
   if (params.error) {
     const target = new URL("/settings", CLIENT_URL);
     target.searchParams.set("tab", "integrations");
-    target.searchParams.set("canvasError", "canvas_authorization_denied");
+    target.searchParams.set("canvasError", params.error);
     return target.toString();
   }
   if (!params.code || !params.state) {
@@ -1443,13 +1448,9 @@ export async function handleCanvasOAuthCallback(params: {
   }
 
   try {
-    const state = await consumeCanvasOAuthState(params.state);
-    await assertCanvasOAuthActor(state);
+    const state = verifyCanvasStateToken(params.state);
     const token = await exchangeAuthorizationCode(state.baseUrl, params.code);
     const encryptedCredentials = serializeCredentials(token);
-    if (!isEncrypted(encryptedCredentials)) {
-      throw new Error("Canvas OAuth credentials were not encrypted.");
-    }
     await prisma.integrationConnection.upsert({
       where: { provider_schoolId: { provider: "CANVAS", schoolId: state.schoolId } },
       update: {
@@ -1457,7 +1458,7 @@ export async function handleCanvasOAuthCallback(params: {
         displayName: state.displayName,
         baseUrl: state.baseUrl,
         credentialsEncrypted: encryptedCredentials,
-        config: JSON.stringify({ mode: "OAUTH" }),
+        config: JSON.stringify({ mode: "OAUTH", selectedExternalCourseIds: [] }),
         disconnectedAt: null,
         updatedById: state.actorId,
       },
@@ -1468,7 +1469,7 @@ export async function handleCanvasOAuthCallback(params: {
         displayName: state.displayName,
         baseUrl: state.baseUrl,
         credentialsEncrypted: encryptedCredentials,
-        config: JSON.stringify({ mode: "OAUTH" }),
+        config: JSON.stringify({ mode: "OAUTH", selectedExternalCourseIds: [] }),
         createdById: state.actorId,
         updatedById: state.actorId,
       },
@@ -1491,10 +1492,10 @@ export async function handleCanvasOAuthCallback(params: {
     target.searchParams.set("canvas", "connected");
     return target.toString();
   } catch (error) {
-    console.error("[Canvas OAuth] callback failed:", error instanceof Error ? error.message : "unknown error");
+    const message = error instanceof Error ? error.message : "canvas_oauth_failed";
     const target = new URL("/settings", CLIENT_URL);
     target.searchParams.set("tab", "integrations");
-    target.searchParams.set("canvasError", "canvas_oauth_failed");
+    target.searchParams.set("canvasError", message.slice(0, 180));
     return target.toString();
   }
 }
@@ -1518,13 +1519,15 @@ export async function connectCanvasForSchool(params: {
   const config: CanvasConnectionConfig = {
     mode: "MOCK",
     mockScenario: input.mockScenario ?? "default",
+    selectedExternalCourseIds: [],
   };
+  const mockBaseUrl = new URL(input.baseUrl ?? "https://canvas.mock.local").origin;
   const connection = await prisma.integrationConnection.upsert({
     where: { provider_schoolId: { provider: "CANVAS", schoolId: params.schoolId } },
     update: {
       status: "CONNECTED",
       displayName: input.displayName ?? "Canvas Mock Sandbox",
-      baseUrl: normalizeCanvasBaseUrl(input.baseUrl ?? "https://canvas.mock.local"),
+      baseUrl: mockBaseUrl,
       credentialsEncrypted: encryptField(JSON.stringify({ mode: "MOCK", placeholderToken: "dev-only" })),
       config: JSON.stringify(config),
       disconnectedAt: null,
@@ -1535,7 +1538,7 @@ export async function connectCanvasForSchool(params: {
       schoolId: params.schoolId,
       status: "CONNECTED",
       displayName: input.displayName ?? "Canvas Mock Sandbox",
-      baseUrl: normalizeCanvasBaseUrl(input.baseUrl ?? "https://canvas.mock.local"),
+      baseUrl: mockBaseUrl,
       credentialsEncrypted: encryptField(JSON.stringify({ mode: "MOCK", placeholderToken: "dev-only" })),
       config: JSON.stringify(config),
       createdById: params.actorId,
@@ -1632,8 +1635,25 @@ export async function getCanvasErrorsForSchool(schoolId: string) {
   }));
 }
 
-export async function previewCanvasSyncForSchool(params: { schoolId: string; actorId: string }) {
-  const result = await runCanvasSync({ schoolId: params.schoolId, actorId: params.actorId, mode: "PREVIEW" });
+export async function getCanvasCoursesForSchool(schoolId: string) {
+  const connection = await getConnectionForSchool(schoolId);
+  if (!connection || !["CONNECTED", "ERROR"].includes(connection.status)) {
+    throw new Error("Canvas is not connected for this school.");
+  }
+  const config = parseConnectionConfig(connection.config);
+  return {
+    courses: await listCanvasCourseMetadata(connection),
+    selectedExternalCourseIds: config.selectedExternalCourseIds,
+  };
+}
+
+export async function previewCanvasSyncForSchool(params: { schoolId: string; actorId: string; selectedExternalCourseIds?: unknown }) {
+  const result = await runCanvasSync({
+    schoolId: params.schoolId,
+    actorId: params.actorId,
+    mode: "PREVIEW",
+    selectedExternalCourseIds: params.selectedExternalCourseIds,
+  });
   return {
     connection: safeConnectionResponse(result.connection),
     jobId: result.job.id,
@@ -1642,8 +1662,13 @@ export async function previewCanvasSyncForSchool(params: { schoolId: string; act
   };
 }
 
-export async function applyCanvasSyncForSchool(params: { schoolId: string; actorId: string }) {
-  const result = await runCanvasSync({ schoolId: params.schoolId, actorId: params.actorId, mode: "APPLY" });
+export async function applyCanvasSyncForSchool(params: { schoolId: string; actorId: string; selectedExternalCourseIds?: unknown }) {
+  const result = await runCanvasSync({
+    schoolId: params.schoolId,
+    actorId: params.actorId,
+    mode: "APPLY",
+    selectedExternalCourseIds: params.selectedExternalCourseIds,
+  });
   return {
     connection: safeConnectionResponse(result.connection),
     jobId: result.job.id,

@@ -443,6 +443,7 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
     prisma.user.findMany({
       where: {
         role: "STUDENT",
+        isTestAccount: false,
         OR: [
           { classroom: { schoolId } },
           { cohort: { schoolId } },
@@ -504,6 +505,7 @@ export async function buildLaunchWorkspace(schoolId: string): Promise<LaunchWork
   ]);
 
   const progress = await buildStudentProgressRecords(students, {
+    schoolId,
     requiredHours: school.requiredHours,
     serviceStartDate: school.serviceStartDate,
     serviceEndDate: school.serviceEndDate,

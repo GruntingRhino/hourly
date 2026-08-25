@@ -2,17 +2,16 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { signToken, signUserToken, verifyToken } from "../middleware/auth";
+import { signUserToken } from "../middleware/auth";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
-import { linkSchoolToBeneficiaryDirectory } from "../lib/schoolBeneficiaryLink";
-import { schoolCreatedBeneficiaryPlan } from "../lib/schoolBeneficiaryPolicy";
-import {
-  emailDomainMatchesWebsite,
-  extractDomainFromWebsite,
-  isPersonalEmailDomain,
-} from "../lib/signupEmailPolicy";
+
+import { isInternalAdminUser } from "../lib/internalAdmin";
+import { isPubliclyDeployed } from "../lib/isProdLike";
+import { setAuthCookie } from "../lib/authCookies";
+import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
+import { extractDomainFromWebsite, isPersonalEmailDomain } from "../lib/signupEmailPolicy";
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import {
   firstZodError,
@@ -57,8 +56,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL ?? `${CLIENT_URL}/school/register`;
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-
 // Set ALLOW_PERSONAL_EMAIL_DOMAINS=true to bypass personal email domain restrictions (e.g. during testing).
 const ALLOW_PERSONAL_EMAIL_DOMAINS = process.env.ALLOW_PERSONAL_EMAIL_DOMAINS === "true";
 
@@ -69,7 +66,7 @@ const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
   .filter(Boolean);
 
 function isApprovedDomain(email: string): boolean {
-  if (!IS_PRODUCTION) return true;
+  if (!isPubliclyDeployed()) return true;
   if (APPROVED_DOMAINS.length === 0) return true;
   const domain = email.split("@")[1]?.toLowerCase() || "";
   return APPROVED_DOMAINS.some((allowed) =>
@@ -86,7 +83,7 @@ const OAUTH_STATE_COOKIE = "gh_oauth_state";
 const OAUTH_STATE_COOKIE_OPTS = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: IS_PRODUCTION,
+  secure: isPubliclyDeployed(),
   path: "/api/auth/google",
 };
 
@@ -150,18 +147,6 @@ const verifySchoolQuerySchema = strictObject({
 
 function getEmailDomain(email: string): string {
   return email.split("@")[1]?.toLowerCase().trim() || "";
-}
-
-function isDirectoryClaimAuthorized(
-  email: string,
-  directory: { emailDomain?: string | null; website?: string | null },
-): boolean {
-  const officialDomain = directory.emailDomain ||
-    (directory.website ? extractDomainFromWebsite(directory.website) : null);
-  return Boolean(
-    officialDomain &&
-    emailDomainMatchesWebsite(getEmailDomain(email), officialDomain),
-  );
 }
 
 /** Layer 2: true if the domain ends with .edu (US institutional fast-track). */
@@ -248,6 +233,20 @@ async function handleGoogleIdentity(params: {
     }
 
     const existingUser = user!;
+    const eligibility = evaluateSessionEligibility({
+      ...existingUser,
+      isInternalAdmin: isInternalAdminUser(existingUser),
+    });
+    if (eligibility.allowed === false) {
+      return {
+        status: eligibility.status,
+        body: {
+          error: eligibility.error,
+          code: eligibility.code,
+          requiresSchoolOwnershipReview: eligibility.code === "SCHOOL_OWNERSHIP_PENDING",
+        },
+      };
+    }
     const token = signUserToken(existingUser);
     return {
       status: 200 as const,
@@ -268,16 +267,23 @@ async function handleGoogleIdentity(params: {
   }
 
   const domainSuggestions = await findDomainSuggestions(params.email);
-  const regToken = signToken(
-    {
-      googleId: params.googleId,
-      email: params.email,
-      name: params.name || params.email,
-      emailVerified: true,
-      pendingSchoolAdmin: true,
-    },
-    { expiresIn: "1h" }
-  );
+  const regToken = generateToken();
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.schoolRegistrationIntent.updateMany({
+      where: { email: params.email, consumedAt: null },
+      data: { consumedAt: now },
+    });
+    await tx.schoolRegistrationIntent.create({
+      data: {
+        tokenHash: hashToken(regToken),
+        googleId: params.googleId,
+        email: params.email,
+        name: params.name || params.email,
+        expiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+      },
+    });
+  });
 
   return {
     status: 202 as const,
@@ -289,6 +295,15 @@ async function handleGoogleIdentity(params: {
       domainSuggestions,
     },
   };
+}
+
+function sendGoogleIdentityResult(
+  res: Response,
+  result: Awaited<ReturnType<typeof handleGoogleIdentity>>
+) {
+  const token = (result.body as { token?: string }).token;
+  if (token) setAuthCookie(res, token, { persistent: true });
+  return res.status(result.status).json(result.body);
 }
 
 // GET /api/auth/google/classify-domain?email=xxx — classify a contact email domain (unauthenticated)
@@ -305,7 +320,7 @@ router.get("/classify-domain", publicGoogleAuthLimiter, (req: Request, res: Resp
     return res.json({ status: "unknown", blocked: false });
   }
   // Personal emails are only blocked in production (unless feature flag overrides)
-  if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email)) {
+  if (isPubliclyDeployed() && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(email)) {
     return res.json({ status: "personal", blocked: true });
   }
   if (isEduDomain(email)) {
@@ -361,7 +376,7 @@ router.get("/callback", publicGoogleAuthLimiter, (req: Request, res: Response) =
   res.redirect(target.toString());
 });
 
-if (!IS_PRODUCTION) {
+if (!isPubliclyDeployed()) {
   router.post("/dev-signin", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
     try {
       const { email, name, state } = strictObject({
@@ -379,7 +394,7 @@ if (!IS_PRODUCTION) {
         persistGoogleId: false,
       });
 
-      return res.status(result.status).json(result.body);
+      return sendGoogleIdentityResult(res, result);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: firstZodError(err) });
@@ -470,7 +485,7 @@ router.post("/callback", publicGoogleAuthLimiter, async (req: Request, res: Resp
       persistGoogleId: true,
     });
 
-    return res.status(result.status).json(result.body);
+    return sendGoogleIdentityResult(res, result);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
     console.error("Google auth callback error:", err);
@@ -565,42 +580,35 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
   try {
     const data = registerSchoolSchema.parse(req.body);
 
-    // Verify the registration token (contains Google profile)
-    let googleProfile: any;
-    try {
-      googleProfile = verifyToken<any>(data.registrationToken);
-    } catch {
-      return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
-    }
-
-    if (!googleProfile.pendingSchoolAdmin) {
-      return res.status(400).json({ error: "Invalid registration token" });
-    }
-    if (
-      googleProfile.emailVerified !== true ||
-      typeof googleProfile.googleId !== "string" ||
-      typeof googleProfile.email !== "string"
-    ) {
-      return res.status(400).json({ error: "Registration token is invalid. Please sign in with Google again." });
+    const registrationIntent = await prisma.schoolRegistrationIntent.findFirst({
+      where: {
+        tokenHash: hashToken(data.registrationToken),
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!registrationIntent) {
+      return res.status(400).json({ error: "Registration token is invalid, expired, or already used. Please sign in with Google again." });
     }
 
     // Block personal/consumer email providers on the contact email (production only, unless feature flag overrides)
-    if (IS_PRODUCTION && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(data.contactEmail)) {
+    if (isPubliclyDeployed() && !ALLOW_PERSONAL_EMAIL_DOMAINS && isPersonalEmailDomain(data.contactEmail)) {
       return res.status(400).json({
         error: "Please use your school's official email address. Personal email providers like Gmail, Yahoo, and Outlook are not accepted.",
         code: "PERSONAL_EMAIL",
       });
     }
 
-    if (!isApprovedDomain(googleProfile.email)) {
+    if (!isApprovedDomain(registrationIntent.email)) {
       return res.status(403).json({
         error: "Your email domain is not approved for GoodHours. Please use your institutional school email address.",
       });
     }
 
-    // Check if school directory entry exists and is already claimed; also validate contact email domain
+    const dirEntry = data.directorySchoolId
+      ? await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } })
+      : null;
     if (data.directorySchoolId) {
-      const dirEntry = await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } });
       const existingSchool = await prisma.school.findFirst({
         where: { directoryId: data.directorySchoolId },
         include: { createdBy: { select: { email: true } } },
@@ -617,14 +625,17 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         });
       }
 
-      if (
-        !isDirectoryClaimAuthorized(googleProfile.email, dirEntry) ||
-        !isDirectoryClaimAuthorized(data.contactEmail, dirEntry)
-      ) {
-        return res.status(400).json({
-          error: "Google and contact email domains must match the selected school's official domain.",
-          code: "DOMAIN_MISMATCH",
-        });
+      const schoolDomain = dirEntry.emailDomain || (dirEntry.website ? extractDomainFromWebsite(dirEntry.website) : null);
+      if (schoolDomain && (isPubliclyDeployed() || !ALLOW_PERSONAL_EMAIL_DOMAINS)) {
+        try {
+          assertExactSchoolDomain(registrationIntent.email, schoolDomain);
+          assertExactSchoolDomain(data.contactEmail, schoolDomain);
+        } catch {
+          return res.status(403).json({
+            error: `Google and contact email domains must exactly match the school's domain (${schoolDomain}).`,
+            code: "SCHOOL_DOMAIN_MISMATCH",
+          });
+        }
       }
     }
 
@@ -632,129 +643,68 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     const magicToken = generateToken();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create a placeholder school record to store the magic link
-    // We need a user record to satisfy the createdById FK
-    // Create a system placeholder if doesn't exist, or create school after email verification
-    // Instead: store registration context in School.registrationToken before user exists
+    const registrationDigest = hashToken(data.registrationToken);
 
-    // First create or find the user (Google user — no password needed yet)
-    let adminUser = await prisma.user.findFirst({
-      where: { OR: [{ googleId: googleProfile.googleId }, { email: googleProfile.email }] },
-    });
+    const school = await prisma.$transaction(async (tx) => {
+      const consumed = await tx.schoolRegistrationIntent.updateMany({
+        where: {
+          id: registrationIntent.id,
+          tokenHash: registrationDigest,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { consumedAt: new Date() },
+      });
+      if (consumed.count !== 1) {
+        throw Object.assign(new Error("Registration token is no longer available"), { status: 409 });
+      }
 
-    if (!adminUser) {
-      adminUser = await prisma.user.create({
+      const existingUser = await tx.user.findFirst({
+        where: {
+          OR: [
+            { googleId: registrationIntent.googleId },
+            { email: registrationIntent.email },
+          ],
+        },
+        select: { id: true },
+      });
+      if (existingUser) {
+        throw Object.assign(new Error("This Google account is already registered"), { status: 409 });
+      }
+
+      const adminUser = await tx.user.create({
         data: {
-          email: googleProfile.email,
-          name: googleProfile.name || googleProfile.email,
+          email: registrationIntent.email,
+          name: registrationIntent.name,
           role: "SCHOOL_ADMIN",
-          googleId: googleProfile.googleId,
+          googleId: registrationIntent.googleId,
           emailVerified: true,
           status: "ACTIVE",
         },
-      });
-    }
-
-    if (adminUser.role !== "SCHOOL_ADMIN" || adminUser.status !== "ACTIVE") {
-      return res.status(403).json({ error: "This Google account cannot register a school." });
-    }
-
-    // Check if this user already has a school
-    if (adminUser.schoolId) {
-      const school = await prisma.school.findUnique({ where: { id: adminUser.schoolId } });
-
-      // If onboarding is already complete, just return the existing session — no email needed
-      if (school?.onboardingComplete) {
-        const token = signUserToken(adminUser);
-        return res.json({
-          alreadyRegistered: true,
-          token,
-          user: { id: adminUser.id, email: adminUser.email, name: adminUser.name, role: adminUser.role, schoolId: adminUser.schoolId },
-          school,
-        });
-      }
-
-      // School exists but onboarding is incomplete — regenerate the magic link and resend.
-      // This handles the case where the previous send failed or the token expired.
-      const magicToken = generateToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      const contactEmail = data.contactEmail || school?.registrationEmail;
-
-      if (!contactEmail) {
-        return res.status(400).json({ error: "Cannot resend: no contact email on file. Please restart registration." });
-      }
-
-      await prisma.school.update({
-        where: { id: school!.id },
-        data: { registrationToken: hashToken(magicToken), registrationTokenExpires: expiresAt, registrationEmail: contactEmail },
+        select: { id: true },
       });
 
-      const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
-      let emailDeliveryFailed = false;
-      try {
-        await sendSchoolRegistrationMagicLink(contactEmail, school!.name, magicLink);
-      } catch (emailErr) {
-        emailDeliveryFailed = true;
-        console.error("[register-school] Failed to resend magic link:", emailErr);
-      }
-
-      return res.json({
-        message: emailDeliveryFailed
-          ? "A new registration link was saved, but the email could not be delivered. Please contact support or try again."
-          : "A new registration link has been sent. Please check your inbox.",
-        schoolId: school!.id,
-        schoolName: school!.name,
-        sentTo: contactEmail,
-        emailDeliveryFailed,
-      });
-    }
-
-    // Create the school record with registration magic link
-    const dirEntry = data.directorySchoolId
-      ? await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } })
-      : null;
-
-    const school = await prisma.$transaction(async (tx) => {
       const txSchool = await tx.school.create({
         data: {
           name: dirEntry?.name || data.schoolName,
           verified: false,
+          ownershipStatus: "PENDING",
           registrationToken: hashToken(magicToken),
           registrationTokenExpires: expiresAt,
+          registrationEmail: data.contactEmail,
+          createdById: adminUser.id,
+          type: dirEntry?.type || undefined,
+          address: dirEntry?.address || undefined,
+          city: dirEntry?.city || data.schoolCity || undefined,
+          state: dirEntry?.state || data.schoolState || undefined,
+          zip: dirEntry?.zip || data.schoolZip || undefined,
+          latitude: dirEntry?.latitude ?? undefined,
+          longitude: dirEntry?.longitude ?? undefined,
+          directoryId: data.directorySchoolId || undefined,
+          domain: dirEntry?.emailDomain || undefined,
         },
         select: { id: true, name: true },
       });
-
-      try {
-        await tx.school.update({
-          where: { id: txSchool.id },
-          data: {
-            type: dirEntry?.type || undefined,
-            address: dirEntry?.address || undefined,
-            city: dirEntry?.city || data.schoolCity || undefined,
-            state: dirEntry?.state || data.schoolState || undefined,
-            zip: dirEntry?.zip || data.schoolZip || undefined,
-            latitude: dirEntry?.latitude ?? undefined,
-            longitude: dirEntry?.longitude ?? undefined,
-            directoryId: data.directorySchoolId || undefined,
-            domain: dirEntry?.emailDomain || undefined,
-            registrationEmail: data.contactEmail,
-          },
-          select: { id: true, name: true },
-        });
-      } catch (err) {
-        console.error("[register-school] Failed to apply school metadata:", err);
-      }
-
-      if (data.directorySchoolId) {
-        const claimResult = await tx.schoolDirectory.updateMany({
-          where: { id: data.directorySchoolId, claimed: false },
-          data: { claimed: true, claimedBySchoolId: txSchool.id },
-        });
-        if (claimResult.count !== 1) {
-          throw Object.assign(new Error("This school is already registered."), { code: "SCHOOL_ALREADY_CLAIMED" });
-        }
-      }
 
       await tx.user.update({
         where: { id: adminUser.id },
@@ -763,62 +713,6 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
 
       return txSchool;
     });
-
-
-    try {
-      await prisma.school.update({
-        where: { id: school.id },
-        data: { createdById: adminUser.id },
-      });
-    } catch (err) {
-      console.error("[register-school] Failed to mark school creator:", err);
-    }
-
-    // Create the school's private beneficiary so it can post opportunities immediately.
-    // This is best-effort so a duplicate/legacy data issue can't abort registration
-    // after the school and admin user have already been created.
-    try {
-      const schoolBeneficiary =
-        (await prisma.beneficiary.findFirst({
-          where: { createdBySchoolId: school.id, visibility: "PRIVATE" },
-        })) ??
-        (await prisma.beneficiary.create({
-          data: {
-            name: school.name,
-            visibility: "PRIVATE",
-            status: "ACTIVE",
-            createdBySchoolId: school.id,
-            ...schoolCreatedBeneficiaryPlan("PRIVATE"),
-          },
-        }));
-
-      await prisma.beneficiary.update({
-        where: { id: schoolBeneficiary.id },
-        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
-      });
-      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
-        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
-      });
-      if (!existingApproval) {
-        await prisma.schoolBeneficiaryApproval.create({
-          data: {
-            schoolId: school.id,
-            beneficiaryId: schoolBeneficiary.id,
-            status: "APPROVED",
-            approvedAt: new Date(),
-          },
-        });
-      }
-    } catch (err) {
-      console.error("[register-school] Failed to create default school beneficiary:", err);
-    }
-
-    // Link to BeneficiaryDirectory if a directory school was chosen
-    try {
-      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
-    } catch (err) {
-      console.error("[register-school] Failed to link school to BeneficiaryDirectory:", err);
-    }
 
     // Send magic link to contact email
     const magicLink = `${CLIENT_URL}/school/verify-registration?token=${magicToken}`;
@@ -833,207 +727,33 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     res.json({
       message: emailDeliveryFailed
         ? "Registration saved, but the magic-link email could not be delivered. Please contact support or try again."
-        : "Registration link sent to the school email address. Please check the inbox to complete registration.",
+        : "Registration link sent. Contact verification and independent ownership review are both required before sign-in.",
       schoolId: school.id,
       schoolName: school.name,
       sentTo: data.contactEmail,
       emailDeliveryFailed,
+      requiresSchoolOwnershipReview: true,
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
-    if ((err as any)?.code === "SCHOOL_ALREADY_CLAIMED") {
-      return res.status(409).json({ error: "This school is already registered." });
+    const status = typeof err === "object" && err && "status" in err
+      ? Number((err as { status: unknown }).status)
+      : 500;
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({ error: err instanceof Error ? err.message : "Registration failed" });
     }
     console.error("Register school error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-const completeRegistrationSchema = strictObject({
-  registrationToken: tokenSchema,
-  directorySchoolId: opaqueIdSchema.optional(),
-  schoolName: trimmedString(255, 1),
-});
-
-// POST /api/auth/google/complete-registration — directly create school from Google-authenticated session (no magic link needed)
-router.post("/complete-registration", publicGoogleAuthLimiter, async (req: Request, res: Response) => {
-  try {
-    const data = completeRegistrationSchema.parse(req.body);
-
-    let googleProfile: any;
-    try {
-      googleProfile = verifyToken<any>(data.registrationToken);
-    } catch {
-      return res.status(400).json({ error: "Registration token is invalid or expired. Please sign in with Google again." });
-    }
-
-    if (!googleProfile.pendingSchoolAdmin) {
-      return res.status(400).json({ error: "Invalid registration token" });
-    }
-    if (
-      googleProfile.emailVerified !== true ||
-      typeof googleProfile.googleId !== "string" ||
-      typeof googleProfile.email !== "string"
-    ) {
-      return res.status(400).json({ error: "Registration token is invalid. Please sign in with Google again." });
-    }
-
-    let adminUser = await prisma.user.findFirst({
-      where: { OR: [{ googleId: googleProfile.googleId }, { email: googleProfile.email }] },
-    });
-
-    if (!adminUser) {
-      adminUser = await prisma.user.create({
-        data: {
-          email: googleProfile.email,
-          name: googleProfile.name || googleProfile.email,
-          role: "SCHOOL_ADMIN",
-          googleId: googleProfile.googleId,
-          emailVerified: true,
-          status: "ACTIVE",
-        },
-      });
-    }
-
-    if (adminUser.role !== "SCHOOL_ADMIN" || adminUser.status !== "ACTIVE") {
-      return res.status(403).json({ error: "This Google account cannot register a school." });
-    }
-
-    // If user already has a school, return existing session
-    if (adminUser.schoolId) {
-      const fullUser = await prisma.user.findUnique({
-        where: { id: adminUser.id },
-        include: {
-          school: true,
-          cohort: { include: { school: true } },
-          cohortMemberships: { where: { isActive: true }, include: { cohort: { include: { school: true } } }, orderBy: { updatedAt: "desc" as const } },
-          beneficiary: true,
-        },
-      });
-      const token = signUserToken(adminUser);
-      return res.json({ token, user: buildUserPayload(fullUser) });
-    }
-
-    const dirEntry = data.directorySchoolId
-      ? await prisma.schoolDirectory.findUnique({ where: { id: data.directorySchoolId } })
-      : null;
-
-    if (data.directorySchoolId && !dirEntry) {
-      return res.status(400).json({ error: "Selected school is no longer available. Please search again." });
-    }
-
-    if (data.directorySchoolId) {
-      if (!isDirectoryClaimAuthorized(googleProfile.email, dirEntry!)) {
-        return res.status(400).json({
-          error: "Google email domain does not match the selected school's official domain.",
-          code: "DOMAIN_MISMATCH",
-        });
-      }
-      const existing = await prisma.school.findFirst({ where: { directoryId: data.directorySchoolId } });
-      if (existing) {
-        return res.status(409).json({ error: "This school is already registered." });
-      }
-    }
-
-    const school = await prisma.$transaction(async (tx) => {
-      const txSchool = await tx.school.create({
-        data: {
-          name: dirEntry?.name || data.schoolName,
-          verified: true,
-          registrationEmail: googleProfile.email,
-        },
-        select: { id: true, name: true },
-      });
-
-      if (dirEntry) {
-        await tx.school.update({
-          where: { id: txSchool.id },
-          data: {
-            type: dirEntry.type || undefined,
-            address: dirEntry.address || undefined,
-            city: dirEntry.city || undefined,
-            state: dirEntry.state || undefined,
-            zip: dirEntry.zip || undefined,
-            latitude: dirEntry.latitude ?? undefined,
-            longitude: dirEntry.longitude ?? undefined,
-            directoryId: data.directorySchoolId,
-            domain: dirEntry.emailDomain || undefined,
-          },
-        }).catch((err: any) => console.error("[complete-registration] metadata update failed:", err));
-      }
-
-      if (data.directorySchoolId) {
-        const claimResult = await tx.schoolDirectory.updateMany({
-          where: { id: data.directorySchoolId, claimed: false },
-          data: { claimed: true, claimedBySchoolId: txSchool.id },
-        });
-        if (claimResult.count !== 1) {
-          throw Object.assign(new Error("This school is already registered."), { code: "SCHOOL_ALREADY_CLAIMED" });
-        }
-      }
-
-      await tx.user.update({ where: { id: adminUser.id }, data: { schoolId: txSchool.id } });
-      return txSchool;
-    });
-
-
-    await prisma.school.update({ where: { id: school.id }, data: { createdById: adminUser.id } })
-      .catch((err: any) => console.error("[complete-registration] createdBy update failed:", err));
-
-    try {
-      const schoolBeneficiary =
-        (await prisma.beneficiary.findFirst({ where: { createdBySchoolId: school.id, visibility: "PRIVATE" } })) ??
-        (await prisma.beneficiary.create({
-          data: {
-            name: school.name,
-            visibility: "PRIVATE",
-            status: "ACTIVE",
-            createdBySchoolId: school.id,
-            ...schoolCreatedBeneficiaryPlan("PRIVATE"),
-          },
-        }));
-      await prisma.beneficiary.update({
-        where: { id: schoolBeneficiary.id },
-        data: schoolCreatedBeneficiaryPlan("PRIVATE"),
-      });
-      const existingApproval = await prisma.schoolBeneficiaryApproval.findFirst({
-        where: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id },
-      });
-      if (!existingApproval) {
-        await prisma.schoolBeneficiaryApproval.create({
-          data: { schoolId: school.id, beneficiaryId: schoolBeneficiary.id, status: "APPROVED", approvedAt: new Date() },
-        });
-      }
-    } catch (err) {
-      console.error("[complete-registration] Failed to create default beneficiary:", err);
-    }
-
-    try {
-      await linkSchoolToBeneficiaryDirectory(school.id, data.directorySchoolId);
-    } catch (err) {
-      console.error("[complete-registration] Failed to link to BeneficiaryDirectory:", err);
-    }
-
-    const fullUser = await prisma.user.findUnique({
-      where: { id: adminUser.id },
-      include: {
-        school: true,
-        cohort: { include: { school: true } },
-        cohortMemberships: { where: { isActive: true }, include: { cohort: { include: { school: true } } }, orderBy: { updatedAt: "desc" as const } },
-        beneficiary: true,
-      },
-    });
-
-    const token = signUserToken(adminUser);
-    res.json({ token, user: buildUserPayload(fullUser) });
-  } catch (err) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
-    if ((err as any)?.code === "SCHOOL_ALREADY_CLAIMED") {
-      return res.status(409).json({ error: "This school is already registered." });
-    }
-    console.error("Complete registration error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
+// Direct Google identity is not school-authority evidence. Keep this legacy
+// endpoint as an explicit fail-closed compatibility response.
+router.post("/complete-registration", publicGoogleAuthLimiter, (_req: Request, res: Response) => {
+  return res.status(410).json({
+    error: "Direct school claiming is disabled. Submit the independently reviewed school-registration flow.",
+    code: "SCHOOL_AUTHORITY_REVIEW_REQUIRED",
+  });
 });
 
 // GET /api/auth/google/verify-school?token=xxx — complete school registration from magic link
@@ -1047,57 +767,41 @@ router.get("/verify-school", publicGoogleAuthLimiter, async (req: Request, res: 
       where: {
         registrationToken: hashToken(token),
         registrationTokenExpires: { gt: new Date() },
+        ownershipStatus: "PENDING",
       },
-      include: { createdBy: true },
+      select: { id: true, name: true },
     });
 
     if (!school) {
       return res.status(400).json({ error: "Invalid or expired registration link. Please restart registration." });
     }
 
-    if (!school.createdBy) {
-      return res.status(400).json({ error: "School registration is incomplete. Please restart registration." });
-    }
-    if (school.createdBy.role !== "SCHOOL_ADMIN" || school.createdBy.status !== "ACTIVE") {
-      return res.status(403).json({ error: "School registration administrator is not active." });
-    }
-
-    // Consume the token as part of the verification write so a replay cannot
-    // verify the same registration twice.
     const consumed = await prisma.school.updateMany({
       where: {
         id: school.id,
         registrationToken: hashToken(token),
         registrationTokenExpires: { gt: new Date() },
+        ownershipStatus: "PENDING",
+        ownershipEvidenceVerifiedAt: null,
       },
       data: {
-        verified: true,
+        ownershipEvidenceVerifiedAt: new Date(),
         registrationToken: null,
         registrationTokenExpires: null,
       },
     });
     if (consumed.count !== 1) {
-      return res.status(400).json({ error: "Invalid or expired registration link. Please restart registration." });
+      return res.status(409).json({ error: "Registration link has already been used." });
     }
 
-    // Return auth token for the admin
-    const adminUser = school.createdBy;
-    const jwtToken = signUserToken(adminUser);
-
     res.json({
-      token: jwtToken,
-      user: {
-        id: adminUser.id,
-        email: adminUser.email,
-        name: adminUser.name,
-        role: adminUser.role,
-        schoolId: school.id,
-        emailVerified: true,
-      },
+      message: "School contact verified. Independent ownership review is pending.",
+      requiresSchoolOwnershipReview: true,
       school: {
         id: school.id,
         name: school.name,
-        verified: true,
+        verified: false,
+        ownershipStatus: "PENDING",
       },
     });
   } catch (err) {

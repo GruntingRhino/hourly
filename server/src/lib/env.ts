@@ -21,14 +21,13 @@ const OPTIONAL = [
   "ALLOWED_ORIGINS",         // comma-separated list of allowed CORS origins
   "FIELD_ENCRYPTION_KEY",   // 64 hex chars — encrypts sensitive PII fields at rest
   "CRON_SECRET",            // shared secret for scheduled internal jobs (e.g. Vercel cron)
-  "QR_ATTENDANCE_SECRET",   // optional separate HMAC secret for event attendance QR tokens
   "APP_ENV",                // "production" | "development" — set explicitly per Vercel project
   "DEV_DATABASE_URL",       // explicit development-only database URL; overrides DATABASE_URL when APP_ENV=development
   "ALLOW_SHARED_DEV_DATABASE", // set true only if you intentionally want dev to use a shared remote database
   "CANVAS_CLIENT_ID",
   "CANVAS_CLIENT_SECRET",
   "CANVAS_CALLBACK_URL",
-  "CANVAS_ALLOWED_HOSTS", // comma-separated production Canvas tenant host allowlist
+  "CANVAS_ALLOWED_ORIGINS",
   "CANVAS_ENABLE_MOCK",
   "CANVAS_REQUEST_TIMEOUT_MS",
   "CANVAS_PAGE_SIZE",
@@ -38,10 +37,6 @@ const OPTIONAL = [
   "GOOGLE_CLASSROOM_ENABLE_MOCK",
   "GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS",
   "GOOGLE_CLASSROOM_PAGE_SIZE",
-  "GOOGLE_CLASSROOM_API_BASE_URL",
-  "GOOGLE_CLASSROOM_AUTH_BASE_URL",
-  "GOOGLE_CLASSROOM_TOKEN_BASE_URL",
-  "GOOGLE_CLASSROOM_ALLOWED_HOSTS",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
 ] as const;
@@ -123,6 +118,10 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
       console.error("❌ CANVAS_ENABLE_MOCK=true is not allowed in production.");
       process.exit(1);
     }
+    if (process.env.LMS_ALLOW_TEST_ORIGINS === "true" || process.env.LMS_TEST_ALLOWED_ORIGINS) {
+      console.error("❌ LMS test origins are not allowed in production.");
+      process.exit(1);
+    }
 
     const hasAnyCanvasOAuthConfig = Boolean(
       process.env.CANVAS_CLIENT_ID || process.env.CANVAS_CLIENT_SECRET || process.env.CANVAS_CALLBACK_URL
@@ -135,6 +134,32 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
       if (!/^https:\/\//i.test(process.env.CANVAS_CALLBACK_URL)) {
         console.error("❌ CANVAS_CALLBACK_URL must use HTTPS in production.");
         process.exit(1);
+      }
+      const allowedOrigins = (process.env.CANVAS_ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (allowedOrigins.length === 0) {
+        console.error("❌ Canvas OAuth requires CANVAS_ALLOWED_ORIGINS with at least one administratively approved tenant origin.");
+        process.exit(1);
+      }
+      for (const value of allowedOrigins) {
+        try {
+          const url = new URL(value);
+          if (
+            url.protocol !== "https:" ||
+            url.username ||
+            url.password ||
+            url.pathname !== "/" ||
+            url.search ||
+            url.hash
+          ) {
+            throw new Error("invalid origin");
+          }
+        } catch {
+          console.error("❌ CANVAS_ALLOWED_ORIGINS must contain only exact HTTPS origins without credentials, paths, queries, or fragments.");
+          process.exit(1);
+        }
       }
     }
 
@@ -154,10 +179,6 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
       }
       if (!/^https:\/\//i.test(process.env.GOOGLE_CLASSROOM_CALLBACK_URL)) {
         console.error("❌ GOOGLE_CLASSROOM_CALLBACK_URL must use HTTPS in production.");
-        process.exit(1);
-      }
-      if (!process.env.GOOGLE_CLASSROOM_ALLOWED_HOSTS?.trim()) {
-        console.error("❌ GOOGLE_CLASSROOM_ALLOWED_HOSTS is required in production when Google Classroom OAuth is configured.");
         process.exit(1);
       }
     }
@@ -181,3 +202,5 @@ export function isDevMode(): boolean {
       (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production"))
   );
 }
+
+export { isProdLike } from "./isProdLike";

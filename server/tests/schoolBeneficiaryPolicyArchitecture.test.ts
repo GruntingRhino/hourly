@@ -57,7 +57,7 @@ test("every school-created beneficiary create delegates visibility-aware entitle
     visit(source);
   }
 
-  assert.equal(schoolCreateSites.length, 11, `expected 11 audited creation sites, found ${JSON.stringify(schoolCreateSites)}`);
+  assert.equal(schoolCreateSites.length, 9, `expected 9 audited creation sites, found ${JSON.stringify(schoolCreateSites)}`);
   assert.ok(ordinaryCreateSites.length > 0, "expected to audit ordinary beneficiary creation sites");
 });
 

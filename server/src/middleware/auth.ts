@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
+import { isInternalAdminUser } from "../lib/internalAdmin";
+import { evaluateSessionEligibility } from "../lib/schoolAuthority";
+import { AUTH_COOKIE_NAME } from "../lib/authCookies";
 
 // JWT_SECRET must be set. env.ts calls process.exit(1) at startup if missing,
 // so this cast is safe — but we still refuse to fall back to any default.
@@ -43,22 +46,43 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+/**
+ * Prefer the HttpOnly session cookie (§15 migration); fall back to the
+ * Authorization header for any client/tooling not yet switched over.
+ */
+function extractToken(req: Request): string | null {
+  const cookieToken = (req as unknown as { cookies?: Record<string, string> }).cookies?.[AUTH_COOKIE_NAME];
+  if (cookieToken) return cookieToken;
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
+  if (header?.startsWith("Bearer ")) return header.slice(7);
+  return null;
+}
+
+export function authenticate(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  if (!token) {
     return res.status(401).json({ error: "Missing or invalid authorization header" });
   }
 
-  const token = header.slice(7);
   void (async () => {
     try {
       const payload = verifyToken(token);
       const user = await prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { id: true, email: true, role: true, status: true, tokenVersion: true },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          tokenVersion: true,
+          emailVerified: true,
+          school: {
+            select: { verified: true, ownershipStatus: true },
+          },
+        },
       });
 
-      if (!user || user.status !== "ACTIVE") {
+      if (!user) {
         return res.status(401).json({ error: "Invalid or expired token" });
       }
 
@@ -66,6 +90,17 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
       // (or none at all) and are no longer accepted.
       if ((payload.tv ?? 0) !== user.tokenVersion) {
         return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      const eligibility = evaluateSessionEligibility({
+        ...user,
+        isInternalAdmin: isInternalAdminUser(user),
+      });
+      if (eligibility.allowed === false) {
+        return res.status(eligibility.status).json({
+          error: eligibility.error,
+          code: eligibility.code,
+        });
       }
 
       req.user = {

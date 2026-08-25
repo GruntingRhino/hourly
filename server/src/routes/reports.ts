@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { create as contentDisposition } from "content-disposition";
 import prisma from "../lib/prisma";
 import { buildCsv } from "../lib/csv";
 import { authenticate } from "../middleware/auth";
@@ -116,7 +117,7 @@ function buildSchoolReportAuditDetails(params: {
   actorRole: string;
   scope: Awaited<ReturnType<typeof getStaffAccessScope>>;
   selectedCohortNames: string[];
-  students: Array<{ name: string; email: string }>;
+  students: Array<{ id: string }>;
 }) {
   const isAssignedCohortScope = !!params.scope && !params.scope.isSchoolAdmin;
   return {
@@ -161,6 +162,15 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       });
     }
 
+    const reportOwner = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { schoolId: true },
+    });
+    if (!reportOwner?.schoolId) {
+      return res.status(404).json({ error: "Student school not found" });
+    }
+    const owningSchoolId = reportOwner.schoolId;
+
     const fallbackResponse = {
       totalApprovedHours: 0,
       totalPendingHours: 0,
@@ -178,7 +188,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
 
     try {
       const sessions = await prisma.serviceSession.findMany({
-        where: { userId },
+        where: { userId, schoolId: owningSchoolId },
         include: {
           opportunity: {
             include: { organization: { select: { id: true, name: true } } },
@@ -193,7 +203,7 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
     const rejected = sessions.filter((s) => s.verificationStatus === "REJECTED");
 
     // Aggregate hours from all sources: BeneficiarySignup + SelfSubmittedRequest + ServiceSession (legacy)
-    const hoursMap = await calculateStudentHours([userId]);
+    const hoursMap = await calculateStudentHours([userId], owningSchoolId);
     const studentHours = hoursMap.get(userId) ?? { approved: 0, pending: 0 };
 
     // totalCommittedHours remains ServiceSession-only (no equivalent concept in other models)
@@ -234,6 +244,10 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       totalCommittedHours: Math.round(totalCommittedHours * 100) / 100,
       requiredHours: user?.cohort?.requiredHours ?? school?.requiredHours ?? 40,
       activitiesCompleted: approved.length,
+      // COMPLETE unless one or more underlying hour sources failed to load — in that
+      // case the totals above may be understated and should not be treated as final.
+      dataState: hoursMap.dataState,
+      ...(hoursMap.dataState === "PARTIAL" ? { failedSources: hoursMap.failedSources } : {}),
       sessions,
       approved,
       pending,
@@ -345,6 +359,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       where: {
         role: "STUDENT",
         ...(scope ? buildCohortScopedStudentWhere(scope) : {
+          isTestAccount: false,
           OR: [
             { classroom: { schoolId: school.id } },
             { cohort: { schoolId: school.id } },
@@ -387,6 +402,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
     });
 
     const progress = await buildStudentProgressRecords(students, {
+      schoolId: school.id,
       requiredHours: school.requiredHours,
       serviceStartDate: school.serviceStartDate,
       serviceEndDate: school.serviceEndDate,
@@ -422,7 +438,7 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
         actorRole: req.user!.role,
         scope,
         selectedCohortNames: selectedCohorts.map((cohort) => cohort.name),
-        students: students.map((student) => ({ name: student.name, email: student.email })),
+        students: students.map((student) => ({ id: student.id })),
       }),
     });
 
@@ -432,6 +448,11 @@ router.get("/school", authenticate, async (req: Request, res: Response) => {
       totalStudents: report.length,
       studentsCompleted: report.filter((r) => r.completed).length,
       students: report,
+      // COMPLETE unless one or more underlying hour/no-show sources failed to
+      // load for this batch — in that case some students' totals above may be
+      // understated and should not be treated as final.
+      dataState: progress.dataState,
+      ...(progress.dataState === "PARTIAL" ? { failedSources: progress.failedSources } : {}),
     });
     } catch (err) {
       console.error("School report enrichment failed:", err);
@@ -465,7 +486,12 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
     if (type === "student" || req.user!.role === "STUDENT") {
       const userId = req.user!.userId;
 
-      const [sessions, benSignups, selfSubs] = await Promise.all([
+      // Promise.allSettled (not Promise.all): this export is a student's
+      // official hours record — if one of the three independent sources
+      // has a transient failure, the other two should still be exported
+      // rather than the whole request 500ing, but the export must say so
+      // rather than silently presenting an incomplete record as complete.
+      const [sessionsResult, benSignupsResult, selfSubsResult] = await Promise.allSettled([
         prisma.serviceSession.findMany({
           where: { userId, verificationStatus: "APPROVED" },
           include: { opportunity: { include: { organization: { select: { name: true } } } } },
@@ -490,12 +516,33 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
         }),
       ]);
 
+      const failedSources: string[] = [];
+      if (sessionsResult.status === "rejected") {
+        failedSources.push("organization-verified hours");
+        console.error("CSV export: serviceSession lookup failed", sessionsResult.reason);
+      }
+      if (benSignupsResult.status === "rejected") {
+        failedSources.push("beneficiary-verified hours");
+        console.error("CSV export: beneficiarySignup lookup failed", benSignupsResult.reason);
+      }
+      if (selfSubsResult.status === "rejected") {
+        failedSources.push("self-submitted hours");
+        console.error("CSV export: selfSubmittedRequest lookup failed", selfSubsResult.reason);
+      }
+      const sessions = sessionsResult.status === "fulfilled" ? sessionsResult.value : [];
+      const benSignups = benSignupsResult.status === "fulfilled" ? benSignupsResult.value : [];
+      const selfSubs = selfSubsResult.status === "fulfilled" ? selfSubsResult.value : [];
+
       await logDataAccess({
         actorId: userId,
         action: "EXPORT_CSV",
         targetType: "student",
         targetId: userId,
-        details: { type: "student", sessionCount: sessions.length + benSignups.length + selfSubs.length },
+        details: {
+          type: "student",
+          sessionCount: sessions.length + benSignups.length + selfSubs.length,
+          ...(failedSources.length ? { partial: true, failedSources } : {}),
+        },
       });
 
       // Combine all sources into uniform rows, sorted by date
@@ -529,9 +576,20 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
 
       allRows.sort((a, b) => a.date.localeCompare(b.date));
 
+      // All three sources failing would otherwise produce an empty CSV
+      // indistinguishable from a genuinely zero-hours student — refuse to
+      // export a record that isn't known to be complete rather than
+      // silently claiming zero hours.
+      if (failedSources.length === 3) {
+        return res.status(503).json({ error: "Unable to retrieve your hours right now. Please try again shortly." });
+      }
+
       rows.push(["Date", "Opportunity", "Organization", "Hours", "Status"]);
       for (const r of allRows) {
         rows.push([r.date, r.activity, r.organization, String(r.hours), "APPROVED"]);
+      }
+      if (failedSources.length > 0) {
+        rows.push([`WARNING: this export is incomplete — could not retrieve ${failedSources.join(", ")}. Please try again shortly.`, "", "", "", ""]);
       }
       filename = "my-service-hours.csv";
     }
@@ -540,7 +598,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
       ? buildCsv(rows)
       : '"Date","Opportunity","Organization","Hours","Status"';
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDisposition(filename));
     res.send(csv);
   } catch (err) {
     console.error("CSV export error:", err);

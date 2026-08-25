@@ -2,12 +2,20 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { buildStudentProgressRecords } from "../lib/studentProgress";
+import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/studentProgress";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { sendStudentLeftClassroomEmail } from "../services/email";
 
 const router = Router();
+
+const updateClassroomSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  isActive: z.boolean().optional(),
+  teacherId: z.string().trim().min(1).optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, {
+  message: "At least one field is required",
+});
 
 function generateInviteCode(): string {
   return crypto.randomBytes(4).toString("hex"); // 8 hex chars
@@ -84,6 +92,7 @@ router.get(
       const students = await prisma.user.findMany({
         where: {
           role: "STUDENT",
+          isTestAccount: false,
           classroomId: { in: classrooms.map((classroom) => classroom.id) },
         },
         select: {
@@ -123,11 +132,12 @@ router.get(
       });
 
       const progress = await buildStudentProgressRecords(students, {
+        schoolId: user.schoolId,
         requiredHours: school?.requiredHours ?? 40,
         serviceStartDate: school?.serviceStartDate ?? null,
         serviceEndDate: school?.serviceEndDate ?? null,
       });
-      const progressByClassroomId = new Map<string, typeof progress>();
+      const progressByClassroomId = new Map<string, StudentProgressRecord[]>();
       for (const student of progress) {
         const sourceStudent = students.find((row) => row.id === student.id);
         if (!sourceStudent?.classroomId) continue;
@@ -184,7 +194,7 @@ router.get(
               email: true,
               grade: true,
               serviceSessions: {
-                where: { verificationStatus: "APPROVED" },
+                where: { schoolId: user.schoolId, verificationStatus: "APPROVED" },
                 select: { totalHours: true },
               },
             },
@@ -198,6 +208,9 @@ router.get(
       }
       if (classroom.schoolId !== user?.schoolId) {
         return res.status(403).json({ error: "Not your school" });
+      }
+      if (user.role === "TEACHER" && classroom.teacherId !== user.id) {
+        return res.status(404).json({ error: "Classroom not found" });
       }
 
       const studentsWithHours = classroom.students.map((s) => ({
@@ -235,11 +248,27 @@ router.put(
       if (classroom.schoolId !== user?.schoolId) {
         return res.status(403).json({ error: "Not your school" });
       }
+      if (user.role === "TEACHER" && classroom.teacherId !== user.id) {
+        return res.status(404).json({ error: "Classroom not found" });
+      }
 
-      const data: any = {};
-      if (req.body.name !== undefined) data.name = req.body.name;
-      if (req.body.isActive !== undefined) data.isActive = req.body.isActive;
-      if (req.body.teacherId !== undefined) data.teacherId = req.body.teacherId;
+      const data = updateClassroomSchema.parse(req.body);
+      if (user.role === "TEACHER" && data.teacherId !== undefined) {
+        return res.status(403).json({ error: "Only school administrators may reassign classrooms" });
+      }
+      if (data.teacherId !== undefined) {
+        const replacementTeacher = await prisma.user.findUnique({
+          where: { id: data.teacherId },
+          select: { role: true, schoolId: true },
+        });
+        if (
+          !replacementTeacher ||
+          replacementTeacher.schoolId !== classroom.schoolId ||
+          !["SCHOOL_ADMIN", "TEACHER"].includes(replacementTeacher.role)
+        ) {
+          return res.status(400).json({ error: "Replacement teacher must be staff at this school" });
+        }
+      }
 
       const updated = await prisma.classroom.update({
         where: { id: req.params.id },
@@ -248,6 +277,9 @@ router.put(
 
       res.json(updated);
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: err.errors });
+      }
       console.error("Update classroom error:", err);
       res.status(500).json({ error: "Internal server error" });
     }

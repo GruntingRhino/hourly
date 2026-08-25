@@ -212,10 +212,13 @@ export default function OpportunityDetail() {
         const formData = new FormData();
         formData.append("signatureFile", signatureFile!);
         formData.append("signatureType", "FILE");
-        const token = localStorage.getItem("goodhours_token");
+        // A raw fetch (rather than api.post) is kept deliberately here to
+        // preserve the non-JSON error-body handling below for Multer-level
+        // file-type rejections. Auth travels via the HttpOnly session
+        // cookie, sent automatically for this same-origin request.
         const res = await fetch(`/api/sessions/${mySession.id}/submit-verification`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "same-origin",
           body: formData,
         });
         if (!res.ok) {
