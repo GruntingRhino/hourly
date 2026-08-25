@@ -94,3 +94,43 @@ Environment: https://goodhours.app (production), logged in as Principal Johnson 
 - Submissions page: All three tabs (Pending, Approved, Rejected) render with correct empty-state messages.
 - Cohorts → Cohort detail: Students, Analytics, Invitations, and Import tabs all render correctly. Add Student: browser native required-field validation fires on empty email. Import tab shows CSV format instructions.
 - Onboarding wizard (Dashboard): "Skip this step →" correctly advances to next step (NOT a bug — see BUG-001 update).
+
+---
+
+# 2026-08-25 — Staging E2E Functional Pass (hourly-dev.vercel.app)
+
+Tested: 2026-08-25 (API-level, curl; synthetic `example.invalid` identities + seeded staging accounts)
+Full detail: `docs/qa/E2E_STAGING_2026-08-25.md`
+
+## BUG-0825-1: Staging DB schema drift — widespread 500 on Opportunity/Organization/Signup/ServiceSession endpoints — OPEN
+
+**Severity:** CRITICAL
+**Repro:** `curl https://hourly-dev.vercel.app/api/opportunities` → `500 {"error":"Internal server error"}`. Same for `/api/opportunities/:id`, `/api/signups/my`, `GET /api/sessions/my`, `/api/organizations`. Endpoints touching only User/School/Beneficiary return 200, so DB is reachable — the failing models share recent migrations (`add_attendance_qr_tokens` … `add_reminder_leases`) that appear unapplied on the staging Neon DB.
+**Impact:** Core student journey (browse → signup → session) is dead in staging.
+**Fix:** Run pending Prisma migrations against staging.
+
+## BUG-0825-2: New-user signup returns 500 and persists no user row — OPEN
+
+**Severity:** HIGH
+**Repro:** `POST /api/auth/signup` with valid SCHOOL_ADMIN payload (3 distinct fresh emails, .invalid and .edu domains) → `500 Internal server error`; retry same email after per-email cooldown → 500 again (not 409), proving no row was created. Failure occurs at/before `user.create` — consistent with BUG-0825-1 schema drift on `User`.
+**Impact:** No new accounts can be created in staging at all.
+
+## BUG-0825-3: Seeded SCHOOL_ADMIN login returns 500 — OPEN
+
+**Severity:** HIGH
+**Repro:** `POST /api/auth/login {"email":"admin@lincoln.edu","password":"password123"}` → `500` (reproduced across two separate runs). STUDENT (`john@student.edu`) and BENEFICIARY_ADMIN logins return 200. Blocks all SCHOOL_ADMIN-gated flows (cohorts CSV import/export/rollback) in staging.
+
+## BUG-0825-4: Staging deployment is stale — newer API routes 404 — OPEN
+
+**Severity:** HIGH (process/release)
+**Repro:** Routes present in server source but absent from deployed build, returning app-level fallback `404 {"error":"Not found"}`: `POST /api/sessions/opportunities/:id/qr-token`, `POST /api/sessions/qr-checkin`, `POST /api/beneficiaries/supervisor-verification/:token/consume`, `GET /api/verification/pending`, `GET /api/cohorts/export`.
+**Impact:** QR attendance (incl. expiry/replay rejection) and supervisor verification link flows are untestable in staging; launch-prep features are not actually deployed.
+
+## BUG-0825-5: Student personal-hours CSV export returns 503 — OPEN
+
+**Severity:** MEDIUM
+**Repro:** `GET /api/reports/export/csv` as authenticated STUDENT → `503 {"error":"Unable to retrieve your hours right now..."}`. Route is deployed and auth-gated correctly but its data source fails (likely same drift as BUG-0825-1).
+
+## Coverage gaps (not defects)
+
+- **No ORG_ADMIN provisioning path:** public signup accepts only `role=SCHOOL_ADMIN` (`VALID_ROLES` in `routes/auth.ts`); no route creates ORG_ADMIN or creates a legacy Organization. Org-admin → create-org → create-opportunity flows are untestable without a seeded org admin.
