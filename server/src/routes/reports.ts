@@ -61,7 +61,7 @@ router.get("/student/milestones", authenticate, async (req: Request, res: Respon
     const school = student.school;
     const requiredHours = student.cohort?.requiredHours ?? school?.requiredHours ?? 40;
     const thresholds = parseMilestoneThresholds(student.cohort?.milestoneThresholds ?? school?.milestoneThresholds);
-    const hours = (await calculateStudentHours([studentId])).get(studentId) ?? { approved: 0, pending: 0 };
+    const hours = (await calculateStudentHours([studentId], student.schoolId ?? "")).get(studentId) ?? { approved: 0, pending: 0 };
     return res.json({ ...deriveMilestones({ approvedHours: hours.approved, requiredHours, thresholds }), pendingHours: hours.pending });
   } catch (err) {
     console.error("Student milestones error:", err);
