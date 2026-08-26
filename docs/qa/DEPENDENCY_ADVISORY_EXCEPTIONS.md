@@ -25,3 +25,33 @@ The advisory is scoped to React Router's RSC mode. GoodHours is a client-only Vi
 ### Recheck trigger and expiry
 
 Recheck when a patched stable version becomes available, on every React Router upgrade, and no later than 2026-08-31. Remove this exception only after a clean production dependency audit or a replacement applicability analysis.
+
+## GHSA-ggr8-5vv4-36mx — deepmerge-ts stack exhaustion — RESOLVED 2026-08-26
+
+- **Affected audit range:** `deepmerge-ts <8.0.0`
+- **Previously installed:** `deepmerge-ts@7.1.5` via `prisma@6.19.3` → `@prisma/config@6.19.3`
+- **Severity reported by npm:** high (3 findings: deepmerge-ts, @prisma/config, prisma)
+- **Disposition:** RESOLVED via npm `overrides` pin, not an exception.
+
+`npm audit fix --force` proposes installing `prisma@6.12.0`, a breaking
+downgrade of a core dependency — rejected per audit policy. Instead,
+`server/package.json` now pins:
+
+```json
+"overrides": { "deepmerge-ts": "8.0.2" }
+```
+
+Compatibility evidence: `@prisma/config` uses exactly one API from
+deepmerge-ts (`const { deepmerge } = await import("deepmerge-ts")`, passed as
+c12's `merger`), and 8.0.2 ships dual ESM/CJS builds, so the dynamic import
+keeps working. Verified after reinstall:
+
+- `npm ls`: lockfile resolves `node_modules/deepmerge-ts` → `8.0.2`
+- `npx prisma --version`, `npx prisma generate`, `npx prisma validate`,
+  `npx prisma migrate status`, both `prisma migrate diff` directions: PASS
+- server build PASS; full suite **431 tests / 430 pass / 0 fail / 1 skip**
+- `NODE_ENV=development npm audit`: **0 vulnerabilities**
+
+Recheck on every Prisma major upgrade; remove the override once `@prisma/config`
+declares `deepmerge-ts >=8.0.0` natively.
+
