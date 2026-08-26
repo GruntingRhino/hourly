@@ -18,6 +18,7 @@ export default function CancelSignup() {
   const [info, setInfo] = useState<Confirmation | null>(null);
   const [resultMessage, setResultMessage] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!token) {
       setStatus("error");
