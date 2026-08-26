@@ -137,6 +137,12 @@ model User {
   uploadedOrganizationInvoiceArtifacts OrganizationInvoiceArtifact[] @relation("OrganizationInvoiceArtifactUploader")
   serviceHourLedgerEntries             ServiceHourLedgerEntry[]      @relation("ServiceHourLedgerStudent")
   approvedServiceHourLedgerEntries     ServiceHourLedgerEntry[]      @relation("ServiceHourLedgerApprover")
+  canonicalLedgerEntries               CanonicalLedgerEntry[]        @relation("LedgerStudent")
+  transcriptSnapshots                  VerifiedTranscriptSnapshot[]  @relation("TranscriptStudent")
+  studentPreference                    StudentPreference?
+  availabilityWindows                  StudentAvailabilityWindow[]
+  attendanceQrTokensCreated            AttendanceQrToken[]           @relation("AttendanceQrTokenCreator")
+  attendanceQrRedemptions              AttendanceQrRedemption[]      @relation("AttendanceQrRedemptionStudent")
 
   // Foreign-key columns filtered on constantly for tenant/relationship scoping
   // (school-scoped student/staff lookups, cohort membership, etc.) had no
@@ -208,11 +214,11 @@ enum SchoolAccessStatus {
 }
 
 model School {
-  id                            String                @id @default(cuid())
+  id                            String                     @id @default(cuid())
   name                          String
   // Directory reference — if this school came from the schools directory
   directoryId                   String? // references SchoolDirectory.id
-  directoryEntry                SchoolDirectory?      @relation(fields: [directoryId], references: [id])
+  directoryEntry                SchoolDirectory?           @relation(fields: [directoryId], references: [id])
   type                          String? // public, private, charter
   address                       String?
   city                          String?
@@ -221,32 +227,33 @@ model School {
   latitude                      Float?
   longitude                     Float?
   domain                        String? // official email domain(s) — eligibility check only, not self-enrollment
-  verified                      Boolean               @default(false)
-  ownershipStatus               SchoolOwnershipStatus @default(PENDING)
+  verified                      Boolean                    @default(false)
+  ownershipStatus               SchoolOwnershipStatus      @default(PENDING)
   ownershipEvidenceVerifiedAt   DateTime?
   ownershipReviewedAt           DateTime?
   ownershipReviewedById         String?
   ownershipReviewNote           String?
   // Magic link registration
-  registrationToken             String?               @unique
+  registrationToken             String?                    @unique
   registrationTokenExpires      DateTime?
   registrationEmail             String? // email to which the magic link was sent
   createdById                   String?
-  createdBy                     User?                 @relation("SchoolCreator", fields: [createdById], references: [id])
-  ownershipTransferToken        String?               @unique
+  createdBy                     User?                      @relation("SchoolCreator", fields: [createdById], references: [id])
+  ownershipTransferToken        String?                    @unique
   ownershipTransferExpires      DateTime?
   ownershipTransferTargetUserId String?
-  requiredHours                 Float                 @default(40)
+  requiredHours                 Float                      @default(40)
   verificationStandard          SchoolVerificationStandard @default(STANDARD)
   serviceStartDate              DateTime?
   serviceEndDate                DateTime?
-  allowSelfSubmission           Boolean               @default(true)
-  ferpaBeneficiaryPiiEnabled    Boolean               @default(false) // when true, student names are shared with beneficiary admins
-  requireOrgVerification        Boolean               @default(false)
+  allowSelfSubmission           Boolean                    @default(true)
+  ferpaBeneficiaryPiiEnabled    Boolean                    @default(false) // when true, student names are shared with beneficiary admins
+  requireOrgVerification        Boolean                    @default(false)
   categoryHourCaps              String? // JSON: { [category: string]: number }
+  milestoneThresholds           String? // JSON object: { "25": "Started", ... }
   // Legacy
-  allowJoinByCode               Boolean               @default(false)
-  onboardingComplete            Boolean               @default(false)
+  allowJoinByCode               Boolean                    @default(false)
+  onboardingComplete            Boolean                    @default(false)
   partnerInviteTemplate         String?
   launchOnboardingConfig        String?
   launchSupportConfig           String?
@@ -254,34 +261,41 @@ model School {
   launchMonitoringConfig        String?
   zipCodes                      String? // JSON array of zip codes (service area)
   // Billing / procurement
-  billingStatus                 SchoolBillingStatus   @default(NONE)
-  accessStatus                  SchoolAccessStatus    @default(PROCUREMENT)
+  billingStatus                 SchoolBillingStatus        @default(NONE)
+  accessStatus                  SchoolAccessStatus         @default(PROCUREMENT)
   pilotExpiresAt                DateTime?
-  createdAt                     DateTime              @default(now())
-  updatedAt                     DateTime              @updatedAt
+  createdAt                     DateTime                   @default(now())
+  updatedAt                     DateTime                   @updatedAt
 
-  staff                   User[]                       @relation("SchoolStaff")
-  cohorts                 Cohort[]
-  classrooms              Classroom[] // legacy
-  approvedOrgs            SchoolOrganization[] // legacy
-  beneficiaryApprovals    SchoolBeneficiaryApproval[]
-  groups                  StudentGroup[]
-  verifiedDomains         VerifiedDomain[]
-  selfSubmissions         SelfSubmittedRequest[]
-  beneficiarySignups      BeneficiarySignup[]
-  serviceSessions         ServiceSession[]
-  launchBugs              SchoolLaunchBug[]
-  integrationConnections  IntegrationConnection[]
-  integrationSyncJobs     IntegrationSyncJob[]
-  integrationSyncErrors   IntegrationSyncError[]
-  integrationMappings     IntegrationExternalMapping[]
-  interventionCampaigns   InterventionCampaign[]
-  interventionCases       InterventionCase[]
-  billingRecord           SchoolBillingRecord?
-  quoteRequests           SchoolQuoteRequest[]
-  partnerRequestsSent     SchoolPartnerRequest[]       @relation("PartnerRequestFrom")
-  partnerRequestsReceived SchoolPartnerRequest[]       @relation("PartnerRequestTo")
+  staff                    User[]                       @relation("SchoolStaff")
+  cohorts                  Cohort[]
+  classrooms               Classroom[] // legacy
+  approvedOrgs             SchoolOrganization[] // legacy
+  beneficiaryApprovals     SchoolBeneficiaryApproval[]
+  groups                   StudentGroup[]
+  verifiedDomains          VerifiedDomain[]
+  selfSubmissions          SelfSubmittedRequest[]
+  beneficiarySignups       BeneficiarySignup[]
+  serviceSessions          ServiceSession[]
+  launchBugs               SchoolLaunchBug[]
+  integrationConnections   IntegrationConnection[]
+  integrationSyncJobs      IntegrationSyncJob[]
+  integrationSyncErrors    IntegrationSyncError[]
+  integrationMappings      IntegrationExternalMapping[]
+  interventionCampaigns    InterventionCampaign[]
+  interventionCases        InterventionCase[]
+  billingRecord            SchoolBillingRecord?
+  quoteRequests            SchoolQuoteRequest[]
+  partnerRequestsSent      SchoolPartnerRequest[]       @relation("PartnerRequestFrom")
+  partnerRequestsReceived  SchoolPartnerRequest[]       @relation("PartnerRequestTo")
   serviceHourLedgerEntries ServiceHourLedgerEntry[]
+  canonicalLedgerEntries   CanonicalLedgerEntry[]       @relation("LedgerSchool")
+  transcriptSnapshots      VerifiedTranscriptSnapshot[] @relation("TranscriptSchool")
+  studentPreferences       StudentPreference[]
+  approvedInterestTags     String?
+  signupQuestionTemplates  SignupQuestionTemplate[]
+  supervisorVerifications  SupervisorVerification[]
+  beneficiaryImportBatches BeneficiaryImportBatch[]
 }
 
 enum SchoolPartnerRequestStatus {
@@ -361,6 +375,7 @@ model Cohort {
   serviceEndDate      DateTime?
   allowSelfSubmission Boolean? // null = inherit from school
   categoryHourCaps    String? // JSON override; null = inherit from school
+  milestoneThresholds String? // JSON object: { "25": "Started", ... }
   usesHouseField      Boolean      @default(false)
   graduationYear      Int?
   status              CohortStatus @default(DRAFT)
@@ -608,6 +623,7 @@ model Beneficiary {
   reminderConfig        OrgReminderConfig?
   invoiceRequests       OrganizationInvoiceRequest[]
   stripeCheckoutAttempt StripeCheckoutAttempt?
+  reliabilityEvents     OrganizationReliabilityEvent[]
 }
 
 model StripeCheckoutAttempt {
@@ -895,8 +911,10 @@ model BeneficiarySignup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  auditLogs    BeneficiaryAuditLog[]
-  reminderLogs OrgEventReminderLog[]
+  auditLogs              BeneficiaryAuditLog[]
+  reminderLogs           OrgEventReminderLog[]
+  questionAnswers        BeneficiarySignupAnswer[]
+  supervisorVerification SupervisorVerification?
 
   @@unique([slotId, studentId])
   @@index([schoolId, studentId])
@@ -960,11 +978,14 @@ model OrgEventReminderLog {
   deliveryStatus    OrgEventReminderDeliveryStatus @default(PENDING)
   providerMessageId String?
   failureReason     String?
+  attempts          Int                            @default(0)
+  leasedUntil       DateTime?
   createdAt         DateTime                       @default(now())
 
   @@unique([signupId, reminderType])
   @@index([beneficiaryId, deliveryStatus])
   @@index([scheduledFor, deliveryStatus])
+  @@index([leasedUntil, deliveryStatus])
 }
 
 // ─── Legacy: Classrooms ─────────────────────────────────────────
@@ -1111,9 +1132,10 @@ model Opportunity {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  signups         Signup[]
-  serviceSessions ServiceSession[]
-  savedBy         SavedOpportunity[]
+  signups            Signup[]
+  serviceSessions    ServiceSession[]
+  savedBy            SavedOpportunity[]
+  attendanceQrTokens AttendanceQrToken[]
 }
 
 // ─── Legacy: Signups ────────────────────────────────────────────
@@ -1205,10 +1227,11 @@ model ServiceSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user        User        @relation(fields: [userId], references: [id])
-  school      School?     @relation(fields: [schoolId], references: [id], onDelete: SetNull)
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
-  auditLogs   AuditLog[]
+  user          User                     @relation(fields: [userId], references: [id])
+  school        School?                  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  opportunity   Opportunity              @relation(fields: [opportunityId], references: [id])
+  auditLogs     AuditLog[]
+  qrRedemptions AttendanceQrRedemption[]
 
   @@unique([userId, opportunityId])
   @@index([userId, verificationStatus])
@@ -1593,4 +1616,209 @@ model ScheduledJobLease {
   updatedAt  DateTime  @updatedAt
 
   @@index([leaseUntil])
+}
+
+model CanonicalLedgerEntry {
+  id               String    @id @default(cuid())
+  studentId        String
+  schoolId         String
+  source           String
+  sourceId         String
+  serviceDate      DateTime
+  organizationName String
+  description      String
+  hours            Float
+  verifiedBy       String?
+  verifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  student          User      @relation("LedgerStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  school           School    @relation("LedgerSchool", fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([source, sourceId])
+  @@index([studentId, serviceDate])
+  @@index([schoolId, serviceDate])
+}
+
+model VerifiedTranscriptSnapshot {
+  id          String    @id @default(cuid())
+  studentId   String
+  schoolId    String
+  snapshot    String
+  ledgerHash  String
+  status      String    @default("DRAFT")
+  certifiedBy String?
+  certifiedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  student     User      @relation("TranscriptStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  school      School    @relation("TranscriptSchool", fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([schoolId, status])
+}
+
+model StudentPreference {
+  id           String                      @id @default(cuid())
+  studentId    String                      @unique
+  schoolId     String
+  optedIn      Boolean                     @default(false)
+  interestTags String                      @default("[]")
+  timezone     String
+  updatedAt    DateTime                    @updatedAt
+  student      User                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  school       School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  availability StudentAvailabilityWindow[]
+}
+
+model StudentAvailabilityWindow {
+  id           String            @id @default(cuid())
+  studentId    String
+  preferenceId String
+  weekday      Int
+  start        String
+  end          String
+  student      User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  preference   StudentPreference @relation(fields: [preferenceId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, weekday])
+}
+
+model CanvasOAuthState {
+  id          String    @id @default(cuid())
+  stateHash   String    @unique
+  schoolId    String
+  actorId     String
+  baseUrl     String
+  displayName String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([schoolId, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model GoogleClassroomOAuthState {
+  id          String    @id @default(cuid())
+  stateHash   String    @unique
+  schoolId    String
+  actorId     String
+  baseUrl     String?
+  displayName String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([schoolId, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+// === Restored 2026-08-26: models created by committed migrations
+// (20260808213000_add_attendance_qr_tokens .. 20260809095000_add_import_batches)
+// but dropped from this datamodel during the daebece merge reconciliation.
+// Kept declaratively in sync with prisma/migrations — see docs/qa/MIGRATION_RECONCILIATION_2026-08-26.md
+model AttendanceQrToken {
+  id            String    @id @default(cuid())
+  opportunityId String
+  createdById   String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  opportunity Opportunity              @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdBy   User                     @relation("AttendanceQrTokenCreator", fields: [createdById], references: [id])
+  redemptions AttendanceQrRedemption[]
+
+  @@index([opportunityId, expiresAt])
+}
+
+model AttendanceQrRedemption {
+  id          String   @id @default(cuid())
+  tokenId     String
+  studentId   String
+  sessionId   String
+  checkedInAt DateTime @default(now())
+
+  token   AttendanceQrToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  student User              @relation("AttendanceQrRedemptionStudent", fields: [studentId], references: [id])
+  session ServiceSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenId, studentId])
+  @@index([studentId, checkedInAt])
+  @@index([sessionId])
+}
+
+model SupervisorVerification {
+  id              String            @id @default(cuid())
+  signupId        String            @unique
+  schoolId        String
+  supervisorEmail String
+  tokenHash       String            @unique
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime          @default(now())
+  signup          BeneficiarySignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  school          School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, usedAt])
+}
+
+model SignupQuestionTemplate {
+  id        String                    @id @default(cuid())
+  schoolId  String
+  label     String
+  type      String
+  required  Boolean                   @default(false)
+  active    Boolean                   @default(true)
+  createdBy String
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  school    School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  answers   BeneficiarySignupAnswer[]
+
+  @@index([schoolId, active])
+}
+
+model BeneficiaryImportBatch {
+  id             String    @id @default(cuid())
+  schoolId       String
+  createdBy      String
+  rawCsv         String
+  beforeSnapshot String
+  afterSnapshot  String    @default("[]")
+  status         String    @default("PREVIEW")
+  createdAt      DateTime  @default(now())
+  appliedAt      DateTime?
+  rolledBackAt   DateTime?
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+}
+
+model OrganizationReliabilityEvent {
+  id                  String      @id @default(cuid())
+  beneficiaryId       String
+  occurredAt          DateTime
+  responseMinutes     Float?
+  attendanceAccurate  Boolean?
+  cancelled           Boolean?
+  verificationMinutes Float?
+  createdBy           String?
+  createdAt           DateTime    @default(now())
+  beneficiary         Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+
+  @@index([beneficiaryId, occurredAt])
+}
+
+model BeneficiarySignupAnswer {
+  id         String                 @id @default(cuid())
+  signupId   String
+  questionId String
+  value      String
+  signup     BeneficiarySignup      @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  question   SignupQuestionTemplate @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([signupId, questionId])
 }
