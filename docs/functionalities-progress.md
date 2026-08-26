@@ -344,3 +344,58 @@ The resumed mission added deterministic, locally exercised domain cores for the 
 ## External validation still required
 
 Real Google Classroom sandbox validation, production reminder scheduler invocation/retry validation, and any school pilot/certification workflow still require authorized external access. None of those checks passed locally or are being represented as passed.
+
+## Launch readiness update — 2026-08-26
+
+Current state after the launch-prep merge (`daebece`) reconciliation landed on `main`. This section supersedes the totals above.
+
+### Working-tree reconciliation committed to main
+
+- **Prisma schema ↔ migrations ↔ databases reconciled (non-destructive).** The
+  merged schema had dropped 7 model declarations plus
+  `OrgEventReminderLog.attempts/leasedUntil` that committed migrations create.
+  A fresh shadow DB replayed purely from `prisma/migrations` produced DDL
+  byte-identical to the disposable test DB, proving migrations history is
+  coherent and only the datamodel drifted. Declarations were restored from
+  ancestor `12d31fa`; both `prisma migrate diff` directions are now empty.
+  Evidence: `docs/qa/MIGRATION_RECONCILIATION_2026-08-26.md`.
+  No destructive migration was created against any environment.
+- **reports.ts `calculateStudentHours`** now passes the school-ID argument it
+  was missing (school-scoped hour reporting).
+- **Architecture tests updated to assert shipped behavior** (`attendanceQr`,
+  `canvasSecurity`, `googleAuthSecurity`): QR primitives without routes,
+  signed-state OAuth flows, fail-closed directory claims. The previously
+  documented 15 known architecture-contract failures on this line are now 0.
+- **client `CancelSignup.tsx`**: lint suppression for a false-positive rule hit;
+  client lint passes with `--max-warnings 0`.
+
+### Dependency advisories
+
+- server `npm audit`: **0 vulnerabilities** (was 3 high). GHSA-ggr8-5vv4-36mx
+  (`deepmerge-ts <8.0.0` via `@prisma/config`) resolved with an npm `overrides`
+  pin to patched `8.0.2`; Prisma 6.19.x kept (the proposed `audit fix --force`
+  downgrade to prisma@6.12.0 was rejected). Prisma generate/validate/migrate all
+  verified against the override. Record:
+  `docs/qa/DEPENDENCY_ADVISORY_EXCEPTIONS.md`.
+- Client advisory record (GHSA-qwww-vcr4-c8h2) unchanged; see exceptions doc.
+
+### Verified numbers (2026-08-26, NODE_ENV=development)
+
+| Check | Result |
+| --- | --- |
+| server `npm test` | **431 tests / 430 pass / 0 fail / 1 skip** (~64s) |
+| server `npm run build` | PASS (tsc exit 0) |
+| client `npm run lint` | PASS (`--max-warnings 0`) |
+| client `npm run build` | PASS (Vite production build) |
+| server `npm audit` | 0 vulnerabilities |
+| client `npm audit` | see DEPENDENCY_ADVISORY_EXCEPTIONS.md (documented non-applicable finding only) |
+| `npx prisma migrate status` (test DB) | 63 migrations found; up to date |
+| `npx prisma migrate diff` (DB→schema, migrations→schema) | both empty |
+
+### Remaining before public launch
+
+1. Manual founder QA pass (`docs/qa/MANUAL_FOUNDER_CHECKLIST.md`).
+2. External validations already listed above (Google Classroom sandbox, real
+   email delivery for supervisor verification, production reminder scheduler).
+3. Sol security audit of pushed main HEAD (runs automatically).
+
