@@ -50,8 +50,15 @@ const SCHOOL_ROLES = ["SCHOOL_ADMIN", "TEACHER"];
 router.get("/student/milestones", authenticate, async (req: Request, res: Response) => {
   try {
     const studentId = typeof req.query.studentId === "string" ? req.query.studentId : req.user!.userId;
-    if (studentId !== req.user!.userId && !SCHOOL_ROLES.includes(req.user!.role)) {
-      return res.status(403).json({ error: "Cannot view this report" });
+    if (studentId !== req.user!.userId) {
+      if (!SCHOOL_ROLES.includes(req.user!.role)) {
+        return res.status(403).json({ error: "Cannot view this report" });
+      }
+      const scope = await getStaffAccessScope(req.user!.userId);
+      const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, studentId) : false;
+      if (!studentAllowed) {
+        return res.status(403).json({ error: "Student is not enrolled in your school" });
+      }
     }
     const student = await prisma.user.findUnique({
       where: { id: studentId },
