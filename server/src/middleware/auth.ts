@@ -129,5 +129,6 @@ export function signUserToken(user: {
   role: string;
   tokenVersion: number;
 }): string {
-  return signToken({ userId: user.id, email: user.email, role: user.role, tv: user.tokenVersion });
+  const expiresIn = user.role === "STUDENT" ? "24h" : "7d";
+  return signToken({ userId: user.id, email: user.email, role: user.role, tv: user.tokenVersion }, { expiresIn });
 }

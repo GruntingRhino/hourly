@@ -12,9 +12,11 @@ const googleService = fs.readFileSync(googleServicePath, "utf8");
 const routes = fs.readFileSync(routePath, "utf8");
 const schema = fs.readFileSync(schemaPath, "utf8");
 
-test("Canvas OAuth uses a persistent single-use state record", () => {
-  assert.match(service, /buildCanvasStateToken/);
-  assert.match(service, /verifyCanvasStateToken/);
+test("Canvas OAuth uses opaque persistent state and browser binding", () => {
+  assert.match(service, /createOAuthState/);
+  assert.match(service, /claimOAuthState/);
+  assert.match(service, /assertOAuthAdministrator/);
+  assert.match(routes, /httpOnly: true/);
 });
 
 test("Canvas OAuth callback re-checks the initiating school administrator", () => {
@@ -40,9 +42,11 @@ test("Canvas mapped records and API routes remain school scoped", () => {
   assert.match(routes, /handleCanvasOAuthCallback/);
 });
 
-test("Google Classroom OAuth uses a persistent single-use state record", () => {
-  assert.match(googleService, /buildGoogleClassroomStateToken/);
-  assert.match(googleService, /verifyGoogleClassroomStateToken/);
+test("Google Classroom OAuth uses opaque persistent state and browser binding", () => {
+  assert.match(googleService, /createOAuthState/);
+  assert.match(googleService, /claimOAuthState/);
+  assert.match(googleService, /assertOAuthAdministrator/);
+  assert.match(routes, /httpOnly: true/);
 });
 
 test("Google Classroom OAuth callback re-checks the initiating school administrator", () => {

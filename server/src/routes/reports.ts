@@ -290,6 +290,9 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
 // GET /api/reports/organization — org volunteer report
 router.get("/organization", authenticate, async (req: Request, res: Response) => {
   try {
+    if (!["ORG_ADMIN", "SCHOOL_ADMIN", "TEACHER"].includes(req.user!.role)) {
+      return res.status(403).json({ error: "Organization report role required" });
+    }
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user?.organizationId && !SCHOOL_ROLES.includes(req.user!.role)) {
       return res.status(400).json({ error: "Not associated with organization" });

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { OAUTH_STATE_COOKIE } from "../lib/oauthState";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import prisma from "../lib/prisma";
@@ -86,7 +87,8 @@ router.get("/canvas/oauth/url", authenticate, requireRole("SCHOOL_ADMIN"), async
       baseUrl,
       displayName,
     });
-    res.json(result);
+    res.cookie(OAUTH_STATE_COOKIE, result.browserBinding, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 15 * 60 * 1000 });
+    res.json({ url: result.url });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     res.status(400).json({ error: message });
@@ -97,6 +99,7 @@ router.get("/canvas/oauth/callback", async (req: Request, res: Response) => {
   const redirectUrl = await handleCanvasOAuthCallback({
     code: typeof req.query.code === "string" ? req.query.code : undefined,
     state: typeof req.query.state === "string" ? req.query.state : undefined,
+    browserBinding: req.cookies?.[OAUTH_STATE_COOKIE],
     error: typeof req.query.error === "string" ? req.query.error : undefined,
   });
   res.redirect(redirectUrl);
@@ -231,7 +234,8 @@ router.get("/googleClassroom/oauth/url", authenticate, requireRole("SCHOOL_ADMIN
       testOrigin,
       displayName,
     });
-    res.json(result);
+    res.cookie(OAUTH_STATE_COOKIE, result.browserBinding, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 15 * 60 * 1000 });
+    res.json({ url: result.url });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     res.status(400).json({ error: message });
@@ -242,6 +246,7 @@ router.get("/googleClassroom/oauth/callback", async (req: Request, res: Response
   const redirectUrl = await handleGoogleClassroomOAuthCallback({
     code: typeof req.query.code === "string" ? req.query.code : undefined,
     state: typeof req.query.state === "string" ? req.query.state : undefined,
+    browserBinding: req.cookies?.[OAUTH_STATE_COOKIE],
     error: typeof req.query.error === "string" ? req.query.error : undefined,
   });
   res.redirect(redirectUrl);

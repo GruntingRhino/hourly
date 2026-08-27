@@ -1,8 +1,6 @@
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { decryptField, encryptField } from "../lib/fieldEncryption";
@@ -17,6 +15,7 @@ import {
 } from "../lib/lmsOutboundSecurity";
 import { getCanvasMockDataset, type CanvasMockDataset, type CanvasMockScenario } from "./canvasMock";
 import { isProdLike } from "../lib/isProdLike";
+import { assertOAuthAdministrator, claimOAuthState, createOAuthState, storeOAuthState } from "../lib/oauthState";
 
 const CANVAS_ENABLE_MOCK = process.env.CANVAS_ENABLE_MOCK === "true" || !isProdLike();
 const CANVAS_REQUEST_TIMEOUT_MS = Number(process.env.CANVAS_REQUEST_TIMEOUT_MS || 15000);
@@ -270,18 +269,6 @@ function safeConnectionResponse(connection: any) {
     mode: config.mode,
     selectedExternalCourseIds: config.selectedExternalCourseIds,
   };
-}
-
-function buildCanvasStateToken(payload: CanvasStatePayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
-}
-
-function verifyCanvasStateToken(token: string): CanvasStatePayload {
-  const payload = verifyToken<CanvasStatePayload>(token);
-  if (payload.purpose !== "canvas-oauth") {
-    throw new Error("Invalid Canvas OAuth state.");
-  }
-  return payload;
 }
 
 function parseCanvasLinkHeader(linkHeader: string | null): string | null {
@@ -1412,12 +1399,9 @@ export async function getCanvasOAuthUrlForSchool(params: {
   assertOAuthConfigured();
   const normalizedBaseUrl = await normalizeApprovedCanvasOrigin(params.baseUrl);
   const displayName = params.displayName?.trim() || "Canvas";
-  const state = buildCanvasStateToken({
-    purpose: "canvas-oauth",
-    schoolId: params.schoolId,
-    actorId: params.actorId,
-    baseUrl: normalizedBaseUrl,
-    displayName,
+  const { state, browserBinding } = createOAuthState();
+  await storeOAuthState("canvasOAuthState", state, browserBinding, {
+    schoolId: params.schoolId, actorId: params.actorId, baseUrl: normalizedBaseUrl, displayName,
   });
   const scope = encodeURIComponent(
     "url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments"
@@ -1426,12 +1410,13 @@ export async function getCanvasOAuthUrlForSchool(params: {
     `${normalizedBaseUrl}/login/oauth2/auth?client_id=${encodeURIComponent(CANVAS_CLIENT_ID)}` +
     `&response_type=code&redirect_uri=${encodeURIComponent(CANVAS_CALLBACK_URL)}` +
     `&scope=${scope}&state=${encodeURIComponent(state)}`;
-  return { url };
+  return { url, browserBinding };
 }
 
 export async function handleCanvasOAuthCallback(params: {
   code?: string;
   state?: string;
+  browserBinding?: string;
   error?: string;
 }) {
   if (params.error) {
@@ -1448,7 +1433,9 @@ export async function handleCanvasOAuthCallback(params: {
   }
 
   try {
-    const state = verifyCanvasStateToken(params.state);
+    if (!params.browserBinding) throw new Error("Missing OAuth browser binding.");
+    const state = await claimOAuthState<CanvasStatePayload>("canvasOAuthState", params.state, params.browserBinding);
+    await assertOAuthAdministrator(state.actorId, state.schoolId);
     const token = await exchangeAuthorizationCode(state.baseUrl, params.code);
     const encryptedCredentials = serializeCredentials(token);
     await prisma.integrationConnection.upsert({

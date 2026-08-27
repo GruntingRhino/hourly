@@ -1,8 +1,6 @@
 import crypto from "crypto";
 import { generateToken, hashToken } from "../lib/tokenHash";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { verifyToken } from "../middleware/auth";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { decryptField, encryptField } from "../lib/fieldEncryption";
@@ -20,6 +18,7 @@ import {
 } from "../lib/lmsOutboundSecurity";
 import { getGoogleClassroomMockDataset, type GoogleClassroomMockDataset, type GoogleClassroomMockScenario } from "./googleClassroomMock";
 import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
+import { assertOAuthAdministrator, claimOAuthState, createOAuthState, storeOAuthState } from "../lib/oauthState";
 
 const GOOGLE_CLASSROOM_ENABLE_MOCK = process.env.GOOGLE_CLASSROOM_ENABLE_MOCK === "true" || !isProdLike();
 const GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS = Number(process.env.GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS || 15000);
@@ -283,18 +282,6 @@ function safeConnectionResponse(connection: any) {
     mode: config.mode,
     selectedExternalCourseIds: config.selectedExternalCourseIds,
   };
-}
-
-function buildGoogleClassroomStateToken(payload: GoogleClassroomStatePayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
-}
-
-function verifyGoogleClassroomStateToken(token: string): GoogleClassroomStatePayload {
-  const payload = verifyToken<GoogleClassroomStatePayload>(token);
-  if (payload.purpose !== "googleClassroom-oauth") {
-    throw new Error("Invalid Google Classroom OAuth state.");
-  }
-  return payload;
 }
 
 function getGoogleClassroomCapabilities() {
@@ -1423,12 +1410,9 @@ export async function getGoogleClassroomOAuthUrlForSchool(params: {
   const testOrigin = await normalizeGoogleTestOrigin(params.testOrigin);
   const authOrigin = testOrigin ?? GOOGLE_CLASSROOM_AUTH_ORIGIN;
   const displayName = params.displayName?.trim() || "Google Classroom";
-  const state = buildGoogleClassroomStateToken({
-    purpose: "googleClassroom-oauth",
-    schoolId: params.schoolId,
-    actorId: params.actorId,
-    testOrigin,
-    displayName,
+  const { state, browserBinding } = createOAuthState();
+  await storeOAuthState("googleClassroomOAuthState", state, browserBinding, {
+    schoolId: params.schoolId, actorId: params.actorId, baseUrl: null, testOrigin, displayName,
   });
   const scope = encodeURIComponent([
     "openid",
@@ -1441,12 +1425,13 @@ export async function getGoogleClassroomOAuthUrlForSchool(params: {
     `${authOrigin}/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLASSROOM_CLIENT_ID)}` +
     `&response_type=code&redirect_uri=${encodeURIComponent(GOOGLE_CLASSROOM_CALLBACK_URL)}` +
     `&access_type=offline&prompt=consent&scope=${scope}&state=${encodeURIComponent(state)}`;
-  return { url };
+  return { url, browserBinding };
 }
 
 export async function handleGoogleClassroomOAuthCallback(params: {
   code?: string;
   state?: string;
+  browserBinding?: string;
   error?: string;
 }) {
   if (params.error) {
@@ -1463,7 +1448,9 @@ export async function handleGoogleClassroomOAuthCallback(params: {
   }
 
   try {
-    const state = verifyGoogleClassroomStateToken(params.state);
+    if (!params.browserBinding) throw new Error("Missing OAuth browser binding.");
+    const state = await claimOAuthState<GoogleClassroomStatePayload>("googleClassroomOAuthState", params.state, params.browserBinding);
+    await assertOAuthAdministrator(state.actorId, state.schoolId);
     const token = await exchangeAuthorizationCode(params.code, state.testOrigin);
     const encryptedCredentials = serializeCredentials(token);
     const apiOrigin = state.testOrigin ?? GOOGLE_CLASSROOM_API_ORIGIN;

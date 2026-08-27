@@ -1685,30 +1685,32 @@ model StudentAvailabilityWindow {
 }
 
 model CanvasOAuthState {
-  id          String    @id @default(cuid())
-  stateHash   String    @unique
-  schoolId    String
-  actorId     String
-  baseUrl     String
-  displayName String
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  stateHash          String    @unique
+  schoolId           String
+  actorId            String
+  baseUrl            String
+  displayName        String
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  browserBindingHash String?
+  createdAt          DateTime  @default(now())
 
   @@index([schoolId, expiresAt])
   @@index([expiresAt, consumedAt])
 }
 
 model GoogleClassroomOAuthState {
-  id          String    @id @default(cuid())
-  stateHash   String    @unique
-  schoolId    String
-  actorId     String
-  baseUrl     String?
-  displayName String
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  stateHash          String    @unique
+  schoolId           String
+  actorId            String
+  baseUrl            String?
+  displayName        String
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  browserBindingHash String?
+  createdAt          DateTime  @default(now())
 
   @@index([schoolId, expiresAt])
   @@index([expiresAt, consumedAt])
