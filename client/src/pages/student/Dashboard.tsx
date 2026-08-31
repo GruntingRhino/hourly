@@ -746,7 +746,7 @@ export default function StudentDashboard() {
           {upcoming.length === 0 ? (
             <div className="border border-[var(--border)] rounded-[3px] p-5 text-[13.5px]" style={{ background: "var(--surface)", color: "var(--text-sec)" }}>
               No upcoming activities.{" "}
-              <Link to="/browse" className="hover:underline" style={{ color: "var(--action)" }}>Browse opportunities</Link>
+              <Link to="/browse" className="underline underline-offset-2" style={{ color: "var(--action)" }}>Browse opportunities</Link>
             </div>
           ) : (
             <div className="border border-[var(--border)] rounded-[3px] overflow-hidden" style={{ background: "var(--surface)" }}>

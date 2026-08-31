@@ -9,6 +9,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.PW_BASE_URL || 'http://localhost:5173',
     browserName: 'chromium',
+    launchOptions: process.env.PW_CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: process.env.PW_CHROMIUM_EXECUTABLE_PATH }
+      : undefined,
     headless: true,
     trace: 'off',
     screenshot: 'off',

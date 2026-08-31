@@ -15,10 +15,14 @@ import { test, expect, Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 const BASE = process.env.PW_BASE_URL || "http://localhost:5173";
+const QA_PASSWORD = process.env.QA_PASSWORD || "Playwright1!";
+const QA_STUDENT_EMAIL = process.env.QA_STUDENT_EMAIL || "abhay.sivaram+5@gmail.com";
+const QA_ORG_EMAIL = process.env.QA_ORG_EMAIL || "abhay.sivaram+3@gmail.com";
+const QA_SCHOOL_EMAIL = process.env.QA_SCHOOL_EMAIL || "abhay.sivaram+1@gmail.com";
 
 // ─── Helper: login ────────────────────────────────────────────────────────────
 
-async function loginAs(page: Page, email: string, password = "password123") {
+async function loginAs(page: Page, email: string, password = QA_PASSWORD) {
   await page.goto(`${BASE}/login`);
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
@@ -259,7 +263,7 @@ test("Landing page — buttons have accessible names", async ({ page }) => {
 // ─── 7. Student dashboard ─────────────────────────────────────────────────────
 
 test("Student dashboard — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "john@student.edu");
+  await loginAs(page, QA_STUDENT_EMAIL);
   await page.waitForLoadState("networkidle");
 
   const { critical, serious } = await runAxe(page, "Student Dashboard");
@@ -272,7 +276,7 @@ test("Student dashboard — WCAG 2.1 AA", async ({ page }) => {
 // ─── 8. Student browse page ───────────────────────────────────────────────────
 
 test("Student browse page — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "john@student.edu");
+  await loginAs(page, QA_STUDENT_EMAIL);
   await page.goto(`${BASE}/browse`);
   await page.waitForLoadState("networkidle");
 
@@ -286,7 +290,7 @@ test("Student browse page — WCAG 2.1 AA", async ({ page }) => {
 // ─── 9. Opportunity detail page ───────────────────────────────────────────────
 
 test("Opportunity detail page — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "john@student.edu");
+  await loginAs(page, QA_STUDENT_EMAIL);
   await page.goto(`${BASE}/browse`);
   await page.waitForLoadState("networkidle");
 
@@ -323,7 +327,7 @@ test("Opportunity detail page — WCAG 2.1 AA", async ({ page }) => {
 // ─── 10. Org dashboard ────────────────────────────────────────────────────────
 
 test("Org dashboard — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "volunteer@greenearth.org");
+  await loginAs(page, QA_ORG_EMAIL);
   await page.waitForLoadState("networkidle");
 
   const { critical, serious } = await runAxe(page, "Org Dashboard");
@@ -336,7 +340,7 @@ test("Org dashboard — WCAG 2.1 AA", async ({ page }) => {
 // ─── 11. School admin dashboard ───────────────────────────────────────────────
 
 test("School admin dashboard — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "admin@lincoln.edu");
+  await loginAs(page, QA_SCHOOL_EMAIL);
   await page.waitForLoadState("networkidle");
 
   const { critical, serious } = await runAxe(page, "School Dashboard");
@@ -349,7 +353,7 @@ test("School admin dashboard — WCAG 2.1 AA", async ({ page }) => {
 // ─── 12. School student list ──────────────────────────────────────────────────
 
 test("School student list page — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, "admin@lincoln.edu");
+  await loginAs(page, QA_SCHOOL_EMAIL);
   await page.goto(`${BASE}/students`);
   await page.waitForLoadState("networkidle");
 
