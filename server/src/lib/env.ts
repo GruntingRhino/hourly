@@ -108,9 +108,8 @@ function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv
     }
 
     if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-      console.warn("⚠️  Shared Redis rate limiting is not configured in production.");
-      console.warn("   Falling back to per-instance in-memory buckets until UPSTASH_REDIS_REST_URL and");
-      console.warn("   UPSTASH_REDIS_REST_TOKEN are added.");
+      console.warn("⚠️  Upstash Redis is not configured; using the PostgreSQL-backed shared rate limiter.");
+      console.warn("   Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN only if Redis is preferred.");
     }
 
     const canvasMockEnabled = process.env.CANVAS_ENABLE_MOCK === "true";

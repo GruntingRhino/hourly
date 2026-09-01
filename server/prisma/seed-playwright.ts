@@ -78,6 +78,7 @@ async function main() {
       data: {
         name: "Playwright School A",
         verified: true,
+        ownershipStatus: "APPROVED",
         onboardingComplete: true,
         createdById: adminA.id,
       },
@@ -103,7 +104,7 @@ async function main() {
   } else {
     await prisma.school.update({
       where: { id: schoolA.id },
-      data: { onboardingComplete: true, verified: true },
+      data: { onboardingComplete: true, verified: true, ownershipStatus: "APPROVED" },
     });
   }
   await prisma.beneficiary.updateMany({
@@ -137,6 +138,7 @@ async function main() {
       data: {
         name: "Playwright School B",
         verified: true,
+        ownershipStatus: "APPROVED",
         onboardingComplete: true,
         createdById: adminB.id,
       },
@@ -161,7 +163,7 @@ async function main() {
   } else {
     await prisma.school.update({
       where: { id: schoolB.id },
-      data: { onboardingComplete: true, verified: true },
+      data: { onboardingComplete: true, verified: true, ownershipStatus: "APPROVED" },
     });
   }
   await prisma.beneficiary.updateMany({
