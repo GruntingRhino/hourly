@@ -37,6 +37,10 @@ async function fetchWithAuth(path: string, options?: RequestInit): Promise<Respo
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
+  const token = typeof window !== "undefined" ? window.localStorage.getItem("goodhours_token") : null;
+  if (token && !headers.Authorization) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), getTimeoutMs());

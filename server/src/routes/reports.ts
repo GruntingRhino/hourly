@@ -173,10 +173,10 @@ router.get("/student", authenticate, async (req: Request, res: Response) => {
       where: { id: userId },
       select: { schoolId: true },
     });
-    if (!reportOwner?.schoolId) {
+    const owningSchoolId = reportOwner?.schoolId ?? await resolveStudentSchoolId(userId);
+    if (!owningSchoolId) {
       return res.status(404).json({ error: "Student school not found" });
     }
-    const owningSchoolId = reportOwner.schoolId;
 
     const fallbackResponse = {
       totalApprovedHours: 0,

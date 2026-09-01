@@ -268,14 +268,14 @@ async function main() {
   void benefAdminB;
 
   // ── Students ─────────────────────────────────────────────────────────────────
-  for (const [email, name, cohortId] of [
-    ["abhay.sivaram+5@gmail.com", "PW Student 1", cohortA.id],
-    ["abhay.sivaram+6@gmail.com", "PW Student 2", cohortA.id],
-    ["abhay.sivaram+7@gmail.com", "PW Student 3", cohortB.id],
-  ] as [string, string, string][]) {
+  for (const [email, name, cohortId, schoolId] of [
+    ["abhay.sivaram+5@gmail.com", "PW Student 1", cohortA.id, schoolA.id],
+    ["abhay.sivaram+6@gmail.com", "PW Student 2", cohortA.id, schoolA.id],
+    ["abhay.sivaram+7@gmail.com", "PW Student 3", cohortB.id, schoolB.id],
+  ] as [string, string, string, string][]) {
     const student = await prisma.user.upsert({
       where: { email },
-      update: { passwordHash, isTestAccount: true, emailVerified: true, cohortId },
+      update: { passwordHash, isTestAccount: true, emailVerified: true, schoolId, cohortId },
       create: {
         email,
         name,
@@ -283,6 +283,7 @@ async function main() {
         passwordHash,
         emailVerified: true,
         isTestAccount: true,
+        schoolId,
         cohortId,
       },
     });

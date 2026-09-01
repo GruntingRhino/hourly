@@ -115,7 +115,15 @@ export async function assertStudentAccessibleToStaff(
   });
   if (!student || student.role !== "STUDENT") return false;
 
-  if (student.schoolId !== scope.schoolId) return false;
+  // Prefer the legacy direct association, then use the active cohort/classroom
+  // association for migrated students. A direct association to another school
+  // remains authoritative and cannot be bypassed by a stray membership.
+  const studentSchoolId = student.schoolId
+    ?? student.cohort?.schoolId
+    ?? student.cohortMemberships[0]?.cohort.schoolId
+    ?? student.classroom?.schoolId
+    ?? null;
+  if (studentSchoolId !== scope.schoolId) return false;
 
   if (scope.isSchoolAdmin) return true;
   if (student.cohortId && scope.assignedCohortIds.includes(student.cohortId)) return true;

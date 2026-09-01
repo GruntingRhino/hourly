@@ -2584,12 +2584,15 @@ router.post("/slots/:slotId/signup", authenticate, requireRole("STUDENT"), async
     if (!slot) return res.status(404).json({ error: "Time slot not found" });
     if (slot.opportunity.status !== "ACTIVE") return res.status(400).json({ error: "This opportunity is no longer active" });
 
-    // Use the canonical owning school; cohort/classroom associations cannot establish tenancy.
+    // Resolve the canonical owning school. Preserve the legacy direct field,
+    // then fall back to the active cohort/classroom membership used elsewhere.
     const student = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { schoolId: true },
+      select: { id: true, schoolId: true },
     });
-    const studentSchoolId = student?.schoolId ?? null;
+    // Match the school-resolution policy used by slot discovery: legacy user.schoolId
+    // is preferred, then active cohort/classroom membership is authoritative.
+    const studentSchoolId = student?.schoolId ?? (student ? await resolveStudentSchoolId(student.id) : null);
     if (!studentSchoolId) {
       return res.status(403).json({ error: "You must be enrolled in a school to sign up for opportunities." });
     }

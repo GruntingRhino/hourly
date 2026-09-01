@@ -125,6 +125,12 @@ async function apiGet<T>(page: Page, apiPath: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+function submissionCard(page: Page, organizationName: string) {
+  return page
+    .getByText(organizationName, { exact: true })
+    .locator("xpath=ancestor::div[contains(@class, 'bg-')][1]");
+}
+
 function fieldByLabel(container: Page | ReturnType<Page["locator"]>, label: RegExp, tag: "input" | "textarea" | "select" = "input") {
   return container.locator("label").filter({ hasText: label }).locator("..").locator(tag).first();
 }
@@ -285,7 +291,7 @@ test.describe.serial("UI stateful audit", () => {
     await expect(studentPage.locator("main")).toContainText(/submission sent for review/i);
 
     await schoolPage.goto(`${UI_BASE}/submissions`, { waitUntil: "networkidle" });
-    const pendingCard = schoolPage.locator("div").filter({ hasText: flow.submissionOrgName }).first();
+    const pendingCard = submissionCard(schoolPage, flow.submissionOrgName);
     await expect(pendingCard).toBeVisible({ timeout: 20_000 });
     await pendingCard.getByRole("button", { name: /review/i }).click();
     await pendingCard.getByRole("button", { name: /request revision/i }).click();
@@ -328,7 +334,7 @@ test.describe.serial("UI stateful audit", () => {
     await expect(studentPage.locator("main")).toContainText(/resubmitted for review/i);
 
     await schoolPage.goto(`${UI_BASE}/submissions`, { waitUntil: "networkidle" });
-    const reviewCard = schoolPage.locator("div").filter({ hasText: flow.submissionOrgName }).first();
+    const reviewCard = submissionCard(schoolPage, flow.submissionOrgName);
     await expect(reviewCard).toBeVisible({ timeout: 20_000 });
     await reviewCard.getByRole("button", { name: /review/i }).click();
     await reviewCard.getByRole("button", { name: /^approve$/i }).click();
