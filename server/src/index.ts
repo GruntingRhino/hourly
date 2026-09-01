@@ -114,7 +114,10 @@ app.use(cors({
     ) {
       return callback(null, true);
     }
-    callback(new Error(`CORS: origin '${origin}' not allowed`));
+    // Reject unknown origins cleanly: omit CORS headers and let the request
+    // continue, so server-to-server diagnostics receive the real response
+    // instead of a generic 500 from the global error handler.
+    callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

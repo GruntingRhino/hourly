@@ -1,5 +1,5 @@
 import prisma from "./prisma";
-import { isPrismaKnownRequestError } from "./prismaErrors";
+import { isUniqueConstraintError } from "./prismaErrors";
 
 type LeaseHandle = {
   release: (markRan?: boolean) => Promise<void>;
@@ -31,7 +31,7 @@ export async function acquireJobLease(
         },
       });
     } catch (err) {
-      if (!isPrismaKnownRequestError(err) || err.code !== "P2002") {
+      if (!isUniqueConstraintError(err)) {
         throw err;
       }
 
