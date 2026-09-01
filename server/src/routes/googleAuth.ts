@@ -67,6 +67,9 @@ const APPROVED_DOMAINS = (process.env.APPROVED_SCHOOL_DOMAINS || "")
 
 function isApprovedDomain(email: string): boolean {
   if (!isPubliclyDeployed()) return true;
+  // The dev-project flag intentionally permits synthetic accounts from any
+  // domain, including when the project uses Vercel's production target.
+  if (ALLOW_PERSONAL_EMAIL_DOMAINS) return true;
   if (APPROVED_DOMAINS.length === 0) return true;
   const domain = email.split("@")[1]?.toLowerCase() || "";
   return APPROVED_DOMAINS.some((allowed) =>
@@ -626,7 +629,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
       }
 
       const schoolDomain = dirEntry.emailDomain || (dirEntry.website ? extractDomainFromWebsite(dirEntry.website) : null);
-      if (schoolDomain && (isPubliclyDeployed() || !ALLOW_PERSONAL_EMAIL_DOMAINS)) {
+      if (schoolDomain && !ALLOW_PERSONAL_EMAIL_DOMAINS) {
         try {
           assertExactSchoolDomain(registrationIntent.email, schoolDomain);
           assertExactSchoolDomain(data.contactEmail, schoolDomain);
