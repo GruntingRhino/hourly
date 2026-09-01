@@ -44,6 +44,29 @@ const OPTIONAL = [
 type RequiredEnv = (typeof REQUIRED)[number];
 type OptionalEnv = (typeof OPTIONAL)[number];
 
+// Vercel dashboard entries are sometimes pasted with shell-style surrounding
+// quotes. Normalize only the OAuth scalar values before consumers snapshot them
+// at module load; never log the values.
+const QUOTE_WRAPPED_OAUTH_KEYS = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_CALLBACK_URL",
+  "GOOGLE_CLASSROOM_CLIENT_ID",
+  "GOOGLE_CLASSROOM_CLIENT_SECRET",
+  "GOOGLE_CLASSROOM_CALLBACK_URL",
+] as const;
+
+for (const key of QUOTE_WRAPPED_OAUTH_KEYS) {
+  const value = process.env[key];
+  if (value && value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      process.env[key] = value.slice(1, -1);
+    }
+  }
+}
+
 function validateEnv(): Record<RequiredEnv, string> & Partial<Record<OptionalEnv, string>> {
   const isDevelopmentLike =
     process.env.APP_ENV === "development" ||
