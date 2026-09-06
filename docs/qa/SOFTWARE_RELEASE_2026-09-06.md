@@ -2,8 +2,8 @@
 
 ## Outcome
 
-- **GitHub release:** PASS. The reviewed production source commit is `5dda9f51f76985795cf4d2a1c1ae5b839da845e2`; the evidence commit now at `origin/main` is `b665c507a7be8fd1acb1258602893dc936812d4f`.
-- **GitHub Actions CI:** PASS on the exact evidence SHA. The original release run [34009209241](https://github.com/GruntingRhino/Hourly/actions/runs/34009209241), job [101421928285](https://github.com/GruntingRhino/Hourly/actions/runs/34009209241/job/101421928285), and the evidence-doc run [34009443448](https://github.com/GruntingRhino/Hourly/actions/runs/34009443448), job [101422558302](https://github.com/GruntingRhino/Hourly/actions/runs/34009443448/job/101422558302), all concluded `success`.
+- **GitHub release:** PASS. The reviewed production source commit is `5dda9f51f76985795cf4d2a1c1ae5b839da845e2`; the current evidence commit at `origin/main` is `9a2de227a9ca84aa77809b06f22a194de340d156`.
+- **GitHub Actions CI:** PASS on the exact evidence SHAs. The original release run [34009209241](https://github.com/GruntingRhino/Hourly/actions/runs/34009209241), the first evidence-doc run [34009443448](https://github.com/GruntingRhino/Hourly/actions/runs/34009443448) for `b665c507a7be8fd1acb1258602893dc936812d4f`, and the final evidence-doc run [34009650750](https://github.com/GruntingRhino/Hourly/actions/runs/34009650750) for `9a2de227a9ca84aa77809b06f22a194de340d156` all concluded `success`.
 - **Vercel production deployment:** PASS for source/build provenance. The Git-linked deployment created from `main` at the exact SHA is Ready and aliased to `goodhours.app`.
 - **Live read-only verification:** PASS for health, allowed/invalid-origin CORS behavior, protected auth boundaries, static privacy page, and PostgreSQL rate-limiter selection.
 - **Production migration:** **BLOCKED — not executed.** The release contains six forward-only additive migrations, but this VM was not permitted to use `vercel env pull` or create/alter environment variables, and no safe authorized production connection mechanism was available without exposing or copying the production `DATABASE_URL`. No production data or credentials were read or changed.
@@ -13,7 +13,7 @@
 
 - Checkout: `/home/opc/RTB/projects/goodhours`
 - Release source commit: `5dda9f51f76985795cf4d2a1c1ae5b839da845e2`.
-- Evidence checkout: `git rev-parse HEAD` = `git rev-parse origin/main` = `b665c507a7be8fd1acb1258602893dc936812d4f`; this is the docs-only evidence commit on top of the reviewed source.
+- Evidence checkout: `git rev-parse HEAD` = `git rev-parse origin/main` = `9a2de227a9ca84aa77809b06f22a194de340d156`; this is the docs-only evidence commit on top of the reviewed source.
 - The pre-existing untracked `docs/legal/` content remains untouched and untracked; no legal work was performed.
 - `git diff --check HEAD`: PASS.
 
@@ -71,7 +71,8 @@ The migration was intentionally not run from this VM: using `vercel env pull` wa
 ## Continuation verification — documentation CI and migration mechanism
 
 - Documentation CI run [34009443448](https://github.com/GruntingRhino/Hourly/actions/runs/34009443448) completed `success` for `b665c507a7be8fd1acb1258602893dc936812d4f`; job [101422558302](https://github.com/GruntingRhino/Hourly/actions/runs/34009443448/job/101422558302) completed every step successfully, including Prisma migration replay/status against its disposable PostgreSQL service, server tests, onboarding browser regressions, dependency audits, builds, and diff sanity.
-- Current remote equality was independently rechecked: `HEAD`, `origin/main`, and `git ls-remote origin refs/heads/main` all resolve to `b665c507a7be8fd1acb1258602893dc936812d4f`.
+- Current remote equality was independently rechecked: `HEAD`, `origin/main`, and `git ls-remote origin refs/heads/main` all resolve to `9a2de227a9ca84aa77809b06f22a194de340d156`.
+- Final documentation CI run [34009650750](https://github.com/GruntingRhino/Hourly/actions/runs/34009650750) completed `success` for `9a2de227a9ca84aa77809b06f22a194de340d156`; job [101423110362](https://github.com/GruntingRhino/Hourly/actions/runs/34009650750/job/101423110362) completed every step successfully.
 - The exact production deployment was independently rechecked with authenticated Vercel metadata: `dpl_FHVC2TFqq1qXMpsQC91R7qamnJr6`, target `production`, `readyState=READY`, aliases include `goodhours.app`, source SHA `5dda9f51f76985795cf4d2a1c1ae5b839da845e2`.
 - Read-only live probes remain healthy: `/api/health` returned `200` with `status=ok` and `db=ok`; same-origin `/api/auth/me` returned `401` with the expected CORS allow header; an invalid-origin request returned `401` with no CORS allow header.
 - Existing automation was inspected by workflow/script metadata only. `.github/workflows/app-verification.yml` runs `prisma migrate deploy` only against disposable CI PostgreSQL; Vercel's production build command runs `prisma generate` only; the only existing workflow that references `secrets.DATABASE_URL` is the directory-refresh job and it performs data-refresh/geocoding work, not migrations. No safe existing Vercel/GitHub mechanism was found that can apply production migrations without exposing/copying/modifying the production secret.
