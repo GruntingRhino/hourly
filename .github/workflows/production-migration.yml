@@ -1,0 +1,83 @@
+name: Production database migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type APPLY_PRODUCTION_MIGRATIONS to authorize the gated run"
+        required: true
+        type: string
+
+# This workflow is intentionally manual. The `production` environment must have
+# required reviewers configured, and its DATABASE_URL secret is consumed only
+# in-process by Prisma on the GitHub-hosted runner.
+permissions:
+  contents: read
+
+concurrency:
+  group: goodhours-production-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply and verify production schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      WORKFLOW_REF: ${{ github.ref_name }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Enforce production-only explicit confirmation
+        run: |
+          set -euo pipefail
+          test "$WORKFLOW_REF" = "main" || {
+            echo "Refusing migration: workflow must run from main (got $WORKFLOW_REF)." >&2
+            exit 1
+          }
+          test "$CONFIRMATION" = "APPLY_PRODUCTION_MIGRATIONS" || {
+            echo "Refusing migration: explicit confirmation did not match." >&2
+            exit 1
+          }
+          test -n "${DATABASE_URL:-}" || {
+            echo "Refusing migration: production environment DATABASE_URL secret is not configured." >&2
+            exit 1
+          }
+
+      - name: Checkout deploy branch
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install Prisma CLI without lifecycle scripts
+        run: npm ci --ignore-scripts --include=dev
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=server/prisma/schema.prisma
+
+      - name: Apply forward-only migrations
+        run: npx prisma migrate deploy --schema=server/prisma/schema.prisma
+
+      - name: Verify migration ledger and actual schema
+        run: |
+          set -euo pipefail
+          npx prisma migrate status --schema=server/prisma/schema.prisma
+          diff_output="$(npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel server/prisma/schema.prisma \
+            --script)"
+          normalized_diff="$(printf '%s' "$diff_output" | sed '/^[[:space:]]*$/d')"
+          if [ -n "$normalized_diff" ] && [ "$normalized_diff" != "-- This is an empty migration." ]; then
+            echo "Production schema differs from the repository datamodel after migration." >&2
+            printf '%s\n' "$diff_output" >&2
+            exit 1
+          fi
+          echo "PRODUCTION_SCHEMA_MATCH=verified"
