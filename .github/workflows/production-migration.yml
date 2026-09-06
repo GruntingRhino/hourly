@@ -8,9 +8,10 @@ on:
         required: true
         type: string
 
-# This workflow is intentionally manual. The `production` environment must have
-# required reviewers configured, and its DATABASE_URL secret is consumed only
-# in-process by Prisma on the GitHub-hosted runner.
+# Manual-only. Configure the GitHub `production` environment with required
+# reviewers, PRODUCTION_DATABASE_HOST, PRODUCTION_DATABASE_NAME, and the
+# uniquely named GOODHOURS_PRODUCTION_DATABASE_URL secret. The environment's
+# reviewer configuration is an external GitHub setting, not provable in YAML.
 permissions:
   contents: read
 
@@ -25,31 +26,83 @@ jobs:
     timeout-minutes: 15
     environment: production
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      WORKFLOW_REF: ${{ github.ref_name }}
+      WORKFLOW_REF: ${{ github.ref }}
+      REVIEWED_SHA: ${{ github.sha }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      EXPECTED_DB_HOST: ${{ vars.PRODUCTION_DATABASE_HOST }}
+      EXPECTED_DB_NAME: ${{ vars.PRODUCTION_DATABASE_NAME }}
     steps:
-      - name: Enforce production-only explicit confirmation
+      - name: Enforce production-only explicit confirmation and target configuration
+        env:
+          PRODUCTION_DATABASE_URL: ${{ secrets.GOODHOURS_PRODUCTION_DATABASE_URL }}
         run: |
           set -euo pipefail
-          test "$WORKFLOW_REF" = "main" || {
-            echo "Refusing migration: workflow must run from main (got $WORKFLOW_REF)." >&2
+          test "$WORKFLOW_REF" = "refs/heads/main" || {
+            echo "Refusing migration: workflow must run from refs/heads/main (got $WORKFLOW_REF)." >&2
             exit 1
           }
           test "$CONFIRMATION" = "APPLY_PRODUCTION_MIGRATIONS" || {
             echo "Refusing migration: explicit confirmation did not match." >&2
             exit 1
           }
-          test -n "${DATABASE_URL:-}" || {
-            echo "Refusing migration: production environment DATABASE_URL secret is not configured." >&2
+          test -n "${EXPECTED_DB_HOST:-}" || {
+            echo "Refusing migration: production environment variable PRODUCTION_DATABASE_HOST is not configured." >&2
             exit 1
           }
+          test -n "${EXPECTED_DB_NAME:-}" || {
+            echo "Refusing migration: production environment variable PRODUCTION_DATABASE_NAME is not configured." >&2
+            exit 1
+          }
+          test -n "${PRODUCTION_DATABASE_URL:-}" || {
+            echo "Refusing migration: production environment secret GOODHOURS_PRODUCTION_DATABASE_URL is not configured." >&2
+            exit 1
+          }
+          EXPECTED_DB_HOST="$EXPECTED_DB_HOST" EXPECTED_DB_NAME="$EXPECTED_DB_NAME" \
+            node <<'NODE'
+          const value = process.env.PRODUCTION_DATABASE_URL;
+          const expectedHost = process.env.EXPECTED_DB_HOST;
+          const expectedName = process.env.EXPECTED_DB_NAME;
+          let parsed;
+          let actualName;
+          try {
+            parsed = new URL(value);
+            actualName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+          } catch {
+            console.error("Refusing migration: production database secret is not a valid URL.");
+            process.exit(1);
+          }
+          if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+            console.error("Refusing migration: production database URL must use PostgreSQL.");
+            process.exit(1);
+          }
+          if (parsed.hostname !== expectedHost.toLowerCase() || actualName !== expectedName) {
+            console.error("Refusing migration: database URL identity does not match the configured production host/database.");
+            process.exit(1);
+          }
+          console.log("PRODUCTION_DATABASE_IDENTITY=verified");
+          NODE
 
-      - name: Checkout deploy branch
+      - name: Record reviewed commit
+        run: |
+          set -euo pipefail
+          printf 'REVIEWED_SHA=%s\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reviewed workflow commit recorded: $REVIEWED_SHA"
+
+      - name: Checkout reviewed commit exactly
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checked out commit is the reviewed SHA
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REVIEWED_SHA" || {
+            echo "Refusing migration: checkout did not resolve to the reviewed SHA." >&2
+            exit 1
+          }
+          echo "CHECKED_OUT_SHA=$REVIEWED_SHA"
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -64,9 +117,13 @@ jobs:
         run: npx prisma generate --schema=server/prisma/schema.prisma
 
       - name: Apply forward-only migrations
+        env:
+          DATABASE_URL: ${{ secrets.GOODHOURS_PRODUCTION_DATABASE_URL }}
         run: npx prisma migrate deploy --schema=server/prisma/schema.prisma
 
       - name: Verify migration ledger and actual schema
+        env:
+          DATABASE_URL: ${{ secrets.GOODHOURS_PRODUCTION_DATABASE_URL }}
         run: |
           set -euo pipefail
           npx prisma migrate status --schema=server/prisma/schema.prisma
