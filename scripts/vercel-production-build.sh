@@ -58,7 +58,38 @@ NODE
   npx prisma migrate status --schema=server/prisma/schema.prisma
   diff_output="$(npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel server/prisma/schema.prisma --script)"
   normalized_diff="$(printf '%s' "$diff_output" | sed '/^[[:space:]]*$/d')"
-  if [[ -n "$normalized_diff" && "$normalized_diff" != "-- This is an empty migration." ]]; then
+  legacy_enum_diff=$'-- DropEnum\nDROP TYPE "UserRole";'
+  if [[ -z "$normalized_diff" || "$normalized_diff" == "-- This is an empty migration." ]]; then
+    :
+  elif [[ "$normalized_diff" == "$legacy_enum_diff" ]]; then
+    # A historical migration converted User.role to TEXT but did not remove the
+    # old enum. Permit only this exact non-destructive cleanup, and only after a
+    # live catalog check proves no table/view/routine depends on the type. The
+    # check is read-only; the build never executes DROP TYPE.
+    if ! cat <<'SQL' | npx prisma db execute --stdin --schema=server/prisma/schema.prisma >/dev/null 2>&1
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_depend d
+    JOIN pg_type t ON t.oid = d.refobjid
+    JOIN pg_namespace ns ON ns.oid = t.typnamespace
+    WHERE ns.nspname = 'public'
+      AND t.typname = 'UserRole'
+      AND t.typtype = 'e'
+      AND d.deptype IN ('a', 'n')
+      AND d.classid <> 'pg_type'::regclass
+  ) THEN
+    RAISE EXCEPTION 'UserRole enum is still referenced';
+  END IF;
+END $$;
+SQL
+    then
+      echo "Refusing build: legacy UserRole enum dependency check failed." >&2
+      exit 1
+    fi
+    echo "PRODUCTION_LEGACY_ENUM=unreferenced name=UserRole"
+  else
     echo "Refusing build: production schema differs from repository datamodel." >&2
     printf '%s\n' "$diff_output" >&2
     exit 1
