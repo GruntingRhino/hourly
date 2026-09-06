@@ -12,6 +12,7 @@ import { firstZodError, strictObject, tokenSchema, trimmedString } from "../lib/
 import { roleForBeneficiaryClaim } from "../lib/beneficiaryAdminPolicy";
 import { runSerializableTransaction } from "../lib/serializableTransaction";
 import { ForbiddenFeatureError, requireOrgFeature, sendForbiddenFeature } from "../lib/orgTierGates";
+import { ELIGIBILITY_POLICY_VERSION } from "../lib/schoolAuthority";
 
 const router = Router();
 const publicInvitationLimiter = createHybridRateLimit({
@@ -37,12 +38,14 @@ const acceptStudentInvitationSchema = strictObject({
   token: tokenSchema,
   name: trimmedString(255, 1),
   password: passwordSchema,
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
 });
 
 const acceptBeneficiaryInvitationSchema = strictObject({
   token: tokenSchema,
   name: trimmedString(255, 1),
   password: passwordSchema,
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
 });
 
 const declineBeneficiaryInvitationSchema = strictObject({
@@ -53,6 +56,7 @@ const acceptBeneficiaryAdminInvitationSchema = strictObject({
   token: tokenSchema,
   name: trimmedString(255, 1),
   password: passwordSchema,
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
 });
 
 // GET /api/invitations/student?token=xxx — look up a student invitation
@@ -109,104 +113,27 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
       return res.status(400).json({ error: "Invitation has expired. Contact your school administrator." });
     }
 
-    // Check if user already exists with this email
-    const existing = await prisma.user.findUnique({ where: { email: inv.email } });
-    if (existing) {
-      // If the user exists and is already a STUDENT, link them to the cohort
-      if (existing.role === "STUDENT") {
-        if (existing.schoolId && existing.schoolId !== inv.cohort.schoolId) {
-          return res.status(409).json({
-            error: "This account belongs to another school; an authorized school transfer is required.",
-          });
-        }
-        await prisma.user.update({
-          where: { id: existing.id },
-          data: {
-            schoolId: existing.schoolId ?? inv.cohort.schoolId,
-            grade: existing.grade ?? inv.grade,
-            house: existing.house ?? inv.house,
-          },
-        });
-        await ensureStudentCohortMembership({
-          studentId: existing.id,
-          cohortId: inv.cohortId,
-          source: "INVITATION",
-          forcePrimary: !existing.cohortId,
-          schoolId: inv.cohort.schoolId,
-        });
-        await prisma.studentInvitation.update({
-          where: { id: inv.id },
-          data: { status: "ACCEPTED", acceptedAt: new Date() },
-        });
-        if (inv.startingHours && inv.startingHours > 0) {
-          await prisma.selfSubmittedRequest.create({
-            data: {
-              studentId: existing.id,
-              schoolId: inv.cohort.schoolId,
-              organizationName: "Prior Service Record",
-              description: "Hours credited from school import",
-              date: new Date(),
-              hours: inv.startingHours,
-              status: "APPROVED",
-              reviewedAt: new Date(),
-            },
-          });
-        }
-        const token = signUserToken(existing);
-        setAuthCookie(res, token, { persistent: true });
-        return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name, role: existing.role, cohortId: existing.cohortId ?? inv.cohortId, schoolId: inv.cohort.schoolId } });
-      }
-      return res.status(409).json({ error: "An account with this email already exists with a different role." });
-    }
-
     const passwordHash = await bcrypt.hash(data.password, 12);
-
-    const user = await prisma.user.create({
-      data: {
-        email: inv.email,
-        passwordHash,
-        name: data.name,
-        role: "STUDENT",
-        grade: inv.grade || null,
-        house: inv.house || null,
-        cohortId: inv.cohortId,
-        schoolId: inv.cohort.schoolId,
-        emailVerified: true, // invitation-based — email implicitly verified
-        status: "ACTIVE",
-      },
+    const acceptance = await runSerializableTransaction(async (tx) => {
+      const existing = await tx.user.findUnique({ where: { email: inv.email } });
+      if (existing && existing.role !== "STUDENT") throw Object.assign(new Error("An account with this email already exists with a different role."), { status: 409 });
+      if (existing?.schoolId && existing.schoolId !== inv.cohort.schoolId) throw Object.assign(new Error("This account belongs to another school; an authorized school transfer is required."), { status: 409 });
+      const claimed = await tx.studentInvitation.updateMany({ where: { id: inv.id, status: "PENDING", expiresAt: { gt: new Date() } }, data: { status: "ACCEPTED", acceptedAt: new Date() } });
+      if (claimed.count !== 1) throw Object.assign(new Error("Invitation is no longer available"), { status: 409 });
+      const user = existing
+        ? await tx.user.update({ where: { id: existing.id }, data: { schoolId: existing.schoolId ?? inv.cohort.schoolId, grade: existing.grade ?? inv.grade, house: existing.house ?? inv.house } })
+        : await tx.user.create({ data: { email: inv.email, passwordHash, name: data.name, role: "STUDENT", grade: inv.grade || null, house: inv.house || null, cohortId: inv.cohortId, schoolId: inv.cohort.schoolId, emailVerified: true, status: "ACTIVE" } });
+      await tx.eligibilityAttestation.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" } });
+      await ensureStudentCohortMembership({ studentId: user.id, cohortId: inv.cohortId, source: "INVITATION", forcePrimary: !existing?.cohortId, schoolId: inv.cohort.schoolId, db: tx });
+      if (inv.startingHours && inv.startingHours > 0) await tx.selfSubmittedRequest.create({ data: { studentId: user.id, schoolId: inv.cohort.schoolId, organizationName: "Prior Service Record", description: "Hours credited from school import", date: new Date(), hours: inv.startingHours, status: "APPROVED", reviewedAt: new Date(), sourceStudentInvitationId: inv.id } });
+      return { user, created: !existing };
     });
-    await ensureStudentCohortMembership({
-      studentId: user.id,
-      cohortId: inv.cohortId,
-      source: "INVITATION",
-      forcePrimary: true,
-      schoolId: inv.cohort.schoolId,
-    });
-
-    await prisma.studentInvitation.update({
-      where: { id: inv.id },
-      data: { status: "ACCEPTED", acceptedAt: new Date() },
-    });
-
-    if (inv.startingHours && inv.startingHours > 0) {
-      await prisma.selfSubmittedRequest.create({
-        data: {
-          studentId: user.id,
-          schoolId: inv.cohort.schoolId,
-          organizationName: "Prior Service Record",
-          description: "Hours credited from school import",
-          date: new Date(),
-          hours: inv.startingHours,
-          status: "APPROVED",
-          reviewedAt: new Date(),
-        },
-      });
-    }
+    const user = acceptance.user;
 
     const jwtToken = signUserToken(user);
     setAuthCookie(res, jwtToken, { persistent: true });
 
-    res.status(201).json({
+    res.status(acceptance.created ? 201 : 200).json({
       token: jwtToken,
       user: {
         id: user.id,
@@ -219,6 +146,7 @@ router.post("/student/accept", publicInvitationLimiter, async (req: Request, res
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    if ((err as any)?.status === 409) return res.status(409).json({ error: (err as any).message });
     console.error("Accept student invitation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -335,6 +263,11 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
               status: "ACTIVE",
             },
           });
+      await tx.eligibilityAttestation.upsert({
+        where: { userId: acceptedUser.id },
+        update: {},
+        create: { userId: acceptedUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" },
+      });
       await tx.beneficiary.update({
         where: { id: inv.beneficiaryId },
         data: { claimed: true, status: "ACTIVE" },
@@ -374,7 +307,7 @@ router.post("/beneficiary/decline", publicInvitationLimiter, async (req: Request
   try {
     const { token } = declineBeneficiaryInvitationSchema.parse(req.body);
 
-    const inv = await prisma.beneficiaryInvitation.findUnique({ where: { token } });
+    const inv = await prisma.beneficiaryInvitation.findUnique({ where: { token: hashToken(token) } });
     if (!inv) return res.status(404).json({ error: "Invalid invitation token" });
     if (inv.status === "DECLINED") {
       return res.json({ message: "Invitation already declined" });
@@ -447,7 +380,7 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
         data: { status: "ACCEPTED", acceptedAt: new Date() },
       });
       if (claimed.count !== 1) throw Object.assign(new Error("Invitation is no longer available"), { status: 409 });
-      return tx.user.create({
+      const user = await tx.user.create({
         data: {
           email: invitation.email,
           passwordHash,
@@ -459,6 +392,10 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
           status: "ACTIVE",
         },
       });
+      await tx.eligibilityAttestation.create({
+        data: { userId: user.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" },
+      });
+      return user;
     });
     const jwtToken = signUserToken(user);
     setAuthCookie(res, jwtToken, { persistent: true });

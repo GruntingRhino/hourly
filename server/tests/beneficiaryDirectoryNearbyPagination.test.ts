@@ -28,7 +28,7 @@ function setupMocks() {
     where.id === schoolAdmin.id
       ? {
           id: schoolAdmin.id, email: schoolAdmin.email, role: schoolAdmin.role, status: "ACTIVE", tokenVersion: 0,
-          schoolId: schoolAdmin.schoolId, emailVerified: true, school: { verified: true, ownershipStatus: "APPROVED" },
+          schoolId: schoolAdmin.schoolId, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: { verified: true, ownershipStatus: "APPROVED" },
         }
       : null;
   let queryCount = 0;

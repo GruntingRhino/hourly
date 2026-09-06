@@ -39,6 +39,7 @@ interface RegistrationPayload {
   registrationToken: string;
   schoolName: string;
   directorySchoolId?: string;
+  eligible13Plus: true;
 }
 
 type Step = "google" | "email-collect" | "search" | "contact" | "sent";
@@ -102,6 +103,7 @@ export default function SchoolRegister() {
 
   // Contact step
   const [contactEmail, setContactEmail] = useState("");
+  const [eligible13Plus, setEligible13Plus] = useState(false);
   const [domainStatus, setDomainStatus] = useState<DomainStatus>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -299,6 +301,10 @@ export default function SchoolRegister() {
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!eligible13Plus) {
+      setError("Please confirm that you are 13 or older to continue.");
+      return;
+    }
     setSubmitting(true);
     try {
       const schoolName = selectedSchool?.name || customSchoolName;
@@ -310,6 +316,7 @@ export default function SchoolRegister() {
           password: emailCollectPassword,
           name: emailCollectName,
           role: "SCHOOL_ADMIN",
+          eligible13Plus: eligible13Plus as true,
           schoolName,
           directorySchoolId: selectedSchool?.id,
         });
@@ -320,6 +327,7 @@ export default function SchoolRegister() {
         // Google OAuth path: send magic link to complete registration
         const payload: RegistrationPayload & { contactEmail: string } = {
           registrationToken,
+          eligible13Plus: eligible13Plus as true,
           schoolName,
           contactEmail,
         };
@@ -846,9 +854,13 @@ export default function SchoolRegister() {
                   </p>
                 )}
               </div>
+              <label className="flex items-start gap-2 text-sm text-[var(--text-sec)]">
+                <input type="checkbox" checked={eligible13Plus} onChange={(e) => setEligible13Plus(e.target.checked)} className="mt-1" />
+                <span>I confirm that I am 13 or older.</span>
+              </label>
               <button
                 type="submit"
-                disabled={submitting || domainStatus === "personal"}
+                disabled={submitting || domainStatus === "personal" || !eligible13Plus}
                 className="w-full py-2.5 bg-[var(--action)] text-white rounded-[3px] font-semibold hover:bg-[var(--action)] disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
               >
                 {submitting ? (

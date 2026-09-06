@@ -50,14 +50,18 @@ test("cross-school cohort membership is rejected before any mutation", async () 
   assert.equal(userUpdateCount, 0);
 });
 
-test("student invitation acceptance cannot silently transfer an existing student across schools", async () => {
+test("student invitation acceptance claims and mutates inside one transaction with a cross-school guard", async () => {
   const invitations = await readFile(new URL("../src/routes/invitations.ts", import.meta.url), "utf8");
-  const studentBranch = invitations.indexOf('if (existing.role === "STUDENT")');
-  const crossSchoolGuard = invitations.indexOf("existing.schoolId && existing.schoolId !== inv.cohort.schoolId", studentBranch);
-  const firstMutation = invitations.indexOf("await prisma.user.update", studentBranch);
+  const studentRoute = invitations.indexOf('router.post("/student/accept"');
+  const transaction = invitations.indexOf("runSerializableTransaction", studentRoute);
+  const crossSchoolGuard = invitations.indexOf("existing?.schoolId && existing.schoolId !== inv.cohort.schoolId", transaction);
+  const claim = invitations.indexOf("tx.studentInvitation.updateMany", transaction);
+  const membership = invitations.indexOf("db: tx", transaction);
 
-  assert.ok(studentBranch >= 0);
-  assert.ok(crossSchoolGuard > studentBranch, "cross-school guard must exist inside the existing-student branch");
-  assert.ok(crossSchoolGuard < firstMutation, "cross-school guard must run before changing the user");
+  assert.ok(studentRoute >= 0);
+  assert.ok(transaction > studentRoute, "student acceptance must use a transaction");
+  assert.ok(crossSchoolGuard > transaction, "cross-school guard must run inside the transaction");
+  assert.ok(claim > crossSchoolGuard, "invitation must be conditionally claimed after validation");
+  assert.ok(membership > claim, "membership mutation must use the transaction client");
   assert.match(invitations, /authorized school transfer is required/i);
 });

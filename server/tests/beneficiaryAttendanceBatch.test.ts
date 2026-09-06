@@ -33,7 +33,7 @@ const FUTURE_SLOT = { date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), endT
 function setupMocks(signups: Array<{ id: string; status: string; slot?: { date: Date; endTime: string } }>) {
   prismaClient.user.findUnique = async ({ where }: any) =>
     where.id === benAdmin.id
-      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, school: null }
+      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null }
       : null;
   prismaClient.beneficiaryOpportunity.findUnique = async () => ({ beneficiaryId: benAdmin.beneficiaryId });
   prismaClient.beneficiarySignup.findMany = async () =>

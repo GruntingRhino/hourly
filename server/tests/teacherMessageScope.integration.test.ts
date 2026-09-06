@@ -57,7 +57,7 @@ test("teacher bulk messaging excludes same-school students outside assigned coho
       role: "TEACHER",
       status: "ACTIVE",
       tokenVersion: 0,
-      emailVerified: true,
+      emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
       schoolId: "school-a",
       school: { verified: true, ownershipStatus: "APPROVED" },
     };

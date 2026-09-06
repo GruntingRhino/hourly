@@ -18,7 +18,7 @@ import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations 
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import { isUniqueConstraintError } from "../lib/prismaErrors";
 import { isInternalAdminUser } from "../lib/internalAdmin";
-import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
+import { assertExactSchoolDomain, ELIGIBILITY_POLICY_VERSION, evaluateSessionEligibility } from "../lib/schoolAuthority";
 import {
   firstZodError,
   opaqueIdSchema,
@@ -30,6 +30,7 @@ import {
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendSchoolOwnershipApprovalEmail,
   CLIENT_URL,
   getCapturedMailinatorInbox,
 } from "../services/email";
@@ -241,6 +242,7 @@ function buildLoginUserPayload(user: {
   classroomId: string | null;
   cohortId: string | null;
   beneficiaryId: string | null;
+  eligibilityAttestation?: { eligible13Plus: boolean } | null;
 }, profile: Awaited<ReturnType<typeof loadLoginProfile>> | null) {
   const enriched = profile ?? null;
   const enrichedUser = enriched as (typeof enriched & {
@@ -315,6 +317,7 @@ function buildLoginUserPayload(user: {
     cohorts: serializeCohortMemberships(enriched?.cohortMemberships),
     beneficiaryId: user.beneficiaryId,
     beneficiary: enriched?.beneficiary ?? null,
+    requiresEligibilityAttestation: user.eligibilityAttestation?.eligible13Plus !== true,
   };
 }
 
@@ -361,6 +364,7 @@ const signupSchema = strictObject({
   schoolDomain: optionalTrimmedString(255),
   directorySchoolId: opaqueIdSchema.optional(), // SchoolDirectory.id if chosen from directory
   zipCodes: z.array(z.string().trim().regex(/^\d{5}$/, "Invalid ZIP code")).max(50).optional(),
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
 });
 
 const loginSchema = strictObject({
@@ -386,6 +390,9 @@ const resetPasswordSchema = strictObject({
   password: passwordSchema,
 });
 
+const eligibilityAttestationSchema = strictObject({
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
+});
 const messagePreferenceSchema = strictObject({
   allowFrom: z.enum(["EVERYONE", "ORGS_ONLY", "ADMINS_ONLY"]).optional(),
   profileVisibility: z.enum(["EVERYONE", "SCHOOL", "PRIVATE"]).optional(),
@@ -425,12 +432,17 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
     if (existing) {
       return res.status(409).json({ error: "Email already registered" });
     }
+    if (data.role === "SCHOOL_ADMIN") {
+      const blocked = await prisma.schoolOwnershipBlock.findUnique({ where: { emailHash: hashToken(data.email) }, select: { id: true } });
+      if (blocked) return res.status(403).json({ error: "This email is blocked from submitting a school ownership request.", code: "SCHOOL_EMAIL_BLOCKED" });
+    }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
     // Generate email verification token — only the hash is stored
     const emailVerificationToken = generateToken();
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const ownershipApprovalToken = generateToken();
 
     const directorySchool = data.directorySchoolId
       ? await prisma.schoolDirectory.findUnique({
@@ -509,11 +521,18 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
           select: { id: true, email: true, name: true, role: true },
         });
 
+        await tx.eligibilityAttestation.create({
+          data: { userId: txUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "signup" },
+        });
+
         const txSchool = await tx.school.create({
           data: {
             name: schoolName,
             verified: false,
             ownershipStatus: "PENDING",
+            ownershipApprovalToken: hashToken(ownershipApprovalToken),
+            ownershipApprovalTokenExpires: null,
+            ownershipApprovalLastSentAt: new Date(),
             registrationEmail: data.email,
             createdById: txUser.id,
             domain: schoolDomain || undefined,
@@ -556,10 +575,29 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
       console.error("[signup] Failed to send verification email:", emailErr);
     }
 
+    const ownerApprovalEmail = "abhaysivaram31@gmail.com";
+    const approvalUrl = `${CLIENT_URL}/api/schools/ownership-approval?token=${ownershipApprovalToken}`;
+    const productionOwnerApproval = isProdLike() && /(^|\.)goodhours\.app$/i.test(new URL(CLIENT_URL).hostname);
+    let ownershipApprovalDelivery: "sent" | "bypass" | "failed" = "bypass";
+    if (productionOwnerApproval) {
+      try {
+        await sendSchoolOwnershipApprovalEmail(ownerApprovalEmail, schoolName, user.email, approvalUrl);
+        ownershipApprovalDelivery = "sent";
+      } catch (emailErr) {
+        ownershipApprovalDelivery = "failed";
+        console.error("[signup] Failed to send school ownership approval email:", emailErr);
+      }
+    } else {
+      console.info("[signup] School ownership approval email bypassed in non-production environment", {
+        environment: process.env.VERCEL_ENV || process.env.APP_ENV || process.env.NODE_ENV || "local",
+      });
+    }
+
     res.status(201).json({
       requiresEmailVerification: true,
       requiresSchoolOwnershipReview: true,
       ownershipStatus: "PENDING",
+      ownershipApprovalDelivery,
       email: user.email,
       schoolApplicationId: schoolId,
     });
@@ -590,6 +628,7 @@ router.post("/login", publicAuthLimiter, loginIpLimiter, loginLimiter, async (re
         status: true,
         passwordHash: true,
         emailVerified: true,
+        eligibilityAttestation: { select: { eligible13Plus: true } },
         organizationId: true,
         schoolId: true,
         classroomId: true,
@@ -658,6 +697,24 @@ router.post("/logout", async (_req: Request, res: Response) => {
   res.status(204).send();
 });
 
+// Existing accounts are never deleted for missing evidence. They receive a
+// setup-only session and must bind a fresh, explicit attestation here.
+router.post("/eligibility/attest", authenticate, async (req: Request, res: Response) => {
+  try {
+    eligibilityAttestationSchema.parse(req.body);
+    const existing = await prisma.eligibilityAttestation.findUnique({ where: { userId: req.user!.userId } });
+    if (existing) return res.json({ eligible13Plus: existing.eligible13Plus, policyVersion: existing.policyVersion, attestedAt: existing.attestedAt });
+    const attestation = await prisma.eligibilityAttestation.create({
+      data: { userId: req.user!.userId, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "existing_user" },
+    });
+    res.status(201).json({ eligible13Plus: attestation.eligible13Plus, policyVersion: attestation.policyVersion, attestedAt: attestation.attestedAt });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: firstZodError(err) });
+    console.error("Eligibility attestation error:", err);
+    res.status(500).json({ error: "Could not save eligibility attestation" });
+  }
+});
+
 const sessionPrefSchema = z.object({ persistent: z.boolean() });
 
 // POST /api/auth/session-pref — re-issues the session cookie with the
@@ -698,6 +755,7 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
         house: true,
         status: true,
         emailVerified: true,
+        eligibilityAttestation: { select: { eligible13Plus: true } },
         organizationId: true,
         schoolId: true,
         classroomId: true,
@@ -722,6 +780,45 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Me error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/ownership-approval/resend — pending school admins may request
+// another business-owner email, but never more often than once per 15 minutes.
+router.post("/ownership-approval/resend", authenticate, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const school = await prisma.school.findFirst({
+      where: { createdById: userId, ownershipStatus: "PENDING" },
+      select: { id: true, name: true, ownershipApprovalLastSentAt: true, ownershipApprovalTokenUsedAt: true },
+    });
+    if (!school) return res.status(409).json({ error: "No pending school approval was found." });
+    const now = new Date();
+    const cooldownMs = 15 * 60 * 1000;
+    const retryAfterSeconds = school.ownershipApprovalLastSentAt
+      ? Math.max(1, Math.ceil((school.ownershipApprovalLastSentAt.getTime() + cooldownMs - now.getTime()) / 1000))
+      : 0;
+    if (retryAfterSeconds > 0) {
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({ error: "Approval email can be resent every 15 minutes.", retryAfterSeconds });
+    }
+    if (school.ownershipApprovalTokenUsedAt) return res.status(409).json({ error: "This approval request is no longer active." });
+    const token = generateToken();
+    const claimed = await prisma.school.updateMany({
+      where: { id: school.id, ownershipStatus: "PENDING", ownershipApprovalLastSentAt: school.ownershipApprovalLastSentAt },
+      data: { ownershipApprovalToken: hashToken(token), ownershipApprovalTokenExpires: null, ownershipApprovalLastSentAt: now },
+    });
+    if (claimed.count !== 1) return res.status(409).json({ error: "Approval state changed; please try again." });
+    const production = isProdLike() && /(^|\\.)goodhours\\.app$/i.test(new URL(CLIENT_URL).hostname);
+    if (!production) {
+      console.info("[ownership-approval] resend bypassed in development", { userId, schoolId: school.id });
+      return res.json({ delivery: "bypass", message: "Development bypass: approval email was not sent.", retryAfterSeconds: 900 });
+    }
+    await sendSchoolOwnershipApprovalEmail("abhaysivaram31@gmail.com", school.name, req.user!.email, `${CLIENT_URL}/api/schools/ownership-approval?token=${token}`);
+    return res.json({ delivery: "sent", message: "Approval email resent to the GoodHours business owner.", retryAfterSeconds: 900 });
+  } catch (err) {
+    console.error("Ownership approval resend error:", err);
+    return res.status(500).json({ error: "Could not resend the approval email." });
   }
 });
 
@@ -935,29 +1032,29 @@ router.post("/reset-password", publicAuthLimiter, async (req: Request, res: Resp
   try {
     const { token, password } = resetPasswordSchema.parse(req.body);
 
-    const user = await prisma.user.findFirst({
+    const tokenDigest = hashToken(token);
+    const passwordHash = await bcrypt.hash(password, 12);
+    // Claim and consume the hashed token in one conditional update. Only one
+    // concurrent request can match the still-present token; losers cannot
+    // update the password or bump tokenVersion a second time.
+    const consumed = await prisma.user.updateMany({
       where: {
-        passwordResetToken: hashToken(token),
+        passwordResetToken: tokenDigest,
         passwordResetExpires: { gt: new Date() },
       },
-    });
-
-    if (!user) {
-      return res.status(400).json({ error: "Invalid or expired reset token" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 12);
-    // tokenVersion bump revokes every JWT issued before the reset —
-    // a stolen session cannot outlive a password reset.
-    await prisma.user.update({
-      where: { id: user.id },
       data: {
         passwordHash,
         passwordResetToken: null,
         passwordResetExpires: null,
+        // tokenVersion bump revokes every JWT issued before the reset —
+        // a stolen session cannot outlive a password reset.
         tokenVersion: { increment: 1 },
       },
     });
+
+    if (consumed.count !== 1) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
 
     res.json({ message: "Password reset successfully" });
   } catch (err) {
@@ -968,6 +1065,13 @@ router.post("/reset-password", publicAuthLimiter, async (req: Request, res: Resp
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+class SchoolAdminTransferRequiredError extends Error {
+  constructor() {
+    super("A school admin must transfer ownership before deleting their account");
+    this.name = "SchoolAdminTransferRequiredError";
+  }
+}
 
 // DELETE /api/auth/account — permanently delete the current user's account and all their data
 router.delete("/account", authenticate, async (req: Request, res: Response) => {
@@ -981,6 +1085,19 @@ router.delete("/account", authenticate, async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     await prisma.$transaction(async (tx) => {
+      if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
+        // Serialize admin departures for this school. Without the row lock, two
+        // concurrent last-admin deletions can both observe two admins and leave
+        // a live school with no administrator.
+        await tx.$queryRaw`SELECT id FROM "School" WHERE id = ${user.schoolId} FOR UPDATE`;
+        const schoolAdminCount = await tx.user.count({
+          where: { schoolId: user.schoolId, role: "SCHOOL_ADMIN" },
+        });
+        if (schoolAdminCount <= 1) {
+          throw new SchoolAdminTransferRequiredError();
+        }
+      }
+
       const deleteUserServiceSessionAuditLogs = async () => {
         const sessions = await tx.serviceSession.findMany({
           where: { userId },
@@ -1123,16 +1240,18 @@ router.delete("/account", authenticate, async (req: Request, res: Response) => {
       await tx.beneficiarySignup.deleteMany({ where: { studentId: userId } });
       await tx.signup.deleteMany({ where: { userId } });
       await tx.serviceSession.deleteMany({ where: { userId } });
-      if (user.role === "SCHOOL_ADMIN" && user.schoolId) {
-        await deleteSchoolData(user.schoolId);
-      }
-
       // Delete the user
       await tx.user.delete({ where: { id: userId } });
     });
 
     res.json({ message: "Account permanently deleted" });
   } catch (err) {
+    if (err instanceof SchoolAdminTransferRequiredError) {
+      return res.status(409).json({
+        error: err.message,
+        code: "SCHOOL_ADMIN_TRANSFER_REQUIRED",
+      });
+    }
     console.error("Delete account error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

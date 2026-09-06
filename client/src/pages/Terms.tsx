@@ -29,10 +29,11 @@ export default function Terms() {
             Terms.
           </p>
           <p className="mt-3">
-            <strong>For users under 18:</strong> You must have your parent or legal guardian's
-            permission to use this Service. If you are a school administrator granting students
-            access, you represent that your institution has obtained any required consents and that
-            use of GoodHours complies with applicable law, including FERPA and COPPA.
+            <strong>Age requirement:</strong> GoodHours is available only to users who are 13 or
+ older. Users ages 13 through 17 should obtain parent or legal guardian permission before
+ using the Service. If you are a school administrator granting access, you are responsible
+ for authorizing the enrollment and use of student information under your school's policies
+ and applicable law.
           </p>
         </>
       ),
@@ -76,9 +77,9 @@ export default function Terms() {
       content: (
         <>
           <p>
-            To use GoodHours you must be at least 10 years of age. Users under 13 may only access
-            the Service through a school that has agreed to these Terms on their behalf and, where
-            required by applicable law, obtained verifiable parental consent.
+            To use GoodHours you must be at least 13 years of age. School invitations do not create
+            an exception to this requirement. GoodHours does not ask users to provide a date of
+            birth or identity document as part of this policy.
           </p>
           <p className="mt-3">
             <strong>Registration.</strong> Students join exclusively through a school-issued
@@ -118,7 +119,7 @@ export default function Terms() {
               laws.
             </li>
             <li>
-              Obtain any necessary parental or guardian consent before enrolling students under 13.
+              Enroll only students who meet the Service's 13+ age requirement.
             </li>
             <li>
               Ensure that teachers and staff who access student data are authorized to do so under
@@ -231,10 +232,10 @@ export default function Terms() {
       content: (
         <>
           <p>
-            GoodHours maintains an immutable audit trail of all verification actions. Once a
-            service-hour record is verified, it cannot be retroactively altered by the student.
-            Schools and authorized administrators may make corrections through the Platform's
-            override process, which is itself logged.
+            GoodHours records verification actions. Once a service-hour record is verified, it
+            cannot be retroactively altered by the student. Schools and authorized administrators
+            may make corrections through the Platform's override process, which is logged where
+            supported.
           </p>
           <p className="mt-3">
             <strong>Signatures.</strong> Students may be required to submit a drawn or uploaded
@@ -323,8 +324,8 @@ export default function Terms() {
           <p>
             <strong>By You.</strong> You may delete your account at any time through the Settings
             page. Account deletion triggers a cascading removal of your personal profile, messages,
-            service signups, and associated records. Immutable audit-trail entries required for
-            compliance purposes may be retained in anonymized or aggregated form.
+            service signups, and associated records. Audit-trail entries may be retained or deleted
+            according to the applicable record and account-deletion process.
           </p>
           <p className="mt-3">
             <strong>By GoodHours.</strong> We may suspend or terminate your account, with or
@@ -333,9 +334,9 @@ export default function Terms() {
           </p>
           <p className="mt-3">
             <strong>School Termination.</strong> If a school administrator deletes a school
-            account, all associated student and teacher accounts, cohorts, and records are
-            permanently removed. Schools are responsible for exporting any necessary records before
-            initiating deletion.
+            account, associated student and teacher accounts, cohorts, and records may be removed
+            according to the account-deletion process and applicable records obligations. Schools are
+            responsible for exporting any necessary records before initiating deletion.
           </p>
           <p className="mt-3">
             Termination does not affect any rights or obligations that accrued before the effective
@@ -457,7 +458,8 @@ export default function Terms() {
   return (
     <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
+      <header>
+        <nav aria-label="Primary" className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img
             src="/logo-full.png"
@@ -481,9 +483,10 @@ export default function Terms() {
             Sign in
           </Link>
         </div>
-      </div>
+        </nav>
+      </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <main className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-[30px] font-bold text-[var(--text)] mb-2">Terms of Service</h1>
@@ -549,7 +552,7 @@ export default function Terms() {
             <Link to="/" className="hover:text-[var(--text-sec)]">Home</Link>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

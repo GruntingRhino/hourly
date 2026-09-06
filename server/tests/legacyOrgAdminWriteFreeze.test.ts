@@ -28,7 +28,7 @@ const orgAdmin = {
   status: "ACTIVE",
   tokenVersion: 0,
   organizationId: "org-a",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
 };
 
 function orgAdminToken(): string {

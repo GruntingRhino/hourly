@@ -340,7 +340,7 @@ export default function Landing() {
               {[
                 "Automatically track, verify, and report student volunteer hours",
                 "Connect schools with approved community service partners",
-                "Meet graduation requirements with a compliant digital record",
+                "Track graduation requirements with an organized digital record",
                 "Free for schools — no credit card required to get started",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3 text-[13.5px]" style={{ color: "var(--text-sec)" }}>
@@ -375,10 +375,10 @@ export default function Landing() {
         <section className="py-8 md:py-10" style={{ background: "var(--navy)" }}>
           <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-center">
             {[
-              { value: "700,000+", label: "Community Partners Across USA" },
-              { value: "100%", label: "Verified school-controlled records" },
-              { value: "FERPA", label: "Compliant student data security" },
-              { value: "35,000", label: "High Schools. Claim Yours." },
+              { value: "School-first", label: "Community service coordination" },
+              { value: "Verified", label: "School-reviewed hour records" },
+              { value: "Privacy-focused", label: "Controls for student information" },
+              { value: "13+", label: "Age requirement" },
             ].map((s) => (
               <div key={s.label} className="text-white">
                 <div className="text-xl md:text-[28px] font-bold">{s.value}</div>
@@ -486,7 +486,7 @@ export default function Landing() {
                     "Sign up for time slots with calendar view",
                     "Track progress toward graduation requirement",
                     "Submit self-selected volunteering for review",
-                    "Download certified hour transcripts",
+                    "Download hour summaries",
                   ],
                 },
                 {

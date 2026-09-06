@@ -508,7 +508,7 @@ router.get("/export/csv", authenticate, async (req: Request, res: Response) => {
           orderBy: { checkInTime: "asc" },
         }),
         prisma.beneficiarySignup.findMany({
-          where: { studentId: userId, verificationStatus: "APPROVED" },
+          where: { studentId: userId, verificationStatus: "APPROVED", status: { not: "CANCELLED" } },
           include: {
             slot: {
               include: {
@@ -667,9 +667,9 @@ router.get("/audit/:sessionId", authenticate, async (req: Request, res: Response
     // Authorization: student owns the session, school staff of their school, or org admin of the opportunity
     if (session.userId !== actorId) {
       if (SCHOOL_ROLES.includes(actorRole)) {
-        const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { schoolId: true } });
-        const studentSchoolId = await resolveStudentSchoolId(session.user.id);
-        if (!actor?.schoolId || studentSchoolId !== actor.schoolId) {
+        const scope = await getStaffAccessScope(actorId);
+        const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, session.user.id) : false;
+        if (!studentAllowed) {
           return res.status(403).json({ error: "Not authorized to view this audit log" });
         }
       } else if (actorRole === "ORG_ADMIN") {

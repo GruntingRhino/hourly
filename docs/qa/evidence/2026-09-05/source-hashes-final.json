@@ -1,0 +1,419 @@
+{
+  "generated_at_utc": "2026-09-05T18:17:08.127030Z",
+  "repo": "/home/opc/RTB/projects/goodhours",
+  "head": "9c32bb6a84c9ac6f5e115e8e7bc250b2cdef03f2",
+  "scope": "dirty tracked/untracked code, tests, schema, package/lock, deployment config; excludes secrets, node_modules, build output, docs",
+  "files": [
+    {
+      "path": "client/package-lock.json",
+      "bytes": 141141,
+      "sha256": "30552c01f0bf57121df290a5fdbada6968c0d7eb46b734e9487e2a71e894373f"
+    },
+    {
+      "path": "client/package.json",
+      "bytes": 1296,
+      "sha256": "c5de5f84b486b98e673e73a66c8be4c0245c77818d2bc41415c363631b82713a"
+    },
+    {
+      "path": "client/src/App.tsx",
+      "bytes": 10666,
+      "sha256": "df39a8548ef62392918d1e194b15776c4e5bae23fde7eb04b2955bb6601f8c65"
+    },
+    {
+      "path": "client/src/hooks/authTypes.ts",
+      "bytes": 2392,
+      "sha256": "415d1a5f31cac310e2f852de0e8ee43582e9542648a8b1f02313d9cac20b9e11"
+    },
+    {
+      "path": "client/src/pages/AgeEligibility.tsx",
+      "bytes": 2639,
+      "sha256": "46891fcb6ad074785112ca52a01536426d253b14d8ecece7ad86673a91862bad"
+    },
+    {
+      "path": "client/src/pages/FAQ.tsx",
+      "bytes": 9842,
+      "sha256": "ca8a7b6754ccc665a07e5a9cf2f859c7347f8317d5c5c36d74db9cd88ab4c116"
+    },
+    {
+      "path": "client/src/pages/Landing.tsx",
+      "bytes": 35409,
+      "sha256": "55338fd9dcffb587cf6bd90db5ff3ee314775ac786f506b4ed1c832c8f5ee937"
+    },
+    {
+      "path": "client/src/pages/Privacy.tsx",
+      "bytes": 35373,
+      "sha256": "2667c1ef72563ee0c936ebfec0809793307fe242831174b8056f621296f31cc3"
+    },
+    {
+      "path": "client/src/pages/Signup.tsx",
+      "bytes": 4138,
+      "sha256": "361a03c5622f6e452b4c0a48f96f2528cb29d4ac1a95673551560d865364a78e"
+    },
+    {
+      "path": "client/src/pages/Terms.tsx",
+      "bytes": 23962,
+      "sha256": "06b627f8f7a3b6acc07342acddb489a14ff1c9cfcfde0b5163f04774eb029210"
+    },
+    {
+      "path": "client/src/pages/beneficiary/AdminTeam.tsx",
+      "bytes": 5564,
+      "sha256": "2c3a6d9243c6c1949479a56ecea05b7dd8c9d28856860d056e5b0a767698ef50"
+    },
+    {
+      "path": "client/src/pages/beneficiary/JoinBeneficiary.tsx",
+      "bytes": 9043,
+      "sha256": "b7d532ef578ea45b355b4ebd0b9dbe8ffeb483ff59bdf51afa38ecb868ef16bf"
+    },
+    {
+      "path": "client/src/pages/beneficiary/JoinBeneficiaryAdmin.tsx",
+      "bytes": 6416,
+      "sha256": "06ddd54e8f9e8cb7cfa642154d1f0e98f3ae9103e4f450252b0b38681273a26c"
+    },
+    {
+      "path": "client/src/pages/beneficiary/Opportunities.tsx",
+      "bytes": 91992,
+      "sha256": "62434204c7b6459fd5f185b03b385eb817def3d88b14f5c1b2ece8bcceb9f8fa"
+    },
+    {
+      "path": "client/src/pages/school/PendingApproval.tsx",
+      "bytes": 3345,
+      "sha256": "234b65f39cc0d353471771d12b0d7500021dbffaa02545f3e43f60e9a799838f"
+    },
+    {
+      "path": "client/src/pages/school/Register.tsx",
+      "bytes": 44821,
+      "sha256": "9d0121385d69e0d680a8a5d6650b9dbb4f73faee5467e80fd0c52e5e96b80443"
+    },
+    {
+      "path": "client/src/pages/school/VerifyRegistration.tsx",
+      "bytes": 3213,
+      "sha256": "c4f2b0c969527d9cf118e8503f98391594f63a7893b8492dce8daf87e3a3ace4"
+    },
+    {
+      "path": "client/src/pages/student/JoinCohort.tsx",
+      "bytes": 7718,
+      "sha256": "3163ebd4976b1551e95ebee73255edd615b3999befa472fdf3100991fda9576e"
+    },
+    {
+      "path": "client/src/pages/student/SlotDetail.tsx",
+      "bytes": 9225,
+      "sha256": "642a87264c421b5f62b67a4281b1e8c3c69a5c40d2d65e2f8007a96766333c52"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 277869,
+      "sha256": "7bff004dedd0b13dc86e2aea9dc9522f3f7ac1df07816376880caae90751f661"
+    },
+    {
+      "path": "package.json",
+      "bytes": 2307,
+      "sha256": "1f480ea4d84bb3e506070f18af6961c0f12b0976b9452bc9fdf68cd27c052d3b"
+    },
+    {
+      "path": "server/package-lock.json",
+      "bytes": 105013,
+      "sha256": "59f066c7384566a2f97538a5ce78a023de7beb8fa84d7191c76599a7c8584e86"
+    },
+    {
+      "path": "server/package.json",
+      "bytes": 2240,
+      "sha256": "9e776631b0b9f1a42451d67c87489d65fc043f655a6340dd4eb8033827ef4ebe"
+    },
+    {
+      "path": "server/prisma/schema.prisma",
+      "bytes": 68819,
+      "sha256": "6f06193b3dc994b5a22b2d2f821162a9447c80a82939d05474cbae073830aa35"
+    },
+    {
+      "path": "server/src/lib/schoolActivation.ts",
+      "bytes": 6811,
+      "sha256": "73c11c4c387f700e7abe3c0da5e102fb0d1bfb8292a2d8588486fc9f3752f9ac"
+    },
+    {
+      "path": "server/src/lib/schoolAuthority.ts",
+      "bytes": 3082,
+      "sha256": "2fe927642d8e5fb5d529c488c015ea8b7870b7fd092c2c8793837bd2b267110a"
+    },
+    {
+      "path": "server/src/middleware/auth.ts",
+      "bytes": 5128,
+      "sha256": "5f6029c2d854ec1f205c70a8e1dbe2994a49847ba68b85880c87afc57ff58911"
+    },
+    {
+      "path": "server/src/middleware/rateLimit.ts",
+      "bytes": 17133,
+      "sha256": "2c929d18ad589f3510fcc0116d2e8f67baf3340e38d130b654016b5432d7f543"
+    },
+    {
+      "path": "server/src/routes/auth.ts",
+      "bytes": 53507,
+      "sha256": "1533f733bca0f1a9c9583763d0c420fb028a1db2c00614f2aeff9bf747371b51"
+    },
+    {
+      "path": "server/src/routes/beneficiaries.ts",
+      "bytes": 172424,
+      "sha256": "2ee7cf63814e755c75ebc85a2ba046db2e3ec1d3c96a90c2901f1638dbd07e6a"
+    },
+    {
+      "path": "server/src/routes/googleAuth.ts",
+      "bytes": 32256,
+      "sha256": "b2b1897d4ea8e4add1f44fe02cff097eed5c02d220a30cd6069ea19a71742620"
+    },
+    {
+      "path": "server/src/routes/invitations.ts",
+      "bytes": 20022,
+      "sha256": "09ff827db365f85221d02591bfbcad0d50f940824f47919730cb106e2235d8ad"
+    },
+    {
+      "path": "server/src/routes/reports.ts",
+      "bytes": 28740,
+      "sha256": "0fe34ca814333e463cf940d89fef51cf63be2baf464980d70a2ee32d6b01febd"
+    },
+    {
+      "path": "server/src/routes/schools.ts",
+      "bytes": 100052,
+      "sha256": "3fe6a222d375144c6ad9fabc94fea5332975dc427e5c6e245bceda33b1c42b3f"
+    },
+    {
+      "path": "server/src/services/email.ts",
+      "bytes": 37159,
+      "sha256": "37d138bc946d8d15ddb4396396aff6cafed8d631cb825b5fbe8e8190a51037d4"
+    },
+    {
+      "path": "server/tests/accountDeletionSchoolSafety.integration.test.ts",
+      "bytes": 6715,
+      "sha256": "2794afafec14c630fb1f439400188bc0f89ccf1b648d93c216ddf88601fb9dc5"
+    },
+    {
+      "path": "server/tests/ageEligibility.integration.test.ts",
+      "bytes": 2832,
+      "sha256": "5a6047075751670380efbbb10f4b8b4fbc9e48bfdd1f3e957aa7966beae02ac9"
+    },
+    {
+      "path": "server/tests/authCookieMigration.test.ts",
+      "bytes": 8892,
+      "sha256": "35c59a483620996c83c9c947c4fa43c43e1c13fa5c3ea6d4afd8caf0fff016f0"
+    },
+    {
+      "path": "server/tests/beneficiaryAttendanceBatch.test.ts",
+      "bytes": 10661,
+      "sha256": "bc421aa7faa372e9ebd99be4e4024cf942a0f3e0b74e0424331797be007d64df"
+    },
+    {
+      "path": "server/tests/beneficiaryDirectoryNearbyPagination.test.ts",
+      "bytes": 3981,
+      "sha256": "0f74844cfdb722e46a971103585d9ab55dedd2119dcb152384693ac2bb447f87"
+    },
+    {
+      "path": "server/tests/beneficiaryListStatusFilterValidation.test.ts",
+      "bytes": 4735,
+      "sha256": "62dbeb313f66152234d055c71515b04df8e309b548607d448dd4cf4aac4031c4"
+    },
+    {
+      "path": "server/tests/beneficiaryNoShowApprovalOverride.test.ts",
+      "bytes": 7861,
+      "sha256": "82119446ff5a6013747f07a51d2abc988e8c78aebdb442c3c2414d75c4c76272"
+    },
+    {
+      "path": "server/tests/beneficiaryNoShowEarlyOverride.test.ts",
+      "bytes": 5353,
+      "sha256": "e3168dc48d531502db77a79b3789cb7642457b85002421ff6fb128e48e179576"
+    },
+    {
+      "path": "server/tests/beneficiaryOpportunityRecurrenceValidation.test.ts",
+      "bytes": 4480,
+      "sha256": "001109e323088b1f3d883c181ca05006d394a75c1683d40e4af18c90b29ef7cd"
+    },
+    {
+      "path": "server/tests/beneficiaryPrivacy.integration.test.ts",
+      "bytes": 6672,
+      "sha256": "062938463a77af8c369d58060e43e13b4772b93e5ff416ab26ac935a1ae77325"
+    },
+    {
+      "path": "server/tests/beneficiarySignupStatusFilterAndAttendanceValidation.test.ts",
+      "bytes": 5046,
+      "sha256": "06bf858202cbb6d15a98c8a87c7214174c2028e47851680d074d0e71d2fa9226"
+    },
+    {
+      "path": "server/tests/billingInternalInvoiceRequestStatusFilterValidation.test.ts",
+      "bytes": 4255,
+      "sha256": "abaa462055e0f54b57fe60c8aceca45ca4c0f3df77a5dc1e7165287268e75420"
+    },
+    {
+      "path": "server/tests/bulkImportDryRun.test.ts",
+      "bytes": 13870,
+      "sha256": "17b7403734b1f16b53b6da1d46b90e5ec264c6d72e26ec7885afb9413f6a7be9"
+    },
+    {
+      "path": "server/tests/bulkMessageRateLimit.test.ts",
+      "bytes": 4252,
+      "sha256": "68e1660681422086241e52ff47ce52e6d4279741e3f32677bfff8324e04275d1"
+    },
+    {
+      "path": "server/tests/canonicalEventTimeModel.test.ts",
+      "bytes": 7968,
+      "sha256": "a30baf8ef806f6cc3213a19751de05bd2015233843cbec702a6e3b9f0d510fd2"
+    },
+    {
+      "path": "server/tests/csvExportPartialDataFailure.test.ts",
+      "bytes": 5893,
+      "sha256": "528549d9f1d72248bda3faa68a5f3a04e12830d69ccfff9c192bb7a219450884"
+    },
+    {
+      "path": "server/tests/dataAccessLogFailClosed.test.ts",
+      "bytes": 4415,
+      "sha256": "d1fd7d71fee474598ddd5c4aaab79c9bbe48a2308e88a4097c0e352b5450b6c6"
+    },
+    {
+      "path": "server/tests/interventionCaseStatusFilterValidation.test.ts",
+      "bytes": 4492,
+      "sha256": "0cd59140c26e5d195f7082d7ae0537a2b3f6bfb52ad36d2678be9983c259609a"
+    },
+    {
+      "path": "server/tests/invitationOwnerLifecycle.integration.test.ts",
+      "bytes": 13543,
+      "sha256": "76a26948061ed70c238f081cdc3de30b2a447c1f053857cb915e0eeaf0455a74"
+    },
+    {
+      "path": "server/tests/legacyOrgAdminWriteFreeze.test.ts",
+      "bytes": 7201,
+      "sha256": "782b0decd758ca07f28382a3efc66287a751912e3ac97c3edc0b2ebd16302259"
+    },
+    {
+      "path": "server/tests/opportunityStatusAndUpdateValidation.test.ts",
+      "bytes": 5280,
+      "sha256": "a53b318079cca0b8337c989659e8d4cd3335585bbeb4fcf7b9ccc75d9d66f90c"
+    },
+    {
+      "path": "server/tests/organizationPrivacy.integration.test.ts",
+      "bytes": 5214,
+      "sha256": "d9c3f98ddd2c739b5b70ab2d5baa0105da0fcdc2aa7de147bd3cb57a1b0df7b9"
+    },
+    {
+      "path": "server/tests/previewDeploymentGatingArchitecture.test.ts",
+      "bytes": 4271,
+      "sha256": "c9a0fa47baf4e2b8a507af33c5ad054c94e0c7d1d2bdaeb53aa590b01da24b49"
+    },
+    {
+      "path": "server/tests/rateLimitLease.behavior.test.ts",
+      "bytes": 1863,
+      "sha256": "287400c2b63496f80c369e5f3bf8b987ddd1f2e130be9f90fa2193dc56e30ec5"
+    },
+    {
+      "path": "server/tests/rateLimitLease.helper.ts",
+      "bytes": 4342,
+      "sha256": "b794ed4b54cc4e9cb5e09df8a00eb6f543b0f9dfa2b8e549f088c22071c40123"
+    },
+    {
+      "path": "server/tests/resetTokenConcurrency.integration.test.ts",
+      "bytes": 2404,
+      "sha256": "396db5a8a3bc3b7b326ba71be7d396f502cf6b850b6ccda319a3d78987663f6e"
+    },
+    {
+      "path": "server/tests/savedOpportunityValidation.test.ts",
+      "bytes": 4544,
+      "sha256": "571d08a5a98467af0f1037365bdc7138705240a4aa1c719c366c45fb90d4f014"
+    },
+    {
+      "path": "server/tests/schoolAuthority.test.ts",
+      "bytes": 2033,
+      "sha256": "806aa594c7d31b35c0b6c33908ab36ee2e8e4ef8186fe9b0a5cbab65b507e55d"
+    },
+    {
+      "path": "server/tests/schoolOnboardingSecurityArchitecture.test.ts",
+      "bytes": 3305,
+      "sha256": "698f095700ab660963f63516e0c95b75ef27078cd7fe2311aa525a753590ab87"
+    },
+    {
+      "path": "server/tests/schoolOwnershipBlockRetention.integration.test.ts",
+      "bytes": 1208,
+      "sha256": "0074c102887c7efd65a2a4344d13372189bc18bf96db945071a07faf95825cbe"
+    },
+    {
+      "path": "server/tests/schoolProcurementStorageQuota.test.ts",
+      "bytes": 8564,
+      "sha256": "717df96f998af766a8365968150b19bcb2b8d08fbdd0b42f44e50140d2cef3df"
+    },
+    {
+      "path": "server/tests/selfSubmissionsStatusFilterValidation.test.ts",
+      "bytes": 4038,
+      "sha256": "167ea53a880ffd7953d411f3b65c030174b8276166817dcb076aa488373d04fa"
+    },
+    {
+      "path": "server/tests/studentCohortsSecurity.test.ts",
+      "bytes": 2594,
+      "sha256": "31b97cb58af92818f63da523427ac9b420b8e3b58ebd1575492f4f38b3802629"
+    },
+    {
+      "path": "server/tests/studentHourBreakdownPartialDataFailure.test.ts",
+      "bytes": 9588,
+      "sha256": "234a4831533d4f9aa9a4b6c6ff794c71a3cf59b15bd122abeb780ff6cb8bcbfd"
+    },
+    {
+      "path": "server/tests/studentMilestonesScope.integration.test.ts",
+      "bytes": 3444,
+      "sha256": "01ba4e11c6a7c6ccbeaa11ec5ba0615935b2d15c2af1959e038e785887f09049"
+    },
+    {
+      "path": "server/tests/teacherClassroomScope.integration.test.ts",
+      "bytes": 4998,
+      "sha256": "3de94387b7606922394e9d354976ac25065d7f2bb9aeddd4af3cd287db429390"
+    },
+    {
+      "path": "server/tests/teacherCohortAccess.integration.test.ts",
+      "bytes": 8636,
+      "sha256": "50aeb2399d2088138c661aae2fadc8c226ecfae4cadec1d38de1802acbe4ee37"
+    },
+    {
+      "path": "server/tests/teacherMessageScope.integration.test.ts",
+      "bytes": 4112,
+      "sha256": "605580d09ee19ef75b190ad730f0db7c7563711a2e94f5b49e237c0fbf31624e"
+    },
+    {
+      "path": "server/tests/teacherSessionScope.integration.test.ts",
+      "bytes": 7183,
+      "sha256": "f2bc60b2934f743edca43d5d9049c2973780ce437a814247c3b4c8b201bbfde7"
+    },
+    {
+      "path": "server/tests/testAccountExclusionBespokeQueries.test.ts",
+      "bytes": 10213,
+      "sha256": "e7226916b9c8d09a0f862d04eaed034e35e19af45d1eca4c29f1b6b0a52ce21e"
+    },
+    {
+      "path": "tests/onboarding-browser-verification.spec.ts",
+      "bytes": 6538,
+      "sha256": "98ac4136dc33de8c195adcf2be04dbabbffa8289abd5d119f7b7f60af034f74e"
+    },
+    {
+      "path": "tests/ui-interaction-audit.spec.ts",
+      "bytes": 21163,
+      "sha256": "0e3db493010c8ffdb08c26878ecf464e8abe3693f683a7b8b7f658f585274e6d"
+    },
+    {
+      "path": "tests/ui-stateful-audit.spec.ts",
+      "bytes": 16082,
+      "sha256": "0b30dd37d1198fadd7049d4594e6aa37ae5c2bea52adf8f9c1c1a34e169f9650"
+    },
+    {
+      "path": "tests/ui-surface-audit.spec.ts",
+      "bytes": 22621,
+      "sha256": "a3a9fb411560f969bc3fd01571426364e8f9a8ffadcb029501f7ae37bbeeaef9"
+    },
+    {
+      "path": "vercel.dev.json",
+      "bytes": 576,
+      "sha256": "879aa74868b5e0e8857d1e113032642fa85bdf8723de3fb2f45a900ad2202549"
+    },
+    {
+      "path": "vercel.json",
+      "bytes": 1490,
+      "sha256": "21d1c1717ae184800162e990ab483976af2de0bbecf8daef8eed91c1cc057825"
+    }
+  ],
+  "comparison": {
+    "prior_manifest": "/tmp/goodhours-final-independent-review/source-hashes-final.json",
+    "prior_file_count": 81,
+    "current_file_count": 81,
+    "changed_paths": []
+  }
+}

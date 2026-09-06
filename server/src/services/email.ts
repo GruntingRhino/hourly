@@ -458,6 +458,21 @@ export async function sendVerificationEmail(to: string, verificationLink: string
   await sendWithMailinatorRedundancy(to, subject, html);
 }
 
+export async function sendSchoolOwnershipApprovalEmail(
+  to: string,
+  schoolName: string,
+  applicantEmail: string,
+  approvalLink: string,
+): Promise<void> {
+  const subject = `School approval needed: ${schoolName}`;
+  const html = base(
+    "Approve a school administrator",
+    `<strong>${escapeHtml(applicantEmail)}</strong> requested setup access for <strong>${escapeHtml(schoolName)}</strong>. Review the request and approve it only if you recognize this school administrator. Approval unlocks school-management and student-data features.`,
+    { label: "Approve School", url: approvalLink }
+  );
+  await send(to, subject, html);
+}
+
 export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
   const subject = "Reset your GoodHours password";
   const html = base(

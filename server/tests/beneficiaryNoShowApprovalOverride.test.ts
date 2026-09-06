@@ -45,9 +45,10 @@ async function requestAs(app: express.Express, path: string, body: unknown) {
 }
 
 function setupMocks(signup: ReturnType<typeof pastSlotSignup>) {
+  prismaClient.$transaction = async (callback: (tx: any) => Promise<unknown>) => callback(prismaClient);
   prismaClient.user.findUnique = async ({ where }: any) =>
     where.id === benAdmin.id
-      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, school: null }
+      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null }
       : null;
   prismaClient.beneficiary = prismaClient.beneficiary ?? {};
   prismaClient.beneficiary.findFirst = async () => null;
@@ -55,6 +56,7 @@ function setupMocks(signup: ReturnType<typeof pastSlotSignup>) {
   prismaClient.beneficiarySignup.update = async ({ data }: any) => ({ ...signup, ...data });
   prismaClient.beneficiaryAuditLog.create = async ({ data }: any) => data;
   prismaClient.notification.create = async () => ({});
+  prismaClient.serviceHourLedgerEntry.create = async () => ({});
 }
 
 test("approving a NO_SHOW signup without the override is rejected", async () => {

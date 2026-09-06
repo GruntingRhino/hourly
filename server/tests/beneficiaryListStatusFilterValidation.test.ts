@@ -22,7 +22,7 @@ const schoolAdmin = {
   status: "ACTIVE",
   tokenVersion: 0,
   schoolId: "school-a",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
   school: { verified: true, ownershipStatus: "APPROVED" },
 };
 

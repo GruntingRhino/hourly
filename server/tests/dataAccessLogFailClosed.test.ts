@@ -70,7 +70,7 @@ test("a failed audit write blocks the beneficiary signup-list response instead o
     where.id === benAdmin.id
       ? {
           id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0,
-          beneficiaryId: "beneficiary-1", emailVerified: true, school: null,
+          beneficiaryId: "beneficiary-1", emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null,
         }
       : null;
   prismaClient.beneficiarySignup.findMany = async () => [

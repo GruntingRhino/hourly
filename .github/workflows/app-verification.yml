@@ -13,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      # All database-backed gates use the disposable PostgreSQL service below.
       DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
+      DEV_DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
+      RATE_LIMIT_TEST_DATABASE_URL: postgresql://goodhours:goodhours@localhost:5432/goodhours_ci
       JWT_SECRET: ci-only-release-verification-secret-not-for-production
     services:
       postgres:
@@ -74,10 +77,53 @@ jobs:
           VERCEL_ENV: development
         run: npm test
 
-      - name: Audit production dependencies
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run onboarding browser regressions
+        env:
+          PW_BASE_URL: http://127.0.0.1:5173
+          VITE_API_PROXY_TARGET: http://127.0.0.1:3001
         run: |
-          npm audit --omit=dev --audit-level=high
-          (cd server && npm audit --omit=dev --audit-level=high)
+          set -euo pipefail
+          vite_log="$RUNNER_TEMP/goodhours-vite.log"
+          npm --prefix client run dev -- --host 127.0.0.1 --port 5173 --strictPort >"$vite_log" 2>&1 &
+          vite_pid=$!
+          cleanup() {
+            status=$?
+            kill "$vite_pid" 2>/dev/null || true
+            wait "$vite_pid" 2>/dev/null || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:5173/ >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              printf '%s\n' 'Vite did not become ready.' >&2
+              cat "$vite_log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          npx playwright test tests/onboarding-browser-verification.spec.ts
+
+      - name: Upload browser regression report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: onboarding-browser-report
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+
+      - name: Audit all dependency classes
+        run: |
+          npm audit --include=dev --audit-level=high
+          (cd server && npm audit --include=dev --audit-level=high)
+          (cd client && npm audit --include=dev --audit-level=high)
           (cd client && npm run security:verify-react-router-rsc-advisory)
           (cd client && npm run security:verify-no-rsc)
 

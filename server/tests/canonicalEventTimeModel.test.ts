@@ -58,6 +58,7 @@ const beneficiaryAdmin = {
   tokenVersion: 0,
   beneficiaryId: "cet-beneficiary-1",
   emailVerified: true,
+  eligibilityAttestation: { eligible13Plus: true },
 };
 
 function adminToken(): string {
@@ -102,16 +103,16 @@ test("POST /:id/opportunities computes startsAt/endsAt for manually-entered time
       title: "Beach Cleanup",
       description: "Come clean the beach",
       category: "environment",
-      startDate: "2026-09-01",
+      startDate: "2027-09-01",
       timeSlots: [
-        { date: "2026-09-05", startTime: "10:00", endTime: "13:00", durationHours: 3, capacity: 10 },
+        { date: "2027-09-05", startTime: "10:00", endTime: "13:00", durationHours: 3, capacity: 10 },
       ],
     });
     assert.equal(res.status, 201);
     assert.equal(capturedSlots.length, 1);
     // September in America/Los_Angeles is PDT (UTC-7): 10:00 AM -> 17:00 UTC.
-    assert.equal(capturedSlots[0].startsAt.toISOString(), "2026-09-05T17:00:00.000Z");
-    assert.equal(capturedSlots[0].endsAt.toISOString(), "2026-09-05T20:00:00.000Z");
+    assert.equal(capturedSlots[0].startsAt.toISOString(), "2027-09-05T17:00:00.000Z");
+    assert.equal(capturedSlots[0].endsAt.toISOString(), "2027-09-05T20:00:00.000Z");
   } finally {
     prismaClient.user.findUnique = original.userFindUnique;
     prismaClient.beneficiary.findUnique = original.beneficiaryFindUnique;

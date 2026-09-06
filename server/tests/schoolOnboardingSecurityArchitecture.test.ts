@@ -24,12 +24,14 @@ test("password signup creates a pending application but returns no bearer token"
   assert.doesNotMatch(signup, /claimedBySchoolId/);
 });
 
-test("login and every authenticated request enforce current verification and ownership state", () => {
+test("login and authenticated requests enforce verification and restrict pending schools to setup routes", () => {
   const login = routeSlice(authSource, 'router.post("/login"', '// GET /api/auth/me');
   assert.match(login, /evaluateSessionEligibility/);
   assert.match(middlewareSource, /evaluateSessionEligibility/);
   assert.match(middlewareSource, /emailVerified:\s*true/);
   assert.match(middlewareSource, /ownershipStatus:\s*true/);
+  assert.match(middlewareSource, /SCHOOL_SETUP_ONLY/);
+  assert.match(middlewareSource, /isPendingSetupRoute/);
 });
 
 test("Google bootstrap is database-backed, short-lived, and consumed once", () => {

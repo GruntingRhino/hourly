@@ -30,7 +30,7 @@ async function requestAs(app: express.Express, method: "GET" | "POST", path: str
 function setupMocks() {
   prismaClient.user.findUnique = async ({ where }: any) =>
     where.id === student.id
-      ? { id: student.id, email: student.email, role: student.role, status: "ACTIVE", tokenVersion: 0, emailVerified: true, school: null }
+      ? { id: student.id, email: student.email, role: student.role, status: "ACTIVE", tokenVersion: 0, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null }
       : null;
 }
 

@@ -52,7 +52,7 @@ test("teacher cannot list sessions for a same-school student outside assigned co
         role: "TEACHER",
         status: "ACTIVE",
         tokenVersion: 0,
-        emailVerified: true,
+        emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
         schoolId: "school-a",
         school: { verified: true, ownershipStatus: "APPROVED" },
       };
@@ -113,7 +113,7 @@ test("teacher session queries require the record-owning school", async () => {
         role: "TEACHER",
         status: "ACTIVE",
         tokenVersion: 0,
-        emailVerified: true,
+        emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
         schoolId: "school-a",
         school: { verified: true, ownershipStatus: "APPROVED" },
       };
@@ -173,7 +173,7 @@ test("teacher cannot download signature evidence owned by another school", async
         role: "TEACHER",
         status: "ACTIVE",
         tokenVersion: 0,
-        emailVerified: true,
+        emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
         schoolId: "school-a",
         organizationId: null,
         school: { verified: true, ownershipStatus: "APPROVED" },

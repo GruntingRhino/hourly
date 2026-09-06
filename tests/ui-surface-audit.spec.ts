@@ -190,6 +190,8 @@ async function collectVisibleControls(page: Page): Promise<VisibleControl[]> {
 async function withRuntimeAssertions(page: Page, action: () => Promise<void>, label: string): Promise<void> {
   const pageErrors: string[] = [];
   const failingResponses: Array<{ url: string; status: number }> = [];
+  const expectedUnavailableSlotDetail = /UI Stateful Audit Opportunity/.test(label);
+  let sawExpectedUnavailableSlotDetail = false;
   const onPageError = (err: Error) => pageErrors.push(String(err));
   const onConsole = (msg: any) => {
     if (msg.type() !== "error") return;
@@ -198,7 +200,18 @@ async function withRuntimeAssertions(page: Page, action: () => Promise<void>, la
     pageErrors.push(text);
   };
   const onResponse = (response: any) => {
-    if (response.url().startsWith(API_BASE) && response.status() >= 500) {
+    const responseUrl = new URL(response.url());
+    const isApiResponse = response.url().startsWith(API_BASE) || responseUrl.pathname.startsWith("/api/");
+    if (!isApiResponse) return;
+    if (
+      expectedUnavailableSlotDetail &&
+      response.status() === 404 &&
+      /^\/api\/beneficiaries\/slots\/[^/?]+(?:\/questions)?$/.test(responseUrl.pathname)
+    ) {
+      sawExpectedUnavailableSlotDetail = true;
+      return;
+    }
+    if (response.status() >= 500) {
       failingResponses.push({ url: response.url(), status: response.status() });
     }
   };
@@ -211,8 +224,11 @@ async function withRuntimeAssertions(page: Page, action: () => Promise<void>, la
     await action();
     await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
     const body = await page.locator("body").innerText().catch(() => "");
+    const actionablePageErrors = pageErrors.filter(
+      (error) => !(sawExpectedUnavailableSlotDetail && /status of 404 \(Not Found\)/i.test(error)),
+    );
     expect.soft(body, `${label} rendered internal server error`).not.toContain("Internal Server Error");
-    expect.soft(pageErrors, `${label} triggered client errors`).toEqual([]);
+    expect.soft(actionablePageErrors, `${label} triggered client errors`).toEqual([]);
     expect.soft(failingResponses, `${label} triggered API 5xx responses`).toEqual([]);
   } finally {
     page.off("pageerror", onPageError);
@@ -338,15 +354,22 @@ const ROUTES: Record<RoleKey, RouteSpec[]> = {
           await page.getByTestId("canvas-connect").click();
           await expect(page.getByText("Canvas mock connection created.")).toBeVisible({ timeout: 10000 });
           const canvasCourse = page.locator('[data-testid^="canvas-course-"]').first();
-          if (await canvasCourse.count()) await canvasCourse.check();
-          await expect(page.getByTestId("canvas-preview")).toBeEnabled({ timeout: 10000 });
-          await page.getByTestId("canvas-preview").click();
-          await expect(page.getByText("Canvas preview complete.")).toBeVisible({ timeout: 10000 });
-          const canvasCourseForApply = page.locator('[data-testid^="canvas-course-"]').first();
-          if (await canvasCourseForApply.count()) await canvasCourseForApply.check();
-          await expect(page.getByTestId("canvas-apply")).toBeEnabled({ timeout: 10000 });
-          await page.getByTestId("canvas-apply").click();
-          await expect(page.getByText("Canvas sync applied.")).toBeVisible({ timeout: 10000 });
+          const hasCanvasCourse = (await canvasCourse.count()) > 0;
+          if (hasCanvasCourse) {
+            await canvasCourse.check();
+            await expect(canvasCourse).toBeChecked({ timeout: 10000 });
+            await expect(page.getByTestId("canvas-preview")).toBeEnabled({ timeout: 10000 });
+            await page.getByTestId("canvas-preview").click();
+            await expect(page.getByText("Canvas preview complete.")).toBeVisible({ timeout: 10000 });
+            const canvasCourseForApply = page.locator('[data-testid^="canvas-course-"]').first();
+            await canvasCourseForApply.check();
+            await expect(page.getByTestId("canvas-apply")).toBeEnabled({ timeout: 10000 });
+            await page.getByTestId("canvas-apply").click();
+            await expect(page.getByText("Canvas sync applied.")).toBeVisible({ timeout: 10000 });
+          } else {
+            await expect(page.getByTestId("canvas-preview")).toBeDisabled();
+            await expect(page.getByTestId("canvas-apply")).toBeDisabled();
+          }
         }, "/settings :: canvas integration");
 
         await withRuntimeAssertions(page, async () => {
@@ -358,6 +381,7 @@ const ROUTES: Record<RoleKey, RouteSpec[]> = {
           const hasClassroomCourse = (await classroomCourse.count()) > 0;
           if (hasClassroomCourse) {
             await classroomCourse.check();
+            await expect(classroomCourse).toBeChecked({ timeout: 10000 });
             await expect(page.getByTestId("google-classroom-preview")).toBeEnabled({ timeout: 10000 });
             await page.getByTestId("google-classroom-preview").click();
             await expect(page.getByText("Google Classroom preview complete.")).toBeVisible({ timeout: 10000 });

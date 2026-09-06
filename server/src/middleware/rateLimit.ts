@@ -84,6 +84,7 @@ function takeBucket(key: string, windowMs: number) {
       remaining: 0,
       resetAt: fresh.resetAt,
       count: fresh.count,
+      lease: { store: "memory" as const, key, resetAt: fresh.resetAt },
     };
   }
 
@@ -93,12 +94,19 @@ function takeBucket(key: string, windowMs: number) {
     remaining: 0,
     resetAt: existing.resetAt,
     count: existing.count,
+    lease: { store: "memory" as const, key, resetAt: existing.resetAt },
   };
 }
+
+type BucketLease =
+  | { store: "memory"; key: string; resetAt: number }
+  | { store: "upstash"; bucketKey: string; resetAt: number }
+  | { store: "database"; key: string; resetAt: number };
 
 type RateLimitBucketResult = {
   count: number;
   resetAt: number;
+  lease: BucketLease;
 };
 
 async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
@@ -136,7 +144,7 @@ async function takeSharedBucket(key: string, windowMs: number): Promise<RateLimi
     throw new Error("Upstash rate limit returned invalid count");
   }
 
-  return { count, resetAt };
+  return { count, resetAt, lease: { store: "upstash", bucketKey, resetAt } };
 }
 
 async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLimitBucketResult> {
@@ -175,12 +183,11 @@ async function takeDatabaseBucket(key: string, windowMs: number): Promise<RateLi
     throw new Error("Database rate limit upsert returned no row");
   }
 
+  const resetAt = (windowId + 1) * windowMs;
   return {
     count: Number(row.count),
-    // The epoch-aligned boundary computed from this process clock — never
-    // reserialize the database's timestamp-without-time-zone value through
-    // the driver's session-timezone conversion.
-    resetAt: (windowId + 1) * windowMs,
+    resetAt,
+    lease: { store: "database", key, resetAt },
   };
 }
 
@@ -194,10 +201,7 @@ async function takeRateLimitBucket(key: string, windowMs: number): Promise<RateL
   }
 
   const local = takeBucket(key, windowMs);
-  return {
-    count: local.count,
-    resetAt: local.resetAt,
-  };
+  return local;
 }
 
 function getClientIp(req: Request): string {
@@ -255,28 +259,49 @@ function buildRateLimitResponse(res: Response, message: string, retryAfterMs: nu
  * would silently do nothing on the durable path and successful logins would
  * erode auth quotas.
  */
-function releaseInMemoryBucket(key: string, windowMs: number) {
-  const now = Date.now();
-  const bucket = buckets.get(key);
-  if (bucket && bucket.resetAt > now && bucket.count > 0) {
+function releaseInMemoryBucket(lease: BucketLease) {
+  if (lease.store !== "memory") return;
+  const bucket = buckets.get(lease.key);
+  if (bucket && bucket.resetAt === lease.resetAt && bucket.resetAt > Date.now() && bucket.count > 0) {
     bucket.count -= 1;
   }
 }
 
-async function releaseSharedBuckets(keys: string[]) {
-  await Promise.all(
-    keys.map((key) =>
-      prisma
-        .$executeRawUnsafe(
+const decrementScript = `
+  local value = redis.call('GET', KEYS[1])
+  if not value then return 0 end
+  local count = tonumber(value)
+  if not count or count <= 0 then return 0 end
+  return redis.call('DECR', KEYS[1])
+`;
+
+async function releaseUpstashBucket(lease: Extract<BucketLease, { store: "upstash" }>) {
+  const response = await fetch(`${upstashUrl}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${upstashToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify([["EVAL", decrementScript, "1", lease.bucketKey]]),
+  });
+  if (!response.ok) throw new Error(`Upstash release failed with ${response.status}`);
+  const payload = await response.json() as Array<{ result?: number | string; error?: string }>;
+  if (!payload?.[0] || payload[0].error) throw new Error(payload?.[0]?.error || "Upstash release failed");
+}
+
+async function releaseSharedBuckets(leases: BucketLease[]) {
+  await Promise.all(leases.map(async (lease) => {
+    try {
+      if (lease.store === "upstash") {
+        await releaseUpstashBucket(lease);
+      } else if (lease.store === "database") {
+        await prisma.$executeRawUnsafe(
           `UPDATE "RateLimitBucket" SET "count" = "count" - 1, "updatedAt" = NOW()
-           WHERE "key" = $1 AND "count" > 0`,
-          key
-        )
-        .catch(() => {
-          // Best-effort release: over-count is the safe failure mode.
-        })
-    )
-  );
+           WHERE "key" = $1 AND "resetAt" = $2 AND "count" > 0`,
+          lease.key, new Date(lease.resetAt)
+        );
+      }
+    } catch {
+      // Best-effort release: over-count is the safe failure mode.
+    }
+  }));
 }
 
 function isErrorResponse(statusCode: number): boolean {
@@ -305,7 +330,10 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
         options.windowMs
       );
       const ipRemaining = Math.max(0, options.maxPerIp - ipBucket.count);
+      const acquiredLeases: BucketLease[] = [ipBucket.lease];
 
+      let userBucket: RateLimitBucketResult | null = null;
+      let keyBucket: RateLimitBucketResult | null = null;
       let userRemaining: number | null = null;
       let userResetAt: number | null = null;
       let keyRemaining: number | null = null;
@@ -317,11 +345,12 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
       }
 
       if (userId && options.maxPerUser) {
-        const userBucket = await takeRateLimitBucket(
+        userBucket = await takeRateLimitBucket(
           `${options.namespace}:user:${hashKey(userId)}${suffix}`,
           options.windowMs
         );
         userRemaining = Math.max(0, options.maxPerUser - userBucket.count);
+        acquiredLeases.push(userBucket.lease);
         userResetAt = userBucket.resetAt;
 
         if (userBucket.count > options.maxPerUser) {
@@ -334,11 +363,12 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
 
       const rateLimitKey = options.keyGenerator?.(req)?.trim();
       if (rateLimitKey && options.maxPerKey) {
-        const keyBucket = await takeRateLimitBucket(
+        keyBucket = await takeRateLimitBucket(
           `${options.namespace}:key:${hashKey(rateLimitKey)}`,
           options.windowMs
         );
         keyRemaining = Math.max(0, options.maxPerKey - keyBucket.count);
+        acquiredLeases.push(keyBucket.lease);
         keyResetAt = keyBucket.resetAt;
 
         if (keyBucket.count > options.maxPerKey) {
@@ -363,6 +393,8 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
       res.setHeader("RateLimit-Reset", String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
 
       if (blockedRetryAfterMs !== null && blockedRetryAfterMs > 0) {
+        for (const lease of acquiredLeases) releaseInMemoryBucket(lease);
+        await releaseSharedBuckets(acquiredLeases.filter((lease) => lease.store !== "memory"));
         buildRateLimitResponse(
           res,
           options.message ?? "Too many requests. Please wait before trying again.",
@@ -376,34 +408,22 @@ export function createHybridRateLimit(options: HybridRateLimitOptions) {
       // the bucket if the request shouldn't have been counted.
       if (hasResponseFilter && typeof (res as any).end === "function") {
         const originalEnd = res.end.bind(res);
-        const ipKey = `${options.namespace}:ip:${hashKey(ip)}${suffix}`;
-        const userKey = userId && options.maxPerUser
-          ? `${options.namespace}:user:${hashKey(userId)}${suffix}`
-          : null;
-        const keyBucketKey = rateLimitKey && options.maxPerKey
-          ? `${options.namespace}:key:${hashKey(rateLimitKey)}`
-          : null;
+        const allLeases = acquiredLeases;
+        let finished = false;
 
         (res as any).end = async function (this: Response, ...args: any[]) {
+          if (finished) return;
+          finished = true;
           const statusCode = this.statusCode || 200;
           const isError = isErrorResponse(statusCode);
-
-          // Determine whether this response should NOT count toward the quota
           const shouldRelease =
             (options.skipSuccessfulRequests && !isError) ||
             (options.skipFailedRequests && isError);
 
           try {
             if (shouldRelease) {
-              releaseInMemoryBucket(ipKey, options.windowMs);
-              if (userKey) releaseInMemoryBucket(userKey, options.windowMs);
-              if (keyBucketKey) releaseInMemoryBucket(keyBucketKey, options.windowMs);
-              const sharedKeys = [ipKey, userKey, keyBucketKey].filter(
-                (k): k is string => typeof k === "string"
-              );
-              if (sharedKeys.length > 0) {
-                await releaseSharedBuckets(sharedKeys);
-              }
+              for (const lease of allLeases) releaseInMemoryBucket(lease);
+              await releaseSharedBuckets(allLeases.filter((lease) => lease.store !== "memory"));
             }
           } finally {
             return originalEnd.apply(this, args as any);

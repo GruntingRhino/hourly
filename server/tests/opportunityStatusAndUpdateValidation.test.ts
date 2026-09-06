@@ -25,7 +25,7 @@ const orgAdmin = {
   status: "ACTIVE",
   tokenVersion: 0,
   organizationId: "org-a",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
 };
 
 async function requestAs(app: express.Express, method: "GET" | "PUT", path: string, body?: unknown, asUser: boolean = true) {

@@ -7,8 +7,8 @@ import prisma from "../src/lib/prisma";
 import organizationRoutes from "../src/routes/organizations";
 
 const prismaClient = prisma as any;
-const owner = { id: "org-owner", email: "owner@example.test", role: "ORG_ADMIN", status: "ACTIVE", tokenVersion: 0, organizationId: "org-a", emailVerified: true, school: null };
-const outsider = { id: "student-outside", email: "student@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, organizationId: null, emailVerified: true, school: null };
+const owner = { id: "org-owner", email: "owner@example.test", role: "ORG_ADMIN", status: "ACTIVE", tokenVersion: 0, organizationId: "org-a", emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null };
+const outsider = { id: "student-outside", email: "student@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, organizationId: null, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null };
 const organization = {
   id: "org-a",
   name: "Private Organization",

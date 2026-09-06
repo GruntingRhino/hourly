@@ -44,7 +44,7 @@ async function requestAs(app: express.Express, path: string, body: unknown) {
 function setupMocks(signup: ReturnType<typeof makeSignup>) {
   prismaClient.user.findUnique = async ({ where }: any) =>
     where.id === benAdmin.id
-      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, school: null }
+      ? { id: benAdmin.id, email: benAdmin.email, role: benAdmin.role, status: "ACTIVE", tokenVersion: 0, beneficiaryId: benAdmin.beneficiaryId, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null }
       : null;
   prismaClient.beneficiarySignup.findUnique = async () => signup;
   prismaClient.beneficiarySignup.update = async ({ data }: any) => ({ ...signup, ...data });

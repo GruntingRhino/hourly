@@ -12,6 +12,8 @@ import type { ServiceHourLedgerSourceType } from "@prisma/client";
  * how this codebase already treats notification/email sends after a
  * state-changing write.
  */
+type LedgerWriter = Pick<typeof prisma, "serviceHourLedgerEntry">;
+
 export async function recordServiceHourLedgerEntry(entry: {
   studentId: string;
   schoolId: string | null;
@@ -20,9 +22,12 @@ export async function recordServiceHourLedgerEntry(entry: {
   category: string | null;
   approvedHours: number;
   approverId: string;
+  db?: LedgerWriter;
+  throwOnError?: boolean;
 }): Promise<void> {
+  const db = entry.db ?? prisma;
   try {
-    await prisma.serviceHourLedgerEntry.create({
+    await db.serviceHourLedgerEntry.create({
       data: {
         studentId: entry.studentId,
         schoolId: entry.schoolId,
@@ -34,6 +39,7 @@ export async function recordServiceHourLedgerEntry(entry: {
       },
     });
   } catch (err) {
+    if (entry.throwOnError) throw err;
     console.error(`[serviceHourLedger] Failed to record ledger entry for ${entry.sourceType}:${entry.sourceId}:`, err);
   }
 }

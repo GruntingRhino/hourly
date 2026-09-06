@@ -41,6 +41,7 @@ export default function JoinCohort() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [eligible13Plus, setEligible13Plus] = useState(false);
 
   const passwordOk = PASSWORD_RULES.every((r) => r.test(password));
 
@@ -64,6 +65,7 @@ export default function JoinCohort() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordOk) { setError("Password does not meet all requirements"); return; }
+    if (!eligible13Plus) { setError("You must confirm that you are 13 or older to continue."); return; }
     setError("");
     setSubmitting(true);
     try {
@@ -71,6 +73,7 @@ export default function JoinCohort() {
         token,
         name,
         password,
+        eligible13Plus: true,
       });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
@@ -157,11 +160,15 @@ export default function JoinCohort() {
             </div>
             <button
               type="submit"
-              disabled={submitting || !passwordOk}
+              disabled={submitting || !passwordOk || !eligible13Plus}
               className="w-full py-[7px] bg-[var(--action)] text-white rounded-[2px] font-medium hover:opacity-85 disabled:opacity-50 text-sm"
             >
               {submitting ? "Creating account..." : "Join Cohort"}
             </button>
+            <label className="flex items-start gap-2 text-sm text-[var(--text-sec)]">
+              <input type="checkbox" checked={eligible13Plus} onChange={(e) => setEligible13Plus(e.target.checked)} className="mt-1" />
+              <span>I confirm that I am 13 or older. Invitations do not override this requirement.</span>
+            </label>
           </form>
 
           <p className="mt-4 text-center text-xs text-[var(--text-sec)]">

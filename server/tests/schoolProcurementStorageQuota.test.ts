@@ -24,7 +24,8 @@ const schoolAdmin = {
   status: "ACTIVE",
   tokenVersion: 0,
   schoolId: "quota-school-1",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
+  school: { verified: true, ownershipStatus: "APPROVED" },
 };
 
 function adminToken(): string {

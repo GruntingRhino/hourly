@@ -63,7 +63,7 @@ test("googleAuth.ts does not locally redefine a production/deployment check", ()
   const source = read("src/routes/googleAuth.ts");
   assert.doesNotMatch(source, /\bIS_PRODUCTION\b/);
   assert.doesNotMatch(source, /NODE_ENV\s*===\s*["']production["']/);
-  assert.match(source, /import\s*\{\s*isPubliclyDeployed\s*\}\s*from\s*["']\.\.\/lib\/isProdLike["']/);
+  assert.match(source, /import\s*\{[\s\S]*?\bisPubliclyDeployed\b[\s\S]*?\}\s*from\s*["']\.\.\/lib\/isProdLike["']/);
 });
 
 test("the Google /dev-signin auth-bypass route is gated by isPubliclyDeployed", () => {

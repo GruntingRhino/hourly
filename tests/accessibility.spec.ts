@@ -92,33 +92,31 @@ test("Login page — keyboard navigation and form validation", async ({
   await page.goto(`${BASE}/login`);
   await page.waitForLoadState("networkidle");
 
-  // Tab through form: email → password → submit button
+  // Tab through the rendered page in DOM order: logo → email → forgot-password → password.
+  // The logo and forgot-password link are intentionally keyboard reachable navigation.
+  await page.keyboard.press("Tab");
+  const logoFocused = await page.evaluate(
+    () => document.activeElement?.getAttribute("href") === "/"
+  );
+  expect(logoFocused, "Logo link should be focused after first Tab").toBe(true);
+
   await page.keyboard.press("Tab");
   const emailFocused = await page.evaluate(
     () => document.activeElement?.getAttribute("type") === "email"
   );
-  expect(emailFocused, "Email field should be focused after first Tab").toBe(
-    true
+  expect(emailFocused, "Email field should be focused after second Tab").toBe(true);
+
+  await page.keyboard.press("Tab");
+  const forgotFocused = await page.evaluate(
+    () => document.activeElement?.getAttribute("href") === "/forgot-password"
   );
+  expect(forgotFocused, "Forgot-password link should be focused after third Tab").toBe(true);
 
   await page.keyboard.press("Tab");
   const passwordFocused = await page.evaluate(
     () => document.activeElement?.getAttribute("type") === "password"
   );
-  expect(
-    passwordFocused,
-    "Password field should be focused after second Tab"
-  ).toBe(true);
-
-  await page.keyboard.press("Tab");
-  const submitFocused = await page.evaluate(
-    () =>
-      document.activeElement?.tagName === "BUTTON" ||
-      (document.activeElement as HTMLInputElement)?.type === "submit"
-  );
-  expect(submitFocused, "Submit button should be focused after third Tab").toBe(
-    true
-  );
+  expect(passwordFocused, "Password field should be focused after fourth Tab").toBe(true);
 
   // Submit empty form and expect error messages
   await page.keyboard.press("Enter");

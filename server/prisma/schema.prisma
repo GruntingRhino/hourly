@@ -81,6 +81,7 @@ model User {
   passwordResetToken       String?
   passwordResetExpires     DateTime?
   tokenVersion             Int        @default(0) // bumped on password change/reset to revoke outstanding JWTs
+  eligibilityAttestation   EligibilityAttestation?
   googleId                 String?    @unique
   isTestAccount            Boolean    @default(false) // true = Playwright/QA account, hidden from all lists
   notificationPreferences  String? // JSON blob for notification prefs
@@ -152,6 +153,20 @@ model User {
   @@index([classroomId])
   @@index([beneficiaryId])
   @@index([organizationId])
+}
+
+// Immutable, data-minimized 13+ admission evidence. This is a self-attestation,
+// not a verified age signal.
+model EligibilityAttestation {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  eligible13Plus Boolean
+  policyVersion  String
+  method         String
+  attestedAt     DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([policyVersion, attestedAt])
 }
 
 model SchoolRegistrationIntent {
@@ -233,6 +248,10 @@ model School {
   ownershipReviewedAt           DateTime?
   ownershipReviewedById         String?
   ownershipReviewNote           String?
+  ownershipApprovalToken        String?                    @unique
+  ownershipApprovalTokenExpires DateTime?
+  ownershipApprovalTokenUsedAt  DateTime?
+  ownershipApprovalLastSentAt  DateTime?
   // Magic link registration
   registrationToken             String?                    @unique
   registrationTokenExpires      DateTime?
@@ -296,6 +315,16 @@ model School {
   signupQuestionTemplates  SignupQuestionTemplate[]
   supervisorVerifications  SupervisorVerification[]
   beneficiaryImportBatches BeneficiaryImportBatch[]
+  ownershipBlocks          SchoolOwnershipBlock[]
+}
+
+model SchoolOwnershipBlock {
+  id        String   @id @default(cuid())
+  emailHash String   @unique
+  schoolId  String?
+  reason    String?
+  createdAt DateTime @default(now())
+  school    School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
 }
 
 enum SchoolPartnerRequestStatus {
@@ -763,6 +792,7 @@ model SelfSubmittedRequest {
   revisionNote       String? // admin note when requesting revision
   timesRevised       Int                        @default(0)
   convertedSessionId String? // if approved → creates a ServiceSession
+  sourceStudentInvitationId String? @unique // idempotent lineage for imported starting hours
   category           String? // e.g. "environment", "education", "food", "health", "general"
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt

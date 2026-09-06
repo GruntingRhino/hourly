@@ -49,7 +49,7 @@ export default function SchoolVerifyRegistration() {
               </svg>
             </div>
             <h2 className="text-xl font-bold mb-2">School contact verified</h2>
-            <p className="text-sm text-[var(--text-sec)]">Your authority claim is pending independent review. No school-administrator access is available until it is approved.</p>
+            <p className="text-sm text-[var(--text-sec)]">Your school contact is verified. You have restricted setup access while the configured GoodHours business owner reviews the request.</p>
           </div>
         )}
         {status === "error" && (

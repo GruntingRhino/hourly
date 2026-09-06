@@ -36,6 +36,7 @@ import { detectMimeType } from "../lib/detectMimeType";
 import { isDevMode } from "../lib/env";
 import { createHybridRateLimit } from "../middleware/rateLimit";
 import { resolveWritableUploadDir } from "../lib/runtimeStorage";
+import { assertStudentAccessibleToStaff, getStaffAccessScope } from "../lib/cohortAccess";
 import { shouldAutoPromoteWaitlist } from "../lib/waitlistPromotionPolicy";
 import { slotDateTime, computeSlotTimestamps } from "../lib/icsGenerator";
 import { recordServiceHourLedgerEntry } from "../lib/serviceHourLedger";
@@ -2812,44 +2813,43 @@ router.post("/signups/:signupId/approve", authenticate, requireRole("BENEFICIARY
 
     const fromStatus = getBeneficiarySignupDisplayStatus(signup);
 
-    const updated = await prisma.beneficiarySignup.update({
-      where: { id: req.params.signupId },
-      data: {
-        status: "CONFIRMED",
-        verificationStatus: "APPROVED",
-        totalHours: hours,
-        rejectionReason: null,
-        verifiedBy: req.user!.userId,
-        verifiedAt: new Date(),
-      },
-    });
-
-    await prisma.beneficiaryAuditLog.create({
-      data: {
-        action: signup.status === "NO_SHOW"
-          ? "NO_SHOW_OVERRIDE_APPROVED"
-          : signup.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
-        actorId: req.user!.userId,
-        signupId: signup.id,
-        details: JSON.stringify({
-          previousStatus: fromStatus,
-          approvedHours: hours,
-          originalHours: signup.slot.durationHours,
-          ...(overrideCap ? { capOverride: true } : {}),
-          ...(signup.status === "NO_SHOW" ? { noShowOverride: true, noShowOverrideReason } : {}),
-        }),
-      },
-    });
-
-    await recordServiceHourLedgerEntry({
-      studentId: signup.studentId,
-      schoolId: signup.schoolId,
-      sourceType: "BENEFICIARY_SIGNUP",
-      sourceId: signup.id,
-      category: signup.slot.opportunity.category,
-      approvedHours: hours,
-      approverId: req.user!.userId,
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.beneficiarySignup.findUnique({
+        where: { id: signup.id },
+        include: { slot: { include: { opportunity: true } } },
+      });
+      if (!current || !["CONFIRMED", "NO_SHOW"].includes(current.status)) {
+        throw new Error("SIGNUP_STATE_CHANGED");
+      }
+      const priorHours = current.verificationStatus === "APPROVED"
+        ? (current.totalHours ?? current.slot.durationHours)
+        : 0;
+      const result = await tx.beneficiarySignup.update({
+        where: { id: current.id },
+        data: {
+          status: "CONFIRMED", verificationStatus: "APPROVED", totalHours: hours,
+          rejectionReason: null, verifiedBy: req.user!.userId, verifiedAt: new Date(),
+        },
+      });
+      await tx.beneficiaryAuditLog.create({
+        data: {
+          action: current.status === "NO_SHOW" ? "NO_SHOW_OVERRIDE_APPROVED"
+            : current.verificationStatus === "APPROVED" ? "APPROVAL_UPDATED" : overrideCap ? "CAP_OVERRIDE" : "APPROVE",
+          actorId: req.user!.userId, signupId: current.id,
+          details: JSON.stringify({ previousStatus: fromStatus, approvedHours: hours,
+            originalHours: current.slot.durationHours, ledgerDeltaHours: hours - priorHours,
+            ...(overrideCap ? { capOverride: true } : {}),
+            ...(current.status === "NO_SHOW" ? { noShowOverride: true, noShowOverrideReason } : {}) }),
+        },
+      });
+      await recordServiceHourLedgerEntry({
+        db: tx, throwOnError: true, studentId: current.studentId, schoolId: current.schoolId,
+        sourceType: "BENEFICIARY_SIGNUP", sourceId: current.id,
+        category: current.slot.opportunity.category, approvedHours: hours - priorHours,
+        approverId: req.user!.userId,
+      });
+      return result;
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
 
     await notifyBeneficiarySignupReviewChange({
       studentId: signup.studentId,
@@ -3076,26 +3076,36 @@ router.post("/signups/:signupId/reset-review", authenticate, requireRole("BENEFI
       return res.status(400).json({ error: "This signup is already pending review" });
     }
 
-    const updated = await prisma.beneficiarySignup.update({
-      where: { id: signup.id },
-      data: {
-        status: "CONFIRMED",
-        verificationStatus: "PENDING",
-        rejectionReason: null,
-        verifiedBy: null,
-        verifiedAt: null,
-        ...(signup.status === "NO_SHOW" ? { totalHours: null } : {}),
-      },
-    });
-
-    await prisma.beneficiaryAuditLog.create({
-      data: {
-        action: "REVIEW_RESET",
-        actorId: req.user!.userId,
-        signupId: signup.id,
-        details: JSON.stringify({ previousStatus: fromStatus, nextStatus: "Pending" }),
-      },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.beneficiarySignup.findUnique({
+        where: { id: signup.id },
+        include: { slot: { include: { opportunity: true } } },
+      });
+      if (!current || getBeneficiarySignupDisplayStatus(current) === "Pending") {
+        throw new Error("SIGNUP_STATE_CHANGED");
+      }
+      const priorHours = current.verificationStatus === "APPROVED"
+        ? (current.totalHours ?? current.slot.durationHours)
+        : 0;
+      const result = await tx.beneficiarySignup.update({
+        where: { id: current.id },
+        data: { status: "CONFIRMED", verificationStatus: "PENDING", rejectionReason: null,
+          verifiedBy: null, verifiedAt: null, ...(current.status === "NO_SHOW" ? { totalHours: null } : {}) },
+      });
+      await tx.beneficiaryAuditLog.create({
+        data: { action: "REVIEW_RESET", actorId: req.user!.userId, signupId: current.id,
+          details: JSON.stringify({ previousStatus: fromStatus, nextStatus: "Pending", ledgerDeltaHours: -priorHours }) },
+      });
+      if (priorHours !== 0) {
+        await recordServiceHourLedgerEntry({
+          db: tx, throwOnError: true, studentId: current.studentId, schoolId: current.schoolId,
+          sourceType: "BENEFICIARY_SIGNUP", sourceId: current.id,
+          category: current.slot.opportunity.category, approvedHours: -priorHours,
+          approverId: req.user!.userId,
+        });
+      }
+      return result;
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
 
     await notifyBeneficiarySignupReviewChange({
       studentId: signup.studentId,
@@ -3142,8 +3152,9 @@ router.get("/signups/:signupId/history", authenticate, async (req: Request, res:
         return res.status(403).json({ error: "Not your beneficiary's signup" });
       }
     } else if (["SCHOOL_ADMIN", "TEACHER"].includes(actor.role)) {
-      const studentSchoolId = await resolveStudentSchoolId(signup.studentId);
-      if (!actor.schoolId || studentSchoolId !== actor.schoolId) {
+      const scope = await getStaffAccessScope(actor.id);
+      const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, signup.studentId) : false;
+      if (!studentAllowed) {
         return res.status(403).json({ error: "Student is not enrolled in your school" });
       }
     } else if (actor.role === "STUDENT") {

@@ -22,7 +22,7 @@ test("unverified users cannot receive an application session", () => {
   });
 });
 
-test("pending school ownership cannot receive a privileged session", () => {
+test("pending school ownership receives a setup-only session", () => {
   const result = evaluateSessionEligibility({
     email: "admin@school.edu",
     emailVerified: true,
@@ -31,12 +31,7 @@ test("pending school ownership cannot receive a privileged session", () => {
     school: { verified: false, ownershipStatus: "PENDING" },
   });
 
-  assert.deepEqual(result, {
-    allowed: false,
-    status: 403,
-    error: "School ownership review is pending",
-    code: "SCHOOL_OWNERSHIP_PENDING",
-  });
+  assert.deepEqual(result, { allowed: true, setupOnly: true });
 });
 
 test("approved staff and verified non-staff users can receive sessions", () => {

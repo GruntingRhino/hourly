@@ -5,6 +5,8 @@ import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import SessionPrefBanner from "./components/SessionPrefBanner";
 import { getSessionPref } from "./lib/authSession";
+import PendingApproval from "./pages/school/PendingApproval";
+import AgeEligibility from "./pages/AgeEligibility";
 import { ToastProvider } from "./components/Toast";
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -61,8 +63,18 @@ function AppRoutes() {
   const isSchoolAdminLike = user?.role === "SCHOOL_ADMIN";
   const needsSchoolOnboarding =
     isSchoolAdminLike && user.school?.onboardingComplete === false;
-  const suppressPrefBanner = location.pathname === "/settings";
+  const pendingSchoolApproval =
+    user?.role === "SCHOOL_ADMIN" && user.school?.ownershipStatus === "PENDING";
 
+  if (user?.requiresEligibilityAttestation) {
+    return <AgeEligibility />;
+  }
+
+  if (pendingSchoolApproval) {
+    return <PendingApproval />;
+  }
+
+  const suppressPrefBanner = location.pathname === "/settings";
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -103,6 +115,7 @@ function AppRoutes() {
 
       {user ? (
         <>
+        <Route path="/eligibility" element={<AgeEligibility />} />
         {/* Email verification gate — accessible when logged in but unverified */}
         <Route path="/email-verification-required" element={<EmailVerificationRequired />} />
 

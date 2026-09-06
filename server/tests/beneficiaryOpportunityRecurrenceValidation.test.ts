@@ -25,7 +25,7 @@ const beneficiaryAdmin = {
   status: "ACTIVE",
   tokenVersion: 0,
   beneficiaryId: "ben-rec-1",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
 };
 
 async function requestAs(app: express.Express, body: unknown) {

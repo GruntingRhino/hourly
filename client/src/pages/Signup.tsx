@@ -30,12 +30,12 @@ export default function Signup() {
   const selected = AUDIENCES.find((item) => item.id === audience) ?? AUDIENCES[0];
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
+    <main className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-xl text-center">
         <Link to="/" className="block text-[20px] font-bold mb-7" style={{ color: "var(--navy)" }}>GoodHours</Link>
         <div className="border border-[var(--border)] rounded-[3px] p-6 text-left" style={{ background: "var(--surface)" }}>
-          <h2 className="text-[18px] font-semibold mb-2" style={{ color: "var(--text)" }}>How to Join GoodHours</h2>
-          <p className="text-[13px] mb-5" style={{ color: "var(--text-sec)" }}>Pick the path that matches you. Only school admins create new school workspaces here; students and partners join through invitations.</p>
+          <h1 className="text-[18px] font-semibold mb-2" style={{ color: "var(--text)" }}>How to Join GoodHours</h1>
+          <p className="text-[13px] mb-5" style={{ color: "var(--text-sec)" }}>GoodHours is for users who are 13 or older. Pick the path that matches you. Only school admins create new school workspaces here; students and partners join through invitations.</p>
 
           <div className="grid gap-2 sm:grid-cols-3 mb-5" role="tablist" aria-label="Join GoodHours as">
             {AUDIENCES.map((item) => {
@@ -50,7 +50,11 @@ export default function Signup() {
                     ? { borderColor: "var(--action)", background: "var(--action-lt)", color: "var(--navy)" }
                     : { borderColor: "var(--border)", background: "var(--surface)", color: "var(--text-sec)" }
                   }
-                  aria-pressed={active}
+                  id={`join-tab-${item.id}`}
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls="join-tabpanel"
+                  tabIndex={active ? 0 : -1}
                 >
                   <div className="text-[13px] font-semibold" style={{ color: active ? "var(--navy)" : "var(--text)" }}>{item.label}</div>
                   <div className="mt-1 text-[12px] leading-5" style={{ color: "var(--text-faint)" }}>{item.id === "school" ? "Public registration" : "Invitation-based"}</div>
@@ -59,7 +63,13 @@ export default function Signup() {
             })}
           </div>
 
-          <div className="rounded-[3px] border border-[var(--border)] p-4" style={{ background: "var(--surface-alt)" }}>
+          <div
+            id="join-tabpanel"
+            role="tabpanel"
+            aria-labelledby={`join-tab-${audience}`}
+            className="rounded-[3px] border border-[var(--border)] p-4"
+            style={{ background: "var(--surface-alt)" }}
+          >
             <div className="text-[13px] font-semibold mb-1" style={{ color: "var(--text)" }}>{selected.title}</div>
             <div className="text-[13px] mb-4" style={{ color: "var(--text-sec)" }}>{selected.body}</div>
             <Link
@@ -77,6 +87,6 @@ export default function Signup() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

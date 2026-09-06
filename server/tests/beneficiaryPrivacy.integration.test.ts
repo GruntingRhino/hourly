@@ -8,10 +8,10 @@ import beneficiaryRoutes from "../src/routes/beneficiaries";
 
 const prismaClient = prisma as any;
 
-const student = { id: "student-1", email: "student@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, emailVerified: true, school: null };
-const schoolAdmin = { id: "admin-1", email: "admin@example.test", role: "SCHOOL_ADMIN", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a", emailVerified: true, school: { verified: true, ownershipStatus: "APPROVED" } };
-const teacher = { id: "teacher-1", email: "teacher@example.test", role: "TEACHER", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a", emailVerified: true, school: { verified: true, ownershipStatus: "APPROVED" } };
-const unrelatedStudent = { id: "student-2", email: "other@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, emailVerified: true, school: null };
+const student = { id: "student-1", email: "student@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null };
+const schoolAdmin = { id: "admin-1", email: "admin@example.test", role: "SCHOOL_ADMIN", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a", emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: { verified: true, ownershipStatus: "APPROVED" } };
+const teacher = { id: "teacher-1", email: "teacher@example.test", role: "TEACHER", status: "ACTIVE", tokenVersion: 0, schoolId: "school-a", emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: { verified: true, ownershipStatus: "APPROVED" } };
+const unrelatedStudent = { id: "student-2", email: "other@example.test", role: "STUDENT", status: "ACTIVE", tokenVersion: 0, emailVerified: true, eligibilityAttestation: { eligible13Plus: true }, school: null };
 
 const privateBeneficiary = {
   id: "beneficiary-approved",

@@ -13,12 +13,12 @@ export function AdminTeam({ beneficiaryId }: { beneficiaryId: string }) {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const isOwner = admins.some((admin) => admin.id === user?.id && (admin.beneficiaryAdminRole === "OWNER" || admin.beneficiaryAdminRole === null));
+  const isOwner = admins.some((admin) => admin.id === user?.id && admin.beneficiaryAdminRole === "OWNER");
   const load = async () => {
     try {
       const team = await api.get<Admin[]>(`/beneficiaries/${beneficiaryId}/admins`);
       setAdmins(team);
-      if (team.some((admin) => admin.id === user?.id && (admin.beneficiaryAdminRole === "OWNER" || admin.beneficiaryAdminRole === null))) {
+      if (team.some((admin) => admin.id === user?.id && admin.beneficiaryAdminRole === "OWNER")) {
         setInvitations(await api.get<Invitation[]>(`/beneficiaries/${beneficiaryId}/admin-invitations`));
       } else {
         setInvitations([]);

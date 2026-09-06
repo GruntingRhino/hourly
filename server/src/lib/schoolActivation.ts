@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { hashToken } from "./tokenHash";
 import prisma from "./prisma";
 import { linkSchoolToBeneficiaryDirectory } from "./schoolBeneficiaryLink";
 import { schoolCreatedBeneficiaryPlan } from "./schoolBeneficiaryPolicy";
@@ -11,13 +12,16 @@ export type SchoolOwnershipDecision = "APPROVED" | "REJECTED";
  * transaction so concurrent applicants cannot both become owners.
  */
 export async function reviewSchoolOwnership(params: {
-  schoolId: string;
-  reviewerId: string;
+  schoolId?: string;
+  reviewerId?: string;
   decision: SchoolOwnershipDecision;
   note?: string;
+  approvalToken?: string;
 }) {
-  const candidate = await prisma.school.findUnique({
-    where: { id: params.schoolId },
+  const candidate = await prisma.school.findFirst({
+    where: params.schoolId
+      ? { id: params.schoolId }
+      : { ownershipApprovalToken: hashToken(params.approvalToken!) },
     select: {
       id: true,
       name: true,
@@ -25,6 +29,10 @@ export async function reviewSchoolOwnership(params: {
       createdById: true,
       ownershipStatus: true,
       ownershipEvidenceVerifiedAt: true,
+      ownershipApprovalToken: true,
+      ownershipApprovalTokenExpires: true,
+      ownershipApprovalTokenUsedAt: true,
+      registrationEmail: true,
     },
   });
 
@@ -37,23 +45,45 @@ export async function reviewSchoolOwnership(params: {
   if (candidate.ownershipStatus !== "PENDING") {
     throw Object.assign(new Error("School application has already been reviewed"), { status: 409 });
   }
-  if (candidate.createdById === params.reviewerId) {
+  const tokenApproval = Boolean(params.approvalToken);
+  if (!tokenApproval && !params.reviewerId) {
+    throw Object.assign(new Error("School ownership reviewer required"), { status: 403 });
+  }
+  if (!tokenApproval && candidate.createdById === params.reviewerId) {
     throw Object.assign(new Error("School applicants cannot approve their own authority"), { status: 403 });
   }
-  if (params.decision === "APPROVED" && !candidate.ownershipEvidenceVerifiedAt) {
+  if (params.decision === "APPROVED" && !candidate.ownershipEvidenceVerifiedAt && !tokenApproval) {
     throw Object.assign(new Error("School authority evidence has not been verified"), { status: 409 });
   }
 
   const reviewedAt = new Date();
   const reviewed = await prisma.$transaction(async (tx) => {
+    if (params.approvalToken) {
+      const consumed = await tx.school.updateMany({
+        where: {
+          id: candidate.id,
+          ownershipStatus: "PENDING",
+          ownershipApprovalToken: hashToken(params.approvalToken),
+          ownershipApprovalTokenUsedAt: null,
+        },
+        data: {
+          ownershipApprovalTokenUsedAt: reviewedAt,
+          ownershipApprovalToken: null,
+          ownershipApprovalTokenExpires: null,
+        },
+      });
+      if (consumed.count !== 1) {
+        throw Object.assign(new Error("Approval link is invalid, expired, or already used"), { status: 409 });
+      }
+    }
     const updated = await tx.school.updateMany({
       where: { id: candidate.id, ownershipStatus: "PENDING" },
       data: {
         ownershipStatus: params.decision,
         verified: params.decision === "APPROVED",
         ownershipReviewedAt: reviewedAt,
-        ownershipReviewedById: params.reviewerId,
-        ownershipReviewNote: params.note ?? null,
+        ownershipReviewedById: params.reviewerId ?? null,
+        ownershipReviewNote: params.note ?? (params.approvalToken ? (params.decision === "APPROVED" ? "Approved by configured business owner email link" : "Rejected by configured business owner email link") : null),
         registrationToken: null,
         registrationTokenExpires: null,
       },
@@ -63,6 +93,13 @@ export async function reviewSchoolOwnership(params: {
     }
 
     if (params.decision === "REJECTED") {
+      if (candidate.registrationEmail) {
+        await tx.schoolOwnershipBlock.upsert({
+          where: { emailHash: hashToken(candidate.registrationEmail) },
+          update: { reason: "Rejected by configured business owner email link" },
+          create: { emailHash: hashToken(candidate.registrationEmail), schoolId: candidate.id, reason: "Rejected by configured business owner email link" },
+        });
+      }
       await tx.user.update({
         where: { id: candidate.createdById! },
         data: { tokenVersion: { increment: 1 } },

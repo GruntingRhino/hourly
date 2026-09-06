@@ -27,6 +27,7 @@ import { buildStudentProgressRecords, type StudentProgressRecord } from "../lib/
 import { calculateStudentHours } from "../lib/hoursCalculator";
 import { isInternalAdminUser } from "../lib/internalAdmin";
 import { reviewSchoolOwnership } from "../lib/schoolActivation";
+import { hashToken } from "../lib/tokenHash";
 import {
   assertStudentAccessibleToStaff,
   buildCohortScopedStudentWhere,
@@ -214,6 +215,42 @@ async function runOwnershipTransfer(params: {
     });
   });
 }
+
+// GET shows a confirmation page; POST performs the state-changing approval so
+// email security scanners cannot approve a school by prefetching the link.
+async function ownershipApprovalPage(req: Request, res: Response, approve: boolean) {
+  try {
+    const token = z.string().trim().min(20).max(200).parse(req.query.token);
+    const decision = approve ? z.enum(["APPROVED", "REJECTED"]).parse(req.query.decision || "APPROVED") : "APPROVED";
+    if (!approve) {
+      const candidate = await prisma.school.findFirst({
+        where: {
+          ownershipApprovalToken: hashToken(token),
+          ownershipApprovalTokenUsedAt: null,
+          ownershipStatus: "PENDING",
+        },
+        select: { name: true, registrationEmail: true, ownershipEvidenceVerifiedAt: true },
+      });
+      if (!candidate) return res.status(409).type("html").send("<!doctype html><title>GoodHours approval unavailable</title><main style=\"font-family:sans-serif;max-width:640px;margin:4rem auto\"><h1>Approval unavailable</h1><p>This approval link is invalid, expired, already used, or the school has already been reviewed.</p></main>");
+      const evidenceNote = candidate.ownershipEvidenceVerifiedAt
+        ? "The registrant has completed the school contact verification."
+        : "School contact verification is shown for context. The configured GoodHours business owner makes the independent approval decision using this single-use approval link.";
+      return res.type("html").send(`<!doctype html><title>GoodHours school approval</title><main style="font-family:sans-serif;max-width:640px;margin:4rem auto"><h1>Review school administrator</h1><p><strong>${candidate.name}</strong> requested GoodHours school access for <strong>${candidate.registrationEmail || "the registered school email"}</strong>.</p><p>${evidenceNote}</p><form method="post" action="/api/schools/ownership-approval?token=${encodeURIComponent(token)}&decision=APPROVED" style="display:inline"><button type="submit">Yes, approve school</button></form> <form method="post" action="/api/schools/ownership-approval?token=${encodeURIComponent(token)}&decision=REJECTED" style="display:inline"><button type="submit">No, reject and block this email</button></form></main>`);
+    }
+    const reviewed = await reviewSchoolOwnership({ approvalToken: token, decision });
+    if (decision === "REJECTED") {
+      return res.type("html").send(`<!doctype html><title>GoodHours request rejected</title><main style="font-family:sans-serif;max-width:640px;margin:4rem auto"><h1>Request rejected</h1><p>${reviewed.name} was rejected and the applicant’s email has been blocked from this school request.</p></main>`);
+    }
+    return res.type("html").send(`<!doctype html><title>GoodHours school approved</title><main style="font-family:sans-serif;max-width:640px;margin:4rem auto"><h1>School approved</h1><p>${reviewed.name} is now approved. The school administrator can sign in and access the full school workspace.</p><p><a href="${CLIENT_URL}/login">Return to GoodHours</a></p></main>`);
+  } catch (err) {
+    const status = typeof err === "object" && err && "status" in err ? Number((err as { status: unknown }).status) : 400;
+    const message = err instanceof Error ? err.message : "Approval link is invalid or expired";
+    return res.status(status >= 400 && status < 500 ? status : 400).type("html").send(`<!doctype html><title>GoodHours approval unavailable</title><main style="font-family:sans-serif;max-width:640px;margin:4rem auto"><h1>Approval unavailable</h1><p>${message}</p><p>Request a new school registration if this link has expired.</p></main>`);
+  }
+}
+
+router.get("/ownership-approval", (req: Request, res: Response) => ownershipApprovalPage(req, res, false));
+router.post("/ownership-approval", (req: Request, res: Response) => ownershipApprovalPage(req, res, true));
 
 // POST /api/schools/ownership-reviews/:schoolId — every initial school claim
 // requires an independently allowlisted GoodHours operator.
@@ -1893,11 +1930,25 @@ router.get("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_AD
       return res.status(403).json({ error: "Group not found in this school" });
     }
 
+    const scope = await getStaffAccessScope(actor.id);
+    if (!scope) return res.status(403).json({ error: "Staff access scope unavailable" });
+
     const members = await prisma.studentGroupMember.findMany({
       where: { groupId: req.params.groupId },
     });
 
-    const studentIds = members.map((m) => m.studentId);
+    // Resolve the entire roster in one policy-constrained query. This avoids
+    // one authorization query per member while ensuring unauthorized IDs never
+    // enter the student PII query below.
+    const memberIds = members.map((member) => member.studentId);
+    const authorizedStudents = await prisma.user.findMany({
+      where: {
+        AND: [buildCohortScopedStudentWhere(scope), { id: { in: memberIds } }],
+      },
+      select: { id: true },
+    });
+    const authorizedIds = new Set(authorizedStudents.map((student) => student.id));
+    const studentIds = members.filter((member) => authorizedIds.has(member.studentId)).map((member) => member.studentId);
     const [students, school, hoursMap] = await Promise.all([
       prisma.user.findMany({
         where: { id: { in: studentIds } },
@@ -1948,13 +1999,9 @@ router.post("/:id/groups/:groupId/students", authenticate, requireRole("SCHOOL_A
     const { studentId } = req.body;
     if (!studentId) return res.status(400).json({ error: "studentId is required" });
 
-    // Verify the student belongs to this school
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-      select: { role: true },
-    });
-    const studentSchoolId = await resolveStudentSchoolId(studentId);
-    if (!student || student.role !== "STUDENT" || studentSchoolId !== req.params.id) {
+    const scope = await getStaffAccessScope(actor.id);
+    const studentAllowed = scope ? await assertStudentAccessibleToStaff(scope, studentId) : false;
+    if (!studentAllowed) {
       return res.status(403).json({ error: "Student is not enrolled in your school" });
     }
 

@@ -5,6 +5,11 @@ import { isInternalAdminUser } from "../lib/internalAdmin";
 import { evaluateSessionEligibility } from "../lib/schoolAuthority";
 import { AUTH_COOKIE_NAME } from "../lib/authCookies";
 
+const PENDING_SETUP_PATHS = ["/me", "/profile", "/password", "/ownership-approval/resend", "/eligibility/attest"];
+function isPendingSetupRoute(req: Request): boolean {
+  return req.baseUrl === "/api/auth" && PENDING_SETUP_PATHS.includes(req.path);
+}
+
 // JWT_SECRET must be set. env.ts calls process.exit(1) at startup if missing,
 // so this cast is safe — but we still refuse to fall back to any default.
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -76,6 +81,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
           status: true,
           tokenVersion: true,
           emailVerified: true,
+          eligibilityAttestation: { select: { eligible13Plus: true } },
           school: {
             select: { verified: true, ownershipStatus: true },
           },
@@ -100,6 +106,15 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
         return res.status(eligibility.status).json({
           error: eligibility.error,
           code: eligibility.code,
+        });
+      }
+
+      if (eligibility.setupOnly && !isPendingSetupRoute(req)) {
+        return res.status(403).json({
+          error: user.eligibilityAttestation?.eligible13Plus === true
+            ? "School ownership approval is pending. Only account setup is available."
+            : "Age eligibility confirmation is required before continuing.",
+          code: user.eligibilityAttestation?.eligible13Plus === true ? "SCHOOL_SETUP_ONLY" : "AGE_ELIGIBILITY_REQUIRED",
         });
       }
 

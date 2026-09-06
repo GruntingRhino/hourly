@@ -134,10 +134,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
+    <main className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <Link to="/" tabIndex={-1} className="flex justify-center mb-7">
+        <Link to="/" className="flex justify-center mb-7">
           <img
             src="/logo-full.png"
             alt="GoodHours"
@@ -151,7 +151,7 @@ export default function Login() {
         </Link>
 
         <div className="rounded-[3px] border border-[var(--border)] p-7" style={{ background: "var(--surface)" }}>
-          <h2 className="text-[18px] font-semibold mb-1 text-center" style={{ color: "var(--text)" }}>Welcome back</h2>
+          <h1 className="text-[18px] font-semibold mb-1 text-center" style={{ color: "var(--text)" }}>Welcome back</h1>
           <p className="text-[13px] text-center mb-6" style={{ color: "var(--text-sec)" }}>Sign in to your GoodHours account</p>
 
           {error && (
@@ -190,7 +190,6 @@ export default function Login() {
                 placeholder="you@school.edu or your email"
                 aria-invalid={fieldErrors.email ? "true" : "false"}
                 aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
-                tabIndex={1}
               />
               {fieldErrors.email && (
                 <p id="login-email-error" className="mt-1 text-[12px]" style={{ color: "var(--er-t)" }}>
@@ -205,7 +204,6 @@ export default function Login() {
                   to="/forgot-password"
                   className="text-[12px] hover:underline"
                   style={{ color: "var(--action)" }}
-                  tabIndex={4}
                 >
                   Forgot password?
                 </Link>
@@ -231,7 +229,6 @@ export default function Login() {
                   }}
                   aria-invalid={fieldErrors.password ? "true" : "false"}
                   aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
-                  tabIndex={2}
                 />
                 <button
                   type="button"
@@ -239,7 +236,6 @@ export default function Login() {
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 hover:opacity-70"
                   style={{ color: "var(--text-faint)" }}
-                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +261,6 @@ export default function Login() {
               disabled={loading}
               className="w-full h-[34px] text-white rounded-[2px] font-semibold text-[13.5px] disabled:opacity-50 transition-colors"
               style={{ background: "var(--navy)" }}
-              tabIndex={3}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -337,6 +332,6 @@ export default function Login() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

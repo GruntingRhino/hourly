@@ -55,3 +55,30 @@ keeps working. Verified after reinstall:
 Recheck on every Prisma major upgrade; remove the override once `@prisma/config`
 declares `deepmerge-ts >=8.0.0` natively.
 
+## GHSA-px8p-9vwx-vf98 — fflate malformed ZIP64 denial of service — RESOLVED 2026-09-04
+
+- **Affected dependency:** `fflate@0.8.2` via `jspdf@4.2.1`
+- **Severity reported by npm:** moderate
+- **Disposition:** RESOLVED via npm `overrides` pin, not an exception.
+
+`client/package.json` now pins `fflate` to `0.8.3`, the patched release compatible with
+`jspdf@4.2.1`; `client/package-lock.json` resolves the transitive package to `0.8.3`.
+Verified with `npm ls fflate --all`, client build, and offline `npm audit --audit-level=high`:
+`found 0 vulnerabilities`. The online audit endpoint was unavailable during this run,
+so it remains a follow-up verification item when npm audit networking is healthy.
+
+Recheck on every jsPDF upgrade and whenever npm reports a new fflate advisory.
+
+## 2026-09-05 final integration verification
+
+See `docs/qa/DEPENDENCY_FINAL_REMEDIATION_2026-09-05.md` for the complete evidence record.
+
+- Runtime used for release gates: Node `v24.20.0`, npm `11.19.0`.
+- The isolated candidate's global `path-to-regexp: 8.4.2` override was rejected: Express `4.22.2` declares `~0.1.12` and the actual installed Express runtime copy remains `0.1.13`. Integrated selectors upgrade only Vercel 8.x/6.x consumers (`8.4.2`/`6.3.0`) and preserve Express.
+- Actual root tree: `npm ls --all --json` exit 0 with no problems. `tar@7.5.22`, `@tootallnate/once@2.0.1`, `smol-toml@1.6.1`, `ajv@8.18.0`, `js-yaml@4.3.2`, root `minimatch@10.2.6` with `@ts-morph/common` minimatch `3.1.5`, and version-selective `path-to-regexp` were verified from installed package metadata.
+- Root online audit: **10 residual vulnerabilities: 9 moderate, 1 high, 0 critical**. Residuals are in the Vercel CLI/build graph and `undici` 5.x; this is not a clean root audit.
+- Server online audit: **0 vulnerabilities**. Client online audit: **0 vulnerabilities**.
+- Server suite: **461 tests / 461 pass / 0 fail / 0 skip**. Server build, client lint/build, Prisma validate, and both live/shadow migration diffs passed.
+- Actual compiled server boot and HTTP smoke passed: health `200` with DB `ok`, JSON 404, and unauthenticated auth `401`. Vercel CLI `59.11.7` version/help and local builder API imports passed.
+
+`undici` was intentionally not forced from Vercel's 5.x contract to 6.x; npm registry inspection found `5.29.0` as the last 5.x release while the affected fixes require 6.x. Recheck root Vercel advisories on each CLI release and before deployment; do not use `npm audit fix --force` or blanket cross-major overrides.

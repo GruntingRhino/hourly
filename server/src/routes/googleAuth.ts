@@ -4,13 +4,13 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { signUserToken } from "../middleware/auth";
 import { generateToken, hashToken } from "../lib/tokenHash";
-import { sendSchoolRegistrationMagicLink, CLIENT_URL } from "../services/email";
+import { sendSchoolRegistrationMagicLink, sendSchoolOwnershipApprovalEmail, CLIENT_URL } from "../services/email";
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 
 import { isInternalAdminUser } from "../lib/internalAdmin";
-import { isPubliclyDeployed } from "../lib/isProdLike";
+import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
 import { setAuthCookie } from "../lib/authCookies";
-import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
+import { assertExactSchoolDomain, evaluateSessionEligibility, ELIGIBILITY_POLICY_VERSION } from "../lib/schoolAuthority";
 import { extractDomainFromWebsite, isPersonalEmailDomain } from "../lib/signupEmailPolicy";
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import {
@@ -140,6 +140,7 @@ const registerSchoolSchema = strictObject({
   schoolCity: optionalTrimmedString(100),
   schoolZip: z.string().trim().regex(/^\d{5}$/).optional(),
   contactEmail: z.string().trim().toLowerCase().email().max(255),
+  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
 });
 
 const verifySchoolQuerySchema = strictObject({
@@ -184,6 +185,7 @@ function buildUserPayload(user: any) {
     beneficiaryId: user.beneficiaryId,
     beneficiary: user.beneficiary,
     emailVerified: true,
+    requiresEligibilityAttestation: user.eligibilityAttestation?.eligible13Plus !== true,
   };
 }
 
@@ -219,6 +221,7 @@ async function handleGoogleIdentity(params: {
       orderBy: { updatedAt: "desc" as const },
     },
     beneficiary: true,
+    eligibilityAttestation: true,
   };
 
   let user = await prisma.user.findFirst({
@@ -582,6 +585,8 @@ router.get("/schools", publicGoogleAuthLimiter, async (req: Request, res: Respon
 router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, registerSchoolEmailLimiter, async (req: Request, res: Response) => {
   try {
     const data = registerSchoolSchema.parse(req.body);
+    const blocked = await prisma.schoolOwnershipBlock.findUnique({ where: { emailHash: hashToken(data.contactEmail) }, select: { id: true } });
+    if (blocked) return res.status(403).json({ error: "This email is blocked from submitting a school ownership request.", code: "SCHOOL_EMAIL_BLOCKED" });
 
     const registrationIntent = await prisma.schoolRegistrationIntent.findFirst({
       where: {
@@ -645,6 +650,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
     // Generate magic link token
     const magicToken = generateToken();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const ownershipApprovalToken = generateToken();
 
     const registrationDigest = hashToken(data.registrationToken);
 
@@ -686,12 +692,17 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         },
         select: { id: true },
       });
+      await tx.eligibilityAttestation.create({
+        data: { userId: adminUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "google" },
+      });
 
       const txSchool = await tx.school.create({
         data: {
           name: dirEntry?.name || data.schoolName,
           verified: false,
           ownershipStatus: "PENDING",
+          ownershipApprovalToken: hashToken(ownershipApprovalToken),
+          ownershipApprovalTokenExpires: null,
           registrationToken: hashToken(magicToken),
           registrationTokenExpires: expiresAt,
           registrationEmail: data.contactEmail,
@@ -727,14 +738,33 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
       console.error("[register-school] Failed to send magic link:", emailErr);
     }
 
+    const ownerApprovalEmail = "abhaysivaram31@gmail.com";
+    const approvalUrl = `${CLIENT_URL}/api/schools/ownership-approval?token=${ownershipApprovalToken}`;
+    const productionOwnerApproval = isProdLike() && /(^|\.)goodhours\.app$/i.test(new URL(CLIENT_URL).hostname);
+    let ownershipApprovalDelivery: "sent" | "bypass" | "failed" = "bypass";
+    if (productionOwnerApproval) {
+      try {
+        await sendSchoolOwnershipApprovalEmail(ownerApprovalEmail, school.name, registrationIntent.email, approvalUrl);
+        ownershipApprovalDelivery = "sent";
+      } catch (emailErr) {
+        ownershipApprovalDelivery = "failed";
+        console.error("[register-school] Failed to send school ownership approval email:", emailErr);
+      }
+    } else {
+      console.info("[register-school] School ownership approval email bypassed in non-production environment", {
+        environment: process.env.VERCEL_ENV || process.env.APP_ENV || process.env.NODE_ENV || "local",
+      });
+    }
+
     res.json({
       message: emailDeliveryFailed
         ? "Registration saved, but the magic-link email could not be delivered. Please contact support or try again."
-        : "Registration link sent. Contact verification and independent ownership review are both required before sign-in.",
+        : "Registration link sent. Verify the school contact email; then the configured GoodHours business owner must approve the school before full access is enabled.",
       schoolId: school.id,
       schoolName: school.name,
       sentTo: data.contactEmail,
       emailDeliveryFailed,
+      ownershipApprovalDelivery,
       requiresSchoolOwnershipReview: true,
     });
   } catch (err) {

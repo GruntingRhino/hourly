@@ -25,7 +25,7 @@ const student = {
   role: "STUDENT",
   status: "ACTIVE",
   tokenVersion: 0,
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
 };
 
 async function requestAsStudent(app: express.Express) {

@@ -25,7 +25,7 @@ const beneficiaryAdmin = {
   tokenVersion: 0,
   beneficiaryId: "ben-1",
   beneficiaryAdminRole: "OWNER",
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
 };
 
 async function requestAs(app: express.Express, method: "GET" | "POST", path: string, body?: unknown) {

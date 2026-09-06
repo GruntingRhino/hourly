@@ -17,7 +17,7 @@ const teacher = {
   assignedCohorts: [{ cohortId: "cohort-a" }],
   status: "ACTIVE",
   tokenVersion: 0,
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
   school: { verified: true, ownershipStatus: "APPROVED" },
 };
 

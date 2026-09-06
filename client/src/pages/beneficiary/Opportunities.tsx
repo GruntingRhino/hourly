@@ -1244,7 +1244,7 @@ export default function BeneficiaryOpportunities({ overrideBenId }: { overrideBe
               ) : (
                 <div className="space-y-3">
                   {sorted.map(({ opp, displayStatus }) => (
-                    <div key={opp.id} className={`bg-white border rounded-[3px] p-4 ${editOppId === opp.id ? "border-blue-400 ring-1 ring-blue-200" : "border-[var(--border)]"}`}>
+                    <div key={opp.id} data-testid={`opportunity-${opp.id}`} className={`bg-white border rounded-[3px] p-4 ${editOppId === opp.id ? "border-blue-400 ring-1 ring-blue-200" : "border-[var(--border)]"}`}>
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-medium text-sm">{opp.title}</div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">

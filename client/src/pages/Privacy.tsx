@@ -26,11 +26,10 @@ export default function Privacy() {
             or services (collectively, the "Service").
           </p>
           <p className="mt-3">
-            GoodHours is designed primarily for educational use. Because we serve students —
-            including minors — we take privacy seriously and structure our data practices
-            accordingly. This Policy is intended to comply with the Family Educational Rights
-            and Privacy Act (<strong>FERPA</strong>), the Children's Online Privacy Protection
-            Act (<strong>COPPA</strong>), and applicable state privacy laws.
+            GoodHours is designed primarily for educational use. We take the sensitivity of
+            student information seriously and describe the safeguards and choices currently
+            available in the Service. This Policy does not itself establish FERPA, COPPA, or
+            other legal compliance, which depends on applicable facts, agreements, and operations.
           </p>
           <p className="mt-3">
             Please read this Policy carefully. By using the Service, you acknowledge that you
@@ -51,7 +50,7 @@ export default function Privacy() {
               institutions who manage cohorts, verify hours, and access student records.
             </li>
             <li>
-              <strong>Students</strong> — individuals enrolled by their school to track and
+              <strong>Students 13 and older</strong> — individuals enrolled by their school to track and
               verify community service hours. Students join only through school-issued invitations.
             </li>
             <li>
@@ -94,7 +93,7 @@ export default function Privacy() {
                 </tr>
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top">Profile data</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Phone number (encrypted), grade level, house/cohort affiliation, optional bio, optional age (10–25)</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Phone number, grade level, house/cohort affiliation, optional bio</td>
                   <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Students, school staff</td>
                 </tr>
                 <tr>
@@ -165,8 +164,8 @@ export default function Privacy() {
               verification requests.
             </li>
             <li>
-              <strong>Verify and record service hours</strong> — maintain an immutable audit trail
-              of all verification actions to support compliance and reporting.
+              <strong>Verify and record service hours</strong> — record verification actions to
+              support reporting and school review.
             </li>
             <li>
               <strong>Generate reports and transcripts</strong> — produce student progress reports
@@ -226,7 +225,7 @@ export default function Privacy() {
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top">School admin / teacher</td>
                   <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Other administrators and teachers at the same school</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Account profile; no cross-school access</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Account profile; access is limited by role and school-scope controls</td>
                 </tr>
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top">Beneficiary admin</td>
@@ -262,7 +261,7 @@ export default function Privacy() {
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Neon (database)</td>
                   <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Serverless PostgreSQL database hosting</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All stored platform data (encrypted at rest and in transit)</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">All stored platform data needed for the Service</td>
                 </tr>
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Resend</td>
@@ -277,7 +276,7 @@ export default function Privacy() {
                 <tr>
                   <td className="px-3 py-2.5 text-[var(--text)] align-top font-medium">Vercel</td>
                   <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Application hosting and serverless compute</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Request logs (IP, path, timestamp) — standard access logs, short retention</td>
+                  <td className="px-3 py-2.5 text-[var(--text-sec)] align-top">Request logs (IP, path, timestamp) — subject to the hosting provider's configuration</td>
                 </tr>
               </tbody>
             </table>
@@ -305,9 +304,10 @@ export default function Privacy() {
       content: (
         <>
           <p>
-            To the extent GoodHours is used by a school subject to the Family Educational Rights
-            and Privacy Act (FERPA), 20 U.S.C. § 1232g, we act as a "school official" with a
-            legitimate educational interest in accordance with 34 C.F.R. § 99.31(a)(1). GoodHours:
+            If a school subject to the Family Educational Rights and Privacy Act (FERPA), 20 U.S.C.
+            § 1232g, authorizes GoodHours in a written agreement and defines the applicable scope,
+            the school determines the permitted educational purpose and access. GoodHours may
+            process information as the school's service provider under those agreed conditions:
           </p>
           <ul className="list-disc pl-5 mt-3 space-y-2">
             <li>
@@ -319,9 +319,8 @@ export default function Privacy() {
               direction or as required by law.
             </li>
             <li>
-              Maintains a <strong>Data Access Log</strong> — an auditable record of each time a
-              school staff member views, exports, or deletes student data — to support schools'
-              FERPA compliance obligations.
+              Uses available access logging for relevant staff views, exports, and deletion actions;
+              schools remain responsible for their own FERPA obligations and review of those logs.
             </li>
             <li>
               Returns or destroys student education records upon the school's request or upon
@@ -343,15 +342,15 @@ export default function Privacy() {
       content: (
         <>
           <p>
-            The Service is designed for use in educational settings and may be used by students as
-            young as 10 years old. GoodHours does not knowingly solicit or collect personal
-            information directly from children under 13 without verifiable parental consent.
+            GoodHours is for users who are 13 or older. We do not intentionally invite or permit
+            users under 13 to create or use accounts through the Service.
           </p>
           <p className="mt-3">
-            Students under 13 may only use the Service <strong>through their school</strong>.
-            By enrolling students under 13 on GoodHours, a school administrator represents that
-            the school has obtained all necessary parental or guardian consents as required by
-            COPPA (15 U.S.C. §§ 6501–6506) and applicable state law.
+            A school invitation does not create an exception to this age requirement. We do not
+            ask users to provide a date of birth or identity document for this policy. If you
+            believe we may have information about someone under 13, contact us at{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">{CONTACT_EMAIL}</a>
+            so we can review the situation and determine appropriate next steps.
           </p>
           <p className="mt-3">
             We collect the minimum information necessary from student accounts. Specifically:
@@ -363,12 +362,12 @@ export default function Privacy() {
             <li>We do not serve advertising to any users, including children.</li>
           </ul>
           <p className="mt-3">
-            Parents or guardians who believe their child's information was collected without proper
-            consent may contact us at{" "}
+            Parents or guardians may contact us at{" "}
             <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--action)] underline hover:opacity-80">
               {CONTACT_EMAIL}
             </a>
-            . We will promptly review and, if confirmed, delete the information.
+            . We will review reports and respond based on the facts and applicable requirements;
+            this notice does not promise an automatic deletion process or response deadline.
           </p>
         </>
       ),
@@ -403,13 +402,14 @@ export default function Privacy() {
               rate limits to prevent brute-force attacks.
             </li>
             <li>
-              <strong>Role-based access control:</strong> All API endpoints enforce server-side
-              role checks. School data is strictly scoped — no cross-school access is possible.
+              <strong>Access controls:</strong> The Service uses server-side role and school-scope
+              checks. These controls are intended to limit access to authorized users; no security
+              measure is error-proof.
             </li>
             <li>
-              <strong>Immutable audit logs:</strong> All verification actions and data-access
-              events are logged with actor, timestamp, and details and cannot be deleted through
-              normal platform workflows.
+              <strong>Audit logging:</strong> The Service logs verification actions and certain
+              data-access events with actor, timestamp, and details. Retention and deletion vary by
+              record type and account lifecycle; no audit record is guaranteed to be permanent.
             </li>
           </ul>
           <p className="mt-3">
@@ -429,53 +429,22 @@ export default function Privacy() {
       content: (
         <>
           <p>
-            We retain personal information for as long as your account is active or as needed to
-            provide the Service. The following specific retention practices apply:
+            We retain information only as long as needed for the Service, school-directed records,
+            safety, dispute resolution, or legal obligations. Actual periods vary by data type and
+            account role; we do not publish a complete fixed schedule here because provider,
+            school-record, and legal-hold requirements may differ.
           </p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-[13px] border border-[var(--border)] rounded-[3px] overflow-hidden">
-              <thead>
-                <tr className="bg-[var(--surface-alt)] text-left">
-                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Data Type</th>
-                  <th className="px-3 py-2 font-semibold text-[var(--text)] border-b border-[var(--border)]">Retention Period</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Account profile data</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Until account deletion is requested</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Service-hour records</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Until account deletion; schools should export records before deleting</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Email verification tokens</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">24 hours from issuance</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Password reset tokens</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">1 hour from issuance</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Student invitation tokens</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">72 hours from issuance</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Audit log entries</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Retained for compliance purposes even after account deletion; personally identifiable actor information is subject to review upon request</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2.5 text-[var(--text)]">Uploaded signature files</td>
-                  <td className="px-3 py-2.5 text-[var(--text-sec)]">Retained with the associated verification record; deleted upon account deletion</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
           <p className="mt-3">
-            When you delete your account, we perform a cascading deletion of your profile,
-            messages, signups, sessions, and associated personal data. Certain anonymized
-            records may be retained for legal compliance or aggregate statistical purposes.
+            Temporary credentials and invitation data may expire as configured. Verification,
+            audit, message, upload, export, and school-directed records may be retained or
+            removed differently, including where a school or legal obligation requires it. Ask
+            your school administrator or contact us for a record-specific request.
+          </p>
+          <p className="mt-3">
+            You may request account deletion. The result depends on account type and school
+            records, and some records may be retained, anonymized, or placed under a legal or
+            school-directed hold. Deletion of one account is not a promise that every provider,
+            backup, or school record is immediately removed.
           </p>
         </>
       ),
@@ -607,7 +576,7 @@ export default function Privacy() {
             </p>
           </div>
           <p className="mt-3">
-            We aim to respond to all privacy inquiries within 10 business days.
+            We review privacy inquiries and respond as appropriate based on the request.
           </p>
         </>
       ),
@@ -617,7 +586,8 @@ export default function Privacy() {
   return (
     <div className="min-h-screen bg-[var(--surface-alt)]">
       {/* Nav */}
-      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
+      <header>
+        <nav aria-label="Primary" className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img
             src="/logo-full.png"
@@ -641,9 +611,10 @@ export default function Privacy() {
             Sign in
           </Link>
         </div>
-      </div>
+        </nav>
+      </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <main className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-[30px] font-bold text-[var(--text)] mb-2">Privacy Policy</h1>
@@ -661,10 +632,10 @@ export default function Privacy() {
             </p>
             <ul className="text-[13px] text-[var(--navy)] space-y-1">
               <li>✓ We never sell personal data to advertisers or data brokers.</li>
-              <li>✓ Student data is only visible to their school and approved partner organizations.</li>
-              <li>✓ Student names are anonymized to partner organizations by default.</li>
-              <li>✓ We comply with FERPA and COPPA.</li>
-              <li>✓ You can delete your account and data at any time.</li>
+              <li>✓ Access depends on your role, school arrangements, and the relevant record.</li>
+              <li>✓ Student names are anonymized ("Volunteer [ID]") to partner organizations by default.</li>
+              <li>✓ We describe current privacy choices and access controls.</li>
+              <li>✓ You can request account deletion, subject to applicable records obligations.</li>
             </ul>
           </div>
         </div>
@@ -707,7 +678,7 @@ export default function Privacy() {
             Privacy questions or concerns?
           </div>
           <p className="text-[13px] text-[var(--text-sec)] mb-3">
-            We respond to all privacy inquiries within 10 business days.
+            We review privacy inquiries and respond as appropriate based on the request.
           </p>
           <a
             href={`mailto:${CONTACT_EMAIL}`}
@@ -721,7 +692,7 @@ export default function Privacy() {
             <Link to="/" className="hover:text-[var(--text-sec)]">Home</Link>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

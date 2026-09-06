@@ -7,6 +7,8 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:3001";
 const PASSWORD = "Playwright1!";
 const FIXTURES_DIR = `${process.cwd()}/tests/artifacts/fixtures`;
 const AUTH_CACHE_DIR = path.join(process.cwd(), "tests", ".auth", "ui-audit");
+const ACCOUNT_FILTER = process.env.UI_AUDIT_ACCOUNT || "";
+const ROUTE_FILTER = process.env.UI_AUDIT_ROUTE || "";
 
 type AccountKey =
   | "schoolA"
@@ -505,7 +507,11 @@ async function auditControls(page: Page, route: RouteSpec): Promise<void> {
 }
 
 function routesFor(account: AccountSpec): RouteSpec[] {
-  return ROLE_ROUTES[account.role];
+  return ROLE_ROUTES[account.role].filter((route) => !ROUTE_FILTER || route.id === ROUTE_FILTER);
+}
+
+function accountsForAudit(): AccountSpec[] {
+  return ACCOUNTS.filter((account) => !ACCOUNT_FILTER || account.key === ACCOUNT_FILTER);
 }
 
 function escapeForAttr(value: string): string {
@@ -513,7 +519,7 @@ function escapeForAttr(value: string): string {
 }
 
 test.describe.serial("UI interaction audit", () => {
-  for (const account of ACCOUNTS) {
+  for (const account of accountsForAudit()) {
     test(`${account.key} interactive routes stay healthy`, async ({ browser }) => {
       const ctx = await browser.newContext({ acceptDownloads: true });
       const page = await ctx.newPage();
@@ -528,11 +534,18 @@ test.describe.serial("UI interaction audit", () => {
 
       for (const route of routesFor(account)) {
         await test.step(`${account.key} ${route.id}`, async () => {
-          await auditFields(page, route);
-          await auditControls(page, route);
+          const routePage = await ctx.newPage();
+          try {
+            await loginFast(routePage, account);
+            await auditFields(routePage, route);
+            await auditControls(routePage, route);
+          } finally {
+            await routePage.close();
+          }
         });
       }
 
+      await page.close();
       await ctx.close();
     });
   }

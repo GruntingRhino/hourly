@@ -312,7 +312,7 @@ test.describe.serial("UI stateful audit", () => {
 
     await studentPage.goto(`${UI_BASE}/submit`, { waitUntil: "networkidle" });
     await studentPage.getByRole("button", { name: /needs revision/i }).click();
-    const revisionCard = studentPage.locator("div").filter({ hasText: flow.submissionOrgName }).first();
+    const revisionCard = submissionCard(studentPage, flow.submissionOrgName);
     await expect(revisionCard).toBeVisible({ timeout: 20_000 });
     await revisionCard.getByRole("button", { name: /edit & resubmit/i }).click();
     const revisionForm = studentPage.locator("form").first();
@@ -364,7 +364,7 @@ test.describe.serial("UI stateful audit", () => {
     expect(deleteResponse.ok()).toBeTruthy();
 
     await orgPage.reload({ waitUntil: "networkidle" });
-    await expect(orgPage.locator("main")).not.toContainText(flow.updatedOpportunityTitle);
+    await expect(orgPage.getByTestId(`opportunity-${flow.opportunityId}`)).toHaveCount(0);
     flow.opportunityId = "";
   });
 });

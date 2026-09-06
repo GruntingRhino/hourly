@@ -55,9 +55,26 @@
     "@types/zipcodes": "^8.0.5",
     "prisma": "^6.19.3",
     "typescript": "^5.7.3",
-    "vercel": "^50.44.0"
+    "vercel": "^59.11.7"
   },
   "overrides": {
-    "deepmerge-ts": "8.0.2"
+    "deepmerge-ts": "8.0.2",
+    "qs": "6.16.0",
+    "tar": "7.5.22",
+    "@tootallnate/once": "2.0.1",
+    "smol-toml": "1.6.1",
+    "ajv": "8.18.0",
+    "js-yaml": "4.3.2",
+    "undici": "6.28.0",
+    "@vercel/blob": {
+      "undici": "6.28.1"
+    },
+    "@vercel/sandbox": {
+      "undici": "7.29.1"
+    },
+    "minimatch@10.1.1": "10.2.6",
+    "path-to-regexp@8.3.0": "8.4.2",
+    "path-to-regexp@8.2.0": "8.4.2",
+    "path-to-regexp@6.1.0": "6.3.0"
   }
 }

@@ -59,12 +59,21 @@ export default function SlotDetail() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
-    if (!slot) {
-      api.get<SlotFull>(`/beneficiaries/slots/${id}`)
-        .then((data) => { setSlot(data); setLoading(false); })
-        .catch(() => { setError("Failed to load details."); setLoading(false); });
-    }
-  }, [id, slot]);
+    if (!id) return;
+    let cancelled = false;
+    api.get<SlotFull>(`/beneficiaries/slots/${id}`)
+      .then((data) => {
+        if (cancelled) return;
+        setSlot(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("Failed to load details.");
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id]);
 
   useEffect(() => { if (id) api.get<SignupQuestion[]>(`/beneficiaries/slots/${id}/questions`).then(setQuestions).catch(() => setQuestions([])); }, [id]);
 

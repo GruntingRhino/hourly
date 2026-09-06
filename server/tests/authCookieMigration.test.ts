@@ -116,6 +116,7 @@ test("POST /api/auth/session-pref re-issues the cookie with the requested persis
     status: "ACTIVE",
     tokenVersion: 0,
     emailVerified: true,
+    eligibilityAttestation: { eligible13Plus: true },
     school: null,
   };
   const original = prismaClient.user.findUnique;
@@ -152,6 +153,7 @@ test("an Authorization Bearer header still authenticates when no cookie is prese
     status: "ACTIVE",
     tokenVersion: 0,
     emailVerified: true,
+    eligibilityAttestation: { eligible13Plus: true },
     school: null,
   };
   const original = prismaClient.user.findUnique;
@@ -182,6 +184,7 @@ test("the session cookie takes precedence over a mismatched Authorization header
     status: "ACTIVE",
     tokenVersion: 0,
     emailVerified: true,
+    eligibilityAttestation: { eligible13Plus: true },
     school: null,
   };
   const original = prismaClient.user.findUnique;

@@ -24,7 +24,7 @@ const internalAdmin = {
   role: "SCHOOL_ADMIN",
   status: "ACTIVE",
   tokenVersion: 0,
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
   school: { verified: true, ownershipStatus: "APPROVED" },
 };
 

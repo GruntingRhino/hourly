@@ -39,7 +39,7 @@ const teacher = {
   role: "TEACHER",
   status: "ACTIVE",
   tokenVersion: 0,
-  emailVerified: true,
+  emailVerified: true, eligibilityAttestation: { eligible13Plus: true },
   schoolId: "school-a",
   school: { verified: true, ownershipStatus: "APPROVED" },
 };

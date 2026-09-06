@@ -29,7 +29,7 @@ const SECTIONS: FAQSection[] = [
       },
       {
         q: "How is my data kept private?",
-        a: "GoodHours encrypts sensitive personal information at rest and in transit. Student data is only visible to the student, their school administrators, and the organization that verified their hours. We never sell personal data to third parties.",
+        a: "GoodHours uses access controls and other safeguards for personal information. Access depends on your role, school arrangements, and the relevant record; no online service can promise perfect security. We do not sell personal data to third parties.",
       },
     ],
   },
@@ -38,7 +38,7 @@ const SECTIONS: FAQSection[] = [
     items: [
       {
         q: "How do I join GoodHours as a student?",
-        a: "Your school sends you an invitation email with a unique link. Click the link, create your account, and you'll be automatically enrolled in your school's cohort. You don't need to find your school manually.",
+        a: "GoodHours is for students who are 13 or older. Your school sends you an invitation email with a unique link. Click the link, create your account, and you'll be automatically enrolled in your school's cohort. You don't need to find your school manually.",
       },
       {
         q: "How do I log hours through a school-organized event?",
