@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install --include=dev && rm -rf server/node_modules",
-  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && cd client && npm install --include=dev && npm run build",
+  "buildCommand": "bash scripts/vercel-production-build.sh",
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" }
