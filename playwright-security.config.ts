@@ -12,6 +12,10 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/security",
+  // Creates/removes the run-scoped private JWT cache directory and publishes
+  // its path to the workers via process.env (see helpers/tokenCacheDir.ts).
+  globalSetup: "./tests/security/helpers/globalSetup.ts",
+  globalTeardown: "./tests/security/helpers/globalTeardown.ts",
   timeout: 30_000,
   workers: 1,       // serial — tests share seeded data and mutate school settings
   retries: 0,

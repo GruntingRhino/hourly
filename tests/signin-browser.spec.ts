@@ -163,7 +163,7 @@ test("BR-08: a school admin signs in and is not shown the student age screen", a
   await expect(page.getByText(/13 or older|age eligibility/i)).toHaveCount(0);
 });
 
-test("BR-09: signing out clears the session", async ({ page, context }) => {
+test("BR-09: clicking Sign out ends the session", async ({ page, context }) => {
   await fillLogin(page, STUDENT, PW);
   await Promise.all([
     page.waitForResponse((r) => r.url().includes("/api/auth/login")),
@@ -171,13 +171,48 @@ test("BR-09: signing out clears the session", async ({ page, context }) => {
   ]);
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
 
-  await context.clearCookies();
-  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+  // Precondition — the session really exists before we end it. Same-origin
+  // (`/api` is proxied to the QA API by the static server), so the HttpOnly
+  // cookie is actually sent; a cross-origin call to API_BASE_URL would not
+  // carry it and would 401 for the wrong reason.
+  const sessionCookie = (await context.cookies()).find((c) => c.name === "gh_session");
+  expect(sessionCookie, "no gh_session cookie after signing in").toBeTruthy();
+  expect((await page.request.get("/api/auth/me")).status()).toBe(200);
+
+  // Click the product's own control — nothing here deletes the cookie jar, so
+  // a logout that did not clear the cookie would fail this test.
+  const [logout] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/auth/logout") && r.request().method() === "POST"),
+    page.getByRole("button", { name: /log out|sign out/i }).click(),
+  ]);
+  expect(logout.status()).toBe(204);
+  // The cookie is HttpOnly: only the server can clear it, and it does so here.
+  // (`headers()` deliberately hides cookie headers — `allHeaders()` does not.)
+  const setCookie = (await logout.allHeaders())["set-cookie"] ?? "";
+  expect(setCookie).toContain("gh_session=;");
+  expect(setCookie).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/);
+
+  await expect
+    .poll(async () => (await context.cookies()).some((c) => c.name === "gh_session"))
+    .toBe(false);
+  expect((await page.request.get("/api/auth/me")).status()).toBe(401);
+
+  // ...and the client-side cached profile is gone, so a reload does not show a
+  // signed-in shell.
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("goodhours_user") ?? sessionStorage.getItem("goodhours_user"),
+    ),
+  ).toBeNull();
   await page.goto("/");
   await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", { name: /log out|sign out/i })).toHaveCount(0);
 
-  const me = await page.request.get(`${API}/api/auth/me`);
-  expect(me.status()).toBe(401);
+  // Scope, deliberately: sign-out is the removal of the session cookie. The JWT
+  // is stateless (`server/src/routes/auth.ts` POST /logout only calls
+  // clearAuthCookie), so a bearer token captured before logout stays valid until
+  // it expires. Asserting otherwise would assert a revocation contract this
+  // product does not implement.
 });
 
 test("BR-10: 'Continue with Google' sends the browser to a correct Google consent URL", async ({ page }) => {

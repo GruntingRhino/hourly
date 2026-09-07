@@ -9,14 +9,19 @@
  * correct; the harness was the bug. On disk, a full run logs in each account
  * once regardless of how many workers are recycled.
  *
- * The file lives under the OS temp dir, is keyed by API base URL, and holds only
- * short-lived JWTs for the seeded throwaway `Playwright1!` accounts.
+ * The file holds real bearer tokens, so it lives inside a private per-run
+ * directory (0700, unpredictable name — see `tokenCacheDir.ts`) rather than at
+ * a predictable shared /tmp path, and it is removed at global teardown. Because
+ * the directory is created fresh by global setup and destroyed after the run,
+ * a token can never be adopted by a later run: a re-seed, a `tokenVersion` bump
+ * or a `JWT_SECRET` rotation always produces fresh logins, never 401s from a
+ * stale fixture. Within the run the file is keyed by API base URL.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { request } from "@playwright/test";
+import { createPrivateCacheDir, TOKEN_CACHE_DIR_ENV } from "./tokenCacheDir";
 
 export const BASE = process.env.API_BASE_URL ?? "http://localhost:3001";
 export const PW = "Playwright1!";
@@ -35,33 +40,58 @@ export type Account = keyof typeof ACCOUNTS;
 
 const cache = new Map<Account, string>();
 
-const cacheFile = path.join(
-  os.tmpdir(),
-  `goodhours-security-tokens-${createHash("sha256").update(BASE).digest("hex").slice(0, 16)}.json`,
-);
+const CACHE_FILE_NAME =
+  `tokens-${createHash("sha256").update(BASE).digest("hex").slice(0, 16)}.json`;
+
+let processCacheDir: string | undefined;
+
+/**
+ * The run's private cache directory, published by global setup. If a spec is
+ * run under a config without that global setup, fall back to a private
+ * directory for this process alone — still never a shared predictable path,
+ * just not shared with a restarted worker.
+ */
+function cacheFilePath(): string {
+  const runDir = process.env[TOKEN_CACHE_DIR_ENV];
+  if (runDir) return path.join(runDir, CACHE_FILE_NAME);
+  processCacheDir ??= createPrivateCacheDir();
+  return path.join(processCacheDir, CACHE_FILE_NAME);
+}
 
 function readDiskCache(): Record<string, string> {
+  const file = cacheFilePath();
   try {
-    return JSON.parse(fs.readFileSync(cacheFile, "utf8")) as Record<string, string>;
+    // The containing directory is 0700 and unpredictably named, so nothing
+    // hostile can be in it; reject anything that is not a plain file anyway.
+    if (!fs.lstatSync(file).isFile()) return {};
+    return JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, string>;
   } catch {
     return {};
   }
 }
 
 function writeDiskCache(role: Account, token: string): void {
+  const file = cacheFilePath();
   const next = { ...readDiskCache(), [role]: token };
-  // Atomic-ish: another worker may be writing concurrently, and a torn read is
-  // handled by readDiskCache()'s catch (worst case one extra login).
-  const tmp = `${cacheFile}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(next), { mode: 0o600 });
-  fs.renameSync(tmp, cacheFile);
+  // `wx` — fail if the staging path already exists, rather than following a
+  // pre-planted file or symlink (`mode` alone is applied only on create, so it
+  // is not by itself protection). Atomic-ish: another worker may be writing
+  // concurrently, and a torn read is handled by readDiskCache()'s catch (worst
+  // case one extra login).
+  const tmp = `${file}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(next), { flag: "wx", mode: 0o600 });
+  fs.renameSync(tmp, file);
 }
 
-/** Drops the on-disk cache. Call when the API or seed data is recreated. */
+/**
+ * Drops the on-disk cache. The run-scoped directory means this is not needed
+ * between runs; it exists for a suite that re-seeds mid-run and must not reuse
+ * the tokens it minted before the re-seed.
+ */
 export function clearTokenCache(): void {
   cache.clear();
   try {
-    fs.unlinkSync(cacheFile);
+    fs.unlinkSync(cacheFilePath());
   } catch {
     /* already absent */
   }

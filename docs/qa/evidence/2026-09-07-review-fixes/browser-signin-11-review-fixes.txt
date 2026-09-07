@@ -1,0 +1,16 @@
+
+Running 11 tests using 1 worker
+
+  ✓   1 tests/signin-browser.spec.ts:33:5 › BR-01: a student signs in through the real form and lands in the app (1.3s)
+  ✓   2 tests/signin-browser.spec.ts:46:5 › BR-02: the browser holds a real HttpOnly session cookie afterwards (1.0s)
+  ✓   3 tests/signin-browser.spec.ts:60:5 › BR-03: the session survives a full page reload (2.3s)
+  ✓   4 tests/signin-browser.spec.ts:76:5 › BR-04: a wrong password shows an error and does not navigate away (1.0s)
+  ✓   5 tests/signin-browser.spec.ts:89:5 › BR-05: the error message never reveals whether the account exists (1.5s)
+  ✓   6 tests/signin-browser.spec.ts:107:5 › BR-06: the password is masked by default and only revealed on request (716ms)
+  ✓   7 tests/signin-browser.spec.ts:119:5 › BR-07: the form is operable by keyboard alone (1.1s)
+  ✓   8 tests/signin-browser.spec.ts:153:5 › BR-08: a school admin signs in and is not shown the student age screen (1.5s)
+  ✓   9 tests/signin-browser.spec.ts:166:5 › BR-09: clicking Sign out ends the session (1.9s)
+  ✓  10 tests/signin-browser.spec.ts:218:5 › BR-10: 'Continue with Google' sends the browser to a correct Google consent URL (2.7s)
+  ✓  11 tests/signin-browser.spec.ts:246:5 › BR-11: the login page has no horizontal overflow at 320px and 375px (2.0s)
+
+  11 passed (18.6s)

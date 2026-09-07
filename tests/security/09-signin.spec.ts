@@ -20,6 +20,7 @@
  */
 import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { BASE, ACCOUNTS, PW, getToken, auth } from "./helpers/tokens";
+import { expectNoUserAccount } from "./helpers/qaDb";
 
 const STUDENT = ACCOUNTS.student1.email;
 const SCHOOL_ADMIN = ACCOUNTS.schoolA.email;
@@ -389,13 +390,17 @@ test("GO-07: a state nonce is single-use — the cookie is cleared on the first 
     (await (await c.get(`${BASE}/api/auth/google/url?state=login`)).json()).url,
   ).searchParams.get("state")!;
 
-  // First use: state matches, so it gets past CSRF and fails later, at Google's
-  // token endpoint, with the bogus code. Anything but 403 proves CSRF passed.
+  // First use: the state matches, so it gets *past* the CSRF check and fails
+  // later, in the token exchange, on the bogus code. Assert that specific
+  // outcome — a bare `not.toBe(403)` would also accept a 400/500 raised before
+  // the state comparison ever ran, which would make the 403 on replay below
+  // attributable to something other than nonce consumption.
   const first = await c.post(
     `${BASE}/api/auth/google/callback?state=${encodeURIComponent(state)}`,
     { data: { code: "a-code-google-will-reject" } },
   );
-  expect(first.status()).not.toBe(403);
+  expect(first.status()).toBe(400);
+  expect(await first.text()).toContain("Failed to exchange Google auth code");
 
   // Replaying the same state must now fail the CSRF check.
   const replay = await c.post(
@@ -431,9 +436,28 @@ test("GO-09: the redirect bridge preserves code and state and stays on our origi
   expect([301, 302, 303, 307, 308]).toContain(res.status());
 
   const location = new URL(res.headers()["location"]);
+  // The origin is the point of the test: the bridge must build its target
+  // against the server-side CLIENT_URL, never against request input. Pinned to
+  // the client origin under test (override with CLIENT_ORIGIN when the QA
+  // client is served elsewhere).
+  const expectedOrigin = process.env.CLIENT_ORIGIN ?? "http://127.0.0.1:5312";
+  expect(location.origin).toBe(expectedOrigin);
   expect(location.pathname).toBe("/login");
   expect(location.searchParams.get("code")).toBe("abc123");
   expect(location.searchParams.get("state")).toBe("login.deadbeef");
+
+  // ...and it does not move when the attacker-controlled query changes — an
+  // open-redirect regression that let `state`/`code` steer the base would show
+  // up as a different origin here.
+  for (const query of [
+    `code=abc123&state=${encodeURIComponent("login.//evil.example")}`,
+    `code=${encodeURIComponent("https://evil.example/")}&state=${encodeURIComponent("login.deadbeef")}`,
+    `code=abc123&state=${encodeURIComponent("register.deadbeef")}`,
+  ]) {
+    const probe = await c.get(`${BASE}/api/auth/google/callback?${query}`, { maxRedirects: 0 });
+    expect([301, 302, 303, 307, 308]).toContain(probe.status());
+    expect(new URL(probe.headers()["location"]).origin).toBe(expectedOrigin);
+  }
   await c.dispose();
 });
 
@@ -511,6 +535,13 @@ test("GID-02 (local identity): an unknown address does not silently create an ac
     expect(res.ok()).toBe(false);
   }
   await c.dispose();
+
+  // The response alone cannot prove "no account was created" — a route that
+  // created the row and answered with a token-less registration payload would
+  // satisfy the checks above while doing the exact thing this test is named
+  // after. Assert the database postcondition (see helpers/qaDb.ts: it fails
+  // closed and proves it is reading the API's own QA database first).
+  await expectNoUserAccount(stranger);
 });
 
 test("GID-03 (local identity): a malformed address is rejected", async () => {
