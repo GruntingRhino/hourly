@@ -811,9 +811,14 @@ router.post("/ownership-approval/resend", authenticate, ownershipApprovalResendL
     if (!school) return res.status(409).json({ error: "No pending school approval was found." });
     const now = new Date();
     const cooldownMs = 15 * 60 * 1000;
-    const retryAfterSeconds = school.ownershipApprovalLastSentAt
-      ? Math.max(1, Math.ceil((school.ownershipApprovalLastSentAt.getTime() + cooldownMs - now.getTime()) / 1000))
+    const remainingMs = school.ownershipApprovalLastSentAt
+      ? school.ownershipApprovalLastSentAt.getTime() + cooldownMs - now.getTime()
       : 0;
+    // Only report a server-side cooldown while it is still active; a fully
+    // elapsed window (remainingMs <= 0) must fall through to the send path.
+    // Math.max(1, …) here would force retryAfterSeconds to 1 even after expiry
+    // and spuriously 429 the request.
+    const retryAfterSeconds = remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
     if (retryAfterSeconds > 0) {
       res.setHeader("Retry-After", String(retryAfterSeconds));
       return res.status(429).json({ error: "Approval email can be resent every 15 minutes.", retryAfterSeconds });

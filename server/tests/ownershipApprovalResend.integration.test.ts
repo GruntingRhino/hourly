@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
-import test, { after, before } from "node:test";
+import test, { after, before, beforeEach } from "node:test";
 
 /**
  * POST /api/auth/ownership-approval/resend, driven over real HTTP against the
@@ -34,6 +34,29 @@ let signUserToken: (u: { id: string; email: string; role: string; tokenVersion: 
 
 const servers: Server[] = [];
 const COOLDOWN_MS = 15 * 60 * 1000;
+
+// Rate limiters are created at module load and use an in-memory bucket store
+// in the test environment (no Redis, and isProdLike() is false at import time).
+// Buckets persist across tests in the same process, so clear them here to give
+// each test a clean slate. The limiter module exposes no reset API, so we clear
+// the PostgreSQL table too (used when APP_ENV is flipped to production mid-test
+// by asProduction, since shouldUseDatabaseStore is re-evaluated per request via
+// the module-level flag captured at import — but we also need to clear any
+// buckets that may have been written to the DB during a prior asProduction run).
+//
+// Node's --env-file flag does NOT override variables already present in the
+// shell environment, so NODE_ENV=production (from this shell) would leak into
+// tests and make isProdLike() return true. Explicitly reset all three flags
+// that isProdLike() checks so tests 5 (non-production bypass) runs correctly.
+beforeEach(async () => {
+  process.env.APP_ENV = "development";
+  process.env.NODE_ENV = "test";
+  process.env.VERCEL_ENV = undefined;
+  process.env.EMAIL_DELIVERY_MODE = "log";
+  if (db) {
+    try { await db.$executeRawUnsafe('DELETE FROM "RateLimitBucket"'); } catch {}
+  }
+});
 
 before(async () => {
   prisma = (await import("../src/lib/prisma")).default;
@@ -111,6 +134,26 @@ test("on the production target the resend reaches the real send path and reports
     const school = await db.school.findUnique({ where: { id: schoolId }, select: { ownershipApprovalToken: true, ownershipApprovalLastSentAt: true } });
     assert.notEqual(school.ownershipApprovalToken, "previously-emailed-token-hash", "a delivered resend issues a new token");
     assert.notEqual(school.ownershipApprovalLastSentAt, null, "a delivered resend claims the cooldown");
+  } finally {
+    await http.close();
+    await destroy(user.id);
+  }
+});
+
+test("an elapsed resend cooldown permits another send and renews the cooldown", async () => {
+  const http = await startServer();
+  const { user, schoolId, headers } = await createPendingAdmin(new Date(Date.now() - COOLDOWN_MS - 5_000));
+  try {
+    const before = Date.now();
+    const response = await asProduction("log", () =>
+      fetch(`${http.baseUrl}/api/auth/ownership-approval/resend`, { method: "POST", headers }));
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(body.delivery, "sent");
+    assert.equal(body.retryAfterSeconds, 900);
+    const school = await db.school.findUnique({ where: { id: schoolId }, select: { ownershipApprovalToken: true, ownershipApprovalLastSentAt: true } });
+    assert.notEqual(school.ownershipApprovalToken, "previously-emailed-token-hash");
+    assert.ok(school.ownershipApprovalLastSentAt.getTime() >= before);
   } finally {
     await http.close();
     await destroy(user.id);

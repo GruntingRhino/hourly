@@ -55,8 +55,8 @@ export default function PendingApproval() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-[var(--bg)] px-6 py-12">
-      <section className="w-full max-w-xl rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--accent)]">Setup access</p>
+      <section className="w-full max-w-xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--action)]">Setup access</p>
         <h1 className="mt-2 text-2xl font-bold text-[var(--text)]">Your school is awaiting approval</h1>
         <p className="mt-4 text-[var(--text-sec)]">
           Your email and school-domain affiliation are verified. You can finish account setup, but
@@ -71,13 +71,13 @@ export default function PendingApproval() {
         </p>
         {message && <p className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-alt)] p-3 text-sm text-[var(--text-sec)]">{message}</p>}
         <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" className="cursor-pointer rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void resend()} disabled={sending || cooldownUntil > now} aria-busy={sending}>
+          <button type="button" className="cursor-pointer rounded-[3px] bg-[var(--action)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--action-h)] disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void resend()} disabled={sending || cooldownUntil > now} aria-busy={sending}>
             {sending ? "Sending…" : cooldownUntil > now ? "Email sent — resend in 15 minutes" : "Send approval email"}
           </button>
-          <button type="button" className="cursor-pointer rounded-lg border border-[var(--border)] px-4 py-2 font-medium text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void checkApproval()} disabled={refreshing} aria-busy={refreshing}>
+          <button type="button" className="cursor-pointer rounded-[3px] border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)] disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void checkApproval()} disabled={refreshing} aria-busy={refreshing}>
             {refreshing ? "Checking…" : "Check approval status"}
           </button>
-          <button type="button" className="cursor-pointer rounded-lg border border-[var(--border)] px-4 py-2 font-medium text-[var(--text)]" onClick={logout}>
+          <button type="button" className="cursor-pointer rounded-[3px] border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-alt)]" onClick={logout}>
             Sign out
           </button>
         </div>
