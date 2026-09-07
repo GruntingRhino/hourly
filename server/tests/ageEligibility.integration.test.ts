@@ -16,20 +16,25 @@ async function startServer() {
   return { baseUrl: `http://127.0.0.1:${address.port}`, close: () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())) };
 }
 
-test("password signup rejects a missing 13+ eligibility attestation before creating an account", async () => {
-  const email = `age-missing-${Date.now()}@example.invalid`;
+test("school admin signup does not require a 13+ eligibility attestation", async () => {
+  const email = `school-no-age-${Date.now()}@example.invalid`;
   const http = await startServer();
   try {
     const response = await fetch(`${http.baseUrl}/api/auth/signup`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "ValidPass1!", name: "Age Test", role: "SCHOOL_ADMIN" }),
+      body: JSON.stringify({ email, password: "ValidPass1!", name: "School Admin", role: "SCHOOL_ADMIN", schoolName: "Age Policy Test School" }),
     });
-    assert.equal(response.status, 400, await response.text());
-    assert.equal(await db.user.count({ where: { email } }), 0);
+    assert.equal(response.status, 201, await response.text());
+    assert.equal(await db.user.count({ where: { email } }), 1);
+    assert.equal(await db.eligibilityAttestation.count({ where: { user: { email } } }), 0);
   } finally {
     await http.close();
-    await db.user.deleteMany({ where: { email } });
+    const user = await db.user.findUnique({ where: { email }, select: { id: true } });
+    if (user) {
+      await db.school.deleteMany({ where: { createdById: user.id } });
+      await db.user.delete({ where: { id: user.id } });
+    }
   }
 });
 
@@ -49,7 +54,7 @@ test("invitation account creation rejects missing or false eligibility through H
   }
 });
 
-test("beneficiary invitation account creation rejects missing eligibility through HTTP", async () => {
+test("beneficiary invitation account creation is not age-gated through HTTP", async () => {
   const http = await startServer();
   try {
     const response = await fetch(`${http.baseUrl}/api/invitations/beneficiary/accept`, {
@@ -57,7 +62,7 @@ test("beneficiary invitation account creation rejects missing eligibility throug
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token: "invalid-token-value", name: "Age Test", password: "ValidPass1!" }),
     });
-    assert.equal(response.status, 400, await response.text());
+    assert.equal(response.status, 404, await response.text());
   } finally {
     await http.close();
   }

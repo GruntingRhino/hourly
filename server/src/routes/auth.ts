@@ -34,7 +34,7 @@ import {
   CLIENT_URL,
   getCapturedMailinatorInbox,
 } from "../services/email";
-import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
+import { isProdLike, isProductionOwnerApprovalTarget, isPubliclyDeployed } from "../lib/isProdLike";
 
 const ENABLE_IMPERSONATION = process.env.ENABLE_IMPERSONATION === "true";
 
@@ -156,6 +156,16 @@ const forgotPasswordLimiter = createEmailSendRateLimit({
 const resendVerificationLimiter = createEmailSendRateLimit({
   namespace: "resend-verification",
   recipientKey: (req) => emailRecipientRateLimitKey(req.body?.email),
+});
+
+// The ownership-approval resend always targets the one business-owner mailbox,
+// so this is keyed by the authenticated applicant rather than the recipient —
+// otherwise a single applicant's throttle would block every other pending
+// school. Layered under the 15-minute per-school cooldown in the handler:
+// that DB stamp used to be this route's ONLY throttle.
+const ownershipApprovalResendLimiter = createEmailSendRateLimit({
+  namespace: "ownership-approval-resend",
+  recipientKey: (req) => req.user?.userId ?? null,
 });
 
 // Login global IP window: 50 failed attempts per IP/UA per 15 minutes.
@@ -317,7 +327,7 @@ function buildLoginUserPayload(user: {
     cohorts: serializeCohortMemberships(enriched?.cohortMemberships),
     beneficiaryId: user.beneficiaryId,
     beneficiary: enriched?.beneficiary ?? null,
-    requiresEligibilityAttestation: user.eligibilityAttestation?.eligible13Plus !== true,
+    requiresEligibilityAttestation: user.role === "STUDENT" && user.eligibilityAttestation?.eligible13Plus !== true,
   };
 }
 
@@ -364,7 +374,10 @@ const signupSchema = strictObject({
   schoolDomain: optionalTrimmedString(255),
   directorySchoolId: opaqueIdSchema.optional(), // SchoolDirectory.id if chosen from directory
   zipCodes: z.array(z.string().trim().regex(/^\d{5}$/, "Invalid ZIP code")).max(50).optional(),
-  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
+  // Accepted and ignored for backward compatibility: age eligibility is a
+  // STUDENT-only requirement, but strictObject rejects unknown keys, so a
+  // browser still running the previous bundle would get a 400 during rollout.
+  eligible13Plus: z.literal(true).optional(),
 });
 
 const loginSchema = strictObject({
@@ -521,10 +534,6 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
           select: { id: true, email: true, name: true, role: true },
         });
 
-        await tx.eligibilityAttestation.create({
-          data: { userId: txUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "signup" },
-        });
-
         const txSchool = await tx.school.create({
           data: {
             name: schoolName,
@@ -577,7 +586,7 @@ router.post("/signup", publicAuthLimiter, signupLimiter, signupEmailLimiter, pre
 
     const ownerApprovalEmail = "abhaysivaram31@gmail.com";
     const approvalUrl = `${CLIENT_URL}/api/schools/ownership-approval?token=${ownershipApprovalToken}`;
-    const productionOwnerApproval = isProdLike() && /(^|\.)goodhours\.app$/i.test(new URL(CLIENT_URL).hostname);
+    const productionOwnerApproval = isProductionOwnerApprovalTarget(CLIENT_URL);
     let ownershipApprovalDelivery: "sent" | "bypass" | "failed" = "bypass";
     if (productionOwnerApproval) {
       try {
@@ -785,12 +794,19 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
 
 // POST /api/auth/ownership-approval/resend — pending school admins may request
 // another business-owner email, but never more often than once per 15 minutes.
-router.post("/ownership-approval/resend", authenticate, async (req: Request, res: Response) => {
+router.post("/ownership-approval/resend", authenticate, ownershipApprovalResendLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const school = await prisma.school.findFirst({
       where: { createdById: userId, ownershipStatus: "PENDING" },
-      select: { id: true, name: true, ownershipApprovalLastSentAt: true, ownershipApprovalTokenUsedAt: true },
+      select: {
+        id: true,
+        name: true,
+        ownershipApprovalLastSentAt: true,
+        ownershipApprovalTokenUsedAt: true,
+        ownershipApprovalToken: true,
+        ownershipApprovalTokenExpires: true,
+      },
     });
     if (!school) return res.status(409).json({ error: "No pending school approval was found." });
     const now = new Date();
@@ -809,12 +825,42 @@ router.post("/ownership-approval/resend", authenticate, async (req: Request, res
       data: { ownershipApprovalToken: hashToken(token), ownershipApprovalTokenExpires: null, ownershipApprovalLastSentAt: now },
     });
     if (claimed.count !== 1) return res.status(409).json({ error: "Approval state changed; please try again." });
-    const production = isProdLike() && /(^|\\.)goodhours\\.app$/i.test(new URL(CLIENT_URL).hostname);
+    const production = isProductionOwnerApprovalTarget(CLIENT_URL);
     if (!production) {
       console.info("[ownership-approval] resend bypassed in development", { userId, schoolId: school.id });
       return res.json({ delivery: "bypass", message: "Development bypass: approval email was not sent.", retryAfterSeconds: 900 });
     }
-    await sendSchoolOwnershipApprovalEmail("abhaysivaram31@gmail.com", school.name, req.user!.email, `${CLIENT_URL}/api/schools/ownership-approval?token=${token}`);
+    try {
+      await sendSchoolOwnershipApprovalEmail("abhaysivaram31@gmail.com", school.name, req.user!.email, `${CLIENT_URL}/api/schools/ownership-approval?token=${token}`);
+    } catch (emailErr) {
+      // The cooldown stamp and the token rotation above are claimed BEFORE the
+      // send so two concurrent requests can't both mail the owner. Nothing was
+      // delivered, so undo both:
+      //
+      //  - Restore the previous token. The rotation destroyed the link that was
+      //    already emailed to the owner at signup; leaving it destroyed would
+      //    make the school unapprovable until some later resend succeeds.
+      //  - Shorten, but do NOT clear, the cooldown. This route's only throttle
+      //    is this stamp, and `send()` already retries up to 4 times internally
+      //    — a retryable failure (timeout, 5xx) can mean the provider actually
+      //    accepted the message. Fully releasing would let a loop deliver
+      //    unbounded mail to the business owner's personal inbox.
+      const failureBackoffMs = 60 * 1000;
+      await prisma.school.updateMany({
+        where: { id: school.id, ownershipApprovalLastSentAt: now },
+        data: {
+          ownershipApprovalToken: school.ownershipApprovalToken,
+          ownershipApprovalTokenExpires: school.ownershipApprovalTokenExpires,
+          ownershipApprovalLastSentAt: new Date(now.getTime() - (cooldownMs - failureBackoffMs)),
+        },
+      });
+      console.error("[ownership-approval] resend failed to deliver", { schoolId: school.id, message: (emailErr as any)?.message });
+      return res.status(502).json({
+        error: "The approval email could not be sent. Please try again shortly.",
+        delivery: "failed",
+        retryAfterSeconds: Math.ceil(failureBackoffMs / 1000),
+      });
+    }
     return res.json({ delivery: "sent", message: "Approval email resent to the GoodHours business owner.", retryAfterSeconds: 900 });
   } catch (err) {
     console.error("Ownership approval resend error:", err);

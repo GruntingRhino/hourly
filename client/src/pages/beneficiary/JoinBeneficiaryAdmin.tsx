@@ -32,7 +32,6 @@ export default function JoinBeneficiaryAdmin() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
-  const [eligible13Plus, setEligible13Plus] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const acceptingExistingAccount = useRef(false);
@@ -71,7 +70,7 @@ export default function JoinBeneficiaryAdmin() {
     setSubmitting(true);
     setError("");
     try {
-      const result = await api.post<AuthResult>("/invitations/beneficiary-admin/accept", { token, name, password, eligible13Plus });
+      const result = await api.post<AuthResult>("/invitations/beneficiary-admin/accept", { token, name, password });
       loginWithToken(result.token, result.user);
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
@@ -105,11 +104,7 @@ export default function JoinBeneficiaryAdmin() {
                 <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full px-3 py-2.5 border border-[var(--border-s)] rounded-[3px] text-sm" />
                 {password.length > 0 && <ul className="mt-2 space-y-0.5">{PASSWORD_RULES.map((rule) => <li key={rule.label} className={`text-xs ${rule.test(password) ? "text-[var(--ok-t)]" : "text-[var(--text-faint)]"}`}>{rule.test(password) ? "✓" : "○"} {rule.label}</li>)}</ul>}
               </div>
-              <label className="flex items-start gap-2 text-sm text-[var(--text-sec)]">
-                <input type="checkbox" checked={eligible13Plus} onChange={(event) => setEligible13Plus(event.target.checked)} />
-                <span>I confirm that I am 13 or older. Invitations do not override this requirement.</span>
-              </label>
-              <button disabled={submitting || !passwordOk || !eligible13Plus} className="w-full py-[10px] bg-[var(--action)] text-white rounded-[3px] font-medium text-sm disabled:opacity-50">{submitting ? "Creating account..." : "Accept and create account"}</button>
+              <button disabled={submitting || !passwordOk} className="w-full py-[10px] bg-[var(--action)] text-white rounded-[3px] font-medium text-sm disabled:opacity-50">{submitting ? "Creating account..." : "Accept and create account"}</button>
             </form>
           ) : null}
         </div>

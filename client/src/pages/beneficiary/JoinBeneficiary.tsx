@@ -39,7 +39,6 @@ export default function JoinBeneficiary() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [eligible13Plus, setEligible13Plus] = useState(false);
   const [error, setError] = useState("");
 
   const passwordOk = PASSWORD_RULES.every((r) => r.test(password));
@@ -66,7 +65,7 @@ export default function JoinBeneficiary() {
     setError("");
     setSubmitting(true);
     try {
-      const result = await api.post<AuthResult>("/invitations/beneficiary/accept", { token, name, password, eligible13Plus });
+      const result = await api.post<AuthResult>("/invitations/beneficiary/accept", { token, name, password });
       loginWithToken(result.token, result.user);
       navigate("/dashboard");
     } catch (err: unknown) {
@@ -164,11 +163,7 @@ export default function JoinBeneficiary() {
                 </ul>
               )}
             </div>
-            <label className="flex items-start gap-2 text-sm text-[var(--text-sec)]">
-              <input type="checkbox" checked={eligible13Plus} onChange={(e) => setEligible13Plus(e.target.checked)} />
-              <span>I confirm that I am 13 or older. Invitations do not override this requirement.</span>
-            </label>
-            <button type="submit" disabled={submitting || !passwordOk || !eligible13Plus}
+            <button type="submit" disabled={submitting || !passwordOk}
               className="w-full py-[10px] bg-[var(--action)] text-white rounded-[3px] font-medium hover:opacity-85 disabled:opacity-50 text-sm">
               {submitting ? "Creating account..." : "Accept & Create Account"}
             </button>

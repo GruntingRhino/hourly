@@ -110,11 +110,12 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
       }
 
       if (eligibility.setupOnly && !isPendingSetupRoute(req)) {
+        const ageGate = eligibility.setupReason === "AGE_ELIGIBILITY";
         return res.status(403).json({
-          error: user.eligibilityAttestation?.eligible13Plus === true
-            ? "School ownership approval is pending. Only account setup is available."
-            : "Age eligibility confirmation is required before continuing.",
-          code: user.eligibilityAttestation?.eligible13Plus === true ? "SCHOOL_SETUP_ONLY" : "AGE_ELIGIBILITY_REQUIRED",
+          error: ageGate
+            ? "Age eligibility confirmation is required before continuing."
+            : "School ownership approval is pending. Only account setup is available.",
+          code: ageGate ? "AGE_ELIGIBILITY_REQUIRED" : "SCHOOL_SETUP_ONLY",
         });
       }
 

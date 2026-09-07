@@ -31,25 +31,43 @@ test("pending school ownership receives a setup-only session", () => {
     school: { verified: false, ownershipStatus: "PENDING" },
   });
 
-  assert.deepEqual(result, { allowed: true, setupOnly: true });
+  assert.deepEqual(result, { allowed: true, setupOnly: true, setupReason: "SCHOOL_OWNERSHIP" });
 });
 
-test("approved staff and verified non-staff users can receive sessions", () => {
-  assert.equal(evaluateSessionEligibility({
+test("school staff do not need a 13+ eligibility attestation", () => {
+  assert.deepEqual(evaluateSessionEligibility({
     email: "admin@school.edu",
     emailVerified: true,
     role: "SCHOOL_ADMIN",
     status: "ACTIVE",
     school: { verified: true, ownershipStatus: "APPROVED" },
-  }).allowed, true);
+  }), { allowed: true });
 
-  assert.equal(evaluateSessionEligibility({
+  assert.deepEqual(evaluateSessionEligibility({
+    email: "teacher@school.edu",
+    emailVerified: true,
+    role: "TEACHER",
+    status: "ACTIVE",
+    school: { verified: true, ownershipStatus: "APPROVED" },
+  }), { allowed: true });
+
+  assert.deepEqual(evaluateSessionEligibility({
+    email: "partner@example.org",
+    emailVerified: true,
+    role: "BENEFICIARY_ADMIN",
+    status: "ACTIVE",
+    school: null,
+  }), { allowed: true });
+});
+
+test("students without a 13+ eligibility attestation receive setup-only access", () => {
+  assert.deepEqual(evaluateSessionEligibility({
     email: "student@school.edu",
     emailVerified: true,
     role: "STUDENT",
     status: "ACTIVE",
     school: null,
-  }).allowed, true);
+  }), { allowed: true, setupOnly: true, setupReason: "AGE_ELIGIBILITY" });
 });
 
 test("school-domain validation requires an exact normalized domain", () => {

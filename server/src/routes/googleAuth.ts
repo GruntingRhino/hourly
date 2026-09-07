@@ -8,9 +8,9 @@ import { sendSchoolRegistrationMagicLink, sendSchoolOwnershipApprovalEmail, CLIE
 import { resolveSchoolFromUserAssociations, resolveSchoolIdFromUserAssociations } from "../lib/userAssociations";
 
 import { isInternalAdminUser } from "../lib/internalAdmin";
-import { isProdLike, isPubliclyDeployed } from "../lib/isProdLike";
+import { isProdLike, isProductionOwnerApprovalTarget, isPubliclyDeployed } from "../lib/isProdLike";
 import { setAuthCookie } from "../lib/authCookies";
-import { assertExactSchoolDomain, evaluateSessionEligibility, ELIGIBILITY_POLICY_VERSION } from "../lib/schoolAuthority";
+import { assertExactSchoolDomain, evaluateSessionEligibility } from "../lib/schoolAuthority";
 import { extractDomainFromWebsite, isPersonalEmailDomain } from "../lib/signupEmailPolicy";
 import { createEmailSendRateLimit, createHybridRateLimit } from "../middleware/rateLimit";
 import {
@@ -140,7 +140,10 @@ const registerSchoolSchema = strictObject({
   schoolCity: optionalTrimmedString(100),
   schoolZip: z.string().trim().regex(/^\d{5}$/).optional(),
   contactEmail: z.string().trim().toLowerCase().email().max(255),
-  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
+  // Accepted and ignored for backward compatibility: age eligibility is a
+  // STUDENT-only requirement, but strictObject rejects unknown keys, so a
+  // browser still running the previous bundle would get a 400 during rollout.
+  eligible13Plus: z.literal(true).optional(),
 });
 
 const verifySchoolQuerySchema = strictObject({
@@ -185,7 +188,7 @@ function buildUserPayload(user: any) {
     beneficiaryId: user.beneficiaryId,
     beneficiary: user.beneficiary,
     emailVerified: true,
-    requiresEligibilityAttestation: user.eligibilityAttestation?.eligible13Plus !== true,
+    requiresEligibilityAttestation: user.role === "STUDENT" && user.eligibilityAttestation?.eligible13Plus !== true,
   };
 }
 
@@ -692,10 +695,6 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
         },
         select: { id: true },
       });
-      await tx.eligibilityAttestation.create({
-        data: { userId: adminUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "google" },
-      });
-
       const txSchool = await tx.school.create({
         data: {
           name: dirEntry?.name || data.schoolName,
@@ -740,7 +739,7 @@ router.post("/register-school", publicGoogleAuthLimiter, registerSchoolLimiter, 
 
     const ownerApprovalEmail = "abhaysivaram31@gmail.com";
     const approvalUrl = `${CLIENT_URL}/api/schools/ownership-approval?token=${ownershipApprovalToken}`;
-    const productionOwnerApproval = isProdLike() && /(^|\.)goodhours\.app$/i.test(new URL(CLIENT_URL).hostname);
+    const productionOwnerApproval = isProductionOwnerApprovalTarget(CLIENT_URL);
     let ownershipApprovalDelivery: "sent" | "bypass" | "failed" = "bypass";
     if (productionOwnerApproval) {
       try {

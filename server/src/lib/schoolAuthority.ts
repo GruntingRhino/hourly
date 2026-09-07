@@ -11,8 +11,17 @@ export type SessionEligibilityInput = {
   eligibilityAttestation?: { eligible13Plus: boolean } | null;
 };
 
+/**
+ * Why a session is restricted to setup routes. Age eligibility is a STUDENT-only
+ * requirement, so the reason must come from this evaluator rather than being
+ * re-derived from the attestation at each call site: school staff no longer
+ * carry an attestation at all, and inferring "no attestation ⇒ age gate" would
+ * report a pending school admin as age-blocked.
+ */
+export type SessionSetupReason = "AGE_ELIGIBILITY" | "SCHOOL_OWNERSHIP";
+
 export type SessionEligibility =
-  | { allowed: true; setupOnly?: boolean }
+  | { allowed: true; setupOnly?: boolean; setupReason?: SessionSetupReason }
   | {
       allowed: false;
       status: 401 | 403;
@@ -62,8 +71,8 @@ export function evaluateSessionEligibility(
     return { allowed: false, status: 403, error: "School ownership request was rejected", code: "SCHOOL_OWNERSHIP_REJECTED" };
   }
 
-  if (!user.eligibilityAttestation?.eligible13Plus) {
-    return { allowed: true, setupOnly: true };
+  if (user.role === "STUDENT" && !user.eligibilityAttestation?.eligible13Plus) {
+    return { allowed: true, setupOnly: true, setupReason: "AGE_ELIGIBILITY" };
   }
 
   if (
@@ -75,6 +84,7 @@ export function evaluateSessionEligibility(
     return {
       allowed: true,
       setupOnly: true,
+      setupReason: "SCHOOL_OWNERSHIP",
     };
   }
 

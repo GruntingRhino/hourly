@@ -15,13 +15,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // background; otherwise we show the loading state until it resolves.
   const [loading, setLoading] = useState(() => !getCachedUser<User>());
 
-  const refreshUser = useCallback(async () => {
+  // Deliberately never rejects — a dozen call sites `await refreshUser()` in
+  // the middle of other work and would otherwise need their own guards. It
+  // returns the refreshed user (or null) so a caller that needs to know
+  // whether the refresh actually succeeded can check, instead of assuming it.
+  const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
       const data = await api.get<User>("/auth/me");
       setUser(data);
       setCachedUser(data);
+      return data;
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { clearAuthSession(); setUser(null); }
+      return null;
     }
   }, []);
 

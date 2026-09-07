@@ -45,7 +45,10 @@ const acceptBeneficiaryInvitationSchema = strictObject({
   token: tokenSchema,
   name: trimmedString(255, 1),
   password: passwordSchema,
-  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
+  // Accepted and ignored for backward compatibility: age eligibility is a
+  // STUDENT-only requirement, but strictObject rejects unknown keys, so a
+  // browser still running the previous bundle would get a 400 during rollout.
+  eligible13Plus: z.literal(true).optional(),
 });
 
 const declineBeneficiaryInvitationSchema = strictObject({
@@ -56,7 +59,10 @@ const acceptBeneficiaryAdminInvitationSchema = strictObject({
   token: tokenSchema,
   name: trimmedString(255, 1),
   password: passwordSchema,
-  eligible13Plus: z.literal(true, { errorMap: () => ({ message: "You must confirm that you are 13 or older to use GoodHours." }) }),
+  // Accepted and ignored for backward compatibility: age eligibility is a
+  // STUDENT-only requirement, but strictObject rejects unknown keys, so a
+  // browser still running the previous bundle would get a 400 during rollout.
+  eligible13Plus: z.literal(true).optional(),
 });
 
 // GET /api/invitations/student?token=xxx — look up a student invitation
@@ -263,11 +269,6 @@ router.post("/beneficiary/accept", publicInvitationLimiter, async (req: Request,
               status: "ACTIVE",
             },
           });
-      await tx.eligibilityAttestation.upsert({
-        where: { userId: acceptedUser.id },
-        update: {},
-        create: { userId: acceptedUser.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" },
-      });
       await tx.beneficiary.update({
         where: { id: inv.beneficiaryId },
         data: { claimed: true, status: "ACTIVE" },
@@ -391,9 +392,6 @@ router.post("/beneficiary-admin/accept", publicInvitationLimiter, async (req: Re
           emailVerified: true,
           status: "ACTIVE",
         },
-      });
-      await tx.eligibilityAttestation.create({
-        data: { userId: user.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" },
       });
       return user;
     });

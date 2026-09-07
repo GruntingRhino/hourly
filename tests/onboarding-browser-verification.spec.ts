@@ -12,8 +12,11 @@ async function mockInvitation(page: import("@playwright/test").Page, path: strin
   });
 }
 
+// Age eligibility is a STUDENT-only requirement: the student join and the
+// standalone /eligibility screen keep the 13+ confirmation, and the school
+// registration and both beneficiary-staff joins must NOT show or send one.
 test.describe("onboarding eligibility browser verification", () => {
-  test("student, beneficiary, and beneficiary-admin joins require checked eligibility before POST", async ({ page }) => {
+  test("the student join requires checked eligibility before POST, and staff joins are not age-gated", async ({ page }) => {
     const postBodies: Array<{ url: string; body: unknown }> = [];
     await mockInvitation(page, "/invitations/student?token=student-fixture", {
       email: "student@example.test", name: "Student Fixture", grade: "10", house: null,
@@ -44,12 +47,11 @@ test.describe("onboarding eligibility browser verification", () => {
     await page.locator('input[type="text"]').first().fill("Fixture Admin");
     await page.locator('input[type="password"]').fill(PASSWORD);
     const beneficiarySubmit = page.getByRole("button", { name: "Accept & Create Account" });
-    await expect(beneficiarySubmit).toBeDisabled();
-    await page.getByText("I confirm that I am 13 or older").click();
+    await expect(page.getByText("I confirm that I am 13 or older")).toHaveCount(0);
     await expect(beneficiarySubmit).toBeEnabled();
     await beneficiarySubmit.click();
     await expect.poll(() => postBodies.length).toBe(2);
-    expect(postBodies[1].body).toMatchObject({ eligible13Plus: true });
+    expect(postBodies[1].body).not.toHaveProperty("eligible13Plus");
 
     await mockInvitation(page, "/invitations/beneficiary-admin?token=admin-fixture", {
       beneficiaryName: "Fixture Beneficiary", email: "admin@example.test", hasExistingAccount: false,
@@ -62,15 +64,14 @@ test.describe("onboarding eligibility browser verification", () => {
     await page.locator("input").first().fill("Fixture Admin");
     await page.locator('input[type="password"]').fill(PASSWORD);
     const adminSubmit = page.getByRole("button", { name: "Accept and create account" });
-    await expect(adminSubmit).toBeDisabled();
-    await page.getByText("I confirm that I am 13 or older").click();
+    await expect(page.getByText("I confirm that I am 13 or older")).toHaveCount(0);
     await expect(adminSubmit).toBeEnabled();
     await adminSubmit.click();
     await expect.poll(() => postBodies.length).toBe(3);
-    expect(postBodies[2].body).toMatchObject({ eligible13Plus: true });
+    expect(postBodies[2].body).not.toHaveProperty("eligible13Plus");
   });
 
-  test("age eligibility and school registration do not submit unchecked", async ({ page }) => {
+  test("the student age-eligibility screen still gates its own submit, and school registration shows no age field", async ({ page }) => {
     let attestPosts = 0;
     await page.addInitScript(() => {
       localStorage.setItem("goodhours_token", "synthetic-token");
@@ -103,9 +104,9 @@ test.describe("onboarding eligibility browser verification", () => {
     await expect(schoolPage.getByRole("heading", { name: "Find Your School" })).toBeVisible();
     await schoolPage.getByPlaceholder("Enter school name manually").fill("Fixture School");
     await schoolPage.getByRole("button", { name: "Continue" }).click();
-    await expect(schoolPage.getByText("I confirm that I am 13 or older.")).toBeVisible();
+    await expect(schoolPage.getByText("I confirm that I am 13 or older.")).toHaveCount(0);
     const sendButton = schoolPage.getByRole("button", { name: /Create Account & Verify Email|Send Verification Link/i });
-    await expect(sendButton).toBeDisabled();
+    await expect(sendButton).toBeEnabled();
     await schoolContext.close();
   });
 });

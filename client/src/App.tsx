@@ -66,7 +66,11 @@ function AppRoutes() {
   const pendingSchoolApproval =
     user?.role === "SCHOOL_ADMIN" && user.school?.ownershipStatus === "PENDING";
 
-  if (user?.requiresEligibilityAttestation) {
+  // Age eligibility is a STUDENT-only requirement. The role check is not
+  // redundant with the server flag: AuthProvider optimistically renders the
+  // localStorage-cached user, and a staff account cached before this policy
+  // shipped still carries requiresEligibilityAttestation: true.
+  if (user?.requiresEligibilityAttestation && user.role === "STUDENT") {
     return <AgeEligibility />;
   }
 

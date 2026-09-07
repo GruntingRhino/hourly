@@ -31,7 +31,7 @@ export interface User {
   messagePreferences?: { allowFrom?: string; profileVisibility?: string } | null;
 }
 
-export interface SignupData { email: string; password: string; name: string; role: string; schoolName?: string; schoolDomain?: string; directorySchoolId?: string; eligible13Plus: true }
+export interface SignupData { email: string; password: string; name: string; role: string; schoolName?: string; schoolDomain?: string; directorySchoolId?: string }
 export interface SignupResult { email: string; requiresEmailVerification: true; requiresSchoolOwnershipReview: true; ownershipApprovalDelivery?: "sent" | "bypass" | "failed" }
-export interface AuthContextType { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<void>; loginWithToken: (token: string, user: User) => void; signup: (data: SignupData) => Promise<SignupResult>; logout: () => void; refreshUser: () => Promise<void> }
+export interface AuthContextType { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<void>; loginWithToken: (token: string, user: User) => void; signup: (data: SignupData) => Promise<SignupResult>; logout: () => void; refreshUser: () => Promise<User | null> }
 export type AuthChildren = { children: ReactNode };

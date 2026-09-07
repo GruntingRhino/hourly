@@ -1,0 +1,114 @@
+{
+  "date": "2026-09-07",
+  "checkout": "/home/opc/RTB/projects/goodhours",
+  "head": "238b611f05ada5c0953d5e41cc09e74bc09e0f19",
+  "branch": "main",
+  "scope": "uncommitted source and test changes reviewed and released in this pass; excludes docs, evidence, legal drafts, dependencies and build output",
+  "files": [
+    {
+      "path": "client/src/App.tsx",
+      "sha256": "96a852bc781174213e7b8b538acd78dc7b7f6f23cff0df555a4171579645abd9",
+      "bytes": 10986
+    },
+    {
+      "path": "client/src/hooks/AuthProvider.tsx",
+      "sha256": "99d4fd4858fa1f22bccdfe2d7443513cc1c932a7243bb30c88bf90da1d9edc8c",
+      "bytes": 2863
+    },
+    {
+      "path": "client/src/hooks/authTypes.ts",
+      "sha256": "ae681a86a254e05a5eae5f1758ceff753e581dec67e07d4d4a0a091a7edf82a7",
+      "bytes": 2377
+    },
+    {
+      "path": "client/src/pages/beneficiary/JoinBeneficiary.tsx",
+      "sha256": "bb5b84fb0935feb075857489b886324d817ca9de1a0b24252be8c997dfda30dc",
+      "bytes": 8613
+    },
+    {
+      "path": "client/src/pages/beneficiary/JoinBeneficiaryAdmin.tsx",
+      "sha256": "1670a987cf5ceeb1322509da17dafac62f7f8bdfdc2d47a1a66f4fba4b23992f",
+      "bytes": 5970
+    },
+    {
+      "path": "client/src/pages/school/PendingApproval.tsx",
+      "sha256": "45ca786467a8398e9ea0b9571a7cc82f65d13396886ff5e776513cce46ada21d",
+      "bytes": 4600
+    },
+    {
+      "path": "client/src/pages/school/Register.tsx",
+      "sha256": "97fdbdde24c4798d6975ca228f4ab7ed66a484fa0e5a06c6e1d98ac4cb7bddc6",
+      "bytes": 44185
+    },
+    {
+      "path": "server/src/lib/isProdLike.ts",
+      "sha256": "f0d93a875b4a6d333183acf8d810667c2f48a928dd3ca05eafa2a7f9fc38d8f5",
+      "bytes": 3288
+    },
+    {
+      "path": "server/src/lib/schoolAuthority.ts",
+      "sha256": "8a92850c7eea0de92b9ee5dc0f7885e4d356d2faddaa3fb3158b9fecfb53db19",
+      "bytes": 3664
+    },
+    {
+      "path": "server/src/middleware/auth.ts",
+      "sha256": "4d8cd383f236158bfb81784f1d5fbf6944974f2d7f8f2cbb208fb9c20fe95b08",
+      "bytes": 5109
+    },
+    {
+      "path": "server/src/routes/auth.ts",
+      "sha256": "d153aa66af785726fc137d3d617eae31d76fb07b5cbd9b24fdea2c7e5ef80ec4",
+      "bytes": 55789
+    },
+    {
+      "path": "server/src/routes/googleAuth.ts",
+      "sha256": "a4204e504a1bce14147bd9b6d591b042a551f0d37fa02743ed20fca87579d418",
+      "bytes": 32217
+    },
+    {
+      "path": "server/src/routes/invitations.ts",
+      "sha256": "513daef73aff37753abe0061fddc97b33ddba619c785d112fdc2ca4f0aa022b4",
+      "bytes": 19874
+    },
+    {
+      "path": "server/tests/ageEligibility.integration.test.ts",
+      "sha256": "f9c54daae490d0a658c031946151fbf2b1bcd97169ece4a494ce2119d0f34816",
+      "bytes": 3119
+    },
+    {
+      "path": "server/tests/schoolAuthority.test.ts",
+      "sha256": "52fa52a10d7db786c2e3e286bd57458bb65a5b945956b9892c4dd1061a64fbf6",
+      "bytes": 2658
+    },
+    {
+      "path": "tests/onboarding-browser-verification.spec.ts",
+      "sha256": "85e5368f787db19feb110559c170d65535f6c3de4894461daa6a9e3ce552a873",
+      "bytes": 6736
+    },
+    {
+      "path": "server/tests/_seedPendingAdmin.ts",
+      "sha256": "7321020d96da58c8057c6847fa1b780143afa9b41e5478d51db7e932085bc542",
+      "bytes": 2885
+    },
+    {
+      "path": "server/tests/ownerApprovalProductionTarget.test.ts",
+      "sha256": "49ce1616e65b5e934a44b8bf0e02f4837a33111a211787b47a57f256a12a243e",
+      "bytes": 3961
+    },
+    {
+      "path": "server/tests/ownershipApprovalResend.integration.test.ts",
+      "sha256": "d94df6456cfc720ed9d33f7c58db9d56e5160a7dfe22326df0f9344121520179",
+      "bytes": 9437
+    },
+    {
+      "path": "server/tests/pendingSchoolAdminSetupGate.integration.test.ts",
+      "sha256": "de81447f8cc8d1d5d29cfd264895f9e246fefaa7475bf7b9cfb84d4958b64f40",
+      "bytes": 6891
+    },
+    {
+      "path": "tests/pending-approval-ui.spec.ts",
+      "sha256": "a8d3e6f3693d1a01c620b1c7e429a6f08574bc32cff6ffdfb99a77cbac6377ec",
+      "bytes": 10915
+    }
+  ]
+}

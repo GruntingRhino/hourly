@@ -37,3 +37,32 @@ export function isProdLike(): boolean {
 export function isPubliclyDeployed(): boolean {
   return isProdLike() || process.env.VERCEL_ENV === "preview";
 }
+
+/**
+ * True only on the real production GoodHours deployment (goodhours.app or a
+ * subdomain of it). Gates the outbound business-owner school-ownership
+ * approval email: every other environment logs a bypass instead of mailing a
+ * real person.
+ *
+ * Canonical here for the same reason as isProdLike(): three call sites
+ * (auth signup, auth ownership-approval resend, google register-school) each
+ * inlined their own `/(^|\.)goodhours\.app$/i` literal, and the resend copy
+ * drifted to `/(^|\\.)goodhours\\.app$/i` — doubled backslashes, which
+ * requires a literal backslash in the hostname and so never matched. That made
+ * the production resend endpoint silently answer HTTP 200 `delivery: "bypass"`
+ * while sending nothing, after it had already burned the 15-minute cooldown
+ * and rotated the approval token. Import this instead of rewriting the regex.
+ */
+export function isProductionOwnerApprovalTarget(clientUrl: string): boolean {
+  // Vercel sets NODE_ENV=production on preview deployments too, so isProdLike()
+  // alone is true there. A preview must never mail the real business owner —
+  // environment variables are shared across environments unless explicitly
+  // scoped, so CLIENT_URL is not a reliable second gate on its own.
+  if (process.env.VERCEL_ENV === "preview") return false;
+  if (!isProdLike()) return false;
+  try {
+    return /(^|\.)goodhours\.app$/i.test(new URL(clientUrl).hostname);
+  } catch {
+    return false;
+  }
+}
