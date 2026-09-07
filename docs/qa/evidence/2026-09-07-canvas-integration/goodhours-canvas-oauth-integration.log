@@ -1,0 +1,19 @@
+school admin login -> 200
+GET canvas/oauth/url -> 200 {"url":"http://127.0.0.1:8900/login/oauth2/auth?client_id=10000000000009&response_type=code&redirect_uri=http%3A%2F%2F127.0.0.1%3A3212%2Fapi%2Fintegrations%2Fcanvas%2Foauth%2Fcallback&scope=url%3AGET%7C%2Fapi%2Fv1%2Fcourses%20url%3AGET%7C%2Fapi%2Fv1%2Fcourses%2F%3Acourse_id%2Fsections%20url%3AGET%7C%2Fapi%2Fv1%2Fcourses%2F%3Acourse_id%2Fenrollments&state=0ebe67d2995a07014a4b39fadaddc8ce0df6a9f941c
+oauth state cookie names: gh_oauth_state_binding
+authorize url origin: http://127.0.0.1:8900 client_id: 10000000000009 state_len: 64
+--- GODPC canvas-side authorization ---
+EMAIL_PRESENT=yes PASSWORD_PRESENT=yes
+GET /login/canvas -> 200
+POST /login/canvas -> 302 redirect=http://127.0.0.1:8900/?login_success=1
+GET oauth2/auth (single hop) -> redirect_path=/api/integrations/canvas/oauth/callback
+CODE_PRESENT=yes CODE_LEN=128 source=direct_redirect
+
+authorization code obtained: true len: 128
+GET canvas/oauth/callback -> 302 location: http://127.0.0.1:5312/settings?tab=integrations&canvas=connected
+GET canvas/status -> 200 {"capabilities":{"mockAllowed":true,"oauthConfigured":true,"requestTimeoutMs":15000,"integrationScope":"SINGLE_SCHOOL"},"ops":{"connected":true,"mode":"OAUTH","lastSyncAt":null,"lastSyncStatus":null,"recentJobFailures24h":0,"recentSyncErrors24h":0,"tokenRefreshFailures24h":0,"hasRepeatedFailures":false,"staleSync":false,"warnings":[]},"connection":{"id":"cmtrf8xec0006bjyg0l9b2xwu","provider":"CANVAS","status":"CONNECTED","displayName":"Canvas QA Sandbox","baseUrl":"http://127.0.0.1:8900","connec
+GET canvas/courses -> 200 {"courses":[{"id":"1","name":"GoodHours QA Synthetic Course","workflowState":"available"}],"selectedExternalCourseIds":[]}
+POST canvas/preview -> 200 {"connection":{"id":"cmtrf8xec0006bjyg0l9b2xwu","provider":"CANVAS","status":"CONNECTED","displayName":"Canvas QA Sandbox","baseUrl":"http://127.0.0.1:8900","connectedAt":"2026-09-07T15:54:55.381Z","disconnectedAt":null,"lastSyncedAt":null,"lastSyncStatus":null,"scenario":"oauth","mode":"OAUTH","selectedExternalCourseIds":[]},"jobId":"cmtrf8xj1000abjygx4862sy0","status":"COMPLETED","summary":{"provider":"CANVAS","mode":"PREVIEW","scenario":"oauth","counts":{"cohortsCreated":1,"cohortsUpdated":0,"cohortsArchived":0,"teacherAssignmentsCreated":0,"invitationsCreated":0,"invitationsUpdated":0,"existingUsersLinked":0,"usersAssignedToCohort":0,"skipped":0,"errors":0},"operations":[{"type":"cohort"
+POST canvas/apply -> 200 {"connection":{"id":"cmtrf8xec0006bjyg0l9b2xwu","provider":"CANVAS","status":"CONNECTED","displayName":"Canvas QA Sandbox","baseUrl":"http://127.0.0.1:8900","connectedAt":"2026-09-07T15:54:55.381Z","disconnectedAt":null,"lastSyncedAt":"2026-09-07T15:54:55.937Z","lastSyncStatus":"COMPLETED","scenario":"oauth","mode":"OAUTH","selectedExternalCourseIds":[]},"jobId":"cmtrf8xu9000ebjygh1obea1g","status":"COMPLETED","summary":{"provider":"CANVAS","mode":"APPLY","scenario":"oauth","counts":{"cohortsCreated":1,"cohortsUpdated":0,"cohortsArchived":0,"teacherAssignmentsCreated":1,"invitationsCreated":1,"invitationsUpdated":0,"existingUsersLinked":0,"usersAssignedToCohort":0,"skipped":0,"errors":0},"op
+POST canvas/disconnect -> 200 {"connection":{"id":"cmtrf8xec0006bjyg0l9b2xwu","provider":"CANVAS","status":"DISCONNECTED","displayName":"Canvas QA Sandbox","baseUrl":"http://127.0.0.1:8900","connectedAt":"2026-09-07T15:54:55.381Z","disconnectedAt":"2026-09-07T15:54:56.304Z","lastSyncedAt":"2026-09-07T15:54:56.289Z","lastSyncStat
+GET canvas/status (after disconnect) -> 200 {"capabilities":{"mockAllowed":true,"oauthConfigured":true,"requestTimeoutMs":15000,"integrationScope":"SINGLE_SCHOOL"},"ops":{"connected":false,"mode":"OAUTH","lastSyncAt":"2026-09-07T15:54:56.289Z","lastSyncStatus":"COMPLETED","recentJobFailures24h":0,"recentSyncErrors24h":0,"tokenRefreshFailures2

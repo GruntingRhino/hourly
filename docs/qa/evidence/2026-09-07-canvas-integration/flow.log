@@ -1,0 +1,27 @@
+
+=== STEP7 authorize developer key for the root account :: 2026-09-07T11:45:42-04:00 ===
+BINDING id=2 ws=on account=1 dk=7
+authorized_for_default_account=true
+
+=== STEP8 authenticated Canvas REST API :: 2026-09-07T11:45:45-04:00 ===
+GET /api/v1/accounts -> 200
+[{"id":1,"name":"GoodHours Sandbox","parent_account_id":null,"root_account_id":null,"workflow_state":"active","uuid":"Lft4ZZOVdGPxFKakkib34ZKszkcXcyQA9StfCLXS","default_storage_quota_mb":500,"default_user_storage_quota_mb":50,"default_group_storage_q
+GET /api/v1/users/self -> 200
+{"id":1,"name":"User","created_at":"2026-09-07T03:55:28Z","sortable_name":"User","short_name":"User","sis_user_id":null,"integration_id":null,"sis_import_id":null,"login_id":"goodhours-sandbox@example.invalid","last_name":"","first_name":"User","emai
+
+=== STEP9 create synthetic course :: 2026-09-07T11:45:46-04:00 ===
+POST /api/v1/accounts/1/courses -> 200
+{"id":1,"name":"GoodHours QA Synthetic Course","course_code":"GHQA-SYN-1","account_id":1,"created_at":"2026-09-07T15:45:46Z","start_at":null,"default_view":"modules","enrollment_term_id":1,"is_public":null,"grading_standard_id":null,"root_account_id":1,"uuid":"OH3QOFTRRvoVmkLunY9U1paTDfUYorx1wWypSPi
+
+=== STEP10 create synthetic student :: 2026-09-07T11:45:47-04:00 ===
+POST /api/v1/accounts/1/users -> 200
+{"id":2,"name":"GH QA Synthetic Student","created_at":"2026-09-07T15:45:47Z","sortable_name":"Student, GH QA Synthetic","short_name":"GH QA Synthetic Student","sis_user_id":null,"integration_id":null,"sis_import_id":null,"login_id":"ghqa.synthetic.student@example.invalid","locale":null,"uuid":"R1w7D
+
+=== STEP11 enroll the synthetic student in the synthetic course :: 2026-09-07T11:45:47-04:00 ===
+course_id=1 student_user_id=2
+POST enrollments -> 200
+{"id":1,"root_account_id":1,"user_id":2,"course_id":1,"course_section_id":1,"associated_user_id":null,"limit_privileges_to_course_section":false,"updated_at":"2026-09-07T15:45:47Z","created_at":"2026-09-07T15:45:47Z","start_at":null,"end_at":null,"type":"StudentEnrollment","enrollment_state":"active
+GET course students -> 200
+[{"id":2,"name":"GH QA Synthetic Student","created_at":"2026-09-07T15:45:47Z","sortable_name":"Student, GH QA Synthetic","short_name":"GH QA Synthetic Student","sis_user_id":null,"integration_id":null,"sis_import_id":null,"login_id":"ghqa.synthetic.student@example.invalid","email":"ghqa.synthetic.student@example.invalid","has_non_collaborative_groups":false}]
+
+=== FLOW DONE 2026-09-07T11:45:48-04:00 ===

@@ -1,0 +1,41 @@
+
+=== STEP0 container state before any change :: 2026-09-07T11:43:02-04:00 ===
+NAME                    IMAGE                 COMMAND                  SERVICE    CREATED        STATUS        PORTS
+canvas-lms-postgres-1   canvas-lms-postgres   "docker-entrypoint.s…"   postgres   14 hours ago   Up 14 hours   5432/tcp
+canvas-lms-redis-1      redis:alpine          "docker-entrypoint.s…"   redis      14 hours ago   Up 14 hours   6379/tcp
+canvas-lms-web-1        canvas-lms-web        "/tini -- /usr/src/e…"   web        13 hours ago   Up 13 hours   80/tcp
+
+=== STEP1 stop stale spring preloader :: 2026-09-07T11:43:03-04:00 ===
+Spring stopped.
+
+=== STEP2 confirm fresh boot resolves DB-backed default shard :: 2026-09-07T11:43:03-04:00 ===
+DEPRECATION WARNING: `to_time` will always preserve the full timezone rather than offset of the receiver in Rails 8.1. To opt in to the new behavior, set `config.active_support.to_time_preserves_timezone = :zone`. (called from <class:Application> at /usr/src/app/config/application.rb:62)
+FRESH default=Switchman::Shard/1 current=Switchman::Shard/1
+FRESH Account.default.id=1 local=1
+
+=== STEP3 restart web so the serving Rails app reloads the shard :: 2026-09-07T11:43:07-04:00 ===
+ Container canvas-lms-web-1 Restarting 
+ Container canvas-lms-web-1 Started 
+root 200
+
+=== STEP4 mint admin API token (0600 curlrc, never logged) :: 2026-09-07T11:43:20-04:00 ===
+DEPRECATION WARNING: `to_time` will always preserve the full timezone rather than offset of the receiver in Rails 8.1. To opt in to the new behavior, set `config.active_support.to_time_preserves_timezone = :zone`. (called from <class:Application> at /usr/src/app/config/application.rb:62)
+BOOT default=Switchman::Shard/1
+ACCT id=1 name=GoodHours Sandbox
+ADMIN user_id=1 name=User
+DK_ID=7 dk_root=1
+TOKEN_ID=1 token_root=1
+CURLRC_BYTES=105
+MINT_OK
+
+=== STEP5 authenticated Canvas REST API :: 2026-09-07T11:43:23-04:00 ===
+GET /api/v1/accounts -> 401
+{"errors":[{"message":"Invalid access token."}]}
+GET /api/v1/users/self -> 401
+{"errors":[{"message":"Invalid access token."}]}
+
+=== STEP6 synthetic course :: 2026-09-07T11:43:25-04:00 ===
+POST course -> 401
+{"errors":[{"message":"Invalid access token."}]}
+
+=== ALL DONE 2026-09-07T11:43:25-04:00 ===

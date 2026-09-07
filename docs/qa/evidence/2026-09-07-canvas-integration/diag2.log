@@ -1,0 +1,17 @@
+=== START 2026-09-07T11:40:45-04:00 ===
+time="2026-09-07T11:40:45-04:00" 
+time="2026-09-07T11:40:46-04:00" 
+row_found=Switchman::Shard id=1
+reloaded_default=Switchman::Shard id=1
+gem_path=/home/docker/.gem/3.4/gems/switchman-4.2.4
+switchman_version=4.2.4
+sharding_config=nil
+cached_shards=nil
+acct_after_reload id=1 shard=Switchman::Shard/1
+Account.default(true) => "err"
+Running via Spring preloader in process 18789
+--- GEM SOURCE def self.default ---
+time="2026-09-07T11:40:47-04:00" 
+/home/docker/.gem/3.4/gems/switchman-inst-jobs-4.3.2/lib/switchman_inst_jobs/switchman/shard.rb
+/home/docker/.gem/3.4/gems/switchman-4.2.4/lib/switchman/shard.rb
+=== END 2026-09-07T11:40:58-04:00 ===

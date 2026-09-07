@@ -1,0 +1,14 @@
+=== START 2026-09-07T11:38:55-04:00 ===
+time="2026-09-07T11:38:55-04:00" 
+time="2026-09-07T11:38:56-04:00" 
+IDS_PER_SHARD=10000000000000
+shard_count=1
+SHARDROW {"id" => 1, "name" => nil, "database_server_id" => nil, "default" => true, "settings" => {}, "delayed_jobs_shard_id" => nil, "created_at" => 2026-09-07 03:53:43.042074000 UTC +00:00, "updated_at" => 2026-09-07 03:53:43.042074000 UTC +00:00, "block_stranded" => false, "jobs_held" => false, "migrate_from_delayed_jobs_shard_id" => nil}
+default_class=Switchman::DefaultShard default_id="default" default_name=public
+current_class=Switchman::DefaultShard current_id="default"
+birth_class=Switchman::DefaultShard birth_id="default"
+acct_id=10000000000001 local=1 global=10000000000001 shard_id=1 shard_class=Switchman::Shard
+accounts_rows=[[0, 0, "Dummy Root Account"], [2, 0, "Site Admin"], [1, 0, "GoodHours Sandbox"]]
+shard_id_col=no shards table
+Running via Spring preloader in process 18717
+=== END 2026-09-07T11:39:00-04:00 rc=0 ===
