@@ -19,6 +19,12 @@
 import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { BASE, getToken, auth } from "./helpers/tokens";
 import { getIds, Ids } from "./helpers/setup";
+import {
+  ensureSyntheticBillingRecord,
+  readProcurementDocumentRow,
+  removeSyntheticBillingRecord,
+  type SyntheticBillingRecord,
+} from "../helpers/qaFixtures";
 
 let ids: Ids;
 let tSchoolA: string;
@@ -212,4 +218,117 @@ test("UP-08: a genuine PDF passes every authorization and content check and is r
   // business precondition. Compare with UP-03/04/05, which never get this far.
   expect(res.status()).toBe(400);
   expect(await res.text()).toMatch(/no active procurement record/i);
+});
+
+// ── The accepted path, with the business precondition supplied ────────────────
+//
+// UP-08 above stops at the procurement-record check because no route creates a
+// SchoolBillingRecord. That left the *accepted* upload — the 201, what gets
+// persisted, and who may read it back — untested. The record is supplied here as
+// an explicit synthetic fixture in the disposable QA database (see
+// tests/helpers/qaFixtures.ts, which refuses any non-loopback host or any
+// database not named *_qa / *_test, and proves by positive control that it is
+// writing to the database the API is serving). No production billing data is
+// touched, and the fixture is removed afterwards.
+test.describe("accepted procurement upload", () => {
+  let billing: SyntheticBillingRecord;
+  let uploadedDocId = "";
+
+  test.beforeAll(async () => {
+    billing = await ensureSyntheticBillingRecord(ids.schoolAId);
+  });
+
+  test.afterAll(async () => {
+    if (billing) await removeSyntheticBillingRecord(billing);
+  });
+
+  test("UP-09: a genuine PDF from the school's own admin is accepted", async () => {
+    const res = await api.post(`${BASE}/api/school-procurement/${ids.schoolAId}/documents`, {
+      ...uploadOpts("W9", { filename: "accepted-w9.pdf", bytes: REAL_PDF }, tSchoolA),
+    });
+    expect(
+      res.status(),
+      `expected the upload to be accepted now that a procurement record exists: ${await res.text()}`,
+    ).toBe(201);
+    const body = await res.json();
+    expect(body.id, "the 201 body must identify the stored document").toBeTruthy();
+    expect(body.documentType).toBe("W9");
+    expect(body.originalName).toBe("accepted-w9.pdf");
+    uploadedDocId = body.id;
+  });
+
+  test("UP-10: the stored row carries the school and uploader from the request", async () => {
+    // The 201 body echoes only what was sent. This is the part a response-only
+    // assertion cannot see: that the document was filed against the right school
+    // and attributed to the acting admin, with the verified MIME type rather than
+    // the client-declared one.
+    expect(uploadedDocId, "UP-09 must have produced a document id").toBeTruthy();
+    const row = await readProcurementDocumentRow(uploadedDocId);
+    expect(row, "the accepted upload was not persisted").not.toBeNull();
+    expect(row!.schoolId).toBe(ids.schoolAId);
+    expect(row!.uploadedByUserId).toBe(ids.adminAId);
+    expect(row!.documentType).toBe("W9");
+    expect(row!.mimeType).toBe("application/pdf");
+    expect(row!.fileSizeBytes).toBe(REAL_PDF.length);
+    expect(row!.contentByteLength).toBe(REAL_PDF.length);
+  });
+
+  test("UP-11: the school's own admin reads the document back byte for byte", async () => {
+    expect(uploadedDocId, "UP-09 must have produced a document id").toBeTruthy();
+    const res = await api.get(
+      `${BASE}/api/school-procurement/${ids.schoolAId}/documents/${uploadedDocId}`,
+      auth(tSchoolA),
+    );
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("application/pdf");
+    // Served under the original filename, and quoted rather than interpolated raw.
+    expect(res.headers()["content-disposition"]).toContain("accepted-w9.pdf");
+    const received = await res.body();
+    expect(
+      received.equals(REAL_PDF),
+      "the bytes read back differ from the bytes uploaded",
+    ).toBe(true);
+  });
+
+  test("UP-12: nobody else can read it — other school, student, or anonymous", async () => {
+    expect(uploadedDocId, "UP-09 must have produced a document id").toBeTruthy();
+    const url = `${BASE}/api/school-procurement/${ids.schoolAId}/documents/${uploadedDocId}`;
+
+    const otherSchool = await api.get(url, auth(tSchoolB));
+    expect(otherSchool.status(), "School B's admin must not read School A's document").toBe(403);
+    expect(await otherSchool.text()).not.toContain("%PDF");
+
+    const student = await api.get(url, auth(tStudent1));
+    expect(student.status()).toBe(403);
+
+    const anonymous = await api.get(url);
+    expect(anonymous.status()).toBe(401);
+  });
+
+  test("UP-13: there is no delete endpoint for procurement documents", async () => {
+    // Recorded as a test rather than a comment so the claim stays true. The
+    // router exposes only GET /:id/summary, POST /:id/quote-request,
+    // POST /:id/documents and GET /:id/documents/:docId
+    // (server/src/routes/schoolProcurement.ts), and the school billing UI calls
+    // only upload and download. Retention of procurement paperwork is therefore
+    // not a deletable operation over the API, and no test here should claim to
+    // cover an authorized delete. If a delete route is ever added, this test
+    // fails and must be replaced with real lifecycle coverage.
+    expect(uploadedDocId, "UP-09 must have produced a document id").toBeTruthy();
+    const res = await api.delete(
+      `${BASE}/api/school-procurement/${ids.schoolAId}/documents/${uploadedDocId}`,
+      auth(tSchoolA),
+    );
+    expect(
+      [404, 405].includes(res.status()),
+      `expected the delete verb to be unrouted, got ${res.status()}`,
+    ).toBe(true);
+
+    // And the document is still readable, i.e. the request above deleted nothing.
+    const stillThere = await api.get(
+      `${BASE}/api/school-procurement/${ids.schoolAId}/documents/${uploadedDocId}`,
+      auth(tSchoolA),
+    );
+    expect(stillThere.status()).toBe(200);
+  });
 });

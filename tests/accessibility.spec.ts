@@ -13,6 +13,10 @@
 
 import { test, expect, Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import {
+  createSyntheticOpportunity,
+  deleteSyntheticOpportunity,
+} from "./helpers/qaFixtures";
 
 const BASE = process.env.PW_BASE_URL || "http://localhost:5173";
 const QA_PASSWORD = process.env.QA_PASSWORD || "Playwright1!";
@@ -51,11 +55,28 @@ async function runAxe(page: Page, pageLabel: string) {
     }
   }
 
+  // Defence in depth against a green result that scanned nothing. Every axe test
+  // below gates only on critical+serious being empty, so an axe run that
+  // evaluated no rules at all — a blank or detached frame, for instance — would
+  // pass. `passes` counts rules evaluated and satisfied, so the total below is
+  // zero only in that case. Note this does NOT catch "the page rendered, but it
+  // was the wrong page": an empty document still evaluates rules. Landing on the
+  // intended page has to be asserted per test, as the opportunity detail test
+  // below does.
+  const rulesEvaluated =
+    results.passes.length + results.violations.length + results.incomplete.length;
+
   console.log(
-    `[${pageLabel}] Summary — critical:${critical.length} serious:${serious.length} moderate:${moderate.length} minor:${minor.length}`
+    `[${pageLabel}] Summary — critical:${critical.length} serious:${serious.length} moderate:${moderate.length} minor:${minor.length} rulesEvaluated:${rulesEvaluated}`
   );
 
-  return { violations: results.violations, critical, serious, moderate, minor };
+  expect(
+    rulesEvaluated,
+    `[${pageLabel}] axe evaluated no rules at all, so this page was not actually scanned. ` +
+    "A zero-violation result here means nothing — check the page rendered before the scan."
+  ).toBeGreaterThan(0);
+
+  return { violations: results.violations, critical, serious, moderate, minor, rulesEvaluated };
 }
 
 // ─── 1. Landing page (unauthenticated) ───────────────────────────────────────
@@ -287,39 +308,37 @@ test("Student browse page — WCAG 2.1 AA", async ({ page }) => {
 
 // ─── 9. Opportunity detail page ───────────────────────────────────────────────
 
+// This test previously navigated by scraping the browse page with the locator
+// 'a[href*="/opportunity/"], button' — which can resolve .first() to a <button>
+// whose href is null — and then `return`ed when no link was found, passing
+// without scanning anything. It also depended on browse listing an opportunity
+// at all: Browse.tsx links to /opportunity/<id> only when a slot carries
+// legacyOpportunityId, and otherwise to /slot/<id>. It is now pinned to an
+// explicit synthetic fixture and fails rather than skipping.
 test("Opportunity detail page — WCAG 2.1 AA", async ({ page }) => {
-  await loginAs(page, QA_STUDENT_EMAIL);
-  await page.goto(`${BASE}/browse`);
-  await page.waitForLoadState("networkidle");
+  const fixture = await createSyntheticOpportunity();
+  try {
+    await loginAs(page, QA_STUDENT_EMAIL);
+    await page.goto(`${BASE}/opportunity/${fixture.opportunityId}`);
+    await page.waitForLoadState("networkidle");
 
-  // Click the first opportunity card or link
-  const firstOpportunity = page
-    .locator('a[href*="/opportunity/"], button')
-    .first();
-  const href = await firstOpportunity.getAttribute("href").catch(() => null);
+    // Prove this is the detail view, and that it rendered the fixture, before
+    // the scan result is allowed to mean anything.
+    await expect(page).toHaveURL(new RegExp(`/opportunity/${fixture.opportunityId}$`));
+    await expect(
+      page.getByText(fixture.title, { exact: false }),
+      "the opportunity detail page did not render the synthetic fixture, so a clean " +
+      "axe result would not be evidence about this page"
+    ).toBeVisible({ timeout: 15_000 });
 
-  if (href) {
-    await page.goto(`${BASE}${href}`);
-  } else {
-    // Try clicking the first opportunity-like element
-    const opportunityLink = page.locator('[href*="/opportunity/"]').first();
-    if ((await opportunityLink.count()) > 0) {
-      await opportunityLink.click();
-    } else {
-      console.warn(
-        "[Opportunity Detail] No opportunity links found on browse page — skipping navigation"
-      );
-      return;
-    }
+    const { critical, serious } = await runAxe(page, "Opportunity Detail");
+    expect(
+      critical.concat(serious),
+      `Critical/serious violations on Opportunity Detail: ${[...critical, ...serious].map((v) => v.id).join(", ")}`
+    ).toHaveLength(0);
+  } finally {
+    await deleteSyntheticOpportunity(fixture);
   }
-
-  await page.waitForLoadState("networkidle");
-
-  const { critical, serious } = await runAxe(page, "Opportunity Detail");
-  expect(
-    critical.concat(serious),
-    `Critical/serious violations on Opportunity Detail: ${[...critical, ...serious].map((v) => v.id).join(", ")}`
-  ).toHaveLength(0);
 });
 
 // ─── 10. Org dashboard ────────────────────────────────────────────────────────

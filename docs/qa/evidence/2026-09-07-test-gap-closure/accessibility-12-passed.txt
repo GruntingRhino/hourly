@@ -1,0 +1,25 @@
+
+Running 12 tests using 1 worker
+
+[Landing] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:17
+  ✓   1 tests/accessibility.spec.ts:84:5 › Landing page — WCAG 2.1 AA (2.7s)
+[Login] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:22
+  ✓   2 tests/accessibility.spec.ts:97:5 › Login page — WCAG 2.1 AA (1.7s)
+  ✓   3 tests/accessibility.spec.ts:110:5 › Login page — keyboard navigation and form validation (1.5s)
+  ✓   4 tests/accessibility.spec.ts:161:5 › Login page — focus outline not suppressed globally (167ms)
+  ✓   5 tests/accessibility.spec.ts:217:5 › Landing page — images have alt attributes (692ms)
+  ✓   6 tests/accessibility.spec.ts:250:5 › Landing page — buttons have accessible names (689ms)
+[Student Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:19
+  ✓   7 tests/accessibility.spec.ts:284:5 › Student dashboard — WCAG 2.1 AA (2.6s)
+[Student Browse] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:23
+  ✓   8 tests/accessibility.spec.ts:297:5 › Student browse page — WCAG 2.1 AA (2.8s)
+[Opportunity Detail] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:17
+  ✓   9 tests/accessibility.spec.ts:318:5 › Opportunity detail page — WCAG 2.1 AA (2.6s)
+[Org Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:19
+  ✓  10 tests/accessibility.spec.ts:346:5 › Org dashboard — WCAG 2.1 AA (2.2s)
+[School Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:18
+  ✓  11 tests/accessibility.spec.ts:359:5 › School admin dashboard — WCAG 2.1 AA (2.7s)
+[School Student List] Summary — critical:0 serious:0 moderate:0 minor:0 rulesEvaluated:17
+  ✓  12 tests/accessibility.spec.ts:372:5 › School student list page — WCAG 2.1 AA (2.8s)
+
+  12 passed (25.1s)

@@ -20,7 +20,7 @@ import { expect } from "@playwright/test";
 
 const SEEDED_CONTROL_EMAIL = "abhay.sivaram+5@gmail.com"; // student1, from seed-playwright.ts
 
-function validatedQaUrl(): string {
+export function validatedQaUrl(): string {
   const raw = process.env.QA_DATABASE_URL;
   if (!raw) {
     throw new Error(
