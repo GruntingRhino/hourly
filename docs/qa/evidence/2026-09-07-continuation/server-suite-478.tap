@@ -1,0 +1,3807 @@
+
+> goodhours-server@1.0.0 pretest
+> bash scripts/ensure-test-db.sh
+
+[ensure-test-db] postgres is ready on 127.0.0.1:5433/goodhours_test.
+[ensure-test-db] Prisma migrations applied.
+
+> goodhours-server@1.0.0 test
+> node --env-file-if-exists=.env.test --import tsx --test tests/*.test.ts --test-reporter=tap
+
+TAP version 13
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# {"type":"request","requestId":"d5a66481-e999-4af0-b5c4-eb56c0cedc18","method":"DELETE","path":"/account","status":200,"ms":66,"ip":"127.0.0.1","userId":"cmtqn4bs10003bj70s8ucpcyg"}
+# Subtest: personal deletion by one school admin preserves the school, peers, students, and records
+ok 1 - personal deletion by one school admin preserves the school, peers, students, and records
+  ---
+  duration_ms: 239.401804
+  type: 'test'
+  ...
+# {"type":"request","requestId":"be75e3bc-92b0-4cec-aea5-66e63699d12f","method":"DELETE","path":"/account","status":409,"ms":8,"ip":"127.0.0.1","userId":"cmtqn4bxd000obj708ly78zvj"}
+# Subtest: last school admin cannot personally delete and orphan the school
+ok 2 - last school admin cannot personally delete and orphan the school
+  ---
+  duration_ms: 69.267635
+  type: 'test'
+  ...
+# {"type":"request","requestId":"f65e543a-3d17-474f-8afa-7099166c9c52","method":"DELETE","path":"/account","status":200,"ms":30,"ip":"127.0.0.1","userId":"cmtqn4bzl001lbj70k61tu1qz"}
+# {"type":"request","requestId":"82102d86-f17f-4699-845d-e700a524fa27","method":"DELETE","path":"/account","status":200,"ms":22,"ip":"127.0.0.1","userId":"cmtqn4c1o0022bj70yopd88ew"}
+# Subtest: student and teacher personal deletion leaves the school and other users intact
+ok 3 - student and teacher personal deletion leaves the school and other users intact
+  ---
+  duration_ms: 155.93095
+  type: 'test'
+  ...
+# {"type":"request","requestId":"9d8a49f6-dc3a-46c4-8f33-9fac0fb3263f","method":"DELETE","path":"/account","status":200,"ms":35,"ip":"127.0.0.1","userId":"cmtqn4c3e002fbj70csdj8sud"}
+# {"type":"request","requestId":"f0d38ba3-ace6-4949-9009-e32790c4acb5","method":"DELETE","path":"/account","status":409,"ms":34,"ip":"127.0.0.1","userId":"cmtqn4c3h002jbj70t6mrq1f7"}
+# Subtest: concurrent admin deletions preserve one-admin continuity
+ok 4 - concurrent admin deletions preserve one-admin continuity
+  ---
+  duration_ms: 86.776956
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# [email:dev] Would send "Verify your GoodHours account" → school-no-age-1788749253093@example.invalid
+#   from: noreply@notifications.goodhours.app
+#   body: GoodHours
+#   
+#     Verify your email address
+#     Thanks for signing up for GoodHours. Click the button below to verify your email address and activate your account. This link expires in 24 hours.…
+# [signup] School ownership approval email bypassed in non-production environment { environment: 'development' }
+# {"type":"request","requestId":"e3a13c4b-fec6-42e2-a5c3-24ce7d0478b1","method":"POST","path":"/signup","status":201,"ms":511,"ip":"127.0.0.1","userId":null}
+# Subtest: school admin signup does not require a 13+ eligibility attestation
+ok 5 - school admin signup does not require a 13+ eligibility attestation
+  ---
+  duration_ms: 610.633432
+  type: 'test'
+  ...
+# {"type":"request","requestId":"7f13d640-06ee-4949-b521-253b76e6e692","method":"POST","path":"/student/accept","status":400,"ms":4,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"69df9f78-eaf6-4828-a2fb-ebcb38a3e828","method":"POST","path":"/student/accept","status":400,"ms":2,"ip":"127.0.0.1","userId":null}
+# Subtest: invitation account creation rejects missing or false eligibility through HTTP before token lookup
+ok 6 - invitation account creation rejects missing or false eligibility through HTTP before token lookup
+  ---
+  duration_ms: 28.410395
+  type: 'test'
+  ...
+# {"type":"request","requestId":"47df3439-a8f6-46ff-a4a9-431dd66e4a8b","method":"POST","path":"/beneficiary/accept","status":404,"ms":4,"ip":"127.0.0.1","userId":null}
+# Subtest: beneficiary invitation account creation is not age-gated through HTTP
+ok 7 - beneficiary invitation account creation is not age-gated through HTTP
+  ---
+  duration_ms: 10.870675
+  type: 'test'
+  ...
+# Subtest: creates and parses an expiring attendance QR token
+ok 8 - creates and parses an expiring attendance QR token
+  ---
+  duration_ms: 2.90286
+  type: 'test'
+  ...
+# Subtest: rejects a tampered, expired, or differently signed token
+ok 9 - rejects a tampered, expired, or differently signed token
+  ---
+  duration_ms: 0.378482
+  type: 'test'
+  ...
+# Subtest: hashes the raw token deterministically without storing it
+ok 10 - hashes the raw token deterministically without storing it
+  ---
+  duration_ms: 0.523163
+  type: 'test'
+  ...
+# Subtest: QR token primitives are signed, expiring, and hashable
+ok 11 - QR token primitives are signed, expiring, and hashable
+  ---
+  duration_ms: 1.331049
+  type: 'test'
+  ...
+# Subtest: QR migration reserves hashed-token and replay-prevention constraints
+ok 12 - QR migration reserves hashed-token and replay-prevention constraints
+  ---
+  duration_ms: 0.197561
+  type: 'test'
+  ...
+# Subtest: APPROVE entry has action: APPROVE
+ok 13 - APPROVE entry has action: APPROVE
+  ---
+  duration_ms: 1.726772
+  type: 'test'
+  ...
+# Subtest: APPROVE entry details contain approvedHours as number
+ok 14 - APPROVE entry details contain approvedHours as number
+  ---
+  duration_ms: 0.203841
+  type: 'test'
+  ...
+# Subtest: APPROVE entry details contain originalHours as number
+ok 15 - APPROVE entry details contain originalHours as number
+  ---
+  duration_ms: 0.182161
+  type: 'test'
+  ...
+# Subtest: APPROVE entry details contain actorId as string
+ok 16 - APPROVE entry details contain actorId as string
+  ---
+  duration_ms: 0.161921
+  type: 'test'
+  ...
+# Subtest: APPROVE entry originalHours can be null (when session had no prior hours)
+ok 17 - APPROVE entry originalHours can be null (when session had no prior hours)
+  ---
+  duration_ms: 0.157441
+  type: 'test'
+  ...
+# Subtest: REJECT entry has action: REJECT
+ok 18 - REJECT entry has action: REJECT
+  ---
+  duration_ms: 0.170081
+  type: 'test'
+  ...
+# Subtest: REJECT entry details contain reason as string
+ok 19 - REJECT entry details contain reason as string
+  ---
+  duration_ms: 0.312242
+  type: 'test'
+  ...
+# Subtest: REJECT entry details reason is non-empty
+ok 20 - REJECT entry details reason is non-empty
+  ---
+  duration_ms: 0.203042
+  type: 'test'
+  ...
+# Subtest: OVERRIDE entry has action: OVERRIDE
+ok 21 - OVERRIDE entry has action: OVERRIDE
+  ---
+  duration_ms: 0.595444
+  type: 'test'
+  ...
+# Subtest: OVERRIDE entry details contain reason as string
+ok 22 - OVERRIDE entry details contain reason as string
+  ---
+  duration_ms: 0.760846
+  type: 'test'
+  ...
+# Subtest: all expected audit actions are in the valid set
+ok 23 - all expected audit actions are in the valid set
+  ---
+  duration_ms: 0.159561
+  type: 'test'
+  ...
+# Subtest: APPROVE action string is in the valid actions enum
+ok 24 - APPROVE action string is in the valid actions enum
+  ---
+  duration_ms: 0.130041
+  type: 'test'
+  ...
+# Subtest: REJECT action string is in the valid actions enum
+ok 25 - REJECT action string is in the valid actions enum
+  ---
+  duration_ms: 0.123721
+  type: 'test'
+  ...
+# Subtest: OVERRIDE action string is in the valid actions enum
+ok 26 - OVERRIDE action string is in the valid actions enum
+  ---
+  duration_ms: 0.151482
+  type: 'test'
+  ...
+# Subtest: APPROVE details field is a valid JSON string
+ok 27 - APPROVE details field is a valid JSON string
+  ---
+  duration_ms: 0.226561
+  type: 'test'
+  ...
+# Subtest: REJECT details field is a valid JSON string
+ok 28 - REJECT details field is a valid JSON string
+  ---
+  duration_ms: 0.152081
+  type: 'test'
+  ...
+# Subtest: CHECK_IN details field is a valid JSON string with ISO time
+ok 29 - CHECK_IN details field is a valid JSON string with ISO time
+  ---
+  duration_ms: 0.422883
+  type: 'test'
+  ...
+# Subtest: CHECK_OUT details field contains totalHours as number
+ok 30 - CHECK_OUT details field contains totalHours as number
+  ---
+  duration_ms: 0.183641
+  type: 'test'
+  ...
+# Subtest: details round-trips through JSON serialization without data loss
+ok 31 - details round-trips through JSON serialization without data loss
+  ---
+  duration_ms: 1.296729
+  type: 'test'
+  ...
+# Subtest: OVERRIDE details round-trips through JSON serialization
+ok 32 - OVERRIDE details round-trips through JSON serialization
+  ---
+  duration_ms: 0.290042
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# Subtest: setAuthCookie sets an HttpOnly, SameSite=Lax cookie
+ok 33 - setAuthCookie sets an HttpOnly, SameSite=Lax cookie
+  ---
+  duration_ms: 1.328969
+  type: 'test'
+  ...
+# Subtest: setAuthCookie sets a 7-day Max-Age when persistent, and none when session-only
+ok 34 - setAuthCookie sets a 7-day Max-Age when persistent, and none when session-only
+  ---
+  duration_ms: 0.206201
+  type: 'test'
+  ...
+# Subtest: clearAuthCookie clears the same cookie name with matching attributes
+ok 35 - clearAuthCookie clears the same cookie name with matching attributes
+  ---
+  duration_ms: 0.215521
+  type: 'test'
+  ...
+# Subtest: POST /api/auth/logout clears the session cookie
+ok 36 - POST /api/auth/logout clears the session cookie
+  ---
+  duration_ms: 75.020955
+  type: 'test'
+  ...
+# Subtest: POST /api/auth/session-pref re-issues the cookie with the requested persistence, authenticated via the cookie itself
+ok 37 - POST /api/auth/session-pref re-issues the cookie with the requested persistence, authenticated via the cookie itself
+  ---
+  duration_ms: 41.529045
+  type: 'test'
+  ...
+# Subtest: an Authorization Bearer header still authenticates when no cookie is present (backward compatibility)
+ok 38 - an Authorization Bearer header still authenticates when no cookie is present (backward compatibility)
+  ---
+  duration_ms: 8.042175
+  type: 'test'
+  ...
+# Subtest: the session cookie takes precedence over a mismatched Authorization header when both are present
+ok 39 - the session cookie takes precedence over a mismatched Authorization header when both are present
+  ---
+  duration_ms: 7.576012
+  type: 'test'
+  ...
+# Subtest: session-pref request with neither cookie nor Authorization header is rejected
+ok 40 - session-pref request with neither cookie nor Authorization header is rejected
+  ---
+  duration_ms: 8.71394
+  type: 'test'
+  ...
+# Subtest: availability filter compares event in the student's explicit timezone
+ok 41 - availability filter compares event in the student's explicit timezone
+  ---
+  duration_ms: 25.929098
+  type: 'test'
+  ...
+# Subtest: invalid timezone is rejected instead of silently matching
+ok 42 - invalid timezone is rejected instead of silently matching
+  ---
+  duration_ms: 0.617564
+  type: 'test'
+  ...
+# Subtest: the first administrator claiming an organization becomes its owner
+ok 43 - the first administrator claiming an organization becomes its owner
+  ---
+  duration_ms: 0.918646
+  type: 'test'
+  ...
+# Subtest: a later administrator joining an owned organization is not elevated
+ok 44 - a later administrator joining an owned organization is not elevated
+  ---
+  duration_ms: 0.168281
+  type: 'test'
+  ...
+# Subtest: prevents removing the final organization owner
+ok 45 - prevents removing the final organization owner
+  ---
+  duration_ms: 0.178121
+  type: 'test'
+  ...
+# Subtest: allows an owner to remove a non-owner administrator
+ok 46 - allows an owner to remove a non-owner administrator
+  ---
+  duration_ms: 0.199882
+  type: 'test'
+  ...
+# Subtest: allows removing one of multiple organization owners
+ok 47 - allows removing one of multiple organization owners
+  ---
+  duration_ms: 0.183121
+  type: 'test'
+  ...
+# Subtest: beneficiary approval queues identify the student by name
+ok 48 - beneficiary approval queues identify the student by name
+  ---
+  duration_ms: 1.305129
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: batch attendance rejects more than 200 records
+ok 49 - batch attendance rejects more than 200 records
+  ---
+  duration_ms: 87.151238
+  type: 'test'
+  ...
+# Subtest: batch attendance rejects duplicate signupIds
+ok 50 - batch attendance rejects duplicate signupIds
+  ---
+  duration_ms: 30.007966
+  type: 'test'
+  ...
+# Subtest: marking a signup NO_SHOW through the batch route keeps status in sync with attendance
+ok 51 - marking a signup NO_SHOW through the batch route keeps status in sync with attendance
+  ---
+  duration_ms: 13.676014
+  type: 'test'
+  ...
+# Subtest: marking NO_SHOW before the event has ended is rejected without an early override
+ok 52 - marking NO_SHOW before the event has ended is rejected without an early override
+  ---
+  duration_ms: 9.399184
+  type: 'test'
+  ...
+# Subtest: marking NO_SHOW before the event has ended succeeds with earlyOverride + reason
+ok 53 - marking NO_SHOW before the event has ended succeeds with earlyOverride + reason
+  ---
+  duration_ms: 9.871307
+  type: 'test'
+  ...
+# Subtest: marking ATTENDED before the event has ended does not require the early override
+ok 54 - marking ATTENDED before the event has ended does not require the early override
+  ---
+  duration_ms: 6.959527
+  type: 'test'
+  ...
+# Subtest: batch attendance skips cancelled and waitlisted signups instead of overwriting them
+ok 55 - batch attendance skips cancelled and waitlisted signups instead of overwriting them
+  ---
+  duration_ms: 7.190569
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: GET on a public cancellation link never mutates the signup
+ok 56 - GET on a public cancellation link never mutates the signup
+  ---
+  duration_ms: 68.656191
+  type: 'test'
+  ...
+# Subtest: POST on the cancellation link consumes the token and cancels the signup
+ok 57 - POST on the cancellation link consumes the token and cancels the signup
+  ---
+  duration_ms: 27.536429
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: directory/nearby rejects a non-numeric page instead of building malformed SQL
+ok 58 - directory/nearby rejects a non-numeric page instead of building malformed SQL
+  ---
+  duration_ms: 71.897694
+  type: 'test'
+  ...
+# Subtest: directory/nearby rejects a negative or zero limit
+ok 59 - directory/nearby rejects a negative or zero limit
+  ---
+  duration_ms: 28.288634
+  type: 'test'
+  ...
+# Subtest: directory/nearby accepts a valid page/limit and never reaches raw SQL with NaN
+ok 60 - directory/nearby accepts a valid page/limit and never reaches raw SQL with NaN
+  ---
+  duration_ms: 59.386688
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: GET /api/beneficiaries rejects an invalid status query filter
+ok 61 - GET /api/beneficiaries rejects an invalid status query filter
+  ---
+  duration_ms: 72.95406
+  type: 'test'
+  ...
+# Subtest: GET /api/beneficiaries accepts a valid status query filter
+ok 62 - GET /api/beneficiaries accepts a valid status query filter
+  ---
+  duration_ms: 27.507189
+  type: 'test'
+  ...
+# Subtest: GET /api/beneficiaries?status=ALL is treated as no filter
+ok 63 - GET /api/beneficiaries?status=ALL is treated as no filter
+  ---
+  duration_ms: 8.288897
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: approving a NO_SHOW signup without the override is rejected
+ok 64 - approving a NO_SHOW signup without the override is rejected
+  ---
+  duration_ms: 85.147825
+  type: 'test'
+  ...
+# Subtest: approving a NO_SHOW signup with overrideNoShow but no reason is rejected
+ok 65 - approving a NO_SHOW signup with overrideNoShow but no reason is rejected
+  ---
+  duration_ms: 31.532337
+  type: 'test'
+  ...
+# Subtest: approving a NO_SHOW signup with overrideNoShow + reason succeeds and is audited
+ok 66 - approving a NO_SHOW signup with overrideNoShow + reason succeeds and is audited
+  ---
+  duration_ms: 26.26514
+  type: 'test'
+  ...
+# Subtest: approving a normal CONFIRMED signup does not require the no-show override
+ok 67 - approving a normal CONFIRMED signup does not require the no-show override
+  ---
+  duration_ms: 9.850547
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: marking no-show before the event ends is rejected without an early override
+ok 68 - marking no-show before the event ends is rejected without an early override
+  ---
+  duration_ms: 85.494387
+  type: 'test'
+  ...
+# Subtest: marking no-show before the event ends succeeds with earlyOverride + reason
+ok 69 - marking no-show before the event ends succeeds with earlyOverride + reason
+  ---
+  duration_ms: 41.119482
+  type: 'test'
+  ...
+# Subtest: marking no-show after the event has ended does not require the override
+ok 70 - marking no-show after the event has ended does not require the override
+  ---
+  duration_ms: 10.509793
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Create opportunity validation error: {
+#   beneficiaryId: 'ben-rec-1',
+#   issues: [
+#     {
+#       code: 'custom',
+#       path: [Array],
+#       message: 'End time must be after start time.'
+#     }
+#   ],
+#   body: {
+#     title: 'Weekly Food Bank Shift',
+#     description: 'Sort and pack donations.',
+#     category: 'food',
+#     startDate: '2020-01-01',
+#     recurrenceRule: {
+#       type: 'monthly_day_of_week',
+#       daysOfWeek: [Array],
+#       weeksOfMonth: [Array],
+#       startTime: '11:00',
+#       endTime: '09:00',
+#       durationHours: 2,
+#       capacity: 5,
+#       monthsAhead: 1
+#     }
+#   }
+# }
+# Subtest: POST /:id/opportunities rejects a recurrence rule with endTime before startTime
+ok 71 - POST /:id/opportunities rejects a recurrence rule with endTime before startTime
+  ---
+  duration_ms: 85.048624
+  type: 'test'
+  ...
+# Subtest: POST /:id/opportunities never generates recurring slots dated before today, even with a past startDate
+ok 72 - POST /:id/opportunities never generates recurring slots dated before today, even with a past startDate
+  ---
+  duration_ms: 83.921776
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: beneficiary list enforces student privacy through the authenticated HTTP API
+ok 73 - beneficiary list enforces student privacy through the authenticated HTTP API
+  ---
+  duration_ms: 109.652393
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: GET /:id/signups rejects an invalid status query filter
+ok 74 - GET /:id/signups rejects an invalid status query filter
+  ---
+  duration_ms: 72.099895
+  type: 'test'
+  ...
+# Subtest: GET /:id/signups accepts a valid status query filter
+ok 75 - GET /:id/signups accepts a valid status query filter
+  ---
+  duration_ms: 27.887951
+  type: 'test'
+  ...
+# Subtest: POST /:id/opportunities/:oppId/attendance rejects an invalid attendance value
+ok 76 - POST /:id/opportunities/:oppId/attendance rejects an invalid attendance value
+  ---
+  duration_ms: 22.340553
+  type: 'test'
+  ...
+# Subtest: organization monthly price is $30 (3000 cents)
+ok 77 - organization monthly price is $30 (3000 cents)
+  ---
+  duration_ms: 1.305209
+  type: 'test'
+  ...
+# Subtest: organization annual price is $300 (30000 cents)
+ok 78 - organization annual price is $300 (30000 cents)
+  ---
+  duration_ms: 0.174641
+  type: 'test'
+  ...
+# Subtest: annual price is less than 12 months of monthly (10% savings)
+ok 79 - annual price is less than 12 months of monthly (10% savings)
+  ---
+  duration_ms: 0.191602
+  type: 'test'
+  ...
+# Subtest: legacy organization quote requests default to annual billing
+ok 80 - legacy organization quote requests default to annual billing
+  ---
+  duration_ms: 0.158161
+  type: 'test'
+  ...
+# Subtest: school price per student is $0.50 (50 cents) by default
+ok 81 - school price per student is $0.50 (50 cents) by default
+  ---
+  duration_ms: 0.131841
+  type: 'test'
+  ...
+# Subtest: school estimate has no annual minimum
+ok 82 - school estimate has no annual minimum
+  ---
+  duration_ms: 0.187361
+  type: 'test'
+  ...
+# Subtest: school estimate uses the introductory per-student price
+ok 83 - school estimate uses the introductory per-student price
+  ---
+  duration_ms: 0.316402
+  type: 'test'
+  ...
+# Subtest: school estimate: 2000 students × $0.50 = $1000
+ok 84 - school estimate: 2000 students × $0.50 = $1000
+  ---
+  duration_ms: 0.144801
+  type: 'test'
+  ...
+# Subtest: school pricing progresses from $0.50 to $1 after the configured effective date
+ok 85 - school pricing progresses from $0.50 to $1 after the configured effective date
+  ---
+  duration_ms: 0.690285
+  type: 'test'
+  ...
+# Subtest: server recalculates school estimate (not trusting client value)
+ok 86 - server recalculates school estimate (not trusting client value)
+  ---
+  duration_ms: 0.841606
+  type: 'test'
+  ...
+# Subtest: school estimate rounds enrollment correctly
+ok 87 - school estimate rounds enrollment correctly
+  ---
+  duration_ms: 0.155001
+  type: 'test'
+  ...
+# Subtest: formatCents formats 3000 as $30
+ok 88 - formatCents formats 3000 as $30
+  ---
+  duration_ms: 0.212042
+  type: 'test'
+  ...
+# Subtest: formatCents formats 30000 as $300
+ok 89 - formatCents formats 30000 as $300
+  ---
+  duration_ms: 0.178841
+  type: 'test'
+  ...
+# Subtest: formatCents formats 50000 as $500
+ok 90 - formatCents formats 50000 as $500
+  ---
+  duration_ms: 0.117801
+  type: 'test'
+  ...
+# Subtest: GET /internal/invoice-requests rejects an invalid status query filter
+ok 91 - GET /internal/invoice-requests rejects an invalid status query filter
+  ---
+  duration_ms: 77.16537
+  type: 'test'
+  ...
+# Subtest: GET /internal/invoice-requests accepts a valid status query filter
+ok 92 - GET /internal/invoice-requests accepts a valid status query filter
+  ---
+  duration_ms: 28.622197
+  type: 'test'
+  ...
+# Subtest: GET /internal/invoice-requests with no status query applies no status filter
+ok 93 - GET /internal/invoice-requests with no status query applies no status filter
+  ---
+  duration_ms: 7.955614
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: POST /api/cohorts/:id/import with dryRun:true previews without creating invitations, sending email, or publishing the cohort
+ok 94 - POST /api/cohorts/:id/import with dryRun:true previews without creating invitations, sending email, or publishing the cohort
+  ---
+  duration_ms: 86.339233
+  type: 'test'
+  ...
+# [email:dev] Would send "You've been invited to join Import School on GoodHours" → ada2@example.test
+#   from: noreply@notifications.goodhours.app
+#   body: GoodHours
+#   
+#     Welcome to Import School on GoodHours
+#     Hi Ada Lovelace,Import School has invited you to join the Cohort B cohort on GoodHours — the platform for tracking and verifying your com…
+# Subtest: POST /api/cohorts/:id/import without dryRun still creates invitations and publishes the cohort (regression)
+ok 95 - POST /api/cohorts/:id/import without dryRun still creates invitations and publishes the cohort (regression)
+  ---
+  duration_ms: 34.942719
+  type: 'test'
+  ...
+# Subtest: POST /api/beneficiaries/import-csv with dryRun:true previews without creating any Beneficiary row
+ok 96 - POST /api/beneficiaries/import-csv with dryRun:true previews without creating any Beneficiary row
+  ---
+  duration_ms: 14.910142
+  type: 'test'
+  ...
+# Subtest: POST /api/self-submissions/import with dryRun:true previews without creating any SelfSubmittedRequest or audit log
+ok 97 - POST /api/self-submissions/import with dryRun:true previews without creating any SelfSubmittedRequest or audit log
+  ---
+  duration_ms: 8.565259
+  type: 'test'
+  ...
+# Subtest: POST /api/cohorts/:id/teachers/import with dryRun:true previews without creating a teacher user or assignment
+ok 98 - POST /api/cohorts/:id/teachers/import with dryRun:true previews without creating a teacher user or assignment
+  ---
+  duration_ms: 11.754
+  type: 'test'
+  ...
+# Subtest: POST /api/cohorts/teachers/import with dryRun:true previews without creating a teacher user or assignment
+ok 99 - POST /api/cohorts/teachers/import with dryRun:true previews without creating a teacher user or assignment
+  ---
+  duration_ms: 7.950494
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: POST /bulk is rate limited after 5 calls per staff member per hour
+ok 100 - POST /bulk is rate limited after 5 calls per staff member per hour
+  ---
+  duration_ms: 159.368814
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# Subtest: PostgreSQL proves correction deltas, reversal, and cancelled-export exclusion
+ok 101 - PostgreSQL proves correction deltas, reversal, and cancelled-export exclusion
+  ---
+  duration_ms: 388.224465
+  type: 'test'
+  ...
+# Reset beneficiary review error: PrismaClientKnownRequestError: 
+# Invalid `prisma.beneficiarySignup.update()` invocation:
+# Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+#     at ei.handleRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:7268)
+#     at ei.handleAndLogRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6593)
+#     at ei.request (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6300)
+#     at async a (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:9551)
+#     at async import_prisma.default.$transaction.isolationLevel (/home/opc/RTB/projects/goodhours/server/src/routes/beneficiaries.ts:3090:22)
+#     at async Proxy._transactionWithCallback (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:8120)
+#     at async <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/beneficiaries.ts:3079:21) {
+#   code: 'P2034',
+#   meta: { modelName: 'BeneficiarySignup' },
+#   clientVersion: '6.19.3'
+# }
+# Subtest: serializable HTTP transactions preserve one consistent result under concurrent correction/reset
+ok 102 - serializable HTTP transactions preserve one consistent result under concurrent correction/reset
+  ---
+  duration_ms: 168.918679
+  type: 'test'
+  ...
+# Approve signup error: Error: INJECTED_LEDGER_FAILURE
+#     at Proxy.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/cancelledBeneficiaryExport.test.ts:163:77)
+#     at recordServiceHourLedgerEntry (/home/opc/RTB/projects/goodhours/server/src/lib/serviceHourLedger.ts:30:37)
+#     at import_prisma.default.$transaction.isolationLevel (/home/opc/RTB/projects/goodhours/server/src/routes/beneficiaries.ts:2845:13)
+#     at async Proxy._transactionWithCallback (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:8120)
+#     at async <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/beneficiaries.ts:2816:21)
+# Subtest: injected ledger failure rolls back source, audit, and ledger writes
+ok 103 - injected ledger failure rolls back source, audit, and ledger writes
+  ---
+  duration_ms: 87.49004
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: slotDateTime does not shift the calendar date backward for a timezone behind UTC (regression)
+ok 104 - slotDateTime does not shift the calendar date backward for a timezone behind UTC (regression)
+  ---
+  duration_ms: 11.163317
+  type: 'test'
+  ...
+# Subtest: computeSlotTimestamps derives both startsAt and endsAt via slotDateTime, DST-correctly
+ok 105 - computeSlotTimestamps derives both startsAt and endsAt via slotDateTime, DST-correctly
+  ---
+  duration_ms: 0.959406
+  type: 'test'
+  ...
+# Subtest: POST /:id/opportunities computes startsAt/endsAt for manually-entered time slots from the beneficiary's timezone
+ok 106 - POST /:id/opportunities computes startsAt/endsAt for manually-entered time slots from the beneficiary's timezone
+  ---
+  duration_ms: 85.540187
+  type: 'test'
+  ...
+# Subtest: PATCH /:id/slots/:slotId recomputes startsAt/endsAt when the time changes
+ok 107 - PATCH /:id/slots/:slotId recomputes startsAt/endsAt when the time changes
+  ---
+  duration_ms: 29.068119
+  type: 'test'
+  ...
+# Subtest: canonical ledger excludes unverified entries and resume uses only verified records
+ok 108 - canonical ledger excludes unverified entries and resume uses only verified records
+  ---
+  duration_ms: 2.661339
+  type: 'test'
+  ...
+# Subtest: canonical ledger rejects malformed and negative hours
+ok 109 - canonical ledger rejects malformed and negative hours
+  ---
+  duration_ms: 0.318802
+  type: 'test'
+  ...
+# Subtest: Canvas OAuth uses opaque persistent state and browser binding
+ok 110 - Canvas OAuth uses opaque persistent state and browser binding
+  ---
+  duration_ms: 1.296489
+  type: 'test'
+  ...
+# Subtest: Canvas OAuth callback re-checks the initiating school administrator
+ok 111 - Canvas OAuth callback re-checks the initiating school administrator
+  ---
+  duration_ms: 0.271042
+  type: 'test'
+  ...
+# Subtest: Canvas OAuth rejects unsafe tenant URLs and requires encrypted real credentials
+ok 112 - Canvas OAuth rejects unsafe tenant URLs and requires encrypted real credentials
+  ---
+  duration_ms: 0.341003
+  type: 'test'
+  ...
+# Subtest: Canvas preview does not create local teacher accounts
+ok 113 - Canvas preview does not create local teacher accounts
+  ---
+  duration_ms: 0.146561
+  type: 'test'
+  ...
+# Subtest: Canvas mapped records and API routes remain school scoped
+ok 114 - Canvas mapped records and API routes remain school scoped
+  ---
+  duration_ms: 0.188442
+  type: 'test'
+  ...
+# Subtest: Google Classroom OAuth uses opaque persistent state and browser binding
+ok 115 - Google Classroom OAuth uses opaque persistent state and browser binding
+  ---
+  duration_ms: 0.141161
+  type: 'test'
+  ...
+# Subtest: Google Classroom OAuth callback re-checks the initiating school administrator
+ok 116 - Google Classroom OAuth callback re-checks the initiating school administrator
+  ---
+  duration_ms: 0.358163
+  type: 'test'
+  ...
+# Subtest: Google Classroom OAuth rejects unsafe tenant URLs and requires encrypted credentials
+ok 117 - Google Classroom OAuth rejects unsafe tenant URLs and requires encrypted credentials
+  ---
+  duration_ms: 0.155201
+  type: 'test'
+  ...
+# Subtest: Google Classroom real teacher accounts are not hidden as test accounts
+ok 118 - Google Classroom real teacher accounts are not hidden as test accounts
+  ---
+  duration_ms: 0.571364
+  type: 'test'
+  ...
+# Subtest: Google Classroom OAuth redirect errors do not echo provider error text
+ok 119 - Google Classroom OAuth redirect errors do not echo provider error text
+  ---
+  duration_ms: 0.803285
+  type: 'test'
+  ...
+# Subtest: Google Classroom mapped student lookups remain school scoped
+ok 120 - Google Classroom mapped student lookups remain school scoped
+  ---
+  duration_ms: 0.155001
+  type: 'test'
+  ...
+# Subtest: signup is CONFIRMED when confirmedCount < capacity
+ok 121 - signup is CONFIRMED when confirmedCount < capacity
+  ---
+  duration_ms: 1.254249
+  type: 'test'
+  ...
+# Subtest: signup is CONFIRMED when confirmedCount is 0 and capacity > 0
+ok 122 - signup is CONFIRMED when confirmedCount is 0 and capacity > 0
+  ---
+  duration_ms: 0.213282
+  type: 'test'
+  ...
+# Subtest: signup is WAITLISTED when confirmedCount equals capacity
+ok 123 - signup is WAITLISTED when confirmedCount equals capacity
+  ---
+  duration_ms: 0.155721
+  type: 'test'
+  ...
+# Subtest: signup is WAITLISTED when confirmedCount exceeds capacity
+ok 124 - signup is WAITLISTED when confirmedCount exceeds capacity
+  ---
+  duration_ms: 0.139161
+  type: 'test'
+  ...
+# Subtest: signup is WAITLISTED when at capacity of 1
+ok 125 - signup is WAITLISTED when at capacity of 1
+  ---
+  duration_ms: 0.129041
+  type: 'test'
+  ...
+# Subtest: capacity 0 means opportunity is closed, no signups allowed
+ok 126 - capacity 0 means opportunity is closed, no signups allowed
+  ---
+  duration_ms: 0.117721
+  type: 'test'
+  ...
+# Subtest: capacity 0 is still closed even with 0 confirmed signups
+ok 127 - capacity 0 is still closed even with 0 confirmed signups
+  ---
+  duration_ms: 0.298722
+  type: 'test'
+  ...
+# Subtest: cancelling a CONFIRMED signup when a WAITLISTED user exists promotes that user
+ok 128 - cancelling a CONFIRMED signup when a WAITLISTED user exists promotes that user
+  ---
+  duration_ms: 0.229242
+  type: 'test'
+  ...
+# Subtest: cancelled signup has CANCELLED status after cancellation
+ok 129 - cancelled signup has CANCELLED status after cancellation
+  ---
+  duration_ms: 0.647045
+  type: 'test'
+  ...
+# Subtest: cancelling a CONFIRMED signup with no waitlisted users does not crash
+ok 130 - cancelling a CONFIRMED signup with no waitlisted users does not crash
+  ---
+  duration_ms: 0.829046
+  type: 'test'
+  ...
+# Subtest: oldest waitlisted user is promoted first (FIFO order)
+ok 131 - oldest waitlisted user is promoted first (FIFO order)
+  ---
+  duration_ms: 0.207122
+  type: 'test'
+  ...
+# Subtest: cancelling a WAITLISTED signup does not trigger promotion
+ok 132 - cancelling a WAITLISTED signup does not trigger promotion
+  ---
+  duration_ms: 0.156561
+  type: 'test'
+  ...
+# Subtest: capacity of 1 with 0 confirmed gives CONFIRMED status
+ok 133 - capacity of 1 with 0 confirmed gives CONFIRMED status
+  ---
+  duration_ms: 0.103481
+  type: 'test'
+  ...
+# Subtest: capacity of 1 with 1 confirmed gives WAITLISTED status
+ok 134 - capacity of 1 with 1 confirmed gives WAITLISTED status
+  ---
+  duration_ms: 0.140001
+  type: 'test'
+  ...
+# Subtest: personal provider emails are accepted only when the temporary bypass is enabled
+ok 135 - personal provider emails are accepted only when the temporary bypass is enabled
+  ---
+  duration_ms: 0.975446
+  type: 'test'
+  ...
+# Subtest: school staff student scopes require the canonical student school
+ok 136 - school staff student scopes require the canonical student school
+  ---
+  duration_ms: 2.408097
+  type: 'test'
+  ...
+# Subtest: school staff student scopes exclude Playwright/QA test accounts from staff-facing lists
+ok 137 - school staff student scopes exclude Playwright/QA test accounts from staff-facing lists
+  ---
+  duration_ms: 0.439043
+  type: 'test'
+  ...
+# Subtest: a filename containing an embedded quote cannot break out of the Content-Disposition attribute
+ok 138 - a filename containing an embedded quote cannot break out of the Content-Disposition attribute
+  ---
+  duration_ms: 1.362049
+  type: 'test'
+  ...
+# Subtest: a filename with non-ASCII characters is still encoded safely, not dropped or malformed
+ok 139 - a filename with non-ASCII characters is still encoded safely, not dropped or malformed
+  ---
+  duration_ms: 0.525684
+  type: 'test'
+  ...
+# Subtest: inline type is respected for attachment preview routes
+ok 140 - inline type is respected for attachment preview routes
+  ---
+  duration_ms: 0.284162
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# CSV export: serviceSession lookup failed Error: transient DB error
+#     at Proxy.prismaClient.serviceSession.findMany (/home/opc/RTB/projects/goodhours/server/tests/csvExportPartialDataFailure.test.ts:60:62)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/reports.ts:505:31)
+#     at Layer.handle [as handle_request] (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/layer.js:95:5)
+#     at next (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/route.js:149:13)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/auth.ts:127:7)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: GET /export/csv still exports the other two sources when one source fails
+ok 141 - GET /export/csv still exports the other two sources when one source fails
+  ---
+  duration_ms: 77.353771
+  type: 'test'
+  ...
+# CSV export: serviceSession lookup failed Error: db down
+#     at Proxy.prismaClient.serviceSession.findMany (/home/opc/RTB/projects/goodhours/server/tests/csvExportPartialDataFailure.test.ts:91:62)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/reports.ts:505:31)
+#     at Layer.handle [as handle_request] (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/layer.js:95:5)
+#     at next (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/route.js:149:13)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/auth.ts:127:7)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# CSV export: beneficiarySignup lookup failed Error: db down
+#     at Proxy.prismaClient.beneficiarySignup.findMany (/home/opc/RTB/projects/goodhours/server/tests/csvExportPartialDataFailure.test.ts:92:65)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/reports.ts:510:34)
+#     at Layer.handle [as handle_request] (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/layer.js:95:5)
+#     at next (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/route.js:149:13)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/auth.ts:127:7)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# CSV export: selfSubmittedRequest lookup failed Error: db down
+#     at Proxy.prismaClient.selfSubmittedRequest.findMany (/home/opc/RTB/projects/goodhours/server/tests/csvExportPartialDataFailure.test.ts:93:68)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/reports.ts:523:37)
+#     at Layer.handle [as handle_request] (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/layer.js:95:5)
+#     at next (/home/opc/RTB/projects/goodhours/node_modules/express/lib/router/route.js:149:13)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/auth.ts:127:7)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: GET /export/csv returns 503 (not an empty CSV) when every source fails
+ok 142 - GET /export/csv returns 503 (not an empty CSV) when every source fails
+  ---
+  duration_ms: 30.63377
+  type: 'test'
+  ...
+# Subtest: GET /export/csv succeeds normally with no warning when all sources succeed
+ok 143 - GET /export/csv succeeds normally with no warning when all sources succeed
+  ---
+  duration_ms: 12.379125
+  type: 'test'
+  ...
+# Subtest: CSV import preview deduplicates and rollback restores before-state
+ok 144 - CSV import preview deduplicates and rollback restores before-state
+  ---
+  duration_ms: 2.8155
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: summarizeStudentSubjects never includes student names or emails
+ok 145 - summarizeStudentSubjects never includes student names or emails
+  ---
+  duration_ms: 1.41889
+  type: 'test'
+  ...
+# Subtest: logDataAccess rejects instead of swallowing a write failure
+ok 146 - logDataAccess rejects instead of swallowing a write failure
+  ---
+  duration_ms: 1.008007
+  type: 'test'
+  ...
+# List beneficiary signups error: Error: simulated audit outage
+#     at Proxy.prismaClient.dataAccessLog.create (/home/opc/RTB/projects/goodhours/server/tests/dataAccessLogFailClosed.test.ts:82:11)
+#     at logDataAccess (/home/opc/RTB/projects/goodhours/server/src/lib/dataAccessLog.ts:25:30)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/beneficiaries.ts:2729:11)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: a failed audit write blocks the beneficiary signup-list response instead of releasing student data
+ok 147 - a failed audit write blocks the beneficiary signup-list response instead of releasing student data
+  ---
+  duration_ms: 90.30314
+  type: 'test'
+  ...
+# Subtest: allows a local, opted-in, non-production run
+ok 148 - allows a local, opted-in, non-production run
+  ---
+  duration_ms: 1.45821
+  type: 'test'
+  ...
+# Subtest: blocks a production-like environment even with the opt-in set
+ok 149 - blocks a production-like environment even with the opt-in set
+  ---
+  duration_ms: 0.474843
+  type: 'test'
+  ...
+# Subtest: blocks a production-like environment via APP_ENV specifically
+ok 150 - blocks a production-like environment via APP_ENV specifically
+  ---
+  duration_ms: 0.219761
+  type: 'test'
+  ...
+# Subtest: blocks when ALLOW_DESTRUCTIVE_TEST_SEED is missing
+ok 151 - blocks when ALLOW_DESTRUCTIVE_TEST_SEED is missing
+  ---
+  duration_ms: 0.179322
+  type: 'test'
+  ...
+# Subtest: blocks when ALLOW_DESTRUCTIVE_TEST_SEED is not exactly 'yes'
+ok 152 - blocks when ALLOW_DESTRUCTIVE_TEST_SEED is not exactly 'yes'
+  ---
+  duration_ms: 0.394243
+  type: 'test'
+  ...
+# Subtest: blocks a DATABASE_URL with no valid connection string
+ok 153 - blocks a DATABASE_URL with no valid connection string
+  ---
+  duration_ms: 0.204802
+  type: 'test'
+  ...
+# Subtest: blocks a production-sounding remote host and database name
+ok 154 - blocks a production-sounding remote host and database name
+  ---
+  duration_ms: 0.292642
+  type: 'test'
+  ...
+# Subtest: allows a non-localhost host if the database name looks clearly disposable
+ok 155 - allows a non-localhost host if the database name looks clearly disposable
+  ---
+  duration_ms: 0.196282
+  type: 'test'
+  ...
+# Subtest: allows localhost even if the database name doesn't look disposable
+ok 156 - allows localhost even if the database name doesn't look disposable
+  ---
+  duration_ms: 0.688005
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: two independently constructed hybrid limiter instances share enforcement
+ok 157 - two independently constructed hybrid limiter instances share enforcement
+  ---
+  duration_ms: 2.805979
+  type: 'test'
+  ...
+# Subtest: two independent instances share enforcement through PostgreSQL store
+ok 158 - two independent instances share enforcement through PostgreSQL store
+  ---
+  duration_ms: 1.006807
+  type: 'test'
+  ...
+# [RateLimit] Falling back to open on store error: TypeError: fetch failed
+#     at node:internal/deps/undici/undici:15157:13
+#     at async takeSharedBucket (/home/opc/RTB/projects/goodhours/server/src/middleware/rateLimit.ts:120:20)
+#     at async <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/rateLimit.ts:328:24)
+#     at async main (/home/opc/RTB/projects/goodhours/server/tests/_failClosedHelper.ts:39:5) {
+#   [cause]: Error: bad port
+#       at makeNetworkError (node:internal/deps/undici/undici:9618:35)
+#       at mainFetch (node:internal/deps/undici/undici:10844:20)
+#       at fetching (node:internal/deps/undici/undici:10830:7)
+#       at fetch (node:internal/deps/undici/undici:10699:20)
+#       at fetch (node:internal/deps/undici/undici:15155:10)
+#       at fetch (node:internal/bootstrap/web/exposed-window-or-worker:75:12)
+#       at takeSharedBucket (/home/opc/RTB/projects/goodhours/server/src/middleware/rateLimit.ts:120:26)
+#       at takeRateLimitBucket (/home/opc/RTB/projects/goodhours/server/src/middleware/rateLimit.ts:196:12)
+#       at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/middleware/rateLimit.ts:328:30)
+#       at main (/home/opc/RTB/projects/goodhours/server/tests/_failClosedHelper.ts:39:11)
+# }
+# Subtest: two separately booted processes enforce one PostgreSQL bucket
+ok 159 - two separately booted processes enforce one PostgreSQL bucket
+  ---
+  duration_ms: 1539.568448
+  type: 'test'
+  ...
+# Subtest: failClosed option rejects request with 429 when store throws
+ok 160 - failClosed option rejects request with 429 when store throws
+  ---
+  duration_ms: 495.859124
+  type: 'test'
+  ...
+# Subtest: default behavior falls back to open on store error
+ok 161 - default behavior falls back to open on store error
+  ---
+  duration_ms: 466.12536
+  type: 'test'
+  ...
+# Subtest: skipSuccessfulRequests: only failed responses consume quota
+ok 162 - skipSuccessfulRequests: only failed responses consume quota
+  ---
+  duration_ms: 1.527851
+  type: 'test'
+  ...
+# Subtest: skipFailedRequests: only successful responses consume quota
+ok 163 - skipFailedRequests: only successful responses consume quota
+  ---
+  duration_ms: 1.377609
+  type: 'test'
+  ...
+# Subtest: without skipSuccessfulRequests, successful responses consume quota
+ok 164 - without skipSuccessfulRequests, successful responses consume quota
+  ---
+  duration_ms: 0.401282
+  type: 'test'
+  ...
+# Subtest: without skipFailedRequests, failed responses consume quota
+ok 165 - without skipFailedRequests, failed responses consume quota
+  ---
+  duration_ms: 0.853006
+  type: 'test'
+  ...
+# Subtest: createHybridRateLimit works without new options (backward compat)
+ok 166 - createHybridRateLimit works without new options (backward compat)
+  ---
+  duration_ms: 1.295529
+  type: 'test'
+  ...
+# Subtest: derives milestone state from approved canonical ledger hours
+ok 167 - derives milestone state from approved canonical ledger hours
+  ---
+  duration_ms: 2.267575
+  type: 'test'
+  ...
+# Subtest: uses safe school-configurable defaults and clamps ledger values
+ok 168 - uses safe school-configurable defaults and clamps ledger values
+  ---
+  duration_ms: 0.287482
+  type: 'test'
+  ...
+# [email] Captured "Your volunteer hours have been approved" locally for gh-email-escaping-test-1@mailinator.com
+# [email] Captured "You've been invited to join </strong><script>alert("school")</script><strong> on GoodHours" locally for gh-email-escaping-test-2@mailinator.com
+# [email] Captured "Reminder: <script>alert("event")</script> is coming up" locally for gh-email-escaping-test-3@mailinator.com
+# [email] Captured "Reminder: Beach Cleanup is coming up" locally for gh-email-escaping-test-4@mailinator.com
+# Subtest: sendHourApprovedEmail escapes an org name containing HTML
+ok 169 - sendHourApprovedEmail escapes an org name containing HTML
+  ---
+  duration_ms: 2.416737
+  type: 'test'
+  ...
+# Subtest: sendStudentInvitationEmail escapes a school name used as both title and body text
+ok 170 - sendStudentInvitationEmail escapes a school name used as both title and body text
+  ---
+  duration_ms: 0.471243
+  type: 'test'
+  ...
+# Subtest: sendEventReminderEmail sanitizes brandColor, rejects a javascript: logo URL, and escapes text fields
+ok 171 - sendEventReminderEmail sanitizes brandColor, rejects a javascript: logo URL, and escapes text fields
+  ---
+  duration_ms: 0.663244
+  type: 'test'
+  ...
+# Subtest: sendEventReminderEmail accepts a valid hex brandColor and https logo URL unchanged
+ok 172 - sendEventReminderEmail accepts a valid hex brandColor and https logo URL unchanged
+  ---
+  duration_ms: 0.628964
+  type: 'test'
+  ...
+# Subtest: production email log context omits recipient, subject, body, and tokens
+ok 173 - production email log context omits recipient, subject, body, and tokens
+  ---
+  duration_ms: 1.204288
+  type: 'test'
+  ...
+# Subtest: development email log context preserves useful recipient details
+ok 174 - development email log context preserves useful recipient details
+  ---
+  duration_ms: 0.195961
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: email send limiter allows only one request per recipient every 60 seconds
+ok 175 - email send limiter allows only one request per recipient every 60 seconds
+  ---
+  duration_ms: 3.490584
+  type: 'test'
+  ...
+# Subtest: email send limiter blocks suspicious bursts from one IP across recipients
+ok 176 - email send limiter blocks suspicious bursts from one IP across recipients
+  ---
+  duration_ms: 1.786172
+  type: 'test'
+  ...
+# Subtest: email send limiter shares suspicious-IP detection across email workflows
+ok 177 - email send limiter shares suspicious-IP detection across email workflows
+  ---
+  duration_ms: 1.063047
+  type: 'test'
+  ...
+# [email:dev] Would send "Reminder: Saturday Sort is coming up" → student@example.test
+#   from: noreply@notifications.goodhours.app
+#   body: Food Bank
+#   
+#     Upcoming volunteer event
+#     
+#     
+#     Don't forget — you're signed up for Saturday Sort.
+#     📅 Tuesday, September 8, 2026, 10:00–12:00
+#     📍 Warehouse
+#     Get directions…
+# [email:dev] Would send "Reminder: Saturday Sort is coming up" → student@example.test
+#   from: noreply@notifications.goodhours.app
+#   body: Food Bank
+#   
+#     Upcoming volunteer event
+#     
+#     
+#     Don't forget — you're signed up for Saturday Sort.
+#     📅 Tuesday, September 8, 2026, 14:00–16:00
+#     📍 Warehouse
+#     Get directions…
+# Subtest: a rescheduled event receives a replacement reminder instead of being suppressed by the old log
+ok 178 - a rescheduled event receives a replacement reminder instead of being suppressed by the old log
+  ---
+  duration_ms: 26.733944
+  type: 'test'
+  ...
+# [fieldEncryption] FIELD_ENCRYPTION_KEY is not set — sensitive fields will be stored in plaintext. Set a 64-hex-char key in env to enable encryption.
+# Subtest: encryptField throws instead of silently storing plaintext when APP_ENV=production and no key is configured
+ok 179 - encryptField throws instead of silently storing plaintext when APP_ENV=production and no key is configured
+  ---
+  duration_ms: 1.337409
+  type: 'test'
+  ...
+# Subtest: encryptField passes through as plaintext (with a warning, not a throw) outside production-like environments
+ok 180 - encryptField passes through as plaintext (with a warning, not a throw) outside production-like environments
+  ---
+  duration_ms: 0.839966
+  type: 'test'
+  ...
+# Subtest: geocodeAddress caches a successful lookup and does not refetch
+ok 181 - geocodeAddress caches a successful lookup and does not refetch
+  ---
+  duration_ms: 45.415871
+  type: 'test'
+  ...
+# [geocode] Request timed out after 8000ms for: Unique Slow Address 1788749280107
+# [geocode] Error: Error: network unreachable
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:55:11)
+#     at globalThis.fetch (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:9:55)
+#     at geocodeAddress (/home/opc/RTB/projects/goodhours/server/src/lib/geocode.ts:67:23)
+#     at TestContext.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:59:25)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [geocode] Error: Error: network unreachable
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:55:11)
+#     at globalThis.fetch (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:9:55)
+#     at geocodeAddress (/home/opc/RTB/projects/goodhours/server/src/lib/geocode.ts:67:23)
+#     at TestContext.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/geocode.test.ts:60:26)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: geocodeAddress aborts and returns null on a slow upstream instead of hanging
+ok 182 - geocodeAddress aborts and returns null on a slow upstream instead of hanging
+  ---
+  duration_ms: 8000.698122
+  type: 'test'
+  ...
+# Subtest: geocodeAddress does not cache a transient network failure
+ok 183 - geocodeAddress does not cache a transient network failure
+  ---
+  duration_ms: 4.064988
+  type: 'test'
+  ...
+# Subtest: the /api/geocode route requires authentication
+ok 184 - the /api/geocode route requires authentication
+  ---
+  duration_ms: 0.544523
+  type: 'test'
+  ...
+# Subtest: Google callback requires a verified Google email before account linking
+ok 185 - Google callback requires a verified Google email before account linking
+  ---
+  duration_ms: 0.870446
+  type: 'test'
+  ...
+# Subtest: directory-backed Google registration binds the identity to the directory email domain
+ok 186 - directory-backed Google registration binds the identity to the directory email domain
+  ---
+  duration_ms: 0.218721
+  type: 'test'
+  ...
+# Subtest: directory claiming is conditional and transactional in both Google registration paths
+ok 187 - directory claiming is conditional and transactional in both Google registration paths
+  ---
+  duration_ms: 0.174282
+  type: 'test'
+  ...
+# Subtest: Google registration token cannot be used as an unscoped school admin assertion
+ok 188 - Google registration token cannot be used as an unscoped school admin assertion
+  ---
+  duration_ms: 0.307202
+  type: 'test'
+  ...
+# Subtest: school verification consumes the registration token atomically
+ok 189 - school verification consumes the registration token atomically
+  ---
+  duration_ms: 0.189482
+  type: 'test'
+  ...
+# Subtest: 2 hour session calculates exactly 2.00 hours
+ok 190 - 2 hour session calculates exactly 2.00 hours
+  ---
+  duration_ms: 1.219209
+  type: 'test'
+  ...
+# Subtest: 1 hour 30 minute session calculates 1.5 hours
+ok 191 - 1 hour 30 minute session calculates 1.5 hours
+  ---
+  duration_ms: 0.187561
+  type: 'test'
+  ...
+# Subtest: 5 minute session calculates to 0.08 hours (rounded to 2dp)
+ok 192 - 5 minute session calculates to 0.08 hours (rounded to 2dp)
+  ---
+  duration_ms: 0.128041
+  type: 'test'
+  ...
+# Subtest: same check-in and check-out time calculates 0 hours
+ok 193 - same check-in and check-out time calculates 0 hours
+  ---
+  duration_ms: 0.120001
+  type: 'test'
+  ...
+# Subtest: 8 hour session calculates exactly 8 hours
+ok 194 - 8 hour session calculates exactly 8 hours
+  ---
+  duration_ms: 0.351362
+  type: 'test'
+  ...
+# Subtest: 24 hour session calculates exactly 24 hours
+ok 195 - 24 hour session calculates exactly 24 hours
+  ---
+  duration_ms: 0.150201
+  type: 'test'
+  ...
+# Subtest: calculated hours are always >= 0 for valid check-in/check-out pair
+ok 196 - calculated hours are always >= 0 for valid check-in/check-out pair
+  ---
+  duration_ms: 0.183161
+  type: 'test'
+  ...
+# Subtest: 1 hour 45 minute session calculates 1.75 hours
+ok 197 - 1 hour 45 minute session calculates 1.75 hours
+  ---
+  duration_ms: 0.156561
+  type: 'test'
+  ...
+# Subtest: real wall-clock timestamps produce correct duration
+ok 198 - real wall-clock timestamps produce correct duration
+  ---
+  duration_ms: 0.596164
+  type: 'test'
+  ...
+# Subtest: hour aggregation excludes records owned by another school
+ok 199 - hour aggregation excludes records owned by another school
+  ---
+  duration_ms: 3.353983
+  type: 'test'
+  ...
+# [hoursCalculator] beneficiarySignup lookup failed; omitting this source: Error: simulated outage
+#     at Proxy.prismaClient.beneficiarySignup.findMany (/home/opc/RTB/projects/goodhours/server/tests/hoursDataStatePartialFailure.test.ts:16:11)
+#     at calculateStudentHours (/home/opc/RTB/projects/goodhours/server/src/lib/hoursCalculator.ts:52:30)
+#     at TestContext.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/hoursDataStatePartialFailure.test.ts:22:26)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.start (node:internal/test_runner/test:944:17)
+#     at startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+# [studentProgress] No-show lookup failed; omitting this source: Error: simulated no-show lookup outage
+#     at Proxy.prismaClient.beneficiarySignup.findMany (/home/opc/RTB/projects/goodhours/server/tests/hoursDataStatePartialFailure.test.ts:68:13)
+#     at buildStudentProgressRecords (/home/opc/RTB/projects/goodhours/server/src/lib/studentProgress.ts:206:30)
+#     at TestContext.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/hoursDataStatePartialFailure.test.ts:76:27)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: calculateStudentHours reports PARTIAL and names the failed source instead of silently zeroing it
+ok 200 - calculateStudentHours reports PARTIAL and names the failed source instead of silently zeroing it
+  ---
+  duration_ms: 6.241723
+  type: 'test'
+  ...
+# Subtest: calculateStudentHours reports COMPLETE when every source succeeds
+ok 201 - calculateStudentHours reports COMPLETE when every source succeeds
+  ---
+  duration_ms: 0.327602
+  type: 'test'
+  ...
+# Subtest: buildStudentProgressRecords propagates PARTIAL when the no-show lookup fails, without wiping hours to zero
+ok 202 - buildStudentProgressRecords propagates PARTIAL when the no-show lookup fails, without wiping hours to zero
+  ---
+  duration_ms: 1.977254
+  type: 'test'
+  ...
+# Subtest: empty string fails required string validation
+ok 203 - empty string fails required string validation
+  ---
+  duration_ms: 2.398017
+  type: 'test'
+  ...
+# Subtest: non-empty string passes required string validation
+ok 204 - non-empty string passes required string validation
+  ---
+  duration_ms: 0.202361
+  type: 'test'
+  ...
+# Subtest: whitespace-only string fails after trim().min(1)
+ok 205 - whitespace-only string fails after trim().min(1)
+  ---
+  duration_ms: 0.190602
+  type: 'test'
+  ...
+# Subtest: string with content after trimming passes
+ok 206 - string with content after trimming passes
+  ---
+  duration_ms: 0.803606
+  type: 'test'
+  ...
+# Subtest: tab-only string fails after trim().min(1)
+ok 207 - tab-only string fails after trim().min(1)
+  ---
+  duration_ms: 0.215202
+  type: 'test'
+  ...
+# Subtest: string of 255 chars passes max length check
+ok 208 - string of 255 chars passes max length check
+  ---
+  duration_ms: 0.159521
+  type: 'test'
+  ...
+# Subtest: string of 256 chars fails max length check when limit is 255
+ok 209 - string of 256 chars fails max length check when limit is 255
+  ---
+  duration_ms: 0.393803
+  type: 'test'
+  ...
+# Subtest: string of 10,000 chars fails max length check when limit is 255
+ok 210 - string of 10,000 chars fails max length check when limit is 255
+  ---
+  duration_ms: 0.204922
+  type: 'test'
+  ...
+# Subtest: negative number fails .min(0) constraint
+ok 211 - negative number fails .min(0) constraint
+  ---
+  duration_ms: 0.849806
+  type: 'test'
+  ...
+# Subtest: zero passes .min(0) constraint
+ok 212 - zero passes .min(0) constraint
+  ---
+  duration_ms: 0.784766
+  type: 'test'
+  ...
+# Subtest: positive number passes .min(0) constraint
+ok 213 - positive number passes .min(0) constraint
+  ---
+  duration_ms: 0.165441
+  type: 'test'
+  ...
+# Subtest: valid email passes .email() validation
+ok 214 - valid email passes .email() validation
+  ---
+  duration_ms: 0.485723
+  type: 'test'
+  ...
+# Subtest: missing @ sign fails .email() validation
+ok 215 - missing @ sign fails .email() validation
+  ---
+  duration_ms: 0.446283
+  type: 'test'
+  ...
+# Subtest: missing domain fails .email() validation
+ok 216 - missing domain fails .email() validation
+  ---
+  duration_ms: 0.177201
+  type: 'test'
+  ...
+# Subtest: missing local part fails .email() validation
+ok 217 - missing local part fails .email() validation
+  ---
+  duration_ms: 0.413403
+  type: 'test'
+  ...
+# Subtest: email with spaces fails .email() validation
+ok 218 - email with spaces fails .email() validation
+  ---
+  duration_ms: 0.166281
+  type: 'test'
+  ...
+# Subtest: a past date fails future-date validation
+ok 219 - a past date fails future-date validation
+  ---
+  duration_ms: 0.747525
+  type: 'test'
+  ...
+# Subtest: a future date passes future-date validation
+ok 220 - a future date passes future-date validation
+  ---
+  duration_ms: 0.179201
+  type: 'test'
+  ...
+# Subtest: a future date fails past-date validation
+ok 221 - a future date fails past-date validation
+  ---
+  duration_ms: 0.176441
+  type: 'test'
+  ...
+# Subtest: a past date passes past-date validation
+ok 222 - a past date passes past-date validation
+  ---
+  duration_ms: 0.346202
+  type: 'test'
+  ...
+# Subtest: HTML injection string is accepted by Zod schema (Zod does not sanitize HTML)
+ok 223 - HTML injection string is accepted by Zod schema (Zod does not sanitize HTML)
+  ---
+  duration_ms: 0.138401
+  type: 'test'
+  ...
+# Subtest: SQL-injection-style string is accepted by Zod schema (Zod does not sanitize SQL)
+ok 224 - SQL-injection-style string is accepted by Zod schema (Zod does not sanitize SQL)
+  ---
+  duration_ms: 0.102681
+  type: 'test'
+  ...
+# Subtest: unicode and emoji characters are accepted by Zod string schema
+ok 225 - unicode and emoji characters are accepted by Zod string schema
+  ---
+  duration_ms: 0.101921
+  type: 'test'
+  ...
+# Subtest: opt-in interest matching ranks approved tag relevance first
+ok 226 - opt-in interest matching ranks approved tag relevance first
+  ---
+  duration_ms: 2.281456
+  type: 'test'
+  ...
+# Subtest: opt-out preserves the base marketplace order
+ok 227 - opt-out preserves the base marketplace order
+  ---
+  duration_ms: 0.205042
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: GET /interventions/cases rejects an invalid status query filter
+ok 228 - GET /interventions/cases rejects an invalid status query filter
+  ---
+  duration_ms: 71.615532
+  type: 'test'
+  ...
+# Subtest: GET /interventions/cases accepts a valid status query filter
+ok 229 - GET /interventions/cases accepts a valid status query filter
+  ---
+  duration_ms: 27.875752
+  type: 'test'
+  ...
+# Subtest: GET /interventions/cases with no status query applies no status filter
+ok 230 - GET /interventions/cases with no status query applies no status filter
+  ---
+  duration_ms: 8.378897
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# {"type":"request","requestId":"224b0b87-bb16-4e23-bbe0-97dc2345234a","method":"POST","path":"/student/accept","status":201,"ms":824,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"61b6b536-d743-4318-9139-46c0157be4cc","method":"POST","path":"/student/accept","status":409,"ms":826,"ip":"127.0.0.1","userId":null}
+# Subtest: simultaneous HTTP accepts have one winner and exactly one account, membership, attestation, and imported hours
+ok 231 - simultaneous HTTP accepts have one winner and exactly one account, membership, attestation, and imported hours
+  ---
+  duration_ms: 1023.552787
+  type: 'test'
+  ...
+# Accept student invitation error: PrismaClientKnownRequestError: 
+# Invalid `tx.selfSubmittedRequest.create()` invocation in
+# /home/opc/RTB/projects/goodhours/server/src/routes/invitations.ts:134:85
+#   131   : await tx.user.create({ data: { email: inv.email, passwordHash, name: data.name, role: "STUDENT", grade: inv.grade || null, house: inv.house || null, cohortId: inv.cohortId, schoolId: inv.cohort.schoolId, emailVerified: true, status: "ACTIVE" } });
+#   132 await tx.eligibilityAttestation.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, eligible13Plus: true, policyVersion: ELIGIBILITY_POLICY_VERSION, method: "invitation" } });
+#   133 await ensureStudentCohortMembership({ studentId: user.id, cohortId: inv.cohortId, source: "INVITATION", forcePrimary: !existing?.cohortId, schoolId: inv.cohort.schoolId, db: tx });
+# → 134 if (inv.startingHours && inv.startingHours > 0) await tx.selfSubmittedRequest.create(
+# Unique constraint failed on the fields: (`sourceStudentInvitationId`)
+#     at ei.handleRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:7268)
+#     at ei.handleAndLogRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6593)
+#     at ei.request (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6300)
+#     at async a (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:9551)
+#     at async <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/invitations.ts:134:55)
+#     at async Proxy._transactionWithCallback (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:8120)
+#     at async runSerializableTransaction (/home/opc/RTB/projects/goodhours/server/src/lib/serializableTransaction.ts:21:14)
+#     at async <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/invitations.ts:123:24) {
+#   code: 'P2002',
+#   meta: {
+#     modelName: 'SelfSubmittedRequest',
+#     target: [ 'sourceStudentInvitationId' ]
+#   },
+#   clientVersion: '6.19.3'
+# }
+# {"type":"request","requestId":"f212007f-7921-45e3-9679-3b24d4c71cfb","method":"POST","path":"/student/accept","status":500,"ms":405,"ip":"127.0.0.1","userId":null}
+# Subtest: dependent-write uniqueness failure rolls back invitation claim and created user
+ok 232 - dependent-write uniqueness failure rolls back invitation claim and created user
+  ---
+  duration_ms: 446.216184
+  type: 'test'
+  ...
+# {"type":"request","requestId":"4de79a16-cade-46ba-ab07-fcb283c33a72","method":"POST","path":"/student/accept","status":409,"ms":383,"ip":"127.0.0.1","userId":null}
+# Subtest: cross-school invitation acceptance is rejected without claiming or mutating the existing account
+ok 233 - cross-school invitation acceptance is rejected without claiming or mutating the existing account
+  ---
+  duration_ms: 424.302233
+  type: 'test'
+  ...
+# {"type":"request","requestId":"993ec2f9-320b-41d7-91eb-4249ac7641cc","method":"POST","path":"/student/accept","status":400,"ms":8,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"bcc10c42-8a5f-41cf-9bdc-7b72b4ffdac3","method":"POST","path":"/student/accept","status":201,"ms":400,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"4a46368f-f4ca-4805-8fde-44135cc48f55","method":"POST","path":"/student/accept","status":400,"ms":4,"ip":"127.0.0.1","userId":null}
+# Subtest: expired invitation and replay are rejected without new writes
+ok 234 - expired invitation and replay are rejected without new writes
+  ---
+  duration_ms: 458.688909
+  type: 'test'
+  ...
+# {"type":"request","requestId":"b1c79c20-a542-4e99-a0b8-3314d37dace9","method":"GET","path":"/ownership-approval","status":200,"ms":3,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"7ab5f2b5-e7b8-4bae-a262-1c281ed9ab89","method":"POST","path":"/ownership-approval","status":200,"ms":27,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"964cd78a-fcf1-4358-bf1d-718256dcc65b","method":"POST","path":"/ownership-approval","status":409,"ms":24,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"599305ad-4dc8-4b4e-9803-8b0bf5762cf7","method":"GET","path":"/me","status":401,"ms":4,"ip":"127.0.0.1","userId":null}
+# Subtest: owner approval GET is non-mutating and concurrent POST decisions have one winner
+ok 235 - owner approval GET is non-mutating and concurrent POST decisions have one winner
+  ---
+  duration_ms: 79.453945
+  type: 'test'
+  ...
+# {"type":"request","requestId":"4fd2b70c-b7aa-4b36-91d6-17f3e489cf2a","method":"POST","path":"/ownership-approval","status":200,"ms":20,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"cbf02320-0466-46db-806b-f43d1ad561f8","method":"GET","path":"/school","status":200,"ms":16,"ip":"127.0.0.1","userId":"cmtqn590n001mbju6e64pk3a9"}
+# Subtest: approved owner can access the school report after approval
+ok 236 - approved owner can access the school report after approval
+  ---
+  duration_ms: 70.779286
+  type: 'test'
+  ...
+# {"type":"request","requestId":"f1f784d4-5347-45fd-befe-8d8e57e6cf84","method":"GET","path":"/school","status":200,"ms":17,"ip":"127.0.0.1","userId":"cmtqn592m001xbju6he85zv0o"}
+# {"type":"request","requestId":"83a55c31-9792-4bcf-a04f-ee6b41247f5d","method":"POST","path":"/ownership-approval","status":200,"ms":10,"ip":"127.0.0.1","userId":null}
+# Subtest: pending school admin cannot use protected school route and rejected email block survives school deletion
+ok 237 - pending school admin cannot use protected school route and rejected email block survives school deletion
+  ---
+  duration_ms: 59.288487
+  type: 'test'
+  ...
+# Subtest: marking an invoice paid activates Pro with an explicit period end
+ok 238 - marking an invoice paid activates Pro with an explicit period end
+  ---
+  duration_ms: 1.40349
+  type: 'test'
+  ...
+# Subtest: the runtime-managed reminder cron expires invoice entitlement
+ok 239 - the runtime-managed reminder cron expires invoice entitlement
+  ---
+  duration_ms: 0.190081
+  type: 'test'
+  ...
+# Subtest: paid monthly and annual invoices receive explicit entitlement deadlines
+ok 240 - paid monthly and annual invoices receive explicit entitlement deadlines
+  ---
+  duration_ms: 1.358529
+  type: 'test'
+  ...
+# Subtest: only expired non-Stripe invoice entitlement is eligible for downgrade
+ok 241 - only expired non-Stripe invoice entitlement is eligible for downgrade
+  ---
+  duration_ms: 0.236042
+  type: 'test'
+  ...
+# Subtest: isProdLike is true when only APP_ENV is set to production
+ok 242 - isProdLike is true when only APP_ENV is set to production
+  ---
+  duration_ms: 1.006887
+  type: 'test'
+  ...
+# Subtest: isProdLike is false when no production env vars are set
+ok 243 - isProdLike is false when no production env vars are set
+  ---
+  duration_ms: 0.261842
+  type: 'test'
+  ...
+# Subtest: no file other than lib/isProdLike.ts locally redefines isProdLike()
+ok 244 - no file other than lib/isProdLike.ts locally redefines isProdLike()
+  ---
+  duration_ms: 9.925429
+  type: 'test'
+  ...
+# Subtest: routes/internal.ts imports the canonical isProdLike instead of redefining it
+ok 245 - routes/internal.ts imports the canonical isProdLike instead of redefining it
+  ---
+  duration_ms: 0.707045
+  type: 'test'
+  ...
+# Subtest: no file other than lib/isProdLike.ts (and env.ts's deliberately stricter DB-safety variant) raw-compares NODE_ENV/VERCEL_ENV against "production"
+ok 246 - no file other than lib/isProdLike.ts (and env.ts's deliberately stricter DB-safety variant) raw-compares NODE_ENV/VERCEL_ENV against "production"
+  ---
+  duration_ms: 5.91932
+  type: 'test'
+  ...
+# Subtest: isPubliclyDeployed is true in production, same as isProdLike
+ok 247 - isPubliclyDeployed is true in production, same as isProdLike
+  ---
+  duration_ms: 1.263448
+  type: 'test'
+  ...
+# Subtest: isPubliclyDeployed is true on a Vercel preview deployment, unlike isProdLike
+ok 248 - isPubliclyDeployed is true on a Vercel preview deployment, unlike isProdLike
+  ---
+  duration_ms: 0.243242
+  type: 'test'
+  ...
+# Subtest: isPubliclyDeployed is false for genuinely local dev (no VERCEL_ENV at all)
+ok 249 - isPubliclyDeployed is false for genuinely local dev (no VERCEL_ENV at all)
+  ---
+  duration_ms: 0.281082
+  type: 'test'
+  ...
+# Subtest: isPubliclyDeployed is false when VERCEL_ENV=development (vercel dev locally)
+ok 250 - isPubliclyDeployed is false when VERCEL_ENV=development (vercel dev locally)
+  ---
+  duration_ms: 0.210201
+  type: 'test'
+  ...
+# Subtest: isInternalAdminUser's local SCHOOL_ADMIN fallback does not activate on a preview deployment
+ok 251 - isInternalAdminUser's local SCHOOL_ADMIN fallback does not activate on a preview deployment
+  ---
+  duration_ms: 0.401002
+  type: 'test'
+  ...
+# Subtest: isInternalAdminUser's local SCHOOL_ADMIN fallback still works for genuinely local dev
+ok 252 - isInternalAdminUser's local SCHOOL_ADMIN fallback still works for genuinely local dev
+  ---
+  duration_ms: 0.193921
+  type: 'test'
+  ...
+# Subtest: approved legacy organization opportunities are represented as browsable slots
+ok 253 - approved legacy organization opportunities are represented as browsable slots
+  ---
+  duration_ms: 1.094167
+  type: 'test'
+  ...
+# Subtest: every ORG_ADMIN legacy write route returns 410 without ever writing to the database
+ok 254 - every ORG_ADMIN legacy write route returns 410 without ever writing to the database
+  ---
+  duration_ms: 139.343117
+  type: 'test'
+  ...
+# Subtest: ORG_ADMIN read routes are not affected by the freeze
+ok 255 - ORG_ADMIN read routes are not affected by the freeze
+  ---
+  duration_ms: 10.448551
+  type: 'test'
+  ...
+# Subtest: GET /api/opportunities (public browse) is not affected by the freeze
+ok 256 - GET /api/opportunities (public browse) is not affected by the freeze
+  ---
+  duration_ms: 12.484206
+  type: 'test'
+  ...
+# Subtest: private, loopback, link-local, metadata, and documentation addresses are rejected
+ok 257 - private, loopback, link-local, metadata, and documentation addresses are rejected
+  ---
+  duration_ms: 7.922455
+  type: 'test'
+  ...
+# Subtest: Google OAuth and API destinations are fixed origins
+ok 258 - Google OAuth and API destinations are fixed origins
+  ---
+  duration_ms: 1.56169
+  type: 'test'
+  ...
+# Subtest: approved-origin validation rejects unapproved, credentialed, and private URLs
+ok 259 - approved-origin validation rejects unapproved, credentialed, and private URLs
+  ---
+  duration_ms: 1.047567
+  type: 'test'
+  ...
+# Subtest: course selection is explicit, bounded, deduplicated, and accessible
+ok 260 - course selection is explicit, bounded, deduplicated, and accessible
+  ---
+  duration_ms: 0.472524
+  type: 'test'
+  ...
+# Subtest: redirects and unapproved URLs never forward credential-bearing request bodies
+ok 261 - redirects and unapproved URLs never forward credential-bearing request bodies
+  ---
+  duration_ms: 71.910054
+  type: 'test'
+  ...
+# Subtest: LMS credential-bearing requests use the approved-origin fetch boundary
+ok 262 - LMS credential-bearing requests use the approved-origin fetch boundary
+  ---
+  duration_ms: 8.6853
+  type: 'test'
+  ...
+# Subtest: Google production OAuth origins are fixed and request input cannot provide baseUrl
+ok 263 - Google production OAuth origins are fixed and request input cannot provide baseUrl
+  ---
+  duration_ms: 5.515118
+  type: 'test'
+  ...
+# Subtest: Canvas OAuth accepts only administratively configured exact origins
+ok 264 - Canvas OAuth accepts only administratively configured exact origins
+  ---
+  duration_ms: 1.698572
+  type: 'test'
+  ...
+# Subtest: both LMS providers require and persist explicit course selection before roster retrieval
+ok 265 - both LMS providers require and persist explicit course selection before roster retrieval
+  ---
+  duration_ms: 2.377937
+  type: 'test'
+  ...
+# Subtest: stale LMS user mappings are revalidated against the connection school
+ok 266 - stale LMS user mappings are revalidated against the connection school
+  ---
+  duration_ms: 1.788733
+  type: 'test'
+  ...
+# Subtest: no server source file matches an Origin/Referer header with a substring check against the production domain
+ok 267 - no server source file matches an Origin/Referer header with a substring check against the production domain
+  ---
+  duration_ms: 9.366344
+  type: 'test'
+  ...
+# Subtest: OAuth state is opaque, browser-bound, expires, and is single-use
+ok 268 - OAuth state is opaque, browser-bound, expires, and is single-use
+  ---
+  duration_ms: 2.556778
+  type: 'test'
+  ...
+# Subtest: OAuth callback authorization re-check rejects revoked or non-admin actors
+ok 269 - OAuth callback authorization re-check rejects revoked or non-admin actors
+  ---
+  duration_ms: 0.382923
+  type: 'test'
+  ...
+# Subtest: student session tokens expire in 24 hours while staff retain seven-day sessions
+ok 270 - student session tokens expire in 24 hours while staff retain seven-day sessions
+  ---
+  duration_ms: 2.985141
+  type: 'test'
+  ...
+# Subtest: opportunity categories are alphabetized
+ok 271 - opportunity categories are alphabetized
+  ---
+  duration_ms: 2.619698
+  type: 'test'
+  ...
+# Subtest: predefined categories are recognized after sorting
+ok 272 - predefined categories are recognized after sorting
+  ---
+  duration_ms: 0.252841
+  type: 'test'
+  ...
+# Subtest: custom category resolution still prefers the explicit custom value
+ok 273 - custom category resolution still prefers the explicit custom value
+  ---
+  duration_ms: 0.188601
+  type: 'test'
+  ...
+# Subtest: priority listing never outranks an earlier opportunity
+ok 274 - priority listing never outranks an earlier opportunity
+  ---
+  duration_ms: 1.103367
+  type: 'test'
+  ...
+# Subtest: paid tier does not affect equally relevant opportunity ordering
+ok 275 - paid tier does not affect equally relevant opportunity ordering
+  ---
+  duration_ms: 11.560199
+  type: 'test'
+  ...
+# Subtest: GET /api/opportunities rejects an invalid status query filter
+ok 276 - GET /api/opportunities rejects an invalid status query filter
+  ---
+  duration_ms: 82.921649
+  type: 'test'
+  ...
+# Subtest: GET /api/opportunities accepts a valid status query filter
+ok 277 - GET /api/opportunities accepts a valid status query filter
+  ---
+  duration_ms: 25.243453
+  type: 'test'
+  ...
+# Subtest: PUT /api/opportunities/:id is frozen for ORG_ADMIN (legacy write, §18)
+ok 278 - PUT /api/opportunities/:id is frozen for ORG_ADMIN (legacy write, §18)
+  ---
+  duration_ms: 37.83374
+  type: 'test'
+  ...
+# Subtest: FREE tier has lower storage than PRO
+ok 279 - FREE tier has lower storage than PRO
+  ---
+  duration_ms: 1.38877
+  type: 'test'
+  ...
+# Subtest: FREE tier has lower upload rate than PRO
+ok 280 - FREE tier has lower upload rate than PRO
+  ---
+  duration_ms: 0.173041
+  type: 'test'
+  ...
+# Subtest: FREE tier has all Pro features disabled
+ok 281 - FREE tier has all Pro features disabled
+  ---
+  duration_ms: 0.180201
+  type: 'test'
+  ...
+# Subtest: PRO tier has all features enabled
+ok 282 - PRO tier has all features enabled
+  ---
+  duration_ms: 0.157401
+  type: 'test'
+  ...
+# Subtest: getOrgTierLimits returns FREE limits for FREE tier
+ok 283 - getOrgTierLimits returns FREE limits for FREE tier
+  ---
+  duration_ms: 0.163961
+  type: 'test'
+  ...
+# Subtest: getOrgTierLimits returns PRO limits for PRO tier
+ok 284 - getOrgTierLimits returns PRO limits for PRO tier
+  ---
+  duration_ms: 0.131001
+  type: 'test'
+  ...
+# Subtest: ForbiddenFeatureError has code PRO_FEATURE_REQUIRED
+ok 285 - ForbiddenFeatureError has code PRO_FEATURE_REQUIRED
+  ---
+  duration_ms: 0.357683
+  type: 'test'
+  ...
+# Subtest: Free default reminder is exactly 24h (1440 min)
+ok 286 - Free default reminder is exactly 24h (1440 min)
+  ---
+  duration_ms: 0.157641
+  type: 'test'
+  ...
+# Subtest: Pro default reminders include 48h and 3h
+ok 287 - Pro default reminders include 48h and 3h
+  ---
+  duration_ms: 0.597564
+  type: 'test'
+  ...
+# Subtest: Pro default has no 24h reminder (not duplicating Free)
+ok 288 - Pro default has no 24h reminder (not duplicating Free)
+  ---
+  duration_ms: 0.785765
+  type: 'test'
+  ...
+# Subtest: generateICS produces valid VCALENDAR wrapper
+ok 289 - generateICS produces valid VCALENDAR wrapper
+  ---
+  duration_ms: 0.780605
+  type: 'test'
+  ...
+# Subtest: generateICS uses UTC datetime format (no dashes or colons)
+ok 290 - generateICS uses UTC datetime format (no dashes or colons)
+  ---
+  duration_ms: 0.215642
+  type: 'test'
+  ...
+# Subtest: generateICS escapes commas and semicolons in title
+ok 291 - generateICS escapes commas and semicolons in title
+  ---
+  duration_ms: 0.196402
+  type: 'test'
+  ...
+# Subtest: parseTimeString handles 12-hour AM format
+ok 292 - parseTimeString handles 12-hour AM format
+  ---
+  duration_ms: 0.243721
+  type: 'test'
+  ...
+# Subtest: parseTimeString handles 12-hour PM format
+ok 293 - parseTimeString handles 12-hour PM format
+  ---
+  duration_ms: 0.194681
+  type: 'test'
+  ...
+# Subtest: parseTimeString handles noon (12:00 PM)
+ok 294 - parseTimeString handles noon (12:00 PM)
+  ---
+  duration_ms: 0.129481
+  type: 'test'
+  ...
+# Subtest: parseTimeString handles midnight (12:00 AM)
+ok 295 - parseTimeString handles midnight (12:00 AM)
+  ---
+  duration_ms: 0.179042
+  type: 'test'
+  ...
+# Subtest: slotDateTime combines date and time string correctly (UTC timezone)
+ok 296 - slotDateTime combines date and time string correctly (UTC timezone)
+  ---
+  duration_ms: 20.895263
+  type: 'test'
+  ...
+# Subtest: slotDateTime converts wall-clock time to UTC using org timezone (America/New_York, EDT = UTC-4)
+ok 297 - slotDateTime converts wall-clock time to UTC using org timezone (America/New_York, EDT = UTC-4)
+  ---
+  duration_ms: 0.398882
+  type: 'test'
+  ...
+# Subtest: slotDateTime handles DST transition (America/Los_Angeles, PST = UTC-8)
+ok 298 - slotDateTime handles DST transition (America/Los_Angeles, PST = UTC-8)
+  ---
+  duration_ms: 0.364162
+  type: 'test'
+  ...
+# Subtest: slotDateTime defaults to UTC when no timezone supplied
+ok 299 - slotDateTime defaults to UTC when no timezone supplied
+  ---
+  duration_ms: 0.382323
+  type: 'test'
+  ...
+# Subtest: generateICS folds long lines and preserves multi-byte UTF-8 characters
+ok 300 - generateICS folds long lines and preserves multi-byte UTF-8 characters
+  ---
+  duration_ms: 0.532124
+  type: 'test'
+  ...
+# Subtest: Free org storage limit is 350 MB
+ok 301 - Free org storage limit is 350 MB
+  ---
+  duration_ms: 0.127761
+  type: 'test'
+  ...
+# Subtest: Pro org storage limit is 5 GB
+ok 302 - Pro org storage limit is 5 GB
+  ---
+  duration_ms: 0.104161
+  type: 'test'
+  ...
+# Subtest: Free org upload rate is 50 per hour
+ok 303 - Free org upload rate is 50 per hour
+  ---
+  duration_ms: 0.100641
+  type: 'test'
+  ...
+# Subtest: Pro org upload rate is 100 per hour
+ok 304 - Pro org upload rate is 100 per hour
+  ---
+  duration_ms: 0.111281
+  type: 'test'
+  ...
+# Subtest: Pro features remain false for unknown tier (treated as FREE)
+ok 305 - Pro features remain false for unknown tier (treated as FREE)
+  ---
+  duration_ms: 0.112081
+  type: 'test'
+  ...
+# Subtest: organization directory keeps private rows out of unrelated authenticated responses
+ok 306 - organization directory keeps private rows out of unrelated authenticated responses
+  ---
+  duration_ms: 122.683402
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: organization report rejects a student carrying a legacy organizationId before scope evaluation
+ok 307 - organization report rejects a student carrying a legacy organizationId before scope evaluation
+  ---
+  duration_ms: 69.484117
+  type: 'test'
+  ...
+# Subtest: the production owner-approval target matches the real goodhours.app hosts
+ok 308 - the production owner-approval target matches the real goodhours.app hosts
+  ---
+  duration_ms: 1.334809
+  type: 'test'
+  ...
+# Subtest: the production owner-approval target rejects lookalike, preview and local hosts
+ok 309 - the production owner-approval target rejects lookalike, preview and local hosts
+  ---
+  duration_ms: 0.307122
+  type: 'test'
+  ...
+# Subtest: the production owner-approval target is false when the environment is not production-like
+ok 310 - the production owner-approval target is false when the environment is not production-like
+  ---
+  duration_ms: 0.196641
+  type: 'test'
+  ...
+# Subtest: no route re-derives the goodhours.app production-host check with its own regex
+ok 311 - no route re-derives the goodhours.app production-host check with its own regex
+  ---
+  duration_ms: 8.471538
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# [email:dev] Would send "School approval needed: Resend Test School 1788749304225" → abhaysivaram31@gmail.com
+#   from: noreply@notifications.goodhours.app
+#   body: GoodHours
+#   
+#     Approve a school administrator
+#     resend-1788749304184-2yb7zl@example.invalid requested setup access for Resend Test School 1788749304225. Review the request and approve it only…
+# {"type":"request","requestId":"70c36589-fed4-4aa0-b87a-21855bd50ebb","method":"POST","path":"/ownership-approval/resend","status":200,"ms":31,"ip":"127.0.0.1","userId":"cmtqn5ggt0000bj1e6k046oxl"}
+# Subtest: on the production target the resend reaches the real send path and reports delivery honestly
+ok 312 - on the production target the resend reaches the real send path and reports delivery honestly
+  ---
+  duration_ms: 996.709402
+  type: 'test'
+  ...
+# [email] RESEND_API_KEY is not set
+# [ownership-approval] resend failed to deliver {
+#   schoolId: 'cmtqn5gkk0005bj1e94k8lhp3',
+#   message: '[email] RESEND_API_KEY is not set'
+# }
+# {"type":"request","requestId":"139fb449-4dcb-4dd9-9070-93d124b6562f","method":"POST","path":"/ownership-approval/resend","status":502,"ms":16,"ip":"127.0.0.1","userId":"cmtqn5gkf0003bj1ewhm6dwk9"}
+# Subtest: a failed provider send restores the previously emailed token and keeps a short cooldown
+ok 313 - a failed provider send restores the previously emailed token and keeps a short cooldown
+  ---
+  duration_ms: 50.355906
+  type: 'test'
+  ...
+# {"type":"request","requestId":"db8cbb88-6e88-4ba4-bbc4-159d32ce21cd","method":"POST","path":"/ownership-approval/resend","status":429,"ms":8,"ip":"127.0.0.1","userId":"cmtqn5glq0006bj1e0app2qsj"}
+# Subtest: a resend inside the 15-minute window is refused with a server-provided cooldown and rotates nothing
+ok 314 - a resend inside the 15-minute window is refused with a server-provided cooldown and rotates nothing
+  ---
+  duration_ms: 47.785848
+  type: 'test'
+  ...
+# [ownership-approval] resend bypassed in development {
+#   userId: 'cmtqn5gn30009bj1ebhr9pytu',
+#   schoolId: 'cmtqn5gn9000bbj1ed9rf4ohn'
+# }
+# {"type":"request","requestId":"dabc1dda-5e73-41f2-be0d-b6365903490e","method":"POST","path":"/ownership-approval/resend","status":200,"ms":9,"ip":"127.0.0.1","userId":"cmtqn5gn30009bj1ebhr9pytu"}
+# Subtest: a non-production target still bypasses without mailing anyone
+ok 315 - a non-production target still bypasses without mailing anyone
+  ---
+  duration_ms: 41.640566
+  type: 'test'
+  ...
+# [email:dev] Would send "School approval needed: Resend Test School 1788749304490" → abhaysivaram31@gmail.com
+#   from: noreply@notifications.goodhours.app
+#   body: GoodHours
+#   
+#     Approve a school administrator
+#     resend-1788749304487-f5epu7@example.invalid requested setup access for Resend Test School 1788749304490. Review the request and approve it only…
+# {"type":"request","requestId":"8009a2e2-4537-42fe-b818-5671910de101","method":"POST","path":"/ownership-approval/resend","status":200,"ms":10,"ip":"127.0.0.1","userId":"cmtqn5go8000cbj1eg3bnzba7"}
+# {"type":"request","requestId":"711cc212-d433-4d9f-a114-3bc3ce99df14","method":"POST","path":"/ownership-approval/resend","status":429,"ms":5,"ip":"127.0.0.1","userId":"cmtqn5go8000cbj1eg3bnzba7"}
+# Subtest: the per-applicant rate limiter throttles a burst even when the cooldown would allow it
+ok 316 - the per-applicant rate limiter throttles a burst even when the cooldown would allow it
+  ---
+  duration_ms: 43.567299
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# {"type":"request","requestId":"baf81dca-b3aa-4fbb-b469-141c9973ec8f","method":"GET","path":"/","status":403,"ms":24,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"ba575db2-fc8e-4e21-9efb-a15a63e645ee","method":"GET","path":"/me","status":200,"ms":19,"ip":"127.0.0.1","userId":"cmtqn5hn50000bj1xau22jacu"}
+# Subtest: a pending school admin with no attestation is gated on ownership, never on age
+ok 317 - a pending school admin with no attestation is gated on ownership, never on age
+  ---
+  duration_ms: 235.787219
+  type: 'test'
+  ...
+# {"type":"request","requestId":"a7076f1c-fc6c-44d2-a26c-48d0d48c93d5","method":"GET","path":"/","status":403,"ms":4,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"78b86533-bf42-49ec-b573-b107298e81ef","method":"GET","path":"/me","status":200,"ms":10,"ip":"127.0.0.1","userId":"cmtqn5hr00003bj1xbuareqgj"}
+# Subtest: a student with no attestation is still gated on age
+ok 318 - a student with no attestation is still gated on age
+  ---
+  duration_ms: 38.891387
+  type: 'test'
+  ...
+# {"type":"request","requestId":"4ccf43ac-d83f-4f10-a99d-96ae1701b967","method":"GET","path":"/","status":200,"ms":7,"ip":"127.0.0.1","userId":"cmtqn5hs10004bj1xiht0azxl"}
+# {"type":"request","requestId":"63344c0c-ee0d-41a2-ab08-b420e48d7d91","method":"GET","path":"/me","status":200,"ms":10,"ip":"127.0.0.1","userId":"cmtqn5hs10004bj1xiht0azxl"}
+# Subtest: a student who has attested is no longer gated
+ok 319 - a student who has attested is no longer gated
+  ---
+  duration_ms: 41.161603
+  type: 'test'
+  ...
+# {"type":"request","requestId":"d4291874-1d24-4f4a-8912-c06173912244","method":"GET","path":"/me","status":200,"ms":11,"ip":"127.0.0.1","userId":"cmtqn5ht60007bj1xwnjbhzv6"}
+# {"type":"request","requestId":"cc59d889-07e5-401a-9b87-7435f28d5ef6","method":"GET","path":"/","status":200,"ms":4,"ip":"127.0.0.1","userId":"cmtqn5ht60007bj1xwnjbhzv6"}
+# Subtest: beneficiary staff with no attestation are not gated at all
+ok 320 - beneficiary staff with no attestation are not gated at all
+  ---
+  duration_ms: 31.643417
+  type: 'test'
+  ...
+# Subtest: the dev-only impersonation and bypass-email-verification routes are gated by isPubliclyDeployed, not isProdLike
+ok 321 - the dev-only impersonation and bypass-email-verification routes are gated by isPubliclyDeployed, not isProdLike
+  ---
+  duration_ms: 2.000614
+  type: 'test'
+  ...
+# Subtest: the __test-email inbox-reading route is gated by isPubliclyDeployed, not isProdLike
+ok 322 - the __test-email inbox-reading route is gated by isPubliclyDeployed, not isProdLike
+  ---
+  duration_ms: 0.594324
+  type: 'test'
+  ...
+# Subtest: the internal-admin local SCHOOL_ADMIN fallback is gated by isPubliclyDeployed, not isProdLike
+ok 323 - the internal-admin local SCHOOL_ADMIN fallback is gated by isPubliclyDeployed, not isProdLike
+  ---
+  duration_ms: 0.248201
+  type: 'test'
+  ...
+# Subtest: LMS test-origin bypasses (SSRF protection escape hatch) are gated by isPubliclyDeployed, not isProdLike
+ok 324 - LMS test-origin bypasses (SSRF protection escape hatch) are gated by isPubliclyDeployed, not isProdLike
+  ---
+  duration_ms: 0.251441
+  type: 'test'
+  ...
+# Subtest: the Google Classroom custom-OAuth-destination escape hatch is gated by isPubliclyDeployed
+ok 325 - the Google Classroom custom-OAuth-destination escape hatch is gated by isPubliclyDeployed
+  ---
+  duration_ms: 0.335922
+  type: 'test'
+  ...
+# Subtest: googleAuth.ts does not locally redefine a production/deployment check
+ok 326 - googleAuth.ts does not locally redefine a production/deployment check
+  ---
+  duration_ms: 0.731045
+  type: 'test'
+  ...
+# Subtest: the Google /dev-signin auth-bypass route is gated by isPubliclyDeployed
+ok 327 - the Google /dev-signin auth-bypass route is gated by isPubliclyDeployed
+  ---
+  duration_ms: 0.346882
+  type: 'test'
+  ...
+# Subtest: isApprovedDomain() enforces the school-domain allowlist based on isPubliclyDeployed, not a raw env comparison
+ok 328 - isApprovedDomain() enforces the school-domain allowlist based on isPubliclyDeployed, not a raw env comparison
+  ---
+  duration_ms: 0.663085
+  type: 'test'
+  ...
+# Subtest: isUniqueConstraintError detects Prisma P2002 errors
+ok 329 - isUniqueConstraintError detects Prisma P2002 errors
+  ---
+  duration_ms: 0.955926
+  type: 'test'
+  ...
+# Subtest: analytics, branding, reminders, waitlist controls, and multi-admin writes have server-side feature checks
+ok 330 - analytics, branding, reminders, waitlist controls, and multi-admin writes have server-side feature checks
+  ---
+  duration_ms: 1.853293
+  type: 'test'
+  ...
+# Subtest: new-account admin invitation acceptance re-checks Pro entitlement
+ok 331 - new-account admin invitation acceptance re-checks Pro entitlement
+  ---
+  duration_ms: 0.203082
+  type: 'test'
+  ...
+# Subtest: upload storage and rate limits are selected from effective server-side tier
+ok 332 - upload storage and rate limits are selected from effective server-side tier
+  ---
+  duration_ms: 1.194888
+  type: 'test'
+  ...
+# Subtest: cross-tenant upload authorization runs before multer and abuse strikes
+ok 333 - cross-tenant upload authorization runs before multer and abuse strikes
+  ---
+  duration_ms: 0.254321
+  type: 'test'
+  ...
+# Subtest: required-form follow-ups, advanced content, and branding are filtered by the reminder worker
+ok 334 - required-form follow-ups, advanced content, and branding are filtered by the reminder worker
+  ---
+  duration_ms: 0.160641
+  type: 'test'
+  ...
+# Subtest: featured placement does not use paid tier as a ranking preference
+ok 335 - featured placement does not use paid tier as a ranking preference
+  ---
+  duration_ms: 0.154081
+  type: 'test'
+  ...
+# Subtest: advanced waitlist controls affect automatic promotion and manual approval is Pro-gated
+ok 336 - advanced waitlist controls affect automatic promotion and manual approval is Pro-gated
+  ---
+  duration_ms: 0.408483
+  type: 'test'
+  ...
+# Subtest: student status queries are forced to APPROVED and use an explicit safe projection
+ok 337 - student status queries are forced to APPROVED and use an explicit safe projection
+  ---
+  duration_ms: 1.720812
+  type: 'test'
+  ...
+# Subtest: school-admin invitation metadata is limited to status and createdAt
+ok 338 - school-admin invitation metadata is limited to status and createdAt
+  ---
+  duration_ms: 0.296522
+  type: 'test'
+  ...
+# Subtest: organization directory uses public-safe projections
+ok 339 - organization directory uses public-safe projections
+  ---
+  duration_ms: 0.222602
+  type: 'test'
+  ...
+# Subtest: release uses the acquired Upstash bucket across a window boundary
+ok 340 - release uses the acquired Upstash bucket across a window boundary
+  ---
+  duration_ms: 626.291779
+  type: 'test'
+  ...
+# Subtest: concurrent releases never decrement below zero
+ok 341 - concurrent releases never decrement below zero
+  ---
+  duration_ms: 621.207424
+  type: 'test'
+  ...
+# Subtest: release does not recreate an expired Upstash key
+ok 342 - release does not recreate an expired Upstash key
+  ---
+  duration_ms: 593.953037
+  type: 'test'
+  ...
+# Subtest: an HTTP 200 Upstash EVAL error is conservative
+ok 343 - an HTTP 200 Upstash EVAL error is conservative
+  ---
+  duration_ms: 487.242784
+  type: 'test'
+  ...
+# Subtest: failed responses remain counted when successful responses are skipped
+ok 344 - failed responses remain counted when successful responses are skipped
+  ---
+  duration_ms: 600.402842
+  type: 'test'
+  ...
+# Subtest: hour-bearing records carry and enforce an owning school
+ok 345 - hour-bearing records carry and enforce an owning school
+  ---
+  duration_ms: 7.35669
+  type: 'test'
+  ...
+# Subtest: reliability score uses rolling window and privacy minimum
+ok 346 - reliability score uses rolling window and privacy minimum
+  ---
+  duration_ms: 1.187048
+  type: 'test'
+  ...
+# Subtest: reminder config route validates untrusted input before persistence
+ok 347 - reminder config route validates untrusted input before persistence
+  ---
+  duration_ms: 1.131127
+  type: 'test'
+  ...
+# Subtest: reminder worker uses validated stored config and isolates a bad beneficiary
+ok 348 - reminder worker uses validated stored config and isolates a bad beneficiary
+  ---
+  duration_ms: 0.295482
+  type: 'test'
+  ...
+# Subtest: reminder configuration accepts bounded, unique, valid definitions
+ok 349 - reminder configuration accepts bounded, unique, valid definitions
+  ---
+  duration_ms: 4.893074
+  type: 'test'
+  ...
+# Subtest: reminder configuration rejects duplicate, malformed, and unsafe values
+ok 350 - reminder configuration rejects duplicate, malformed, and unsafe values
+  ---
+  duration_ms: 2.217655
+  type: 'test'
+  ...
+# Subtest: malformed legacy reminder JSON falls back to supplied safe defaults
+ok 351 - malformed legacy reminder JSON falls back to supplied safe defaults
+  ---
+  duration_ms: 0.899726
+  type: 'test'
+  ...
+# Subtest: reminder lease is durable/idempotent and failures are recorded
+ok 352 - reminder lease is durable/idempotent and failures are recorded
+  ---
+  duration_ms: 2.171535
+  type: 'test'
+  ...
+# Subtest: behind-hours in-app alerts are throttled for one week
+ok 353 - behind-hours in-app alerts are throttled for one week
+  ---
+  duration_ms: 0.936607
+  type: 'test'
+  ...
+# Subtest: other in-app reminder types retain the daily cooldown
+ok 354 - other in-app reminder types retain the daily cooldown
+  ---
+  duration_ms: 0.174761
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# [Auth] Dev impersonation routes disabled. Set ENABLE_IMPERSONATION=true to enable.
+# {"type":"request","requestId":"ac3f359d-5c85-447d-a2ca-5f18221a91af","method":"POST","path":"/reset-password","status":200,"ms":778,"ip":"127.0.0.1","userId":null}
+# {"type":"request","requestId":"e0f65f05-6ef3-41dd-97df-0d1a8f45e6cf","method":"POST","path":"/reset-password","status":400,"ms":669,"ip":"127.0.0.1","userId":null}
+# Subtest: concurrent reset requests consume one reset token and revoke sessions once
+ok 355 - concurrent reset requests consume one reset token and revoke sessions once
+  ---
+  duration_ms: 933.225767
+  type: 'test'
+  ...
+# Subtest: POST /api/saved rejects a status value outside SAVED/SKIPPED/DISCARDED
+ok 356 - POST /api/saved rejects a status value outside SAVED/SKIPPED/DISCARDED
+  ---
+  duration_ms: 81.395718
+  type: 'test'
+  ...
+# Subtest: POST /api/saved rejects a missing opportunityId
+ok 357 - POST /api/saved rejects a missing opportunityId
+  ---
+  duration_ms: 27.196027
+  type: 'test'
+  ...
+# Subtest: POST /api/saved accepts a valid status and defaults to SAVED when omitted
+ok 358 - POST /api/saved accepts a valid status and defaults to SAVED when omitted
+  ---
+  duration_ms: 8.80378
+  type: 'test'
+  ...
+# Subtest: GET /api/saved rejects an invalid status query filter
+ok 359 - GET /api/saved rejects an invalid status query filter
+  ---
+  duration_ms: 7.413571
+  type: 'test'
+  ...
+# Subtest: GET /api/saved accepts a valid status query filter
+ok 360 - GET /api/saved accepts a valid status query filter
+  ---
+  duration_ms: 7.838934
+  type: 'test'
+  ...
+# Subtest: unverified users cannot receive an application session
+ok 361 - unverified users cannot receive an application session
+  ---
+  duration_ms: 1.962294
+  type: 'test'
+  ...
+# Subtest: pending school ownership receives a setup-only session
+ok 362 - pending school ownership receives a setup-only session
+  ---
+  duration_ms: 0.208001
+  type: 'test'
+  ...
+# Subtest: school staff do not need a 13+ eligibility attestation
+ok 363 - school staff do not need a 13+ eligibility attestation
+  ---
+  duration_ms: 0.179162
+  type: 'test'
+  ...
+# Subtest: students without a 13+ eligibility attestation receive setup-only access
+ok 364 - students without a 13+ eligibility attestation receive setup-only access
+  ---
+  duration_ms: 0.367962
+  type: 'test'
+  ...
+# Subtest: school-domain validation requires an exact normalized domain
+ok 365 - school-domain validation requires an exact normalized domain
+  ---
+  duration_ms: 0.692965
+  type: 'test'
+  ...
+# Subtest: a private beneficiary automatically created for a school receives permanent Pro
+ok 366 - a private beneficiary automatically created for a school receives permanent Pro
+  ---
+  duration_ms: 2.141494
+  type: 'test'
+  ...
+# Subtest: a public school-created beneficiary does not receive complimentary Pro
+ok 367 - a public school-created beneficiary does not receive complimentary Pro
+  ---
+  duration_ms: 0.198801
+  type: 'test'
+  ...
+# Subtest: an ordinary private organization remains Free unless it has a paid Pro entitlement
+ok 368 - an ordinary private organization remains Free unless it has a paid Pro entitlement
+  ---
+  duration_ms: 0.150961
+  type: 'test'
+  ...
+# Subtest: complimentary school Pro remains permanent after a later visibility change
+ok 369 - complimentary school Pro remains permanent after a later visibility change
+  ---
+  duration_ms: 0.137681
+  type: 'test'
+  ...
+# Subtest: every school-created beneficiary create delegates visibility-aware entitlement to the central policy
+ok 370 - every school-created beneficiary create delegates visibility-aware entitlement to the central policy
+  ---
+  duration_ms: 677.172329
+  type: 'test'
+  ...
+# Subtest: the forward repair grants Pro only to private school-created beneficiaries
+ok 371 - the forward repair grants Pro only to private school-created beneficiaries
+  ---
+  duration_ms: 0.365243
+  type: 'test'
+  ...
+# Subtest: password signup creates a pending application but returns no bearer token
+ok 372 - password signup creates a pending application but returns no bearer token
+  ---
+  duration_ms: 1.267368
+  type: 'test'
+  ...
+# Subtest: login and authenticated requests enforce verification and restrict pending schools to setup routes
+ok 373 - login and authenticated requests enforce verification and restrict pending schools to setup routes
+  ---
+  duration_ms: 0.334042
+  type: 'test'
+  ...
+# Subtest: Google bootstrap is database-backed, short-lived, and consumed once
+ok 374 - Google bootstrap is database-backed, short-lived, and consumed once
+  ---
+  duration_ms: 0.194401
+  type: 'test'
+  ...
+# Subtest: legacy direct school claiming and magic-link session minting fail closed
+ok 375 - legacy direct school claiming and magic-link session minting fail closed
+  ---
+  duration_ms: 0.255962
+  type: 'test'
+  ...
+# Subtest: directory claims happen only inside independent approval transaction
+ok 376 - directory claims happen only inside independent approval transaction
+  ---
+  duration_ms: 0.305122
+  type: 'test'
+  ...
+# Subtest: rejected school email block survives deletion of its source school
+ok 377 - rejected school email block survives deletion of its source school
+  ---
+  duration_ms: 85.334626
+  type: 'test'
+  ...
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# Subtest: POST /:id/documents rejects an upload that would exceed the school's aggregate storage quota
+ok 378 - POST /:id/documents rejects an upload that would exceed the school's aggregate storage quota
+  ---
+  duration_ms: 384.58064
+  type: 'test'
+  ...
+# Subtest: POST /:id/documents allows an upload that stays within the quota
+ok 379 - POST /:id/documents allows an upload that stays within the quota
+  ---
+  duration_ms: 20.861304
+  type: 'test'
+  ...
+# Subtest: POST /:id/documents rejects when a concurrent upload wins the race — the authoritative in-transaction recheck catches what the fast-path check missed
+ok 380 - POST /:id/documents rejects when a concurrent upload wins the race — the authoritative in-transaction recheck catches what the fast-path check missed
+  ---
+  duration_ms: 66.610697
+  type: 'test'
+  ...
+# Subtest: School enum columns accept every documented non-default value and reject an invalid one
+ok 381 - School enum columns accept every documented non-default value and reject an invalid one
+  ---
+  duration_ms: 141.548532
+  type: 'test'
+  ...
+# Subtest: School defaults match the schema's documented defaults
+ok 382 - School defaults match the schema's documented defaults
+  ---
+  duration_ms: 7.186409
+  type: 'test'
+  ...
+# Subtest: GET /api/self-submissions rejects an invalid status query filter
+ok 383 - GET /api/self-submissions rejects an invalid status query filter
+  ---
+  duration_ms: 80.748714
+  type: 'test'
+  ...
+# Subtest: GET /api/self-submissions accepts a valid status query filter, including CANCELLED
+ok 384 - GET /api/self-submissions accepts a valid status query filter, including CANCELLED
+  ---
+  duration_ms: 29.910846
+  type: 'test'
+  ...
+# Subtest: GET /api/self-submissions with no status query applies no status filter
+ok 385 - GET /api/self-submissions with no status query applies no status filter
+  ---
+  duration_ms: 18.93889
+  type: 'test'
+  ...
+# Subtest: recognizes Prisma P2034 conflicts across runtime package boundaries
+ok 386 - recognizes Prisma P2034 conflicts across runtime package boundaries
+  ---
+  duration_ms: 0.933567
+  type: 'test'
+  ...
+# Subtest: recognizes raw PostgreSQL serialization failures wrapped as P2010
+ok 387 - recognizes raw PostgreSQL serialization failures wrapped as P2010
+  ---
+  duration_ms: 0.179801
+  type: 'test'
+  ...
+# Subtest: does not retry unrelated Prisma errors
+ok 388 - does not retry unrelated Prisma errors
+  ---
+  duration_ms: 0.157161
+  type: 'test'
+  ...
+# Subtest: recordServiceHourLedgerEntry creates a row with minutes correctly rounded from hours
+ok 389 - recordServiceHourLedgerEntry creates a row with minutes correctly rounded from hours
+  ---
+  duration_ms: 104.317076
+  type: 'test'
+  ...
+# Subtest: recordServiceHourLedgerEntry is append-only: re-approving the same source inserts a second row, not an update
+ok 390 - recordServiceHourLedgerEntry is append-only: re-approving the same source inserts a second row, not an update
+  ---
+  duration_ms: 25.871537
+  type: 'test'
+  ...
+# [serviceHourLedger] Failed to record ledger entry for SERVICE_SESSION:fake-session-id: PrismaClientKnownRequestError: 
+# Invalid `db.serviceHourLedgerEntry.create()` invocation in
+# /home/opc/RTB/projects/goodhours/server/src/lib/serviceHourLedger.ts:30:37
+#   27 }): Promise<void> {
+#   28   const db = entry.db ?? prisma;
+#   29   try {
+# → 30     await db.serviceHourLedgerEntry.create(
+# Foreign key constraint violated on the constraint: `ServiceHourLedgerEntry_studentId_fkey`
+#     at ei.handleRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:7268)
+#     at ei.handleAndLogRequestError (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6593)
+#     at ei.request (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:125:6300)
+#     at async a (/home/opc/RTB/projects/goodhours/node_modules/.prisma/client/runtime/library.js:134:9551)
+#     at async recordServiceHourLedgerEntry (/home/opc/RTB/projects/goodhours/server/src/lib/serviceHourLedger.ts:30:5)
+#     at async waitForActual (node:assert:644:5)
+#     at async Function.doesNotReject (node:assert:787:33)
+#     at async TestContext.<anonymous> (/home/opc/RTB/projects/goodhours/server/tests/serviceHourLedger.test.ts:88:3)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+#   code: 'P2003',
+#   meta: {
+#     modelName: 'ServiceHourLedgerEntry',
+#     constraint: 'ServiceHourLedgerEntry_studentId_fkey'
+#   },
+#   clientVersion: '6.19.3'
+# }
+# Subtest: recordServiceHourLedgerEntry does not throw when the write fails (best-effort, never blocks the real approval)
+ok 391 - recordServiceHourLedgerEntry does not throw when the write fails (best-effort, never blocks the real approval)
+  ---
+  duration_ms: 9.415304
+  type: 'test'
+  ...
+# Subtest: DB rejects a VERIFIED ServiceSession with checkOutTime but no checkInTime
+ok 392 - DB rejects a VERIFIED ServiceSession with checkOutTime but no checkInTime
+  ---
+  duration_ms: 100.763492
+  type: 'test'
+  ...
+# Subtest: DB allows a VERIFIED ServiceSession with both checkInTime and checkOutTime set
+ok 393 - DB allows a VERIFIED ServiceSession with both checkInTime and checkOutTime set
+  ---
+  duration_ms: 24.325807
+  type: 'test'
+  ...
+# Subtest: signature content validation accepts only PDF PNG and JPEG magic bytes
+ok 394 - signature content validation accepts only PDF PNG and JPEG magic bytes
+  ---
+  duration_ms: 1.078728
+  type: 'test'
+  ...
+# Subtest: signature content validation rejects spoofed extensions and unsupported bytes
+ok 395 - signature content validation rejects spoofed extensions and unsupported bytes
+  ---
+  duration_ms: 0.366162
+  type: 'test'
+  ...
+# Subtest: signature submission authorizes before accepting bytes and persists durable evidence
+ok 396 - signature submission authorizes before accepting bytes and persists durable evidence
+  ---
+  duration_ms: 1.005247
+  type: 'test'
+  ...
+# Subtest: normalizeEmail trims and lowercases input
+ok 397 - normalizeEmail trims and lowercases input
+  ---
+  duration_ms: 0.959326
+  type: 'test'
+  ...
+# Subtest: personal email domains remain blocked by default
+ok 398 - personal email domains remain blocked by default
+  ---
+  duration_ms: 0.263082
+  type: 'test'
+  ...
+# Subtest: QA signup aliases require explicit opt-in
+ok 399 - QA signup aliases require explicit opt-in
+  ---
+  duration_ms: 0.331123
+  type: 'test'
+  ...
+# Subtest: website domain parsing and matching stay strict but practical
+ok 400 - website domain parsing and matching stay strict but practical
+  ---
+  duration_ms: 0.361723
+  type: 'test'
+  ...
+# Subtest: typed signup questions enforce required, scoped answers and privacy limits
+ok 401 - typed signup questions enforce required, scoped answers and privacy limits
+  ---
+  duration_ms: 2.266976
+  type: 'test'
+  ...
+# Subtest: status string PENDING_CHECKIN matches exactly
+ok 402 - status string PENDING_CHECKIN matches exactly
+  ---
+  duration_ms: 1.305889
+  type: 'test'
+  ...
+# Subtest: status string CHECKED_IN matches exactly
+ok 403 - status string CHECKED_IN matches exactly
+  ---
+  duration_ms: 0.205562
+  type: 'test'
+  ...
+# Subtest: status string CHECKED_OUT matches exactly
+ok 404 - status string CHECKED_OUT matches exactly
+  ---
+  duration_ms: 0.151281
+  type: 'test'
+  ...
+# Subtest: status string VERIFIED matches exactly
+ok 405 - status string VERIFIED matches exactly
+  ---
+  duration_ms: 0.146921
+  type: 'test'
+  ...
+# Subtest: status string REJECTED matches exactly
+ok 406 - status string REJECTED matches exactly
+  ---
+  duration_ms: 0.136761
+  type: 'test'
+  ...
+# Subtest: PENDING_CHECKIN → CHECKED_IN is valid (check-in)
+ok 407 - PENDING_CHECKIN → CHECKED_IN is valid (check-in)
+  ---
+  duration_ms: 0.223482
+  type: 'test'
+  ...
+# Subtest: CHECKED_IN → CHECKED_OUT is valid (check-out)
+ok 408 - CHECKED_IN → CHECKED_OUT is valid (check-out)
+  ---
+  duration_ms: 0.322842
+  type: 'test'
+  ...
+# Subtest: CHECKED_OUT → VERIFIED is valid (approve)
+ok 409 - CHECKED_OUT → VERIFIED is valid (approve)
+  ---
+  duration_ms: 0.140121
+  type: 'test'
+  ...
+# Subtest: CHECKED_OUT → REJECTED is valid (reject)
+ok 410 - CHECKED_OUT → REJECTED is valid (reject)
+  ---
+  duration_ms: 0.622524
+  type: 'test'
+  ...
+# Subtest: REJECTED → CHECKED_OUT is valid (re-submit after rejection)
+ok 411 - REJECTED → CHECKED_OUT is valid (re-submit after rejection)
+  ---
+  duration_ms: 0.801965
+  type: 'test'
+  ...
+# Subtest: PENDING_CHECKIN → CHECKED_OUT is invalid (skips CHECKED_IN)
+ok 412 - PENDING_CHECKIN → CHECKED_OUT is invalid (skips CHECKED_IN)
+  ---
+  duration_ms: 0.152801
+  type: 'test'
+  ...
+# Subtest: PENDING_CHECKIN → VERIFIED is invalid (skips multiple steps)
+ok 413 - PENDING_CHECKIN → VERIFIED is invalid (skips multiple steps)
+  ---
+  duration_ms: 0.116401
+  type: 'test'
+  ...
+# Subtest: CHECKED_IN → VERIFIED is invalid (skips CHECKED_OUT)
+ok 414 - CHECKED_IN → VERIFIED is invalid (skips CHECKED_OUT)
+  ---
+  duration_ms: 0.105521
+  type: 'test'
+  ...
+# Subtest: CHECKED_IN → REJECTED is invalid (not yet checked out)
+ok 415 - CHECKED_IN → REJECTED is invalid (not yet checked out)
+  ---
+  duration_ms: 0.143961
+  type: 'test'
+  ...
+# Subtest: VERIFIED → CHECKED_OUT is invalid (VERIFIED is terminal)
+ok 416 - VERIFIED → CHECKED_OUT is invalid (VERIFIED is terminal)
+  ---
+  duration_ms: 0.110001
+  type: 'test'
+  ...
+# Subtest: VERIFIED → REJECTED is invalid (VERIFIED is terminal)
+ok 417 - VERIFIED → REJECTED is invalid (VERIFIED is terminal)
+  ---
+  duration_ms: 0.106481
+  type: 'test'
+  ...
+# Subtest: VERIFIED → PENDING_CHECKIN is invalid (VERIFIED is terminal)
+ok 418 - VERIFIED → PENDING_CHECKIN is invalid (VERIFIED is terminal)
+  ---
+  duration_ms: 0.105001
+  type: 'test'
+  ...
+# Subtest: VERIFIED → CHECKED_IN is invalid (VERIFIED is terminal)
+ok 419 - VERIFIED → CHECKED_IN is invalid (VERIFIED is terminal)
+  ---
+  duration_ms: 0.108561
+  type: 'test'
+  ...
+# Subtest: CHECKED_OUT → CHECKED_OUT (self-transition) is invalid
+ok 420 - CHECKED_OUT → CHECKED_OUT (self-transition) is invalid
+  ---
+  duration_ms: 0.101241
+  type: 'test'
+  ...
+# Subtest: VERIFIED → VERIFIED (self-transition) is invalid
+ok 421 - VERIFIED → VERIFIED (self-transition) is invalid
+  ---
+  duration_ms: 0.233802
+  type: 'test'
+  ...
+# Subtest: checkout reserves one durable beneficiary-scoped attempt and reuses its Stripe idempotency key
+ok 422 - checkout reserves one durable beneficiary-scoped attempt and reuses its Stripe idempotency key
+  ---
+  duration_ms: 1.079008
+  type: 'test'
+  ...
+# Subtest: checkout never redirects to a Stripe session that has already closed or expired
+ok 423 - checkout never redirects to a Stripe session that has already closed or expired
+  ---
+  duration_ms: 0.205322
+  type: 'test'
+  ...
+# Subtest: only one quantity-one approved Pro price is accepted
+ok 424 - only one quantity-one approved Pro price is accepted
+  ---
+  duration_ms: 1.337249
+  type: 'test'
+  ...
+# Subtest: an active subscription grants Pro access
+ok 425 - an active subscription grants Pro access
+  ---
+  duration_ms: 1.342169
+  type: 'test'
+  ...
+# Subtest: a past-due subscription update preserves Pro access
+ok 426 - a past-due subscription update preserves Pro access
+  ---
+  duration_ms: 0.164801
+  type: 'test'
+  ...
+# Subtest: cancellation at period end preserves Pro access through the paid period
+ok 427 - cancellation at period end preserves Pro access through the paid period
+  ---
+  duration_ms: 0.168961
+  type: 'test'
+  ...
+# Subtest: a canceled subscription update retains Pro until the deletion event
+ok 428 - a canceled subscription update retains Pro until the deletion event
+  ---
+  duration_ms: 0.162281
+  type: 'test'
+  ...
+# Subtest: subscription deletion removes paid Pro access after the past-due grace period
+ok 429 - subscription deletion removes paid Pro access after the past-due grace period
+  ---
+  duration_ms: 0.141361
+  type: 'test'
+  ...
+# Subtest: subscription deletion cannot remove permanent school Pro
+ok 430 - subscription deletion cannot remove permanent school Pro
+  ---
+  duration_ms: 0.317402
+  type: 'test'
+  ...
+# Subtest: checkout completion grants Pro using the retrieved subscription state
+ok 431 - checkout completion grants Pro using the retrieved subscription state
+  ---
+  duration_ms: 0.196362
+  type: 'test'
+  ...
+# Subtest: an incomplete subscription does not grant paid Pro
+ok 432 - an incomplete subscription does not grant paid Pro
+  ---
+  duration_ms: 0.623604
+  type: 'test'
+  ...
+# Subtest: non-deletion lifecycle events cannot revoke existing paid Pro
+ok 433 - non-deletion lifecycle events cannot revoke existing paid Pro
+  ---
+  duration_ms: 0.927566
+  type: 'test'
+  ...
+# Subtest: canceled updates and delayed canceled checkout events cannot grant new Pro
+ok 434 - canceled updates and delayed canceled checkout events cannot grant new Pro
+  ---
+  duration_ms: 0.177402
+  type: 'test'
+  ...
+# Subtest: delayed events cannot overwrite a completed or replacement subscription lifecycle
+ok 435 - delayed events cannot overwrite a completed or replacement subscription lifecycle
+  ---
+  duration_ms: 0.239562
+  type: 'test'
+  ...
+# Subtest: Stripe occurrence time permits a newer replacement but rejects delayed old lifecycle events
+ok 436 - Stripe occurrence time permits a newer replacement but rejects delayed old lifecycle events
+  ---
+  duration_ms: 0.163521
+  type: 'test'
+  ...
+# Subtest: all entitlement-changing Stripe lifecycle events are handled
+ok 437 - all entitlement-changing Stripe lifecycle events are handled
+  ---
+  duration_ms: 0.957447
+  type: 'test'
+  ...
+# Subtest: missing metadata falls back to server-owned subscription/customer associations instead of being acknowledged silently
+ok 438 - missing metadata falls back to server-owned subscription/customer associations instead of being acknowledged silently
+  ---
+  duration_ms: 0.221041
+  type: 'test'
+  ...
+# Subtest: webhook projection and receipt commit atomically and reject stale subscription lifecycles
+ok 439 - webhook projection and receipt commit atomically and reject stale subscription lifecycles
+  ---
+  duration_ms: 0.162282
+  type: 'test'
+  ...
+# Subtest: subscription lifecycle events retrieve authoritative Stripe state before projecting a period end
+ok 440 - subscription lifecycle events retrieve authoritative Stripe state before projecting a period end
+  ---
+  duration_ms: 0.230721
+  type: 'test'
+  ...
+# Subtest: checkout customer and session creation use server-selected prices and idempotency keys
+ok 441 - checkout customer and session creation use server-selected prices and idempotency keys
+  ---
+  duration_ms: 0.175361
+  type: 'test'
+  ...
+# Subtest: does not retain an event receipt when the subscription update fails
+ok 442 - does not retain an event receipt when the subscription update fails
+  ---
+  duration_ms: 1.559531
+  type: 'test'
+  ...
+# Subtest: deduplicates an event only after its update commits
+ok 443 - deduplicates an event only after its update commits
+  ---
+  duration_ms: 1.612491
+  type: 'test'
+  ...
+# Subtest: does not mistake a reducer unique-constraint failure for a duplicate event
+ok 444 - does not mistake a reducer unique-constraint failure for a duplicate event
+  ---
+  duration_ms: 0.331122
+  type: 'test'
+  ...
+# Subtest: cross-school cohort membership is rejected before any mutation
+ok 445 - cross-school cohort membership is rejected before any mutation
+  ---
+  duration_ms: 1.615612
+  type: 'test'
+  ...
+# Subtest: student invitation acceptance claims and mutates inside one transaction with a cross-school guard
+ok 446 - student invitation acceptance claims and mutates inside one transaction with a cross-school guard
+  ---
+  duration_ms: 5.987241
+  type: 'test'
+  ...
+# [hoursCalculator] beneficiarySignup lookup failed; omitting this source: Error: transient DB error
+#     at Proxy.prismaClient.beneficiarySignup.findMany (/home/opc/RTB/projects/goodhours/server/tests/studentHourBreakdownPartialDataFailure.test.ts:80:65)
+#     at calculateStudentHours (/home/opc/RTB/projects/goodhours/server/src/lib/hoursCalculator.ts:52:30)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/schools.ts:1380:7)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Student hour breakdown: beneficiarySignup lookup failed Error: transient DB error
+#     at Proxy.prismaClient.beneficiarySignup.findMany (/home/opc/RTB/projects/goodhours/server/tests/studentHourBreakdownPartialDataFailure.test.ts:80:65)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/schools.ts:1348:32)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: GET /:id/students/:studentId/hour-breakdown still returns other sources when one record query fails
+ok 447 - GET /:id/students/:studentId/hour-breakdown still returns other sources when one record query fails
+  ---
+  duration_ms: 143.940068
+  type: 'test'
+  ...
+# Subtest: GET /:id/students/:studentId/hour-breakdown returns COMPLETE dataState when everything succeeds
+ok 448 - GET /:id/students/:studentId/hour-breakdown returns COMPLETE dataState when everything succeeds
+  ---
+  duration_ms: 20.802583
+  type: 'test'
+  ...
+# Subtest: GET /:id/students/:studentId/hour-breakdown includes ledgerEntries without affecting totals
+ok 449 - GET /:id/students/:studentId/hour-breakdown includes ledgerEntries without affecting totals
+  ---
+  duration_ms: 10.13679
+  type: 'test'
+  ...
+# Student hour breakdown: serviceHourLedgerEntry lookup failed Error: transient DB error
+#     at Proxy.prismaClient.serviceHourLedgerEntry.findMany (/home/opc/RTB/projects/goodhours/server/tests/studentHourBreakdownPartialDataFailure.test.ts:196:70)
+#     at <anonymous> (/home/opc/RTB/projects/goodhours/server/src/routes/schools.ts:1387:37)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: GET /:id/students/:studentId/hour-breakdown degrades to PARTIAL (not 500) when the ledger lookup fails
+ok 450 - GET /:id/students/:studentId/hour-breakdown degrades to PARTIAL (not 500) when the ledger lookup fails
+  ---
+  duration_ms: 9.567666
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: student milestones enforce teacher school and assigned-cohort scope
+ok 451 - student milestones enforce teacher school and assigned-cohort scope
+  ---
+  duration_ms: 101.466457
+  type: 'test'
+  ...
+# Subtest: supervisor verification is signed, school-domain authorized, and one-time
+ok 452 - supervisor verification is signed, school-domain authorized, and one-time
+  ---
+  duration_ms: 1.987733
+  type: 'test'
+  ...
+# Subtest: supervisor verification rejects tampering and expiry
+ok 453 - supervisor verification rejects tampering and expiry
+  ---
+  duration_ms: 0.921366
+  type: 'test'
+  ...
+# Subtest: teacher cannot read another teacher's same-school classroom
+ok 454 - teacher cannot read another teacher's same-school classroom
+  ---
+  duration_ms: 73.275463
+  type: 'test'
+  ...
+# Subtest: teacher cannot mutate another teacher's same-school classroom
+ok 455 - teacher cannot mutate another teacher's same-school classroom
+  ---
+  duration_ms: 40.893081
+  type: 'test'
+  ...
+# Subtest: teacher cannot reassign their own classroom
+ok 456 - teacher cannot reassign their own classroom
+  ---
+  duration_ms: 10.444992
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# ⚠️  Optional environment variables not set (some features may be disabled):
+#    - JWT_SECRET_PREVIOUS
+#    - RESEND_API_KEY
+#    - EMAIL_FROM
+#    - GOOGLE_CLIENT_ID
+#    - GOOGLE_CLIENT_SECRET
+#    - GOOGLE_CALLBACK_URL
+#    - APP_URL
+#    - CLIENT_URL
+#    - PORT
+#    - ALLOWED_ORIGINS
+#    - FIELD_ENCRYPTION_KEY
+#    - DEV_DATABASE_URL
+#    - CANVAS_CLIENT_ID
+#    - CANVAS_CLIENT_SECRET
+#    - CANVAS_CALLBACK_URL
+#    - CANVAS_ALLOWED_ORIGINS
+#    - CANVAS_ENABLE_MOCK
+#    - CANVAS_REQUEST_TIMEOUT_MS
+#    - CANVAS_PAGE_SIZE
+#    - GOOGLE_CLASSROOM_CLIENT_ID
+#    - GOOGLE_CLASSROOM_CLIENT_SECRET
+#    - GOOGLE_CLASSROOM_CALLBACK_URL
+#    - GOOGLE_CLASSROOM_ENABLE_MOCK
+#    - GOOGLE_CLASSROOM_REQUEST_TIMEOUT_MS
+#    - GOOGLE_CLASSROOM_PAGE_SIZE
+#    - UPSTASH_REDIS_REST_URL
+#    - UPSTASH_REDIS_REST_TOKEN
+# Subtest: audit history denies same-school teacher outside assigned cohort before logs
+ok 457 - audit history denies same-school teacher outside assigned cohort before logs
+  ---
+  duration_ms: 70.355443
+  type: 'test'
+  ...
+# Subtest: audit history allows assigned-cohort teacher and school admin
+ok 458 - audit history allows assigned-cohort teacher and school admin
+  ---
+  duration_ms: 32.214621
+  type: 'test'
+  ...
+# Subtest: beneficiary history denies same-school out-of-cohort teacher and preserves student owner
+ok 459 - beneficiary history denies same-school out-of-cohort teacher and preserves student owner
+  ---
+  duration_ms: 14.033776
+  type: 'test'
+  ...
+# Subtest: group roster filters out-of-cohort members and add rejects them
+ok 460 - group roster filters out-of-cohort members and add rejects them
+  ---
+  duration_ms: 83.688174
+  type: 'test'
+  ...
+# [RateLimit] Using in-memory bucket store. On Vercel serverless, rate limits reset on every cold start. Configure shared production rate limiting with PostgreSQL or Upstash.
+# Subtest: teacher bulk messaging excludes same-school students outside assigned cohorts
+ok 461 - teacher bulk messaging excludes same-school students outside assigned cohorts
+  ---
+  duration_ms: 89.716736
+  type: 'test'
+  ...
+# Subtest: intervention and bulk-message routes use the central staff cohort policy
+ok 462 - intervention and bulk-message routes use the central staff cohort policy
+  ---
+  duration_ms: 3.908107
+  type: 'test'
+  ...
+# Subtest: teacher cannot list sessions for a same-school student outside assigned cohorts
+ok 463 - teacher cannot list sessions for a same-school student outside assigned cohorts
+  ---
+  duration_ms: 70.332163
+  type: 'test'
+  ...
+# Subtest: teacher session queries require the record-owning school
+ok 464 - teacher session queries require the record-owning school
+  ---
+  duration_ms: 27.935672
+  type: 'test'
+  ...
+# Subtest: teacher cannot download signature evidence owned by another school
+ok 465 - teacher cannot download signature evidence owned by another school
+  ---
+  duration_ms: 10.298391
+  type: 'test'
+  ...
+# Subtest: GET /api/classrooms excludes test accounts from the student roster query
+ok 466 - GET /api/classrooms excludes test accounts from the student roster query
+  ---
+  duration_ms: 72.73998
+  type: 'test'
+  ...
+# Subtest: GET /api/cohorts/:id excludes test accounts from the cohort roster query
+ok 467 - GET /api/cohorts/:id excludes test accounts from the cohort roster query
+  ---
+  duration_ms: 87.623441
+  type: 'test'
+  ...
+# Subtest: GET /api/schools/:id/export excludes test accounts from the student export query
+ok 468 - GET /api/schools/:id/export excludes test accounts from the student export query
+  ---
+  duration_ms: 18.342606
+  type: 'test'
+  ...
+# Subtest: GET /api/schools/:id/students/at-risk excludes test accounts
+ok 469 - GET /api/schools/:id/students/at-risk excludes test accounts
+  ---
+  duration_ms: 8.081416
+  type: 'test'
+  ...
+# Subtest: PUT /api/schools/:id with categoryHourCaps excludes test accounts from cap-warning scan
+ok 470 - PUT /api/schools/:id with categoryHourCaps excludes test accounts from cap-warning scan
+  ---
+  duration_ms: 23.624043
+  type: 'test'
+  ...
+# Subtest: runReminderCycle excludes test accounts from both the deadline/at-risk roster and the pending-review count
+ok 471 - runReminderCycle excludes test accounts from both the deadline/at-risk roster and the pending-review count
+  ---
+  duration_ms: 2.802299
+  type: 'test'
+  ...
+# Subtest: buildLaunchWorkspace excludes test accounts from the onboarding student count
+ok 472 - buildLaunchWorkspace excludes test accounts from the onboarding student count
+  ---
+  duration_ms: 2.159655
+  type: 'test'
+  ...
+# Subtest: procurement document upload authorizes before Multer persists bytes
+ok 473 - procurement document upload authorizes before Multer persists bytes
+  ---
+  duration_ms: 1.191928
+  type: 'test'
+  ...
+# Subtest: internal invoice artifact upload authorizes before Multer persists bytes
+ok 474 - internal invoice artifact upload authorizes before Multer persists bytes
+  ---
+  duration_ms: 0.288882
+  type: 'test'
+  ...
+# Subtest: transcript snapshot is immutable and school-admin certified
+ok 475 - transcript snapshot is immutable and school-admin certified
+  ---
+  duration_ms: 1.692652
+  type: 'test'
+  ...
+# Subtest: Free organizations cannot activate persisted advanced waitlist controls
+ok 476 - Free organizations cannot activate persisted advanced waitlist controls
+  ---
+  duration_ms: 1.020127
+  type: 'test'
+  ...
+# Subtest: Pro can disable automatic promotion or require manual approval
+ok 477 - Pro can disable automatic promotion or require manual approval
+  ---
+  duration_ms: 0.297882
+  type: 'test'
+  ...
+# Subtest: Pro cutoff prevents last-minute automatic promotion
+ok 478 - Pro cutoff prevents last-minute automatic promotion
+  ---
+  duration_ms: 0.268762
+  type: 'test'
+  ...
+1..478
+# tests 478
+# suites 0
+# pass 478
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 82682.882713

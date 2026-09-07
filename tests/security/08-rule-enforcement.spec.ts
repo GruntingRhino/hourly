@@ -24,6 +24,48 @@ let tStudent3: string;
 const WINDOW_START = "2025-09-01T00:00:00.000Z";
 const WINDOW_END   = "2026-06-30T23:59:59.000Z";
 
+type SubmissionInput = {
+  organizationName: string;
+  description: string;
+  date: string;
+  hours: number;
+  category: string;
+};
+
+/**
+ * Creates a PENDING self-submission for student1, or reuses the matching one
+ * left behind by an earlier run against the same database.
+ *
+ * Throws rather than skipping: a cap test that cannot obtain a submission is an
+ * unrun test, and an unrun test must not be reported as a pass.
+ */
+async function createPendingSubmission(
+  ctx: Awaited<ReturnType<typeof playwrightRequest.newContext>>,
+  input: SubmissionInput,
+): Promise<string> {
+  const res = await ctx.post(`${BASE}/api/self-submissions`, {
+    data: input,
+    ...auth(tStudent1),
+  });
+  if (res.ok()) return (await res.json()).id as string;
+
+  const createError = `${res.status()} ${await res.text()}`;
+  const listRes = await ctx.get(`${BASE}/api/self-submissions`, auth(tStudent1));
+  const list: Array<{ id: string; status: string; category: string; date: string }> =
+    listRes.ok() ? await listRes.json() : [];
+  const existing = list.find(
+    (s) => s.status === "PENDING"
+      && s.category === input.category
+      && s.date.startsWith(input.date),
+  );
+  if (existing) return existing.id;
+
+  throw new Error(
+    `Could not create or find a PENDING '${input.category}' submission on ${input.date}. ` +
+    `POST /api/self-submissions answered ${createError}`,
+  );
+}
+
 test.beforeAll(async () => {
   ids = await getIds();
   [tSchoolA, tSchoolB, tStudent1, tStudent3] = await Promise.all([
@@ -167,8 +209,9 @@ test("RU-05: resubmitting with out-of-window date on REVISION_REQUESTED submissi
 
   if (!subId) {
     await ctx.dispose();
-    test.skip(true, "No submission available for RU-05");
-    return;
+    // Throw, never skip: a test that cannot obtain its fixture is unrun, and an
+    // unrun test must not be reportable as a pass.
+    throw new Error("RU-05 could not create or find a PENDING submission for student1");
   }
 
   // Send for revision
@@ -180,8 +223,10 @@ test("RU-05: resubmitting with out-of-window date on REVISION_REQUESTED submissi
   await ctx.dispose();
 
   if (!revRes.ok()) {
-    test.skip(true, "Could not put submission in REVISION_REQUESTED state for RU-05");
-    return;
+    throw new Error(
+      `RU-05 could not move the submission to REVISION_REQUESTED: ` +
+      `${revRes.status()} ${await revRes.text()}`,
+    );
   }
 
   // Resubmit with out-of-window date
@@ -266,39 +311,24 @@ test("RU-07: cohort null allowSelfSubmission inherits school-level false → 403
 test("RU-08: approval exceeding category cap → 400 with capExceeded=true", async ({ request }) => {
   const ctx = await playwrightRequest.newContext();
 
-  // Set a 1-hour cap on "general" for school A
+  // Create the 5-hour pending submission BEFORE the cap exists. Creation is
+  // itself cap-aware (403 `categoryBlocked` once the student has met the cap),
+  // so capping first makes the submission uncreatable and the test unrunnable.
+  const subId = await createPendingSubmission(ctx, {
+    organizationName: "Cap Test Org",
+    description: "Over category cap",
+    date: "2025-12-01",
+    hours: 5,
+    category: "general",
+  });
+
+  // Now set a 1-hour cap on "general" for school A
   await ctx.put(`${BASE}/api/schools/${ids.schoolAId}`, {
     data: { categoryHourCaps: { general: 1 } },
     ...auth(tSchoolA),
   });
 
-  // Create a 5-hour pending submission (over cap)
-  const subRes = await ctx.post(`${BASE}/api/self-submissions`, {
-    data: {
-      organizationName: "Cap Test Org",
-      description: "Over category cap",
-      date: "2025-12-01",
-      hours: 5,
-      category: "general",
-    },
-    ...auth(tStudent1),
-  });
-
-  let subId: string | undefined;
-  if (subRes.ok()) {
-    subId = (await subRes.json()).id as string;
-  } else {
-    const listRes = await ctx.get(`${BASE}/api/self-submissions`, auth(tStudent1));
-    const list: Array<{ id: string; status: string; category: string }> = await listRes.json();
-    subId = list.find((s) => s.status === "PENDING" && s.category === "general")?.id;
-  }
-
   await ctx.dispose();
-
-  if (!subId) {
-    test.skip(true, "No pending general submission for cap test");
-    return;
-  }
 
   const res = await request.post(`${BASE}/api/self-submissions/${subId}/approve`, {
     data: { adjustedHours: 5 },
@@ -325,39 +355,22 @@ test("RU-08: approval exceeding category cap → 400 with capExceeded=true", asy
 test("RU-09: overrideCap=true bypasses category cap and approval succeeds", async ({ request }) => {
   const ctx = await playwrightRequest.newContext();
 
-  // Set a 1-hour cap on "education"
+  // Create before capping — see RU-08.
+  const subId = await createPendingSubmission(ctx, {
+    organizationName: "Cap Override Org",
+    description: "Over education cap — will use override",
+    date: "2025-12-02",
+    hours: 5,
+    category: "education",
+  });
+
+  // Now set a 1-hour cap on "education"
   await ctx.put(`${BASE}/api/schools/${ids.schoolAId}`, {
     data: { categoryHourCaps: { education: 1 } },
     ...auth(tSchoolA),
   });
 
-  // Create a 5-hour education submission
-  const subRes = await ctx.post(`${BASE}/api/self-submissions`, {
-    data: {
-      organizationName: "Cap Override Org",
-      description: "Over education cap — will use override",
-      date: "2025-12-02",
-      hours: 5,
-      category: "education",
-    },
-    ...auth(tStudent1),
-  });
-
-  let subId: string | undefined;
-  if (subRes.ok()) {
-    subId = (await subRes.json()).id as string;
-  } else {
-    const listRes = await ctx.get(`${BASE}/api/self-submissions`, auth(tStudent1));
-    const list: Array<{ id: string; status: string; category: string }> = await listRes.json();
-    subId = list.find((s) => s.status === "PENDING" && s.category === "education")?.id;
-  }
-
   await ctx.dispose();
-
-  if (!subId) {
-    test.skip(true, "No pending education submission for override test");
-    return;
-  }
 
   const res = await request.post(`${BASE}/api/self-submissions/${subId}/approve`, {
     data: { adjustedHours: 5, overrideCap: true },
@@ -474,8 +487,7 @@ test("RU-12: approval exactly at cap boundary → succeeds", async ({ request })
   await ctx.dispose();
 
   if (!subId) {
-    test.skip(true, "No health submission available for RU-12");
-    return;
+    throw new Error("RU-12 could not create or find a PENDING 'health' submission for student1");
   }
 
   const res = await request.post(`${BASE}/api/self-submissions/${subId}/approve`, {

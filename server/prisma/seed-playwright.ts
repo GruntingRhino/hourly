@@ -24,8 +24,30 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { schoolCreatedBeneficiaryPlan } from "../src/lib/schoolBeneficiaryPolicy";
 import { isProdLike } from "../src/lib/isProdLike";
+import { ELIGIBILITY_POLICY_VERSION } from "../src/lib/schoolAuthority";
 
 const prisma = new PrismaClient();
+
+/**
+ * Seeded students stand in for students who already confirmed they are 13+.
+ * Without the attestation row `evaluateSessionEligibility` puts them in the
+ * setup-only state and every student-scoped route answers 403
+ * AGE_ELIGIBILITY_REQUIRED, so the whole security suite tests the age gate
+ * instead of the behaviour it targets. Staff accounts deliberately get no
+ * attestation — the 13+ requirement is students-only.
+ */
+async function attestEligible(userId: string): Promise<void> {
+  await prisma.eligibilityAttestation.upsert({
+    where: { userId },
+    update: { eligible13Plus: true },
+    create: {
+      userId,
+      eligible13Plus: true,
+      policyVersion: ELIGIBILITY_POLICY_VERSION,
+      method: "seed",
+    },
+  });
+}
 
 const PASSWORD = "Playwright1!";
 const SCHOOL_ADMIN_A_EMAIL = "abhay.sivaram+1@gmail.com";
@@ -294,9 +316,10 @@ async function main() {
       update: { isActive: true, source: "MANUAL" },
       create: { studentId: student.id, cohortId, isActive: true, source: "MANUAL" },
     });
+    await attestEligible(student.id);
   }
 
-  await prisma.user.upsert({
+  const canvasStudent = await prisma.user.upsert({
     where: { email: "abhay.sivaram+8@gmail.com" },
     update: {
       passwordHash,
@@ -315,6 +338,7 @@ async function main() {
       schoolId: schoolA.id,
     },
   });
+  await attestEligible(canvasStudent.id);
 
   // ── School ↔ Org approvals ───────────────────────────────────────────────────
   // School A ↔ Org A (APPROVED so students can browse Org A opportunities)

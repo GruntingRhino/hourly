@@ -1,0 +1,49 @@
+
+Running 36 tests using 1 worker
+
+[Landing] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   1 tests/accessibility.spec.ts:63:5 › Landing page — WCAG 2.1 AA (2.8s)
+[Login] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   2 tests/accessibility.spec.ts:76:5 › Login page — WCAG 2.1 AA (1.7s)
+  ✓   3 tests/accessibility.spec.ts:89:5 › Login page — keyboard navigation and form validation (1.5s)
+  ✓   4 tests/accessibility.spec.ts:140:5 › Login page — focus outline not suppressed globally (241ms)
+  ✓   5 tests/accessibility.spec.ts:196:5 › Landing page — images have alt attributes (711ms)
+  ✓   6 tests/accessibility.spec.ts:229:5 › Landing page — buttons have accessible names (727ms)
+[Student Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   7 tests/accessibility.spec.ts:263:5 › Student dashboard — WCAG 2.1 AA (2.6s)
+[Student Browse] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   8 tests/accessibility.spec.ts:276:5 › Student browse page — WCAG 2.1 AA (2.5s)
+[Opportunity Detail] No opportunity links found on browse page — skipping navigation
+  ✓   9 tests/accessibility.spec.ts:290:5 › Opportunity detail page — WCAG 2.1 AA (1.7s)
+[Org Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  10 tests/accessibility.spec.ts:327:5 › Org dashboard — WCAG 2.1 AA (2.2s)
+[School Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  11 tests/accessibility.spec.ts:340:5 › School admin dashboard — WCAG 2.1 AA (2.6s)
+[School Student List] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  12 tests/accessibility.spec.ts:353:5 › School student list page — WCAG 2.1 AA (2.4s)
+  ✓  13 tests/onboarding-browser-verification.spec.ts:19:7 › onboarding eligibility browser verification › the student join requires checked eligibility before POST, and staff joins are not age-gated (1.7s)
+  ✓  14 tests/onboarding-browser-verification.spec.ts:74:7 › onboarding eligibility browser verification › the student age-eligibility screen still gates its own submit, and school registration shows no age field (1.6s)
+  ✓  15 tests/pending-approval-ui.spec.ts:64:5 › the pending screen renders real buttons with accessible roles (1.2s)
+  ✓  16 tests/pending-approval-ui.spec.ts:75:5 › clicking send issues exactly one request and reports the result inline (2.2s)
+  ✓  17 tests/pending-approval-ui.spec.ts:100:5 › a 429 from the server drives the local cooldown (1.3s)
+  ✓  18 tests/pending-approval-ui.spec.ts:124:5 › check approval status refetches server state and shows a busy state (1.2s)
+  ✓  19 tests/pending-approval-ui.spec.ts:140:5 › the pending screen stays pending across a reload (1.2s)
+  ✓  20 tests/pending-approval-ui.spec.ts:148:7 › controls stay reachable and untruncated at 320px (1.2s)
+  ✓  21 tests/pending-approval-ui.spec.ts:148:7 › controls stay reachable and untruncated at 375px (1.2s)
+  ✓  22 tests/pending-approval-ui.spec.ts:168:5 › every control is keyboard reachable, focus-visible, and activates with Enter and Space (1.3s)
+  ✓  23 tests/pending-approval-ui.spec.ts:213:5 › aria-busy is set while a request is in flight (3.0s)
+  ✓  24 tests/pending-approval-ui.spec.ts:234:5 › once the owner approves, Check approval status routes off the pending screen and it stays off after a reload (2.4s)
+  ✓  25 tests/pending-approval-ui.spec.ts:253:5 › sign out clears the session and returns to the public site (1.7s)
+  ✓  26 tests/signin-browser.spec.ts:33:5 › BR-01: a student signs in through the real form and lands in the app (1.5s)
+  ✓  27 tests/signin-browser.spec.ts:46:5 › BR-02: the browser holds a real HttpOnly session cookie afterwards (984ms)
+  ✓  28 tests/signin-browser.spec.ts:60:5 › BR-03: the session survives a full page reload (2.4s)
+  ✓  29 tests/signin-browser.spec.ts:76:5 › BR-04: a wrong password shows an error and does not navigate away (1.5s)
+  ✓  30 tests/signin-browser.spec.ts:89:5 › BR-05: the error message never reveals whether the account exists (2.0s)
+  ✓  31 tests/signin-browser.spec.ts:107:5 › BR-06: the password is masked by default and only revealed on request (1.1s)
+  ✓  32 tests/signin-browser.spec.ts:119:5 › BR-07: the form is operable by keyboard alone (1.6s)
+  ✓  33 tests/signin-browser.spec.ts:153:5 › BR-08: a school admin signs in and is not shown the student age screen (1.5s)
+  ✓  34 tests/signin-browser.spec.ts:166:5 › BR-09: signing out clears the session (2.1s)
+  ✓  35 tests/signin-browser.spec.ts:183:5 › BR-10: 'Continue with Google' sends the browser to a correct Google consent URL (2.6s)
+  ✓  36 tests/signin-browser.spec.ts:211:5 › BR-11: the login page has no horizontal overflow at 320px and 375px (2.0s)
+
+  36 passed (1.1m)

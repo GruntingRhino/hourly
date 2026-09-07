@@ -1,0 +1,47 @@
+
+Running 12 tests using 1 worker
+
+[Landing] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   1 tests/accessibility.spec.ts:63:5 › Landing page — WCAG 2.1 AA (3.2s)
+[Login] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   2 tests/accessibility.spec.ts:76:5 › Login page — WCAG 2.1 AA (1.8s)
+  ✓   3 tests/accessibility.spec.ts:89:5 › Login page — keyboard navigation and form validation (1.5s)
+  ✓   4 tests/accessibility.spec.ts:140:5 › Login page — focus outline not suppressed globally (155ms)
+  ✓   5 tests/accessibility.spec.ts:196:5 › Landing page — images have alt attributes (710ms)
+  ✓   6 tests/accessibility.spec.ts:229:5 › Landing page — buttons have accessible names (695ms)
+[Student Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   7 tests/accessibility.spec.ts:263:5 › Student dashboard — WCAG 2.1 AA (2.8s)
+[Student Browse] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓   8 tests/accessibility.spec.ts:276:5 › Student browse page — WCAG 2.1 AA (2.9s)
+[Opportunity Detail] No opportunity links found on browse page — skipping navigation
+  ✓   9 tests/accessibility.spec.ts:290:5 › Opportunity detail page — WCAG 2.1 AA (1.7s)
+[Org Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  10 tests/accessibility.spec.ts:327:5 › Org dashboard — WCAG 2.1 AA (2.2s)
+[School Dashboard] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  11 tests/accessibility.spec.ts:340:5 › School admin dashboard — WCAG 2.1 AA (2.6s)
+[School Student List] Summary — critical:0 serious:0 moderate:0 minor:0
+  ✓  12 tests/accessibility.spec.ts:353:5 › School student list page — WCAG 2.1 AA (2.5s)
+
+  12 passed (26.2s)
+
+────────────────────────────────────────────────────────────────────────
+ANNOTATION BY THE CONTINUATION WORKER — read before quoting "12 passed".
+
+11 of these 12 tests ran a real axe-core scan and reported
+critical:0 serious:0 moderate:0 minor:0.
+
+Test 9, "Opportunity detail page — WCAG 2.1 AA", printed
+  [Opportunity Detail] No opportunity links found on browse page — skipping navigation
+and returned green WITHOUT scanning an opportunity detail page. It is reported
+here as NOT EXERCISED, not as a pass.
+
+Why it was not fixed by seeding one: POST /api/opportunities requires role
+ORG_ADMIN and is guarded by blockFrozenLegacyOrgAdminWrite — a deliberately
+frozen legacy path. seed-playwright.ts creates BENEFICIARY_ADMIN accounts, not
+ORG_ADMIN, so creating a fixture would have meant manufacturing a legacy account
+for a path the product is retiring. That was judged out of scope rather than
+silently worked around.
+  Reproduced: POST /api/opportunities as abhay.sivaram+3@gmail.com
+              -> 403 {"error":"Insufficient permissions"}
+              GET  /api/opportunities -> 0 rows
+────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,27 @@
+# Production read-only sign-in probes — https://goodhours.app
+# Captured 2026-09-07T02:34:26Z by the continuation worker.
+# Every request below is non-mutating: no account is created, modified or deleted.
+
+GET  /                                        -> 200
+GET  /api/health                              -> {"status":"ok","db":"ok","timestamp":"2026-09-07T02:34:28.298Z"}
+
+GET  /api/auth/google/url?state=login         -> 200
+ origin       : https://accounts.google.com
+ path         : /o/oauth2/v2/auth
+ client_id    : 387467474947-5t2m7gtvp52tku0tpfqtljokoqmjt33m.apps.googleusercontent.com
+ redirect_uri : https://goodhours.app/api/auth/google/callback
+ scope        : openid email profile
+ state shape  : login.<32-hex-nonce>  OK
+
+POST /api/auth/google/callback  (no state)    -> 403   CSRF refused
+     body: {"error":"Sign-in session expired or invalid. Please try signing in again."}
+POST /api/auth/google/callback  (forged state)-> 403   CSRF refused
+GET  /api/auth/google/callback  (bridge)      -> location: https://goodhours.app/login?code=probe123&state=login.deadbeef
+POST /api/auth/google/dev-signin              -> 404   local-only backdoor absent in production
+
+POST /api/auth/login (unknown address)        -> 401
+     body: {"error":"Invalid email or password"}
+
+NOT PROVEN HERE: that a human signed in at accounts.google.com, and that any
+existing production account's password was accepted. No production credential
+was used. A 401 on an invalid address is NOT evidence of a working account login.
