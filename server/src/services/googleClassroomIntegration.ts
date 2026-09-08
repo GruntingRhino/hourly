@@ -159,17 +159,38 @@ type GoogleClassroomApiCourse = {
   courseState?: "ACTIVE" | "ARCHIVED" | "PROVISIONED" | "DECLINED" | "SUSPENDED";
 };
 
-type GoogleClassroomApiUser = {
+type GoogleClassroomApiProfileName = {
+  givenName?: string;
+  familyName?: string;
+  fullName?: string;
+};
+
+export type GoogleClassroomApiUser = {
   userId?: string;
   profile?: {
     id?: string;
-    name?: string;
+    name?: string | GoogleClassroomApiProfileName;
     fullName?: string;
-    givenName?: string;
-    familyName?: string;
+    emailAddress?: string;
   };
   profileEmail?: string;
 };
+
+export function resolveClassroomUserDisplayName(user: GoogleClassroomApiUser, fallback: string): string {
+  const name = user.profile?.name;
+  if (typeof name === "string" && name.trim()) return name;
+  if (name && typeof name === "object") {
+    if (name.fullName?.trim()) return name.fullName;
+    const combined = [name.givenName, name.familyName].filter((part) => part?.trim()).join(" ");
+    if (combined) return combined;
+  }
+  if (user.profile?.fullName?.trim()) return user.profile.fullName;
+  return fallback;
+}
+
+export function resolveClassroomUserEmail(user: GoogleClassroomApiUser): string {
+  return normalizeEmail(user.profile?.emailAddress || user.profileEmail || "");
+}
 
 type GoogleClassroomApiPage<T> = {
   nextPageToken?: string;
@@ -675,11 +696,12 @@ async function fetchGoogleClassroomOAuthDataset(connection: any, selectedExterna
 
       const toEnrollment = (user: GoogleClassroomApiUser, role: "TeacherEnrollment" | "StudentEnrollment"): GoogleClassroomApiEnrollment | null => {
         const userId = user.userId || user.profile?.id;
-        const email = normalizeEmail(user.profileEmail || "");
+        const email = resolveClassroomUserEmail(user);
         if (!userId || !email) return null;
+        const displayName = resolveClassroomUserDisplayName(user, email);
         userById.set(userId, {
           id: userId,
-          name: user.profile?.name || user.profile?.fullName || email,
+          name: displayName,
           email,
           role: role === "TeacherEnrollment" ? "teacher" : "student",
         });
@@ -692,7 +714,7 @@ async function fetchGoogleClassroomOAuthDataset(connection: any, selectedExterna
           workflowState: "active",
           user: {
             id: userId,
-            name: user.profile?.name || user.profile?.fullName || email,
+            name: displayName,
             primary_email: email,
           },
         } as GoogleClassroomApiEnrollment;
