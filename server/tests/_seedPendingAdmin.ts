@@ -23,6 +23,15 @@ async function main() {
     await db.school.update({ where: { id: schoolId }, data: { ownershipStatus: status, verified: status === "APPROVED" } });
     return;
   }
+  if (process.argv[2] === "--bump-token-version") {
+    // Mirrors production approval (reviewSchoolOwnership bumps tokenVersion),
+    // which instantly revokes the applicant's pre-approval session.
+    const { schoolId } = JSON.parse(fs.readFileSync(OUT, "utf8"));
+    const school = await db.school.findUnique({ where: { id: schoolId }, select: { createdById: true } });
+    if (!school) throw new Error("fixture school missing");
+    await db.user.update({ where: { id: school.createdById }, data: { tokenVersion: { increment: 1 } } });
+    return;
+  }
   const cleanupId = process.argv[3];
   if (process.argv[2] === "--cleanup" && cleanupId) {
     await db.school.deleteMany({ where: { createdById: cleanupId } });

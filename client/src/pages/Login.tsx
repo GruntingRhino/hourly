@@ -23,6 +23,7 @@ export default function Login() {
   const [devGoogleEmail, setDevGoogleEmail] = useState("");
   const [devGoogleLoading, setDevGoogleLoading] = useState(false);
   const acceptingAdminInvitation = useRef(false);
+  const justApproved = searchParams.get("approved") === "1";
 
   useEffect(() => {
     if (!user || acceptingAdminInvitation.current) return;
@@ -153,6 +154,16 @@ export default function Login() {
         <div className="rounded-[3px] border border-[var(--border)] p-7" style={{ background: "var(--surface)" }}>
           <h1 className="text-[18px] font-semibold mb-1 text-center" style={{ color: "var(--text)" }}>Welcome back</h1>
           <p className="text-[13px] text-center mb-6" style={{ color: "var(--text-sec)" }}>Sign in to your GoodHours account</p>
+
+          {justApproved && (
+            <div
+              role="status"
+              className="mb-4 px-4 py-3 rounded-[3px] border border-[var(--ok-b)] text-[13px]"
+              style={{ background: "var(--ok-bg)", color: "var(--ok-t)" }}
+            >
+              Your school was approved. Sign in again to enter your workspace.
+            </div>
+          )}
 
           {error && (
             <div

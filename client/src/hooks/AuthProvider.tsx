@@ -31,6 +31,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Approval-aware refresh for the pending-approval screen. Approving a
+  // school bumps the applicant's tokenVersion, which instantly revokes the
+  // pre-approval session — so a 401 here usually means "you were just
+  // approved, sign in again", not a generic failure. Unlike refreshUser,
+  // this does NOT clear the session itself: the caller must navigate()
+  // BEFORE clearing, otherwise the logged-out render at /dashboard briefly
+  // mounts the unauthenticated catch-all <Navigate to="/">, whose effect
+  // fires after our own navigation and strands the user on the landing page.
+  const refreshApprovalStatus = useCallback(async (): Promise<{ ok: true; user: User } | { ok: false; reason: "unauthorized" | "other" }> => {
+    try {
+      const data = await api.get<User>("/auth/me");
+      setUser(data);
+      setCachedUser(data);
+      return { ok: true, user: data };
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        return { ok: false, reason: "unauthorized" };
+      }
+      return { ok: false, reason: "other" };
+    }
+  }, []);
+
   useEffect(() => {
     void (async () => {
       await refreshUser();
@@ -56,5 +78,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, login, loginWithToken, signup, logout, refreshUser }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, loginWithToken, signup, logout, refreshUser, refreshApprovalStatus }}>{children}</AuthContext.Provider>;
 }

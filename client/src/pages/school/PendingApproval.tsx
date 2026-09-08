@@ -4,7 +4,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../components/useToast";
 
 export default function PendingApproval() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshApprovalStatus } = useAuth();
   const { toast } = useToast();
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,10 +42,23 @@ export default function PendingApproval() {
   const checkApproval = async () => {
     setRefreshing(true);
     try {
-      // refreshUser resolves either way; null means /auth/me did not come back.
-      const refreshed = await refreshUser();
-      if (refreshed) toast("Approval status refreshed.", "success");
-      else toast("Could not refresh approval status. Please try again.", "error");
+      // Approving a school revokes the applicant's pre-approval session, so
+      // a 401 here normally means "just approved — sign in again", not a
+      // failure. Route to /login with that message instead of stranding the
+      // user on the landing page with a generic error.
+      const result = await refreshApprovalStatus();
+      if (result.ok) toast("Approval status refreshed.", "success");
+      else if (result.reason === "unauthorized") {
+        // Approving a school revokes the applicant's pre-approval session,
+        // so we must land on /login with a cleared session. An SPA
+        // navigate() loses a race here: the logged-out commit at /dashboard
+        // briefly mounts the unauthenticated catch-all <Navigate to="/">,
+        // whose effect fires after our navigation. A full reload to
+        // /login?approved=1 is deterministic, and the login page shows the
+        // matching banner (a toast would not survive the reload).
+        logout();
+        window.location.assign("/login?approved=1");
+      } else toast("Could not refresh approval status. Please try again.", "error");
     } catch (err) {
       toast(getErrorMessage(err, "Could not refresh approval status."), "error");
     } finally {

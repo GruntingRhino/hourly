@@ -231,6 +231,14 @@ function setSchoolStatus(status: "PENDING" | "APPROVED") {
   );
 }
 
+function bumpTokenVersion() {
+  execFileSync(
+    process.execPath,
+    ["--env-file-if-exists=.env.test", "--import", "tsx", "tests/_seedPendingAdmin.ts", "--bump-token-version"],
+    { cwd: SERVER_DIR, stdio: "ignore" },
+  );
+}
+
 test("once the owner approves, Check approval status routes off the pending screen and it stays off after a reload", async ({ page }) => {
   await signIn(page);
   try {
@@ -245,6 +253,27 @@ test("once the owner approves, Check approval status routes off the pending scre
     // The cached auth state was updated, so a reload must not bounce back.
     await page.reload();
     await expect(page.getByRole("heading", { name: /awaiting approval/i })).toBeHidden({ timeout: 15000 });
+  } finally {
+    setSchoolStatus("PENDING");
+  }
+});
+
+test("a production approval revokes the pre-approval session, so Check routes to login with a sign-in-again message", async ({ page }) => {
+  await signIn(page);
+  try {
+    // Real approval bumps tokenVersion (reviewSchoolOwnership), instantly
+    // revoking the applicant's session cookie. Previously the UI showed a
+    // generic failure and stranded the user on the landing page.
+    setSchoolStatus("APPROVED");
+    bumpTokenVersion();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/auth/me")),
+      page.getByRole("button", { name: CHECK }).click(),
+    ]);
+    // Deterministic full reload (no SPA navigation race): lands on
+    // /login?approved=1 with the sign-in-again banner.
+    await expect(page).toHaveURL(/\/login\?approved=1/, { timeout: 15000 });
+    await expect(page.getByText(/your school was approved\. sign in again/i)).toBeVisible();
   } finally {
     setSchoolStatus("PENDING");
   }
