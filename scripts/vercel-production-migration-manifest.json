@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migration_directory_count": 70,
+  "migration_directory_count": 71,
   "migration_files": [
     {
       "path": "server/prisma/migrations/20260217223113_full_schema/migration.sql",
@@ -281,10 +281,14 @@
     {
       "path": "server/prisma/migrations/20260905110000_add_student_invitation_hour_lineage/migration.sql",
       "sha256": "bc858eba79dba476600bd13a046be1267c4527acfedb182e38e59d5a3207ac91"
+    },
+    {
+      "path": "server/prisma/migrations/20260907234435_add_classroom_oauth_state_test_origin/migration.sql",
+      "sha256": "d637e14c48362cdbfeda9b757ec16107b339051a9e0764b72496de4ea40ebf57"
     }
   ],
   "schema": {
     "path": "server/prisma/schema.prisma",
-    "sha256": "6f06193b3dc994b5a22b2d2f821162a9447c80a82939d05474cbae073830aa35"
+    "sha256": "01ec28ea931812db8475279aaf0a2651ecdee737f736097b237611dbb95367cc"
   }
 }
